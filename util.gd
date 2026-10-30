@@ -11,17 +11,21 @@ static func ui_theme() -> Theme:
 		return _theme
 	_theme = Theme.new()
 	_theme.default_font_size = 24
+	# Аниме-фэнтези: полупрозрачный тёмно-синий фон, светлая золотистая окантовка, мягкая тень
 	var panel := StyleBoxFlat.new()
-	panel.bg_color = Color(0.08, 0.09, 0.12, 0.94)
-	panel.border_color = Color(0.85, 0.7, 0.35)
-	panel.set_border_width_all(2)
-	panel.set_corner_radius_all(10)
-	panel.set_content_margin_all(18)
+	panel.bg_color = Color(0.1, 0.12, 0.24, 0.9)
+	panel.border_color = Color(0.98, 0.88, 0.6)
+	panel.set_border_width_all(3)
+	panel.set_corner_radius_all(18)
+	panel.set_content_margin_all(20)
+	panel.shadow_color = Color(0, 0, 0, 0.35)
+	panel.shadow_size = 8
 	_theme.set_stylebox("panel", "PanelContainer", panel)
 	_theme.set_stylebox("panel", "Panel", panel)
+	_theme.set_color("font_color", "Label", Color(0.98, 0.96, 0.9))
 	var colors := {
-		"normal": Color(0.22, 0.25, 0.32), "hover": Color(0.3, 0.34, 0.44),
-		"pressed": Color(0.45, 0.38, 0.2), "disabled": Color(0.15, 0.15, 0.17),
+		"normal": Color(0.95, 0.93, 0.86), "hover": Color(1.0, 0.98, 0.92),
+		"pressed": Color(1.0, 0.82, 0.45), "disabled": Color(0.45, 0.46, 0.52),
 		"focus": Color(0, 0, 0, 0),
 	}
 	for state in colors:
@@ -29,9 +33,17 @@ static func ui_theme() -> Theme:
 		sb.bg_color = colors[state]
 		if state == "focus":
 			sb.draw_center = false
-		sb.set_corner_radius_all(8)
+		else:
+			sb.border_color = Color(0.85, 0.68, 0.32)
+			sb.set_border_width_all(2)
+		sb.set_corner_radius_all(14)
 		sb.set_content_margin_all(12)
 		_theme.set_stylebox(state, "Button", sb)
+	# Тёмный текст на светлых кнопках
+	for c in ["font_color", "font_hover_color", "font_focus_color", "font_hover_pressed_color"]:
+		_theme.set_color(c, "Button", Color(0.18, 0.16, 0.28))
+	_theme.set_color("font_pressed_color", "Button", Color(0.3, 0.18, 0.05))
+	_theme.set_color("font_disabled_color", "Button", Color(0.8, 0.8, 0.85))
 	return _theme
 
 

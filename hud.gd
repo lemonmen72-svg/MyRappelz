@@ -224,8 +224,11 @@ func _circle(radius: float, fill: Color) -> Panel:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = fill
 	sb.set_corner_radius_all(int(radius))
-	sb.border_color = Color(1, 1, 1, 0.5)
-	sb.set_border_width_all(3)
+	sb.border_color = Color(1.0, 0.95, 0.82, 0.85)
+	sb.set_border_width_all(4)
+	sb.shadow_color = Color(0, 0, 0, 0.3)
+	sb.shadow_size = 6
+	sb.anti_aliasing = true
 	p.add_theme_stylebox_override("panel", sb)
 	add_child(p)
 	return p
@@ -239,8 +242,12 @@ func _bar(parent: Node, pos: Vector2, sz: Vector2, col: Color) -> ProgressBar:
 	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = col
+	fill.set_corner_radius_all(int(sz.y / 2.0))
 	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0, 0, 0, 0.5)
+	bg.bg_color = Color(0.08, 0.1, 0.2, 0.6)
+	bg.border_color = Color(1.0, 0.95, 0.82, 0.8)
+	bg.set_border_width_all(2)
+	bg.set_corner_radius_all(int(sz.y / 2.0))
 	b.add_theme_stylebox_override("fill", fill)
 	b.add_theme_stylebox_override("background", bg)
 	parent.add_child(b)
