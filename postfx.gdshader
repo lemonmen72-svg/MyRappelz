@@ -21,7 +21,7 @@ uniform vec3 warm_tint = vec3(1.035, 1.0, 0.95);
 uniform vec3 cool_tint = vec3(0.97, 0.99, 1.04);
 uniform float vignette = 0.18;
 uniform float bloom_strength = 0.3;
-uniform float bloom_threshold = 0.86;
+uniform float bloom_threshold = 0.93;
 
 void fragment() {
 	vec2 uv = SCREEN_UV;
