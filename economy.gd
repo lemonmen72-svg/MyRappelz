@@ -346,18 +346,6 @@ func _build_safe_zone() -> void:
 	zone.name = "SafeZone"
 	var r := MobData.SAFE_RADIUS
 
-	var disk := MeshInstance3D.new()
-	var dm := CylinderMesh.new()
-	dm.top_radius = r
-	dm.bottom_radius = r
-	dm.height = 0.02
-	dm.radial_segments = 64
-	dm.rings = 1
-	disk.mesh = dm
-	disk.position.y = 0.015
-	disk.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	disk.material_override = _zone_mat(Color(0.5, 0.85, 1.0, 0.12))
-	zone.add_child(disk)
 
 	var ring := MeshInstance3D.new()
 	var rm := TorusMesh.new()
