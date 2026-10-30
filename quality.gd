@@ -158,6 +158,7 @@ static func apply(tree: SceneTree) -> void:
 		if n.has_method("apply_quality"):
 			n.call("apply_quality")
 	IslandVegetation.apply_quality(tree)
+	PoiModels.apply_quality()
 
 
 ## Разрешение рендера: на «Низком» и «Среднем» кадр рисуется высотой 720 пикселей (ширина — по
