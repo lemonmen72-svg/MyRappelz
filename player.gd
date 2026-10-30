@@ -125,10 +125,10 @@ func _physics_process(delta: float) -> void:
 		velocity.y = -1.0
 	else:
 		velocity.y -= 25.0 * delta
+	var prev := global_position
 	move_and_slide()
-
-	global_position.x = clampf(global_position.x, -70.0, 70.0)
-	global_position.z = clampf(global_position.z, -70.0, 70.0)
+	# Остров: в воду и на крутые склоны не заходим, сквозь землю не проваливаемся
+	IslandWorld.constrain(self, prev)
 
 	if dir.length() > 0.1:
 		rotation.y = lerp_angle(rotation.y, atan2(-dir.x, -dir.z), 12.0 * delta)
@@ -506,7 +506,7 @@ func take_damage(amount: int, _attacker: Node3D) -> void:
 	if hp <= 0:
 		hp = max_hp
 		Game.gold = int(Game.gold * 0.8)
-		global_position = Vector3(0, 0.1, 0)
+		global_position = respawn_point()
 		Vfx.heal_sparkles(get_parent(), global_position, 1.3)
 		last_target = null
 		_set_target(null)
@@ -520,6 +520,13 @@ func take_damage(amount: int, _attacker: Node3D) -> void:
 		message.emit("Вы погибли и возродились в центре. Потеряна часть золота.")
 		Game.changed.emit()
 	stats_changed.emit()
+
+
+## Где возрождается игрок: точка старта его расы (деревня расы) или центр карты.
+func respawn_point() -> Vector3:
+	if IslandWorld.current != null:
+		return IslandWorld.current.spawn_point(Game.race_id)
+	return Vector3(0, 0.1, 0)
 
 
 func gain_xp(amount: int) -> void:

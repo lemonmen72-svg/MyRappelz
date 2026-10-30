@@ -1,12 +1,17 @@
 extends Node3D
-## Главная сцена: создание персонажа (если нет сохранения), затем мир, игрок, звери,
+## Главная сцена: создание персонажа (если нет сохранения), затем мир (тренировочный остров
+## из конфига world/training_island.json), игрок в деревне своей расы, звери по зонам,
 ## модули (питомцы, приручение, предметы) и интерфейс.
 
 const RESPAWN_TIME := 20.0
 const AUTOSAVE_TIME := 30.0
-## Камера сверху-сзади: смещение от игрока и точка взгляда над ним.
-const CAM_OFFSET := Vector3(0, 9, 8.5)
+## Камера от третьего лица: вращается вокруг игрока (перетаскивание по правой части экрана).
+const CAM_DIST := 12.4
 const CAM_LOOK_Y := 1.2
+const CAM_PITCH_MIN := deg_to_rad(18.0)
+const CAM_PITCH_MAX := deg_to_rad(75.0)
+## Чувствительность вращения камеры, радиан на пиксель.
+const CAM_SENS := 0.006
 
 var player: Player
 var hud: HUD
@@ -14,11 +19,16 @@ var cam: Camera3D
 var pets: PetManager
 var taming: Taming
 var economy: Economy
+var world: IslandWorld
+## Поворот камеры вокруг игрока (0 — смотрим на север) и наклон над горизонтом.
+var cam_yaw := 0.0
+var cam_pitch := atan2(9.0, 8.5)
 
 var _slots: Array = []
 var _rng := RandomNumberGenerator.new()
 var _started := false
 var _autosave := 0.0
+var _transition_cd := 0.0
 
 
 func _ready() -> void:
@@ -50,7 +60,10 @@ func _start_world() -> void:
 
 
 func _build_world() -> void:
-	WorldBuilder.build(self, _rng)
+	world = IslandWorld.new()
+	world.name = "Island"
+	add_child(world)
+	world.build(_rng)
 
 
 ## Каждый новый меш в игре получает аниме-стиль (toon-свет и контур). Отложенно, чтобы
@@ -77,7 +90,7 @@ func _build_hud() -> void:
 
 func _build_player() -> void:
 	player = Player.new()
-	player.position = Vector3(0, 0.1, 2.0)
+	player.position = world.spawn_point(Game.race_id)
 	add_child(player)
 	player.stats_changed.connect(func(): hud.update_player(player))
 	player.message.connect(func(t: String): hud.show_message(t))
@@ -86,7 +99,7 @@ func _build_player() -> void:
 	cam = Camera3D.new()
 	cam.fov = 55.0
 	add_child(cam)
-	cam.global_position = player.global_position + CAM_OFFSET
+	cam.global_position = player.global_position + _cam_offset()
 	cam.current = true
 
 
@@ -103,18 +116,13 @@ func _build_modules() -> void:
 
 
 func _build_slots() -> void:
-	for group in MobData.SPAWNS:
-		var cnt: int = group[1]
-		for i in cnt:
-			var ang := _rng.randf() * TAU
-			var r := _rng.randf_range(group[2], group[3])
-			_slots.append({"type": group[0], "pos": Vector3(cos(ang) * r, 0.1, sin(ang) * r)})
+	_slots = world.mob_slots(_rng)
 
 
 func _spawn_slot(i: int) -> void:
 	var s: Dictionary = _slots[i]
 	var m := Mob.new()
-	m.setup(s["type"], i, s["pos"])
+	m.setup(s["type"], i, s["pos"], int(s.get("level", -1)))
 	m.gone.connect(_on_mob_gone)
 	add_child(m)
 
@@ -147,20 +155,51 @@ func _process(delta: float) -> void:
 	if not _started:
 		return
 
+	# Камера: перетаскивание по экрану вне кнопок и джойстика
+	var drag := hud.take_camera_drag()
+	cam_yaw -= drag.x * CAM_SENS
+	cam_pitch = clampf(cam_pitch + drag.y * CAM_SENS, CAM_PITCH_MIN, CAM_PITCH_MAX)
+
+	# Движение относительно камеры: «вверх» на джойстике — от камеры вперёд
 	var mv := hud.move_vec
 	if mv.length() < 0.15:
 		mv = Vector2.ZERO
-	player.move_input = mv
+	var dir := Vector3(mv.x, 0.0, mv.y).rotated(Vector3.UP, cam_yaw)
+	player.move_input = Vector2(dir.x, dir.z)
 	if hud.is_held("attack"):
 		player.try_attack()
 	hud.set_cooldown("skill1", player.cooldown_frac("skill1"))
 	hud.set_cooldown("skill2", player.cooldown_frac("skill2"))
 
-	var want := player.global_position + CAM_OFFSET
+	var want := player.global_position + _cam_offset()
+	# Не прятать камеру в холм
+	var ground := world.height_at(want.x, want.z) + 1.0
+	if want.y < ground:
+		want.y = ground
 	cam.global_position = cam.global_position.lerp(want, 1.0 - exp(-8.0 * delta))
 	cam.look_at(player.global_position + Vector3(0, CAM_LOOK_Y, 0), Vector3.UP)
+
+	_check_transitions(delta)
 
 	_autosave += delta
 	if _autosave >= AUTOSAVE_TIME:
 		_autosave = 0.0
 		Game.save_game()
+
+
+func _cam_offset() -> Vector3:
+	return Vector3(0.0, sin(cam_pitch), cos(cam_pitch)).rotated(Vector3.UP, cam_yaw) * CAM_DIST
+
+
+## Переходы из конфига (порт → материк): пока заглушка с сообщением.
+func _check_transitions(delta: float) -> void:
+	_transition_cd = maxf(0.0, _transition_cd - delta)
+	if _transition_cd > 0.0:
+		return
+	for t in world.transitions():
+		var tr: Dictionary = t
+		var c := IslandWorld.v2(tr["center"])
+		if Vector2(player.global_position.x, player.global_position.z).distance_to(c) < float(tr.get("radius", 3.0)):
+			hud.show_message(String(tr.get("message", "Переход пока закрыт")))
+			_transition_cd = 4.0
+			return

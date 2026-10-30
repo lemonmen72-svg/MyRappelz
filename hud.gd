@@ -11,6 +11,8 @@ signal action(id: String)
 const JOY_RADIUS := 110.0
 ## Джойстик не начинается выше этой линии: там панели и кнопки меню.
 const JOY_TOP := 230.0
+## Вращение камеры не начинается выше этой линии (кнопки меню справа вверху).
+const CAM_TOP := 90.0
 const KEYS := {
 	KEY_SPACE: "attack", KEY_1: "skill1", KEY_2: "skill2", KEY_T: "tame", KEY_Q: "potion",
 	KEY_P: "pets_window", KEY_I: "bag_window", KEY_E: "shop", KEY_F: "pet_attack", KEY_G: "pet_follow",
@@ -21,6 +23,10 @@ var move_vec := Vector2.ZERO
 ## id -> {"panel": Panel, "label": Label, "offset": Vector2, "r": float, "hold": bool, "touch": int}
 var _buttons := {}
 var _joy_idx := -1
+## Касание, которым вращают камеру (правая половина экрана вне кнопок), и накопленный сдвиг.
+var _cam_idx := -1
+var _cam_last := Vector2.ZERO
+var _cam_drag := Vector2.ZERO
 var _joy_center := Vector2.ZERO
 var _view := Vector2(1280, 720)
 var _window: Control = null
@@ -132,6 +138,13 @@ func is_held(id: String) -> bool:
 		if KEYS[k] == id and Input.is_key_pressed(k):
 			return true
 	return false
+
+
+## Сдвиг пальца для вращения камеры с прошлого вызова (пиксели); обнуляется.
+func take_camera_drag() -> Vector2:
+	var d := _cam_drag
+	_cam_drag = Vector2.ZERO
+	return d
 
 
 # ---------- Окна ----------
@@ -300,6 +313,7 @@ func _reset_joy() -> void:
 
 func _release_all() -> void:
 	_reset_joy()
+	_cam_idx = -1
 	for id in _buttons:
 		_buttons[id]["touch"] = -1
 
@@ -341,15 +355,24 @@ func _input(event: InputEvent) -> void:
 				_joy_center = p
 				_joy_base.position = p - _joy_base.size / 2.0
 				_joy_knob.position = p - _joy_knob.size / 2.0
+			elif _cam_idx == -1 and p.x >= _view.x * 0.5 and p.y > CAM_TOP:
+				_cam_idx = te.index
+				_cam_last = p
 		else:
 			if te.index == _joy_idx:
 				_reset_joy()
+			if te.index == _cam_idx:
+				_cam_idx = -1
 			for id in _buttons:
 				if _buttons[id]["touch"] == te.index:
 					_buttons[id]["touch"] = -1
 		return
 
 	var de := event as InputEventScreenDrag
+	if de != null and de.index == _cam_idx:
+		_cam_drag += de.position - _cam_last
+		_cam_last = de.position
+		return
 	if de != null and de.index == _joy_idx:
 		var d := de.position - _joy_center
 		var dist := minf(d.length(), JOY_RADIUS)

@@ -175,7 +175,9 @@ func _physics_process(delta: float) -> void:
 		velocity.y = -1.0
 	else:
 		velocity.y -= 25.0 * delta
+	var prev := global_position
 	move_and_slide()
+	IslandWorld.constrain(self, prev)
 
 	if face.length() > 0.01:
 		rotation.y = lerp_angle(rotation.y, atan2(-face.x, -face.z), 10.0 * delta)

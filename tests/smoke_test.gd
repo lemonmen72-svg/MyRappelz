@@ -37,7 +37,7 @@ func run_step() -> void:
 		4:
 			player.take_damage(99999, null)
 			check(player.hp == player.max_hp, "игрок возродился с полным HP")
-			check(player.global_position.length() < 1.0, "игрок возродился в центре")
+			check(player.global_position.distance_to(player.respawn_point()) < 1.5, "игрок возродился в деревне расы")
 			step = 5
 		5:
 			check(game.save_game(), "игра сохранена")

@@ -55,7 +55,8 @@ var _slam_cd := 4.0
 var _slam_windup := 0.0
 
 
-func setup(id: String, spawn_slot: int, pos: Vector3) -> void:
+## lvl > 0: уровень из зоны острова (характеристики и опыт масштабируются от базового уровня вида).
+func setup(id: String, spawn_slot: int, pos: Vector3, lvl: int = -1) -> void:
 	var d := MobData.get_type(id)
 	type_id = id if MobData.TYPES.has(id) else "boar"
 	rarity = d["rarity"]
@@ -69,6 +70,13 @@ func setup(id: String, spawn_slot: int, pos: Vector3) -> void:
 	xp_reward = d["xp"]
 	color = d["color"]
 	body_scale = d["scale"]
+	if lvl > 0 and lvl != level:
+		var f := maxf(0.5, 1.0 + 0.25 * float(lvl - level))
+		max_hp = maxi(1, roundi(float(max_hp) * f))
+		hp = max_hp
+		atk = maxi(1, roundi(float(atk) * f))
+		xp_reward = maxi(1, roundi(float(xp_reward) * f))
+		level = lvl
 	home = pos
 	position = pos
 
@@ -202,7 +210,9 @@ func _physics_process(delta: float) -> void:
 		velocity.y = -1.0
 	else:
 		velocity.y -= 25.0 * delta
+	var prev := global_position
 	move_and_slide()
+	IslandWorld.constrain(self, prev)
 
 	if face.length() < 0.01:
 		face = dir
@@ -313,6 +323,8 @@ func _build_mark() -> void:
 
 
 func _in_safe_zone(n: Node3D) -> bool:
+	if IslandWorld.current != null:
+		return IslandWorld.current.in_safe_zone(n.global_position)
 	return Vector2(n.global_position.x, n.global_position.z).length() < MobData.SAFE_RADIUS
 
 

@@ -6,6 +6,7 @@ extends "res://tests/test_base.gd"
 const SHOTS_DIR := "user://shots/"
 
 var _create: Node = null
+var _top: Camera3D = null
 
 
 func race_class() -> Array:
@@ -22,7 +23,23 @@ func run_step() -> void:
 	var player: Player = main.player
 	match step:
 		0:
+			# Вид острова сверху (север сверху) — для сверки с reference/training_island.png
+			_top = Camera3D.new()
+			_top.projection = Camera3D.PROJECTION_ORTHOGONAL
+			_top.size = 205.0
+			_top.far = 600.0
+			_top.rotation_degrees = Vector3(-90, 0, 0)
+			_top.position = Vector3(1.0, 250.0, -3.0)
+			main.add_child(_top)
+			_top.current = true
 			wait = 90
+			step = 100
+		100:
+			shot("00_island_top")
+			_top.current = false
+			main.cam.current = true
+			_top.queue_free()
+			wait = 20
 			step = 1
 		1:
 			shot("01_start")

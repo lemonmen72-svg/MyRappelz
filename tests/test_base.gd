@@ -108,7 +108,10 @@ func mob_ok(m: Mob) -> bool:
 ## Ставит игрока рядом со зверем (в радиусе атаки зверя, чтобы тот не бегал) и держит HP полным.
 func stand_near(m: Mob, dist: float = 1.5) -> void:
 	var p: Player = main.player
-	p.global_position = m.global_position + Vector3(0, 0, dist)
+	var pos := m.global_position + Vector3(0, 0, dist)
+	if IslandWorld.current != null:
+		pos.y = IslandWorld.current.height_at(pos.x, pos.z) + 0.1
+	p.global_position = pos
 	p.hp = p.max_hp
 
 
