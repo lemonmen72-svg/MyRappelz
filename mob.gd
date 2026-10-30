@@ -46,7 +46,7 @@ var skill_uses := 0
 var _wander_to := Vector3.ZERO
 var _wander_wait := 0.0
 var _regen_acc := 0.0
-var _mat: StandardMaterial3D
+var _mat: Material
 var _label: Label3D
 var _model: Node3D
 var _height := 1.4
@@ -405,9 +405,7 @@ func consume() -> void:
 
 
 func _flash() -> void:
-	_mat.albedo_color = Color(1, 1, 1)
-	var t := create_tween()
-	t.tween_property(_mat, "albedo_color", color, 0.15)
+	CreatureModels.flash(self, _mat)
 	# Модель «сплющивается» от удара и пружинит обратно
 	if _model != null:
 		var sq := create_tween()

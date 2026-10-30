@@ -50,7 +50,7 @@ var skill_uses := 0
 
 var _model: Node3D = null
 var _col: CollisionShape3D = null
-var _mat: StandardMaterial3D = null
+var _mat: Material = null
 var _label: Label3D = null
 var _color := Color.WHITE
 var _scale := 1.0
@@ -529,9 +529,7 @@ func _bump() -> void:
 func _flash() -> void:
 	if _mat == null:
 		return
-	_mat.albedo_color = Color(1, 1, 1)
-	var t := create_tween()
-	t.tween_property(_mat, "albedo_color", _color, 0.15)
+	CreatureModels.flash(self, _mat)
 
 
 func _update_label() -> void:
