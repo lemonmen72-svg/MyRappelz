@@ -1,5 +1,6 @@
 # Сборка APK и публикация релиза. Запускается ТОЛЬКО вручную (по команде Максима):
-# Actions → «Сборка APK» → Run workflow, либо пуш тега вида v0.1.0.
+# Actions → «Сборка APK» → Run workflow, пуш тега вида v0.1.0
+# или изменение версии в android/release_version.txt (так собирает Claude по команде).
 name: Сборка APK
 
 on:
@@ -10,8 +11,13 @@ on:
         required: true
         default: "0.1.0"
   push:
+    # Ветки: только когда меняется android/release_version.txt (paths). Теги v*: всегда.
+    branches:
+      - "**"
     tags:
       - "v*"
+    paths:
+      - "android/release_version.txt"
 
 permissions:
   contents: write
@@ -21,12 +27,14 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       GODOT_VERSION: "4.3"
-      RAW_VERSION: ${{ inputs.version || github.ref_name }}
+      RAW_VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || '' }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Версия
-        run: echo "VERSION=${RAW_VERSION#v}" >> "$GITHUB_ENV"
+        run: |
+          V="${RAW_VERSION:-$(tr -d '[:space:]' < android/release_version.txt)}"
+          echo "VERSION=${V#v}" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
         with:
