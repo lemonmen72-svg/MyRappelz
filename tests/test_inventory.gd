@@ -185,7 +185,7 @@ func run_step() -> void:
 			var in_cells := 0
 			for cd: Dictionary in inv.cells():
 				if not cd.is_empty() and String(cd["id"]) == game.weapon:
-					in_cells += int(cd["count"])
+					in_cells += int(cd["n"])
 			check(in_cells == inv.count(game.weapon) - 1, "надетое оружие в ячейках не лежит (продать нельзя): %d из %d"
 				% [in_cells, inv.count(game.weapon)])
 			# Окно торговца: товары, сумка и карточка
