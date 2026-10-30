@@ -26,13 +26,14 @@ const ROLES := {
 const SKILLS := {
 	"tank": {"name": "Вызов", "cd": 5.0, "duration": 4.0, "radius": 12.0},
 	"fighter": {"name": "Рывок", "cd": 7.0, "power": 2.2, "min_dist": 3.0, "max_dist": 10.0},
-	"mage": {"name": "Искровой взрыв", "cd": 9.0, "power": 1.6, "radius": 3.5},
+	"mage": {"name": "Теневая вспышка", "cd": 9.0, "power": 1.6, "radius": 3.5},
 	"healer": {"name": "Целебная роса", "cd": 8.0, "power": 0.3, "threshold": 0.6},
 }
 
 ## stages: названия трёх стадий. hp/atk/def: на 1 уровне, *_lvl: прибавка за уровень.
 ## range: дальность атаки, м. cd: перезарядка атаки, с. scale: размер модели на 1 стадии.
-## evo_color: к этому цвету сдвигается окраска на старших стадиях.
+## evo_color: к этому цвету сдвигается окраска на старших стадиях (у модели из файла — мягкий
+## оттенок текстуры, см. asset_tint). fx_color: цвет снарядов и вспышек мага/лекаря (необязательно).
 const SPECIES := {
 	"boar": {
 		"role": "fighter", "stages": ["Щетинка", "Клыкач", "Буревепрь"],
@@ -44,20 +45,22 @@ const SPECIES := {
 		"hp": 55, "hp_lvl": 10.0, "atk": 9, "atk_lvl": 2.2, "def": 1, "def_lvl": 0.4,
 		"speed": 7.5, "range": 1.9, "cd": 0.9, "scale": 0.8, "evo_color": Color(0.75, 0.82, 1.0),
 	},
-	"bear": {
-		"role": "tank", "stages": ["Косолапик", "Мшистый медведь", "Горный исполин"],
-		"hp": 110, "hp_lvl": 20.0, "atk": 6, "atk_lvl": 1.3, "def": 5, "def_lvl": 1.2,
-		"speed": 6.4, "range": 2.1, "cd": 1.2, "scale": 0.8, "evo_color": Color(0.4, 0.55, 0.28),
+	"panther": {
+		"role": "mage", "stages": ["Сумрачный котёнок", "Теневая пантера", "Владычица полуночи"],
+		"hp": 52, "hp_lvl": 9.0, "atk": 9, "atk_lvl": 2.3, "def": 1, "def_lvl": 0.45,
+		"speed": 7.0, "range": 9.0, "cd": 1.5, "scale": 0.8, "evo_color": Color(0.55, 0.35, 0.95),
+		"fx_color": Color(0.6, 0.32, 1.0),
 	},
-	"fairy": {
-		"role": "healer", "stages": ["Росинка", "Цветочная фея", "Хранительница рощи"],
+	"pheasant": {
+		"role": "healer", "stages": ["Пёстрышко", "Рассветный фазан", "Златохвост"],
 		"hp": 45, "hp_lvl": 8.0, "atk": 4, "atk_lvl": 1.0, "def": 1, "def_lvl": 0.4,
-		"speed": 6.8, "range": 8.0, "cd": 1.4, "scale": 0.6, "evo_color": Color(1.0, 0.72, 0.95),
+		"speed": 6.8, "range": 8.0, "cd": 1.4, "scale": 0.85, "evo_color": Color(1.0, 0.78, 0.35),
+		"fx_color": Color(1.0, 0.85, 0.45),
 	},
-	"sparkbug": {
-		"role": "mage", "stages": ["Искорка", "Грозовой жук", "Молниеносец"],
-		"hp": 50, "hp_lvl": 9.0, "atk": 9, "atk_lvl": 2.3, "def": 1, "def_lvl": 0.4,
-		"speed": 6.4, "range": 9.0, "cd": 1.5, "scale": 0.7, "evo_color": Color(0.4, 0.8, 1.0),
+	"turtle": {
+		"role": "tank", "stages": ["Галечник", "Мшистый панцирь", "Древний бастион"],
+		"hp": 115, "hp_lvl": 21.0, "atk": 5, "atk_lvl": 1.2, "def": 6, "def_lvl": 1.3,
+		"speed": 6.2, "range": 2.0, "cd": 1.3, "scale": 0.85, "evo_color": Color(0.3, 0.7, 0.65),
 	},
 	"golem": {
 		"role": "tank", "stages": ["Камушек", "Валунный страж", "Древний колосс"],
@@ -105,6 +108,19 @@ static func stage_color(id: String, lvl: int) -> Color:
 	var evo: Color = get_species(id)["evo_color"]
 	var st: Dictionary = STAGES[stage_for(lvl)]
 	return base.lerp(evo, float(st["tint"]))
+
+
+## Оттенок текстуры модели из файла на стадии: белый на 1-й стадии, на старших мягко сдвигается
+## к evo_color (текстура не перекрашивается целиком).
+static func asset_tint(id: String, lvl: int) -> Color:
+	var evo: Color = get_species(id)["evo_color"]
+	var st: Dictionary = STAGES[stage_for(lvl)]
+	return Color.WHITE.lerp(evo, float(st["tint"]) * 0.4)
+
+
+## Цвет снарядов и вспышек питомца (маг, лекарь); fallback — если у вида свой не задан.
+static func fx_color(id: String, fallback: Color) -> Color:
+	return get_species(id).get("fx_color", fallback)
 
 
 static func stage_scale(id: String, lvl: int) -> float:

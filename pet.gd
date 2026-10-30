@@ -8,6 +8,8 @@ extends CharacterBody3D
 ## Режимы: "assist" (бьёт цель хозяина и защищает), "follow" (только идёт следом),
 ## "attack" (атакует заданную цель, после её смерти — снова "assist").
 ## Контракт (HUD, модуль боя): pet_name, level, hp, max_hp, is_down, heal(amount), stats_changed.
+## Модель из файла (CreatureAsset: пантера, черепаха, фазан): клипы по скорости, Attack — удар в момент
+## удара клипа, Cast — умение роли, Hit — урон.
 
 signal stats_changed
 ## Питомец погиб: запись уже помечена dead = true.
@@ -49,6 +51,11 @@ var skill_cd := 0.0
 var skill_uses := 0
 
 var _model: Node3D = null
+## Модель из файла (или null — модель из примитивов).
+var _asset: CreatureAsset = null
+## Атака ждёт момента удара в клипе модели из файла.
+var _pending: Mob = null
+var _pending_left := 0.0
 var _col: CollisionShape3D = null
 var _mat: Material = null
 var _label: Label3D = null
@@ -115,7 +122,10 @@ func _process(delta: float) -> void:
 		return
 	_anim_t += delta
 	var hv := Vector2(velocity.x, velocity.z).length()
-	CreatureModels.animate(_model, species, _anim_t, clampf(hv / maxf(speed, 0.1), 0.0, 1.0))
+	if _asset != null:
+		_asset.update(delta, hv)
+	else:
+		CreatureModels.animate(_model, species, _anim_t, clampf(hv / maxf(speed, 0.1), 0.0, 1.0))
 
 
 func _physics_process(delta: float) -> void:
@@ -124,6 +134,10 @@ func _physics_process(delta: float) -> void:
 	attack_cd = maxf(0.0, attack_cd - delta)
 	skill_cd = maxf(0.0, skill_cd - delta)
 	_calm += delta
+	if _pending != null:
+		_pending_left -= delta
+		if _pending_left <= 0.0:
+			_land_attack()
 
 	var to_o := owner_node.global_position - global_position
 	to_o.y = 0.0
@@ -221,8 +235,32 @@ func _pick_target() -> void:
 
 # ---------- Атака и умения ----------
 
+## Атака по цели: у модели из файла — клип Attack (Cast для умения мага), урон в момент удара клипа.
 func _attack(t: Mob) -> void:
+	if _asset != null:
+		var cast := role == "mage" and skill_cd <= 0.0
+		var delay := _asset.play_cast(attack_time) if cast else _asset.play_attack(attack_time)
+		if delay > 0.0:
+			_pending = t
+			_pending_left = delay
+			return
+	_do_attack(t)
+
+
+## Отложенная атака: цель ещё жива — бьём.
+func _land_attack() -> void:
+	if not is_instance_valid(_pending):
+		_pending = null
+		return
+	var t := _pending
+	_pending = null
+	if not t.is_dead:
+		_do_attack(t)
+
+
+func _do_attack(t: Mob) -> void:
 	var dmg := maxi(1, atk + randi_range(-1, 2))
+	var fx := PetData.fx_color(species, Color(1.0, 0.72, 0.28))
 	match role:
 		"mage":
 			if skill_cd <= 0.0:
@@ -230,11 +268,11 @@ func _attack(t: Mob) -> void:
 				skill_cd = float(sk["cd"])
 				skill_uses += 1
 				_say_skill(String(sk["name"]))
-				_blast(t.global_position, float(sk["radius"]), maxi(1, roundi(atk * float(sk["power"]))))
+				_blast(t.global_position, float(sk["radius"]), maxi(1, roundi(atk * float(sk["power"]))), fx)
 			else:
-				_shoot(t, dmg, Color(1.0, 0.75, 0.3))
+				_shoot(t, dmg, fx)
 		"healer":
-			_shoot(t, dmg, Color(0.6, 1.0, 0.7))
+			_shoot(t, dmg, PetData.fx_color(species, Color(0.6, 1.0, 0.7)))
 		_:
 			t.take_damage(dmg, self)
 			_slash(t, 0.8)
@@ -291,6 +329,8 @@ func _role_support() -> void:
 				skill_cd = float(sk["cd"])
 				skill_uses += 1
 				_say_skill(String(sk["name"]))
+				if _asset != null:
+					_asset.play_cast()
 				Vfx.magic_burst(get_parent(), global_position + Vector3(0, _height * 0.5, 0),
 					CreatureModels.role_color(role), 1.4 * maxf(_scale, 0.8), 0.35)
 				for n in get_tree().get_nodes_in_group("mobs"):
@@ -309,6 +349,8 @@ func _role_support() -> void:
 			skill_cd = float(sk["cd"])
 			skill_uses += 1
 			_say_skill(String(sk["name"]))
+			if _asset != null:
+				_asset.play_cast()
 			owner_node.heal(maxi(1, roundi(float(owner_node.max_hp) * float(sk["power"])) + atk))
 			Vfx.heal_sparkles(get_parent(), owner_node.global_position)
 			Vfx.hit_spark(get_parent(), global_position + Vector3(0, _height * 0.6, 0), Vfx.HEAL, 0.6)
@@ -325,9 +367,11 @@ func _shoot(t: Mob, dmg: int, c: Color) -> void:
 	_bump()
 
 
-## Удар по площади вокруг center.
-func _blast(center: Vector3, radius: float, dmg: int) -> void:
-	Vfx.magic_burst(get_parent(), center + Vector3(0, 0.5, 0), Color(1.0, 0.65, 0.25), radius, 0.4)
+## Удар по площади вокруг center (вспышка цвета c; у пантеры — тёмно-фиолетовая, теневая).
+func _blast(center: Vector3, radius: float, dmg: int, c: Color) -> void:
+	Vfx.magic_burst(get_parent(), center + Vector3(0, 0.5, 0), c, radius, 0.4)
+	# Тёмная сердцевина вспышки
+	Vfx.magic_burst(get_parent(), center + Vector3(0, 0.3, 0), c.darkened(0.55), radius * 0.55, 0.3)
 	for n in get_tree().get_nodes_in_group("mobs"):
 		var m := n as Mob
 		if m == null or m.is_dead:
@@ -402,6 +446,7 @@ func gain_xp(amount: int) -> void:
 func _die() -> void:
 	is_down = true
 	target = null
+	_pending = null
 	_dash_time = 0.0
 	record["dead"] = true
 	record["hp"] = 0
@@ -456,6 +501,7 @@ func _write_record() -> void:
 func _teleport_to_owner() -> void:
 	global_position = owner_node.global_position + Vector3(1.5, 0.2, 1.5)
 	target = null
+	_pending = null
 	_dash_time = 0.0
 
 
@@ -468,14 +514,15 @@ func _build_model() -> void:
 		_col.queue_free()
 	_model = Node3D.new()
 	add_child(_model)
-	_mat = CreatureModels.build(_model, species, _color, _scale)
+	_mat = CreatureModels.build(_model, species, _color, _scale, PetData.asset_tint(species, level))
+	_asset = CreatureModels.asset_of(_model)
 	CreatureModels.decorate_pet(_model, species, _scale, stage, role)
 	_col = CreatureModels.add_collision(self, species, _scale)
 	_height = CreatureModels.height(species, _scale)
 	# Голубой круг под ногами: свой питомец, а не дикий зверь
 	var ring := MeshInstance3D.new()
 	var tm := TorusMesh.new()
-	tm.inner_radius = 0.45 * _scale + 0.15
+	tm.inner_radius = CreatureModels.ring_radius(species, _scale) + 0.15
 	tm.outer_radius = tm.inner_radius + 0.07
 	ring.mesh = tm
 	ring.position.y = 0.05
@@ -527,6 +574,8 @@ func _bump() -> void:
 
 
 func _flash() -> void:
+	if _asset != null:
+		_asset.play_hit()
 	if _mat == null:
 		return
 	CreatureModels.flash(self, _mat)

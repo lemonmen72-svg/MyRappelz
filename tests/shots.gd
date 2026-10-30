@@ -5,8 +5,13 @@ extends "res://tests/test_base.gd"
 
 const SHOTS_DIR := "user://shots/"
 
+## Новые звери (пантера, черепаха, фазан) крупно в ряд — кадры 15 и 16.
+const ROW := ["panther", "turtle", "pheasant"]
+
 var _create: Node = null
 var _top: Camera3D = null
+var _row: Node3D = null
+var _frames := 0
 
 
 func race_class() -> Array:
@@ -70,13 +75,13 @@ func run_step() -> void:
 			step = 4
 		4:
 			shot("04_golem")
-			var f := find_mob("fairy")
+			var f := find_mob("pheasant")
 			if f != null:
 				stand_near(f, 4.0)
 			wait = 60
 			step = 5
 		5:
-			shot("05_fairy")
+			shot("05_pheasant")
 			player.global_position = Vector3(0, 0.1, 1.0)
 			wait = 60
 			step = 6
@@ -146,10 +151,65 @@ func run_step() -> void:
 			shot("14_town_low")
 			Quality.set_level(Quality.HIGH, false)
 			Quality.apply(get_tree())
-			_top.queue_free()
-			main.cam.current = true
-			main.hud.visible = true
-			ok_done()
+			_build_row()
+			wait = 30
+			step = 16
+		16:
+			shot("15_creatures")
+			_frames = 0
+			step = 17
+		17:
+			# Те же звери на ходу: шаг (модель из файла — клип Walk, запасная — перестановка лап)
+			_frames += 1
+			_animate_row(_frames)
+			if _frames >= 24:
+				shot("16_creatures_walk")
+				_row.queue_free()
+				main.player.visible = true
+				_top.queue_free()
+				main.cam.current = true
+				main.hud.visible = true
+				ok_done()
+
+
+## Пантера, черепаха и фазан в ряд перед камерой (вид три четверти), игрок и питомец скрыты.
+func _build_row() -> void:
+	var player: Player = main.player
+	main.pets.recall()
+	player.visible = false
+	var base := player.global_position
+	_row = Node3D.new()
+	_row.name = "CreatureRow"
+	main.add_child(_row)
+	for i in ROW.size():
+		var id := String(ROW[i])
+		var holder := Node3D.new()
+		holder.set_meta("species", id)
+		_row.add_child(holder)
+		var d := MobData.get_type(id)
+		CreatureModels.build(holder, id, d["color"], float(d["scale"]))
+		var gp := base + Vector3((float(i) - 1.0) * 2.2, 0, 0)
+		if IslandWorld.current != null:
+			gp.y = IslandWorld.current.height_at(gp.x, gp.z)
+		holder.global_position = gp
+		# Перед модели (−Z) — к камере (+Z), с поворотом на три четверти
+		holder.rotation.y = PI + 0.7
+		var ca := CreatureModels.asset_of(holder)
+		print("  %s: %s, высота %.2f м" % [id, "модель из файла" if ca != null else "запасная из примитивов",
+			CreatureModels.height(id, float(d["scale"]))])
+	_top.global_position = base + Vector3(0, 1.15, 3.9)
+	_top.look_at(base + Vector3(0, 0.5, 0))
+
+
+func _animate_row(frame_i: int) -> void:
+	for n in _row.get_children():
+		var holder := n as Node3D
+		var id := String(holder.get_meta("species"))
+		var ca := CreatureModels.asset_of(holder)
+		if ca != null:
+			ca.update(1.0 / 30.0, float(ca.info["walk_speed"]) * float(MobData.get_type(id)["scale"]))
+		else:
+			CreatureModels.animate(holder, id, float(frame_i) / 30.0, 0.5)
 
 
 func shot(shot_name: String) -> void:

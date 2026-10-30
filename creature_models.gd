@@ -2,6 +2,9 @@ class_name CreatureModels
 extends RefCounted
 ## Модели зверей и питомцев в аниме-стиле (чиби): округлые формы из сфер и капсул, большие глаза
 ## с бликами, румянец, характерные детали вида. Всё своё, из примитивов.
+## Пантера, черепаха и фазан — модели из файлов (CreatureAsset, assets/creatures/<id>.glb): build() берёт
+## файл, если он есть, иначе строит их запасную модель из примитивов (размеры — CreatureAsset.info_for).
+## Для модели из файла: asset_of(корень) — узел CreatureAsset (анимации вызывают Mob и Pet).
 ## build() строит только меши в отдельном узле, коллизию добавляет add_collision().
 ## Передом модель смотрит в -Z. Части для анимации хранятся в meta "anim" корня модели.
 ## Питомцы: decorate_pet() добавляет ошейник цвета роли и украшения по стадии эволюции.
@@ -11,9 +14,9 @@ extends RefCounted
 ## Node3D, как раньше: animate() вращает их, а в конце переносит их положение в кости Skeleton3D,
 ## к которым привязаны вершины слитого меша (у каждой вершины одна кость с весом 1).
 ## Цвет детали — в цвете вершин, свет и вспышка удара — creature.gdshader, контур — creature_outline.gdshader.
-## Прозрачные крылья феи — вторая поверхность того же меша. Геометрия (ArrayMesh и Skin) кэшируется
+## Полупрозрачные детали (GLASS) — вторая поверхность того же меша. Геометрия (ArrayMesh и Skin) кэшируется
 ## по виду, цвету и размеру и общая у всех одинаковых зверей; материал тела у каждого зверя свой (вспышка).
-## Итого зверь — 1 вызов отрисовки (+1 контур), фея — 2 (+ сияние и искорки), питомец — ещё круг и сияние 3-й стадии.
+## Итого зверь — 1 вызов отрисовки (+1 контур), питомец — ещё круг и сияние 3-й стадии.
 ## skinned = false — запасной режим без скелета: один меш на каждую подвижную часть (≈5–11 вызовов).
 
 ## Цвета ролей питомцев (ошейник, бантик, узоры).
@@ -158,8 +161,16 @@ class Acc extends RefCounted:
 
 
 ## Строит модель вида species в root. Возвращает материал тела (свой у каждого зверя): вспышка
-## при ударе — CreatureModels.flash(узел, материал).
-static func build(root: Node3D, species: String, color: Color, s: float) -> ShaderMaterial:
+## при ударе — CreatureModels.flash(узел, материал). tint — оттенок текстуры модели из файла
+## (стадия питомца, PetData.asset_tint); у моделей из примитивов цвет задаёт color.
+static func build(root: Node3D, species: String, color: Color, s: float, tint: Color = Color.WHITE) -> Material:
+	if CreatureAsset.has_asset(species):
+		var ca := CreatureAsset.new()
+		if ca.setup(species, s, color, tint):
+			root.add_child(ca)
+			root.set_meta("asset", ca)
+			return ca.material
+		ca.free()
 	var rig := Rig.new()
 	rig.key = "%s|%s|%.4f" % [species, color.to_html(true), s]
 	rig.bones.append(root)
@@ -167,10 +178,12 @@ static func build(root: Node3D, species: String, color: Color, s: float) -> Shad
 	rig.mat = _body_mat()
 	root.set_meta("cm_rig", rig)
 	match species:
-		"fairy":
-			_fairy(root, rig, color, s)
-		"sparkbug":
-			_sparkbug(root, rig, color, s)
+		"panther":
+			_panther(root, rig, color, s)
+		"turtle":
+			_turtle(root, rig, color, s)
+		"pheasant":
+			_pheasant(root, rig, color, s)
 		"golem":
 			_golem(root, rig, color, s)
 		_:
@@ -181,40 +194,55 @@ static func build(root: Node3D, species: String, color: Color, s: float) -> Shad
 	return rig.mat
 
 
+## Модель из файла в корне модели root (после build()) или null — модель из примитивов.
+static func asset_of(root: Node3D) -> CreatureAsset:
+	if root == null or not root.has_meta("asset"):
+		return null
+	var ca = root.get_meta("asset")
+	if not is_instance_valid(ca):
+		return null
+	return ca as CreatureAsset
+
+
 ## Белая вспышка модели при ударе (материал из build()); твин принадлежит узлу owner.
+## Модель из примитивов — параметр flash шейдера, модель из файла — эмиссия материала.
 static func flash(owner: Node, mat: Material) -> void:
-	var sm := mat as ShaderMaterial
-	if sm == null or owner == null or not owner.is_inside_tree():
+	if mat == null or owner == null or not owner.is_inside_tree():
 		return
-	sm.set_shader_parameter("flash", 1.0)
-	var setter := func(v: float) -> void:
-		sm.set_shader_parameter("flash", v)
-	var t := owner.create_tween()
-	t.tween_method(setter, 1.0, 0.0, 0.15)
+	var sm := mat as ShaderMaterial
+	if sm != null:
+		sm.set_shader_parameter("flash", 1.0)
+		var setter := func(v: float) -> void:
+			sm.set_shader_parameter("flash", v)
+		var t := owner.create_tween()
+		t.tween_method(setter, 1.0, 0.0, 0.15)
+		return
+	var bm := mat as BaseMaterial3D
+	if bm != null and bm.emission_enabled:
+		bm.emission = CreatureAsset.FLASH
+		var te := owner.create_tween()
+		te.tween_property(bm, "emission", Color.BLACK, 0.18)
 
 
 ## Высота макушки модели над землёй (для подписи и значков над головой).
 static func height(species: String, s: float) -> float:
-	match species:
-		"fairy":
-			return 1.75 * s
-		"sparkbug":
-			return 1.1 * s
-		"golem":
-			return 2.15 * s
+	if CreatureAsset.is_asset_species(species):
+		return CreatureAsset.height_for(species, s)
+	if species == "golem":
+		return 2.15 * s
 	return 1.4 * s
 
 
 ## Коробка-коллизия вида, нижняя грань на уровне земли.
 static func add_collision(body: Node3D, species: String, s: float) -> CollisionShape3D:
 	var size := Vector3(0.9, 1.2, 1.5)
-	match species:
-		"fairy":
-			size = Vector3(0.6, 1.2, 0.6)
-		"sparkbug":
-			size = Vector3(1.0, 0.8, 1.5)
-		"golem":
-			size = Vector3(1.3, 2.1, 0.9)
+	if CreatureAsset.is_asset_species(species):
+		# Размеры вида из creatures.json (длина с хвостом — коробка чуть короче)
+		var inf := CreatureAsset.info_for(species)
+		size = Vector3(maxf(0.3, float(inf["width"])), maxf(0.3, float(inf["height"])),
+			maxf(0.3, float(inf["length"]) * 0.8))
+	elif species == "golem":
+		size = Vector3(1.3, 2.1, 0.9)
 	var col := CollisionShape3D.new()
 	var sh := BoxShape3D.new()
 	sh.size = size * s
@@ -229,9 +257,17 @@ static func role_color(role: String) -> Color:
 	return ROLE_COLORS.get(role, Color(0.3, 0.8, 1.0))
 
 
-## Анимация модели (вызывать каждый кадр). moving: 0 — стоит, 1 — бежит на полной скорости.
-## Звери покачиваются и переставляют лапы, фея парит и машет крыльями, у искрожука пульсирует
-## брюшко, у стража кружат рунные камни.
+## Радиус круга под питомцем (своя модель — по размерам вида).
+static func ring_radius(species: String, s: float) -> float:
+	if CreatureAsset.is_asset_species(species):
+		var inf := CreatureAsset.info_for(species)
+		return maxf(0.45, 0.32 * maxf(float(inf["length"]), float(inf["width"]))) * s
+	return 0.45 * s
+
+
+## Анимация модели из примитивов (вызывать каждый кадр). moving: 0 — стоит, 1 — бежит на полной скорости.
+## Звери и птицы покачиваются и переставляют лапы, у стража кружат рунные камни.
+## Модель из файла анимирует CreatureAsset.update() (здесь ничего не делается).
 static func animate(root: Node3D, _species: String, t: float, moving: float = 0.0) -> void:
 	if root == null or not root.has_meta("anim"):
 		return
@@ -258,31 +294,6 @@ static func animate(root: Node3D, _species: String, t: float, moving: float = 0.
 			var tail: Node3D = a.get("tail")
 			if tail != null:
 				tail.rotation.y = sin(t * (5.0 + 7.0 * mv)) * 0.45
-		"fairy":
-			if body != null:
-				body.position.y = float(a.get("base_y", 0.0)) + sin(t * 2.4) * 0.15 * s
-				body.rotation.z = sin(t * 1.3) * 0.08
-				body.rotation.x = -0.25 * mv
-			var flap := sin(t * 22.0) * 0.55
-			var wl: Node3D = a.get("wing_l")
-			var wr: Node3D = a.get("wing_r")
-			if wl != null and wr != null:
-				wl.rotation.y = flap
-				wr.rotation.y = -flap
-			if head != null:
-				head.rotation.z = sin(t * 1.6) * 0.1
-		"bug":
-			if body != null:
-				body.position.y = absf(sin(t * 14.0)) * 0.03 * s * mv + sin(t * 2.0) * 0.012 * s
-			for i in legs.size():
-				var leg := legs[i] as Node3D
-				leg.rotation.x = sin(t * 16.0 + float(i) * 2.1) * (0.15 + 0.45 * mv)
-			var ants: Array = a.get("ants", [])
-			for i in ants.size():
-				var ant := ants[i] as Node3D
-				ant.rotation.y = sin(t * 3.0 + float(i) * 1.7) * 0.25
-			if head != null:
-				head.rotation.z = sin(t * 1.4) * 0.08
 		"golem":
 			var f := 5.0
 			if body != null:
@@ -301,7 +312,7 @@ static func animate(root: Node3D, _species: String, t: float, moving: float = 0.
 				runes.position.y = float(a.get("runes_y", 0.0)) + sin(t * 2.0) * 0.06 * s
 			if head != null:
 				head.rotation.z = sin(t * 1.2) * 0.05
-	# Общие детали: свечение (брюшко искрожука, ореол феи) и нимб питомца 3-й стадии
+	# Общие детали: пульсирующее свечение (узел glow) и нимб питомца 3-й стадии
 	var glow: Node3D = a.get("glow")
 	if glow != null:
 		var k := 1.0 + sin(t * 4.0) * 0.12
@@ -389,8 +400,13 @@ static func spawn_ring(parent: Node, pos: Vector3, radius: float, color: Color, 
 
 ## Украшения питомца: ошейник цвета роли с бубенчиком (все стадии); бантик и узоры на спине
 ## (со 2-й стадии); золотой нимб, сияние под ногами и искорки (3-я стадия). Вызывать после build().
+## У модели из файла — CreatureAsset.decorate() (самоцвет роли над головой, нимб, сияние).
 ## Детали украшений вливаются в слитый меш модели (меш пересобирается).
 static func decorate_pet(root: Node3D, species: String, s: float, stage: int, role: String) -> void:
+	var ca := asset_of(root)
+	if ca != null:
+		ca.decorate(stage, role)
+		return
 	var rig := root.get_meta("cm_rig", null) as Rig
 	if rig == null:
 		return
@@ -458,11 +474,10 @@ static func decorate_pet(root: Node3D, species: String, s: float, stage: int, ro
 # ---------- Виды ----------
 
 ## Четвероногий зверь-чиби: кабан (пятачок, клыки, хохолок, хвостик-завиток), волк (уши торчком,
-## пушистый хвост, светлая грудка), медведь (круглые уши, пузико, короткий хвостик).
+## пушистый хвост, светлая грудка).
 static func _beast(root: Node3D, rig: Rig, species: String, color: Color, s: float) -> void:
 	var boar := species == "boar"
 	var wolf := species == "wolf"
-	var bear := species == "bear"
 	var m := _lit(color)
 	var light := _lit(color.lightened(0.42))
 	var dark := _lit(color.darkened(0.3))
@@ -470,16 +485,14 @@ static func _beast(root: Node3D, rig: Rig, species: String, color: Color, s: flo
 
 	var body := _joint(rig, root, "Body", Vector3.ZERO)
 	anim["body"] = body
-	var torso_sc := Vector3(0.95, 0.85, 1.15) if bear else Vector3(0.86, 0.76, 1.2)
+	var torso_sc := Vector3(0.86, 0.76, 1.2)
 	_ball(rig, body, 0.5 * s, Vector3(0, 0.7, 0.05) * s, m, torso_sc, false, 16)
-	if bear:
-		_ball(rig, body, 0.34 * s, Vector3(0, 0.6, -0.26) * s, light, Vector3(0.95, 0.9, 1.0))
-	elif wolf:
+	if wolf:
 		_ball(rig, body, 0.27 * s, Vector3(0, 0.82, -0.48) * s, light, Vector3(1.0, 1.1, 0.75))
 
 	# Голова
-	var hr := (0.4 if bear else (0.36 if wolf else 0.38)) * s
-	var head := _joint(rig, body, "Head", Vector3(0, 1.02 if bear else 1.0, -0.62) * s)
+	var hr := (0.36 if wolf else 0.38) * s
+	var head := _joint(rig, body, "Head", Vector3(0, 1.0, -0.62) * s)
 	anim["head"] = head
 	_ball(rig, head, hr, Vector3.ZERO, m, Vector3(1.05, 0.95, 0.95), false, 16)
 	var iris := Color(0.16, 0.1, 0.07)
@@ -524,16 +537,6 @@ static func _beast(root: Node3D, rig: Rig, species: String, color: Color, s: flo
 			var ein := _cyl(rig, head, 0.0, 0.065 * s, 0.2 * s, Vector3(0.185 * side, 0.31, 0.0) * s, inner, true)
 			ein.rotation = Vector3(-0.1, 0.0, -0.28 * side)
 			ein.scale = Vector3(1.0, 1.0, 0.45)
-	else:
-		# Медведь: светлая мордочка, носик, круглые ушки
-		_ball(rig, head, 0.18 * s, Vector3(0, -0.11 * s, -hr * 0.88), light, Vector3(1.1, 0.82, 0.9))
-		_ball(rig, head, 0.06 * s, Vector3(0, -0.05 * s, -hr - 0.11 * s), _flat(Color(0.1, 0.07, 0.06)),
-			Vector3(1.25, 0.85, 0.8), true)
-		var inner := _flat(color.lightened(0.5).lerp(Color(1.0, 0.75, 0.7), 0.4))
-		for i in 2:
-			var side := float(i * 2 - 1)
-			_ball(rig, head, 0.13 * s, Vector3(0.28 * side, 0.28, 0.02) * s, dark, Vector3(1.0, 1.0, 0.6))
-			_ball(rig, head, 0.075 * s, Vector3(0.28 * side, 0.28, -0.045) * s, inner, Vector3(1.0, 1.0, 0.4), true)
 
 	# Хвост
 	var tail := _joint(rig, body, "Tail", Vector3(0, 0.88, 0.62) * s)
@@ -545,12 +548,10 @@ static func _beast(root: Node3D, rig: Rig, species: String, color: Color, s: flo
 		tail.rotation.x = -0.75
 		_ball(rig, tail, 0.17 * s, Vector3(0, 0, 0.3) * s, m, Vector3(0.8, 0.8, 1.9))
 		_ball(rig, tail, 0.13 * s, Vector3(0, 0, 0.6) * s, light)
-	else:
-		_ball(rig, tail, 0.1 * s, Vector3(0, -0.04, 0.02) * s, m)
 
 	# Лапки на шарнирах у бедра
 	var legs: Array = []
-	var lr := (0.14 if bear else 0.12) * s
+	var lr := 0.12 * s
 	var zs := [-0.34, 0.38]
 	for zi in 2:
 		for i in 2:
@@ -565,7 +566,7 @@ static func _beast(root: Node3D, rig: Rig, species: String, color: Color, s: flo
 	# Ошейник — кольцо сразу за головой, бубенчик на груди
 	var neck := _pivot(body, "Neck", Vector3(0, 0.72, -0.33) * s)
 	neck.rotation.x = -1.32
-	neck.set_meta("r", (0.4 if bear else 0.36) * s)
+	neck.set_meta("r", 0.36 * s)
 	neck.set_meta("charm", Vector3(0, -0.14, -0.27) * s)
 	var bow := _pivot(head, "Bow", Vector3(-0.17, 0.29, -0.12) * s)
 	bow.rotation.z = 0.35
@@ -575,153 +576,232 @@ static func _beast(root: Node3D, rig: Rig, species: String, color: Color, s: flo
 	root.set_meta("anim", anim)
 
 
-## Лесная фея: девочка-цветок с платьем-колокольчиком из лепестков, листиком на макушке,
-## четырьмя прозрачными крылышками и мягким сиянием. Парит над землёй.
-static func _fairy(root: Node3D, rig: Rig, color: Color, s: float) -> void:
+## Пантера (запасная модель, если нет assets/creatures/panther.glb): гибкая кошка — вытянутое тело,
+## небольшая голова с ушками-треугольниками, фиолетовые глаза, светящаяся руна на лбу, длинный хвост.
+## Размеры по CreatureAsset.DEFAULTS: высота 1.15, длина 1.9 (с хвостом), ширина 0.5.
+static func _panther(root: Node3D, rig: Rig, color: Color, s: float) -> void:
 	var m := _lit(color)
-	var petal := _lit(color.lightened(0.3))
-	var skin_c := Color(1.0, 0.9, 0.82)
-	var skin := _lit(skin_c)
-	var hair := _lit(color.lerp(Color(1.0, 0.95, 0.6), 0.35))
-	var anim := {"kind": "fairy", "s": s}
-	var fl := _joint(rig, root, "Float", Vector3(0, 0.8, 0) * s)
-	anim["body"] = fl
-	anim["base_y"] = 0.8 * s
+	var light := _lit(color.lightened(0.22))
+	var dark := _lit(color.darkened(0.3))
+	var rune_c := Color(0.72, 0.45, 1.0)
+	var anim := {"kind": "quad", "s": s}
 
-	# Платье-колокольчик и лепестки подола
-	_cyl(rig, fl, 0.09 * s, 0.25 * s, 0.42 * s, Vector3(0, -0.05, 0) * s, m)
-	for i in 4:
-		var ang := TAU * float(i) / 4.0 + PI / 4.0
-		var d := Vector3(cos(ang), -0.6, sin(ang)).normalized()
-		var p := _ball(rig, fl, 0.13 * s, Vector3(cos(ang) * 0.2, -0.24, sin(ang) * 0.2) * s, petal, Vector3(0.8, 0.3, 1.4))
-		_face(p, d)
-	# Ручки
-	for i in 2:
-		var side := float(i * 2 - 1)
-		var arm := _capsule(rig, fl, 0.035 * s, 0.2 * s, Vector3(0.12 * side, 0.07, 0) * s, skin)
-		arm.rotation.z = 0.45 * side
-
-	# Голова, волосы, листик и цветок
-	var head := _joint(rig, fl, "Head", Vector3(0, 0.36, 0) * s)
-	anim["head"] = head
-	var hr := 0.2 * s
-	_ball(rig, head, hr, Vector3.ZERO, skin, Vector3.ONE, false, 16)
-	_ball(rig, head, 0.205 * s, Vector3(0, 0.055, 0.055) * s, hair, Vector3(1.06, 1.0, 1.0), false, 16)
-	var leaf := _ball(rig, head, 0.08 * s, Vector3(0.02, 0.27, 0.0) * s, _lit(Color(0.45, 0.85, 0.35)), Vector3(0.45, 0.14, 1.0))
-	leaf.rotation = Vector3(0.3, 0.5, 0.9)
-	_ball(rig, head, 0.05 * s, Vector3(0.14, 0.15, -0.08) * s, _lit(Color(1.0, 0.6, 0.8)))
-	_eyes(rig, head, hr, 0.065 * s, Color(0.15, 0.45, 0.3), 0.4, -0.05, false)
-	_blush(rig, head, hr, 0.04 * s, skin_c)
-
-	# Крылышки: по два с каждой стороны, на шарнирах для взмахов
-	var wing_m := _glass(Color(color.lightened(0.6), 0.5))
-	for i in 2:
-		var side := float(i * 2 - 1)
-		var pivot := _joint(rig, fl, "WingL" if side < 0.0 else "WingR", Vector3(0.05 * side, 0.12, 0.1) * s)
-		var up := _ball(rig, pivot, 0.18 * s, Vector3(0.2 * side, 0.12, 0) * s, wing_m, Vector3(1.1, 0.75, 0.06), true)
-		up.rotation.z = 0.5 * side
-		var low := _ball(rig, pivot, 0.12 * s, Vector3(0.14 * side, -0.07, 0.02) * s, wing_m, Vector3(1.0, 0.7, 0.06), true)
-		low.rotation.z = -0.45 * side
-		anim["wing_l" if side < 0.0 else "wing_r"] = pivot
-
-	# Светящаяся пыльца и сияние вокруг
-	_ball(rig, fl, 0.06 * s, Vector3(0, -0.36, 0) * s, _flat(Color(1.0, 1.0, 0.65)), Vector3.ONE, true)
-	var glow := MeshInstance3D.new()
-	glow.set_meta("no_outline", true)
-	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	glow.mesh = Vfx._quad()
-	glow.material_override = Vfx.fx_mat(Color(color.lightened(0.4), 0.4), Vfx.tex("dot"), true, BaseMaterial3D.BILLBOARD_ENABLED)
-	glow.scale = Vector3.ONE * 1.3 * s
-	glow.position = Vector3(0, 0.15, 0) * s
-	fl.add_child(glow)
-	glow.set_meta("base", glow.scale)
-	anim["glow"] = glow
-	var sp := Vfx.ambient_sparkles(fl, Color(1.0, 1.0, 0.7), 0.3 * s, 5)
-	sp.position.y = -0.1 * s
-
-	# Точки для украшений питомца
-	var neck := _pivot(fl, "Neck", Vector3(0, 0.17, 0) * s)
-	neck.set_meta("r", 0.1 * s)
-	neck.set_meta("charm", Vector3(0, -0.02, -0.11) * s)
-	var bow := _pivot(head, "Bow", Vector3(-0.17, 0.19, 0.03) * s)
-	bow.rotation.z = 0.5
-	_pivot(head, "Top", Vector3(0, 0.3, 0) * s)
-	var back := _pivot(fl, "Back", Vector3(0, -0.1, 0) * s)
-	back.set_meta("radii", Vector3(0.19, 0.2, 0.19) * s)
-	back.set_meta("u", Vector3(0.5, 0.0, -0.85))
-	root.set_meta("anim", anim)
-
-
-## Искрожук: круглый жучок-светлячок — панцирь из двух половинок с пятнышками, светлая мордочка
-## с большими глазами, усики с огоньками, светящееся брюшко, шесть коротких лапок.
-static func _sparkbug(root: Node3D, rig: Rig, color: Color, s: float) -> void:
-	var m := _lit(color)
-	var dark := _lit(color.darkened(0.55))
-	var face_c := color.lerp(Color(1.0, 0.92, 0.75), 0.55)
-	var face_m := _lit(face_c)
-	var glow_c := color.lightened(0.5)
-	var anim := {"kind": "bug", "s": s}
 	var body := _joint(rig, root, "Body", Vector3.ZERO)
 	anim["body"] = body
+	var torso_sc := Vector3(0.62, 0.6, 1.3)
+	_ball(rig, body, 0.4 * s, Vector3(0, 0.6, 0.02) * s, m, torso_sc, false, 16)
+	_ball(rig, body, 0.19 * s, Vector3(0, 0.56, -0.34) * s, light, Vector3(0.95, 1.0, 0.8))
 
-	# Панцирь-надкрылья с пятнышками
-	var spot := _flat(color.darkened(0.6))
-	for i in 2:
-		var side := float(i * 2 - 1)
-		var half := _ball(rig, body, 0.42 * s, Vector3(0.2 * side, 0.6, 0.0) * s, m, Vector3(0.6, 0.62, 1.08), false, 16)
-		half.rotation.z = 0.12 * side
-		var sp := _ball(rig, body, 0.09 * s, Vector3(0.24 * side, 0.83, -0.05) * s, spot, Vector3(1.0, 0.3, 1.1), true)
-		sp.rotation.z = 0.35 * side
-	# Светящееся брюшко: шарнир с масштабом (пульсирует), шар внутри
-	var glow := _joint(rig, body, "Glow", Vector3(0, 0.5, 0.46) * s, true)
-	glow.scale = Vector3(1.0, 0.85, 1.0)
-	_ball(rig, glow, 0.3 * s, Vector3.ZERO, _flat(glow_c), Vector3.ONE, true)
-	glow.set_meta("base", glow.scale)
-	anim["glow"] = glow
-
-	# Голова-мордочка
-	var hr := 0.3 * s
-	var head := _joint(rig, body, "Head", Vector3(0, 0.56, -0.5) * s)
+	# Голова: мордочка, носик, ушки, руна на лбу
+	var hr := 0.25 * s
+	var head := _joint(rig, body, "Head", Vector3(0, 0.84, -0.6) * s)
 	anim["head"] = head
-	_ball(rig, head, hr, Vector3.ZERO, face_m, Vector3(1.05, 0.95, 0.95), false, 16)
-	_eyes(rig, head, hr, 0.105 * s, Color(0.12, 0.08, 0.14), 0.46, 0.14, true)
-	_blush(rig, head, hr, 0.055 * s, face_c)
-	# Усики с огоньками
-	var ants: Array = []
-	var tip_m := _flat(glow_c.lightened(0.2))
-	var stalk := _lit(color.darkened(0.5))
+	_ball(rig, head, hr, Vector3.ZERO, m, Vector3(1.05, 0.92, 0.95), false, 16)
+	_ball(rig, head, 0.12 * s, Vector3(0, -0.08 * s, -hr * 0.88), light, Vector3(1.0, 0.72, 0.9))
+	_ball(rig, head, 0.04 * s, Vector3(0, -0.04 * s, -hr - 0.07 * s), _flat(Color(0.12, 0.08, 0.14)),
+		Vector3(1.2, 0.8, 0.8), true)
+	_eyes(rig, head, hr, 0.085 * s, Color(0.5, 0.25, 0.85), 0.44, 0.16, true)
+	_blush(rig, head, hr, 0.045 * s, color)
+	var inner := _flat(color.lightened(0.35).lerp(Color(0.85, 0.6, 1.0), 0.4))
 	for i in 2:
 		var side := float(i * 2 - 1)
-		var ant := _joint(rig, head, "Antenna", Vector3(0.1 * side, 0.22, -0.04) * s)
-		ant.rotation = Vector3(-0.45, 0.0, -0.45 * side)
-		_cyl(rig, ant, 0.018 * s, 0.025 * s, 0.36 * s, Vector3(0, 0.18, 0) * s, stalk, true)
-		_ball(rig, ant, 0.065 * s, Vector3(0, 0.38, 0) * s, tip_m, Vector3.ONE, true)
-		ants.append(ant)
-	anim["ants"] = ants
+		var ear := _cyl(rig, head, 0.0, 0.09 * s, 0.17 * s, Vector3(0.15 * side, 0.21, 0.02) * s, dark)
+		ear.rotation = Vector3(-0.15, 0.0, -0.32 * side)
+		ear.scale = Vector3(1.0, 1.0, 0.6)
+		var ein := _cyl(rig, head, 0.0, 0.05 * s, 0.11 * s, Vector3(0.145 * side, 0.2, -0.01) * s, inner, true)
+		ein.rotation = Vector3(-0.15, 0.0, -0.32 * side)
+		ein.scale = Vector3(1.0, 1.0, 0.45)
+	var rune_d := Vector3(0, 0.45, -1.0).normalized()
+	var rune := _ball(rig, head, 0.045 * s, rune_d * hr * 0.97, _flat(rune_c), Vector3(0.7, 1.2, 0.3), true)
+	_face(rune, rune_d)
 
-	# Лапки
+	# Длинный хвост, слегка поднят
+	var tail := _joint(rig, body, "Tail", Vector3(0, 0.7, 0.5) * s)
+	anim["tail"] = tail
+	tail.rotation.x = -0.35
+	var tc := _capsule(rig, tail, 0.06 * s, 0.72 * s, Vector3(0, 0, 0.34) * s, m)
+	tc.rotation.x = PI / 2.0
+	_ball(rig, tail, 0.075 * s, Vector3(0, 0, 0.68) * s, dark)
+
+	# Лапы
 	var legs: Array = []
-	for zi in 3:
-		var z := -0.25 + 0.28 * float(zi)
+	var zs := [-0.3, 0.32]
+	for zi in 2:
 		for i in 2:
 			var side := float(i * 2 - 1)
-			var hip := _joint(rig, body, "Leg", Vector3(0.3 * side, 0.36, z) * s)
-			hip.rotation.z = 0.55 * side
-			_capsule(rig, hip, 0.06 * s, 0.36 * s, Vector3(0, -0.17, 0) * s, dark)
+			var hip := _joint(rig, root, "Leg", Vector3(0.16 * side, 0.36, float(zs[zi])) * s)
+			_capsule(rig, hip, 0.085 * s, 0.42 * s, Vector3(0, -0.15 * s, 0), m)
+			_ball(rig, hip, 0.075 * s, Vector3(0, -0.3, -0.03) * s, dark, Vector3(1.0, 0.6, 1.25))
 			legs.append(hip)
 	anim["legs"] = legs
 
 	# Точки для украшений питомца
-	var neck := _pivot(body, "Neck", Vector3(0, 0.56, -0.42) * s)
-	neck.rotation.x = PI / 2.0
-	neck.set_meta("r", 0.33 * s)
-	neck.set_meta("charm", Vector3(0, -0.29, -0.08) * s)
-	var bow := _pivot(head, "Bow", Vector3(-0.21, 0.22, 0.04) * s)
-	bow.rotation.z = 0.5
-	_pivot(head, "Top", Vector3(0, 0.34, 0) * s)
-	var back := _pivot(body, "Back", Vector3(0, 0.6, 0) * s)
-	back.set_meta("radii", Vector3(0.45, 0.26, 0.45) * s)
-	back.set_meta("u", Vector3(0.45, 0.75, 0.5))
+	var neck := _pivot(body, "Neck", Vector3(0, 0.72, -0.42) * s)
+	neck.rotation.x = -1.2
+	neck.set_meta("r", 0.19 * s)
+	neck.set_meta("charm", Vector3(0, -0.1, -0.15) * s)
+	var bow := _pivot(head, "Bow", Vector3(-0.14, 0.2, -0.04) * s)
+	bow.rotation.z = 0.35
+	_pivot(head, "Top", Vector3(0, hr * 0.95, 0))
+	var back := _pivot(body, "Back", Vector3(0, 0.6, 0.02) * s)
+	back.set_meta("radii", Vector3(0.4 * torso_sc.x, 0.4 * torso_sc.y, 0.4 * torso_sc.z) * s)
+	root.set_meta("anim", anim)
+
+
+## Черепаха (запасная модель): высокий панцирь с пластинами и светлой каймой, голова на шее,
+## четыре толстые лапы, хвостик. Размеры: высота 0.85, длина 1.3, ширина 0.95.
+static func _turtle(root: Node3D, rig: Rig, color: Color, s: float) -> void:
+	var shell := _lit(color)
+	var plate := _lit(color.darkened(0.25))
+	var rim := _lit(color.lerp(Color(0.95, 0.85, 0.55), 0.55))
+	var skin_c := color.lerp(Color(0.75, 0.85, 0.5), 0.55).lightened(0.1)
+	var skin := _lit(skin_c)
+	var anim := {"kind": "quad", "s": s}
+
+	var body := _joint(rig, root, "Body", Vector3.ZERO)
+	anim["body"] = body
+	var shell_sc := Vector3(0.95, 0.78, 1.1)
+	_ball(rig, body, 0.5 * s, Vector3(0, 0.45, 0.05) * s, shell, shell_sc, false, 16)
+	_ball(rig, body, 0.5 * s, Vector3(0, 0.36, 0.05) * s, rim, Vector3(0.99, 0.3, 1.13), false, 16)
+	# Пластины панциря: одна сверху, четыре по бокам (повёрнуты по поверхности)
+	var top_p := _ball(rig, body, 0.15 * s, Vector3(0, 0.82, 0.05) * s, plate, Vector3(1.0, 1.0, 0.22), true)
+	_face(top_p, Vector3.UP)
+	for zi in 2:
+		for i in 2:
+			var side := float(i * 2 - 1)
+			var fz := float(zi * 2 - 1)
+			var u := Vector3(0.55 * side, 0.7, 0.45 * fz).normalized()
+			var p := Vector3(u.x * 0.475, 0.45 + u.y * 0.39, 0.05 + u.z * 0.55) * s
+			var pl := _ball(rig, body, 0.12 * s, p, plate, Vector3(1.0, 1.0, 0.22), true)
+			_face(pl, Vector3(u.x / 0.475, u.y / 0.39, u.z / 0.55))
+
+	# Шея и голова
+	var nk := _capsule(rig, body, 0.1 * s, 0.32 * s, Vector3(0, 0.41, -0.5) * s, skin)
+	nk.rotation.x = -1.1
+	var hr := 0.19 * s
+	var head := _joint(rig, body, "Head", Vector3(0, 0.46, -0.6) * s)
+	anim["head"] = head
+	_ball(rig, head, hr, Vector3.ZERO, skin, Vector3(1.0, 0.9, 1.05), false, 16)
+	_eyes(rig, head, hr, 0.07 * s, Color(0.14, 0.1, 0.08), 0.5, 0.18, true)
+	_blush(rig, head, hr, 0.04 * s, skin_c)
+	_ball(rig, head, 0.035 * s, Vector3(0, -0.07 * s, -hr * 0.95), _flat(skin_c.darkened(0.45)),
+		Vector3(1.6, 0.4, 0.5), true)
+
+	# Хвостик
+	var tail := _joint(rig, body, "Tail", Vector3(0, 0.3, 0.6) * s)
+	anim["tail"] = tail
+	var tc := _cyl(rig, tail, 0.0, 0.07 * s, 0.18 * s, Vector3(0, 0, 0.07) * s, skin)
+	tc.rotation.x = PI / 2.0
+
+	# Толстые лапы
+	var legs: Array = []
+	var zs := [-0.3, 0.32]
+	for zi in 2:
+		for i in 2:
+			var side := float(i * 2 - 1)
+			var hip := _joint(rig, root, "Leg", Vector3(0.36 * side, 0.26, float(zs[zi])) * s)
+			_capsule(rig, hip, 0.12 * s, 0.32 * s, Vector3(0, -0.1 * s, 0), skin)
+			legs.append(hip)
+	anim["legs"] = legs
+
+	# Точки для украшений питомца
+	var neck := _pivot(body, "Neck", Vector3(0, 0.42, -0.5) * s)
+	neck.rotation.x = -1.1
+	neck.set_meta("r", 0.12 * s)
+	neck.set_meta("charm", Vector3(0, -0.12, -0.04) * s)
+	var bow := _pivot(head, "Bow", Vector3(-0.12, 0.15, 0.0) * s)
+	bow.rotation.z = 0.4
+	_pivot(head, "Top", Vector3(0, hr * 0.95, 0))
+	var back := _pivot(body, "Back", Vector3(0, 0.45, 0.05) * s)
+	back.set_meta("radii", Vector3(0.5 * shell_sc.x, 0.5 * shell_sc.y, 0.5 * shell_sc.z) * s)
+	back.set_meta("u", Vector3(0.75, 0.55, -0.1))
+	root.set_meta("anim", anim)
+
+
+## Фазан (запасная модель): медное тело, бирюзовая голова с красными «масками» у глаз и ушками-перьями,
+## белое колечко на шее, светлые крылья, длинный полосатый хвост, тонкие ножки.
+## Размеры: высота 0.85, длина 1.1, ширина 0.4.
+static func _pheasant(root: Node3D, rig: Rig, color: Color, s: float) -> void:
+	var m := _lit(color)
+	var breast := _lit(color.darkened(0.15).lerp(Color(0.6, 0.18, 0.12), 0.35))
+	var wing := _lit(color.lerp(Color(0.9, 0.8, 0.55), 0.45))
+	var head_c := Color(0.12, 0.45, 0.42)
+	var head_m := _lit(head_c)
+	var tail_m := _lit(color.lerp(Color(0.85, 0.7, 0.45), 0.3))
+	var stripe := _lit(color.darkened(0.45))
+	var leg_m := _lit(Color(0.6, 0.48, 0.36))
+	var anim := {"kind": "quad", "s": s}
+
+	var body := _joint(rig, root, "Body", Vector3.ZERO)
+	anim["body"] = body
+	var body_sc := Vector3(0.85, 0.85, 1.25)
+	_ball(rig, body, 0.26 * s, Vector3(0, 0.46, 0.02) * s, m, body_sc, false, 16)
+	_ball(rig, body, 0.17 * s, Vector3(0, 0.44, -0.18) * s, breast, Vector3(0.95, 1.0, 0.8))
+	for i in 2:
+		var side := float(i * 2 - 1)
+		var w := _ball(rig, body, 0.17 * s, Vector3(0.17 * side, 0.5, 0.06) * s, wing, Vector3(0.35, 0.68, 1.25))
+		w.rotation.x = 0.2
+	# Шея с белым колечком
+	var nk := _capsule(rig, body, 0.07 * s, 0.22 * s, Vector3(0, 0.62, -0.2) * s, head_m)
+	nk.rotation.x = -0.3
+	var ring := _torus(rig, body, 0.065 * s, 0.09 * s, Vector3(0, 0.58, -0.19) * s, _lit(Color(0.97, 0.97, 0.93)))
+	ring.rotation.x = -0.3
+
+	# Голова: красные «маски», глаза, клювик, ушки-перья
+	var hr := 0.11 * s
+	var head := _joint(rig, body, "Head", Vector3(0, 0.74, -0.25) * s)
+	anim["head"] = head
+	_ball(rig, head, hr, Vector3.ZERO, head_m, Vector3.ONE, false, 14)
+	var red := _lit(Color(0.92, 0.2, 0.18))
+	for i in 2:
+		var side := float(i * 2 - 1)
+		var d := Vector3(0.62 * side, -0.05, -0.78).normalized()
+		var patch := _ball(rig, head, 0.055 * s, d * hr * 0.8, red, Vector3(0.9, 1.1, 0.7))
+		_face(patch, d)
+		var tuft := _cyl(rig, head, 0.0, 0.03 * s, 0.09 * s, Vector3(0.05 * side, 0.1, 0.04) * s,
+			_lit(head_c.darkened(0.3)))
+		tuft.rotation = Vector3(0.6, 0.0, -0.2 * side)
+	_eyes(rig, head, hr, 0.04 * s, Color(0.12, 0.08, 0.05), 0.6, 0.12, true)
+	var beak := _cyl(rig, head, 0.0, 0.035 * s, 0.09 * s, Vector3(0, -0.025, -0.14) * s, _lit(Color(0.95, 0.85, 0.55)))
+	beak.rotation.x = -PI / 2.0
+
+	# Длинный хвост из трёх перьев с тёмными полосками
+	var tail := _joint(rig, body, "Tail", Vector3(0, 0.5, 0.3) * s)
+	anim["tail"] = tail
+	tail.rotation.x = -0.35
+	for i in 3:
+		var side := float(i - 1)
+		var ln := 1.0 - 0.18 * absf(side)
+		var fz := 0.27 * ln
+		var f := _ball(rig, tail, 0.065 * s, Vector3(0.04 * side, 0.0, fz) * s, tail_m,
+			Vector3(0.65, 0.25, 4.2 * ln))
+		f.rotation.y = 0.16 * side
+		for k in 2:
+			var z := (0.18 + 0.2 * float(k)) * ln
+			var st := _ball(rig, tail, 0.05 * s, Vector3(0.04 * side + 0.16 * side * (z - fz), 0.012, z) * s, stripe,
+				Vector3(0.75, 0.2, 0.25), true)
+			st.rotation.y = 0.16 * side
+
+	# Тонкие ножки с лапками
+	var legs: Array = []
+	for i in 2:
+		var side := float(i * 2 - 1)
+		var hip := _joint(rig, root, "Leg", Vector3(0.08 * side, 0.3, 0.04) * s)
+		_capsule(rig, hip, 0.025 * s, 0.3 * s, Vector3(0, -0.14 * s, 0), leg_m)
+		_ball(rig, hip, 0.05 * s, Vector3(0, -0.29, -0.03) * s, leg_m, Vector3(1.0, 0.3, 1.4))
+		legs.append(hip)
+	anim["legs"] = legs
+
+	# Точки для украшений питомца
+	var neck := _pivot(body, "Neck", Vector3(0, 0.66, -0.21) * s)
+	neck.rotation.x = -0.3
+	neck.set_meta("r", 0.075 * s)
+	neck.set_meta("charm", Vector3(0, -0.03, -0.08) * s)
+	var bow := _pivot(head, "Bow", Vector3(-0.09, 0.08, 0.03) * s)
+	bow.rotation.z = 0.4
+	_pivot(head, "Top", Vector3(0, hr * 0.95 + 0.04 * s, 0))
+	var back := _pivot(body, "Back", Vector3(0, 0.46, 0.02) * s)
+	back.set_meta("radii", Vector3(0.26 * body_sc.x, 0.26 * body_sc.y, 0.26 * body_sc.z) * s)
 	root.set_meta("anim", anim)
 
 

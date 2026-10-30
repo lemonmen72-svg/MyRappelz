@@ -1,7 +1,9 @@
 class_name Mob
 extends CharacterBody3D
 ## Дикий зверь: бродит около дома, нападает на игрока рядом, уходит домой с лечением.
-## Модели видов строит CreatureModels. Метка приручения (Taming) видна кольцом и кристаллом над головой.
+## Модели видов строит CreatureModels (пантера, черепаха и фазан — модели из файлов, CreatureAsset:
+## клипы Idle/Walk/Run по скорости, Attack с моментом удара, Hit, Death; пока зверь спит, анимации стоят).
+## Метка приручения (Taming) видна кольцом и кристаллом над головой.
 ## Уникальный каменный страж раз в несколько секунд бьёт по площади (с замахом).
 
 ## killed = true: зверя убили, false: его забрали из мира (consume)
@@ -49,6 +51,12 @@ var _regen_acc := 0.0
 var _mat: Material
 var _label: Label3D
 var _model: Node3D
+## Модель из файла (или null — модель из примитивов).
+var _asset: CreatureAsset = null
+## Удар, который ещё не нанесён: ждёт момента удара в клипе Attack модели из файла.
+var _hit_target: Node3D = null
+var _hit_left := 0.0
+var _hit_dmg := 0
 var _height := 1.4
 var _anim_t := 0.0
 var _mark: Node3D = null
@@ -92,6 +100,7 @@ func _ready() -> void:
 	_model = Node3D.new()
 	add_child(_model)
 	_mat = CreatureModels.build(_model, type_id, color, body_scale)
+	_asset = CreatureModels.asset_of(_model)
 	CreatureModels.add_collision(self, type_id, body_scale)
 	_height = CreatureModels.height(type_id, body_scale)
 	_anim_t = randf() * 10.0
@@ -135,6 +144,8 @@ func _update_sleep(delta: float) -> void:
 	if far != _asleep:
 		_asleep = far
 		visible = not far
+		if _asset != null:
+			_asset.set_sleeping(far)
 
 
 func _process(delta: float) -> void:
@@ -145,7 +156,10 @@ func _process(delta: float) -> void:
 		return
 	_anim_t += delta
 	var hv := Vector2(velocity.x, velocity.z).length()
-	CreatureModels.animate(_model, type_id, _anim_t, clampf(hv / maxf(speed, 0.1), 0.0, 1.0))
+	if _asset != null:
+		_asset.update(delta, hv)
+	else:
+		CreatureModels.animate(_model, type_id, _anim_t, clampf(hv / maxf(speed, 0.1), 0.0, 1.0))
 	if _mark != null and _mark.visible:
 		_mark.rotation.y += delta * 1.5
 		_mark_gem.position.y = _height + 0.9 + sin(_anim_t * 3.0) * 0.12
@@ -162,7 +176,12 @@ func _physics_process(delta: float) -> void:
 	if stun_time > 0.0:
 		stun_time -= delta
 		_slam_windup = 0.0
+		_hit_target = null
 		return
+	if _hit_target != null:
+		_hit_left -= delta
+		if _hit_left <= 0.0:
+			_land_hit()
 
 	if target != null and _target_gone():
 		target = null
@@ -207,7 +226,15 @@ func _physics_process(delta: float) -> void:
 			dir = to.normalized()
 		elif attack_cd <= 0.0:
 			attack_cd = 1.3
-			target.call("take_damage", atk + randi_range(-1, 2), self)
+			var dmg := atk + randi_range(-1, 2)
+			var delay := _asset.play_attack(attack_cd) if _asset != null else 0.0
+			if delay > 0.0:
+				# Удар попадёт в момент удара клипа Attack
+				_hit_target = target
+				_hit_left = delay
+				_hit_dmg = dmg
+			else:
+				target.call("take_damage", dmg, self)
 	else:
 		# Ищем игрока
 		var p := get_tree().get_first_node_in_group("player") as Node3D
@@ -241,6 +268,21 @@ func _physics_process(delta: float) -> void:
 		face = dir
 	if face.length() > 0.01:
 		rotation.y = lerp_angle(rotation.y, atan2(-face.x, -face.z), 8.0 * delta)
+
+
+## Отложенный удар (модель из файла): цель ещё рядом и жива — получает урон.
+func _land_hit() -> void:
+	if not is_instance_valid(_hit_target):
+		_hit_target = null
+		return
+	var t := _hit_target
+	_hit_target = null
+	if t.get("is_down") == true or t.get("is_dead") == true:
+		return
+	var d := t.global_position - global_position
+	d.y = 0.0
+	if d.length() <= _reach() + 1.5:
+		t.call("take_damage", _hit_dmg, self)
 
 
 ## Дальность ближней атаки: крупные звери достают дальше.
@@ -387,13 +429,26 @@ func _die() -> void:
 	_label.hide()
 	if _mark != null:
 		_mark.hide()
+	_hit_target = null
 	gone.emit(self, true)
-	Vfx.death_puff(get_parent(), global_position + Vector3(0, _height * 0.4, 0), clampf(body_scale, 0.7, 2.0))
 	var t := create_tween()
-	t.tween_property(self, "scale", Vector3(1.2, 0.8, 1.2), 0.08)
-	t.tween_property(self, "scale", Vector3(0.2, 1.3, 0.2), 0.12)
-	t.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.2)
+	var death := _asset.play_death() if _asset != null else 0.0
+	if death > 0.0:
+		# Модель из файла: клип смерти, пауза, затем зверь тает в облачке
+		t.tween_interval(death + 0.5)
+		t.tween_callback(_death_puff)
+		t.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	else:
+		Vfx.death_puff(get_parent(), global_position + Vector3(0, _height * 0.4, 0), clampf(body_scale, 0.7, 2.0))
+		t.tween_property(self, "scale", Vector3(1.2, 0.8, 1.2), 0.08)
+		t.tween_property(self, "scale", Vector3(0.2, 1.3, 0.2), 0.12)
+		t.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.2)
 	t.tween_callback(queue_free)
+
+
+func _death_puff() -> void:
+	if is_inside_tree():
+		Vfx.death_puff(get_parent(), global_position + Vector3(0, _height * 0.3, 0), clampf(body_scale, 0.7, 2.0))
 
 
 ## Убрать зверя из мира без убийства.
@@ -406,6 +461,8 @@ func consume() -> void:
 
 func _flash() -> void:
 	CreatureModels.flash(self, _mat)
+	if _asset != null:
+		_asset.play_hit()
 	# Модель «сплющивается» от удара и пружинит обратно
 	if _model != null:
 		var sq := create_tween()

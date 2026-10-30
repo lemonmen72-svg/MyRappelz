@@ -1,6 +1,7 @@
 extends "res://tests/test_base.gd"
-## Питомцы: приручение кабана (метка → добить), редкий зверь без кристалла, призыв/отзыв через окно,
-## помощь в бою и опыт, эволюция, смерть, воскрешение свитком, отпускание, сохранение коллекции.
+## Питомцы: приручение кабана (метка → добить), уникальный страж без древнего кристалла, призыв/отзыв
+## через окно, помощь в бою и опыт, эволюция, смерть, воскрешение свитком, отпускание, сохранение
+## коллекции, перевод старых видов и предметов (медведь, искрожук, фея) в новые при загрузке.
 
 const MAX_TRIES := 15
 
@@ -27,8 +28,22 @@ func run_step() -> void:
 			check(game.pets.is_empty() and pm.active_pet == null, "питомцев пока нет")
 			for id in MobData.TYPES:
 				check(PetData.SPECIES.has(id), "есть вид питомца для зверя %s" % id)
-			check(PetData.role("bear") == "tank" and PetData.role("golem") == "tank", "медведь и страж — танки")
-			check(PetData.role("fairy") == "healer" and PetData.role("sparkbug") == "mage", "фея — лекарь, искрожук — маг")
+			check(PetData.role("turtle") == "tank" and PetData.role("golem") == "tank", "черепаха и страж — танки")
+			check(PetData.role("pheasant") == "healer" and PetData.role("panther") == "mage", "фазан — лекарь, пантера — маг")
+			for id in ["bear", "sparkbug", "fairy"]:
+				check(not MobData.TYPES.has(id) and not PetData.SPECIES.has(id), "старого вида %s больше нет" % id)
+				check(MobData.TYPES.has(MobData.migrate_id(id)), "старый вид %s → %s" % [id, MobData.migrate_id(id)])
+			for id in ["panther", "turtle", "pheasant"]:
+				check(String(MobData.get_type(id)["rarity"]) == "common", "%s — базовой редкости" % id)
+				check(MobData.rarity_name(id) == "Базовый", "редкость %s видна как «Базовый»" % id)
+				check(tm.needed_crystal(id) == "crystal_common", "%s приручается базовым кристаллом" % id)
+				var names: Array = PetData.get_species(id)["stages"]
+				check(names.size() == 3, "у вида %s три стадии: %s" % [id, str(names)])
+				for e in MobData.get_type(id)["loot"]:
+					var it := String(e[0])
+					check(not ItemData.get_item(it).is_empty(), "добыча %s есть в предметах: %s" % [id, it])
+			check(ItemData.get_item("crystal_common")["desc"].contains("базовых"), "кристалл — для базовых зверей")
+			check(MobData.rarity_label("unique") == "Уникальный", "редкость стража — «Уникальный»")
 			check(PetData.role("boar") == "fighter" and PetData.role("wolf") == "fighter", "кабан и волк — бойцы")
 			check(PetData.stage_for(1) == 0 and PetData.stage_for(14) == 0, "стадия 1 до 15 уровня")
 			check(PetData.stage_for(15) == 1 and PetData.stage_for(30) == 2, "стадии 2 и 3 с 15 и 30 уровня")
@@ -38,15 +53,16 @@ func run_step() -> void:
 			check(PetData.stage_scale("boar", 30) > PetData.stage_scale("boar", 1), "старшая стадия крупнее")
 			step = 1
 		1:
-			# Редкого зверя без редкого кристалла не приручить
-			mob = find_mob("fairy")
-			check(mob != null, "найдена фея")
+			# Уникального стража без древнего кристалла не приручить
+			mob = find_mob("golem")
+			check(mob != null, "найден каменный страж")
 			stand_near(mob, 3.0)
 			player.current_target = mob
 			main._on_action("tame")
-			check(tm.marked == null and not mob.tame_marked, "без редкого кристалла метка не ставится")
+			check(tm.marked == null and not mob.tame_marked, "без древнего кристалла метка не ставится")
 			var msg: String = main.hud._msg_label.text
-			check(msg.contains(ItemData.item_name("crystal_rare")), "сообщение о нужном кристалле: " + msg)
+			check(msg.contains(ItemData.item_name("crystal_unique")), "сообщение о нужном кристалле: " + msg)
+			check(msg.contains("Уникальный"), "в сообщении редкость зверя: " + msg)
 			player.current_target = null
 			player.global_position = Vector3(0, 0.1, 2)
 			mob.target = null
@@ -81,6 +97,7 @@ func run_step() -> void:
 			check(main.hud._pet_box.visible, "панель питомца видна")
 			main._on_action("pets_window")
 			check(main.hud.is_window_open(), "окно питомцев открыто")
+			check(_window_text(pm).contains("Базовый"), "в окне питомцев видна редкость «Базовый»")
 			press(pm, "recall_0")
 			check(pm.active_pet == null and game.active_pet == -1, "питомец отозван")
 			check(not main.hud._pet_box.visible, "панель питомца скрыта после отзыва")
@@ -184,12 +201,52 @@ func run_step() -> void:
 			check(String(r["name"]) == PetData.stage_name("boar", 15), "имя восстановлено")
 			check(int(r["hp"]) == hp_saved and not bool(r["dead"]), "HP восстановлен")
 			check(game.active_pet == 0, "призванный питомец восстановлен")
+			_check_old_save()
+			check(game.load_game(), "игра загружена снова")
+			check(game.pets.size() == 1 and game.active_pet == 0, "коллекция после проверки старого сохранения")
 			wait = 2
 			step = 11
 		11:
 			check(pm.active_pet != null and is_same(pm.active_pet.record, game.pets[0]), "питомец привязан к загруженной записи")
 			check(pm.active_pet.hp == hp_saved and pm.active_pet.level == 15, "питомец в мире с сохранёнными HP и уровнем")
 			ok_done()
+
+
+## Старое сохранение (виды bear/sparkbug/fairy и их трофеи) переводится в новые виды и предметы.
+func _check_old_save() -> void:
+	game.from_dict({
+		"name": "Старый", "race": "human", "class": "warrior", "level": 5, "gold": 10,
+		"inventory": {"bear_claw": 2, "fairy_dust": 1, "spark_core": 3, "panther_fang": 1, "hp_potion": 2},
+		"pets": [
+			{"species": "bear", "name": "Косолапик", "level": 20, "xp": 5, "hp": -1, "dead": false},
+			{"species": "sparkbug", "name": "Искорка", "level": 3},
+			{"species": "fairy", "name": "Росинка", "level": 31, "dead": true},
+			{"species": "wolf", "name": "Серохвост", "level": 2},
+		],
+		"active_pet": 1,
+	})
+	var sp: Array = []
+	for r in game.pets:
+		sp.append(String(r["species"]))
+	check(sp == ["panther", "turtle", "pheasant", "wolf"], "старые виды переведены: %s" % [sp])
+	check(String(game.pets[0]["name"]) == PetData.stage_name("panther", 20), "имя — стадия нового вида: %s"
+		% game.pets[0]["name"])
+	check(int(game.pets[0]["level"]) == 20 and bool(game.pets[2]["dead"]), "уровень и гибель сохранены")
+	check(String(game.pets[3]["name"]) == "Серохвост", "имя питомца прежнего вида не тронуто")
+	check(game.active_pet == 1, "призванный питомец тот же")
+	var inv: Inventory = game.inventory
+	check(inv.count("panther_fang") == 3 and inv.count("pheasant_feather") == 1 and inv.count("shell_plate") == 3,
+		"старые трофеи переведены в новые: %s" % [inv.to_dict()])
+	check(not inv.has("bear_claw") and inv.count("hp_potion") == 2, "старых id в сумке нет, прочее на месте")
+
+
+## Весь текст окна питомцев.
+func _window_text(pm: PetManager) -> String:
+	var t := ""
+	if is_instance_valid(pm._window_body):
+		for n in pm._window_body.find_children("*", "Label", true, false):
+			t += (n as Label).text + "\n"
+	return t
 
 
 ## Нажимает кнопку открытого окна питомцев.

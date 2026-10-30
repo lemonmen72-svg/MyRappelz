@@ -105,18 +105,35 @@ func from_dict(d: Dictionary) -> void:
 	level = int(d.get("level", 1))
 	xp = int(d.get("xp", 0))
 	gold = int(d.get("gold", 0))
-	inventory.from_dict(d.get("inventory", {}))
+	inventory.from_dict(migrate_items(d.get("inventory", {})))
 	for p in d.get("pets", []):
 		var r: Dictionary = p
+		var sp := String(r.get("species", "boar"))
+		var lvl := int(r.get("level", 1))
+		var pet_name := String(r.get("name", "Питомец"))
+		var new_sp := MobData.migrate_id(sp)
+		if new_sp != sp:
+			# Вид из старой версии заменён новым: имя — название стадии нового вида
+			sp = new_sp
+			pet_name = PetData.stage_name(sp, lvl)
 		pets.append({
-			"species": String(r.get("species", "boar")), "name": String(r.get("name", "Питомец")),
-			"level": int(r.get("level", 1)), "xp": int(r.get("xp", 0)),
+			"species": sp, "name": pet_name,
+			"level": lvl, "xp": int(r.get("xp", 0)),
 			"hp": int(r.get("hp", -1)), "dead": bool(r.get("dead", false)),
 		})
 	active_pet = int(d.get("active_pet", -1))
 	if active_pet >= pets.size():
 		active_pet = -1
 	changed.emit()
+
+
+## Сумка из сохранения с прежними id предметов (bear_claw и т. п.) → новые id, количества складываются.
+static func migrate_items(src: Dictionary) -> Dictionary:
+	var res: Dictionary = {}
+	for k in src:
+		var id := ItemData.migrate_id(String(k))
+		res[id] = int(res.get(id, 0)) + int(src[k])
+	return res
 
 
 func has_save() -> bool:
