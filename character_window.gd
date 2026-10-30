@@ -1,8 +1,10 @@
 class_name CharacterWindow
 extends Node
 ## Окно героя (кнопка «Герой» в HUD, клавиша K). Вкладки сверху (не прокручиваются):
-## «Герой» — 3D-превью с оружием в руках, уровень и опыт, HP/MP, очки умений, атака, защита, уклонение, крит,
-## скорость атаки, дальность и выбор оружия (у Бродяги — из сумки: парные кинжалы, парные мечи, арбалет);
+## «Герой» — 3D-превью с оружием в руках, уровень и опыт, HP/MP, очки умений, 7 характеристик (HeroStats, как
+## у питомцев) и боевые показатели (HP, MP, физ./маг. атака и защита, точность, уклонение, крит, скорость атаки,
+## восстановление HP/MP, дальность, бег — с оружием и умениями), выбор оружия (у Бродяги — из сумки: парные
+## кинжалы, парные мечи, арбалет);
 ## древо умений — у Бродяги три вкладки «Общие» / «Мечи и кинжалы» / «Арбалет», у других классов одна «Умения».
 ## Древо — SkillTree (ярусы по уровню героя, линии пререквизитов), справа карточка выбранного умения:
 ## тип, оружие, уровень, эффект сейчас и на следующем, требования, «+ N JP», у переключаемых «Вкл/Выкл»,
@@ -13,7 +15,7 @@ extends Node
 const WINDOW_SIZE := Vector2(1180, 660)
 const TREE_SIZE := Vector2(660, 430)
 const CARD_W := 430.0
-const PREVIEW_SIZE := Vector2i(260, 300)
+const PREVIEW_SIZE := Vector2i(230, 270)
 const GOLD := Color(1.0, 0.85, 0.45)
 const MUTED := Color(0.78, 0.8, 0.9)
 const GOOD := Color(0.55, 1.0, 0.6)
@@ -128,12 +130,11 @@ func _on_tab(which: String) -> void:
 func _build_hero(body: VBoxContainer) -> void:
 	var p := _player()
 	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 20)
+	top.add_theme_constant_override("separation", 18)
 	body.add_child(top)
 	top.add_child(_build_preview(p))
 
 	var info := VBoxContainer.new()
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_constant_override("separation", 4)
 	top.add_child(info)
 	info.add_child(_label(Game.char_name, 30, GOLD))
@@ -157,21 +158,41 @@ func _build_hero(body: VBoxContainer) -> void:
 	to_sk.pressed.connect(_on_tab.bind(String(HeroSkills.tabs_for(Game.class_id)[0][0])))
 	jp_row.add_child(to_sk)
 	buttons["to_skills"] = to_sk
+	info.add_child(_label("JP копятся за победы: %d за каждый уровень опыта." % HeroSkills.JP_PER_LEVEL, 17, MUTED))
 
-	# Боевые показатели (4 колонки: название, значение, название, значение)
+	# 7 характеристик (как у питомцев): у героя со статами (Бродяга)
+	if not p.hero_stats.is_empty():
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 2)
+		top.add_child(col)
+		col.add_child(_label("Характеристики", 23, GOLD))
+		var g1 := GridContainer.new()
+		g1.columns = 2
+		g1.add_theme_constant_override("h_separation", 18)
+		g1.add_theme_constant_override("v_separation", 0)
+		col.add_child(g1)
+		var st: Dictionary = p.hero_stats["stats"]
+		var main_stat := String(HeroStats.MAIN_STAT["ranged" if p.attack_kind == "ranged" else "melee"])
+		for k in Stats.STATS:
+			var key := String(k)
+			g1.add_child(_label(String(Stats.STAT_NAMES[key]) + (" ★" if key == main_stat else ""), 19, MUTED))
+			g1.add_child(_label(str(int(st[key])), 19, Color.WHITE))
+
+	# Боевые показатели (с оружием, умениями и усилениями; по три пары в ряд)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 16)
+	body.add_child(head)
+	head.add_child(_label("Боевые показатели", 23, GOLD))
+	if not p.hero_stats.is_empty():
+		var note := _label("★ — от главной характеристики оружия: клинки — Сила, арбалет — Меткость", 16, MUTED)
+		note.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		head.add_child(note)
 	var g := GridContainer.new()
-	g.columns = 4
-	g.add_theme_constant_override("h_separation", 22)
+	g.columns = 6
+	g.add_theme_constant_override("h_separation", 18)
 	g.add_theme_constant_override("v_separation", 0)
-	info.add_child(g)
-	var aps := 1.0 / maxf(p.attack_time, 0.05)
-	var rows := [
-		["Атака", str(p.cur_atk())], ["Защита", str(p.defense + p.aura_def)],
-		["Уклонение", "%d%%" % roundi(p.cur_eva() * 100.0)], ["Шанс крита", "%d%%" % roundi(p.cur_crit() * 100.0)],
-		["Скорость атаки", "%.2f / с" % aps], ["Дальность", "%.1f м" % p.attack_range],
-		["Скорость бега", "%.1f м/с" % p.cur_speed()], ["Атака", _attack_text(p)],
-	]
-	for r in rows:
+	body.add_child(g)
+	for r in _combat_rows(p):
 		g.add_child(_label(String(r[0]), 19, MUTED))
 		g.add_child(_label(String(r[1]), 19, Color.WHITE))
 
@@ -199,6 +220,38 @@ func _build_hero(body: VBoxContainer) -> void:
 		b.pressed.connect(_on_weapon.bind(wid))
 		wrow.add_child(b)
 		buttons["weapon_" + wid] = b
+
+
+## Строки боевых показателей: [название, значение]. У героя со статами — набор как в окне существа
+## (HP, MP, атаки, защиты, точность, уклонение, крит, скорость атаки, восстановление) плюс дальность и бег.
+func _combat_rows(p: Player) -> Array:
+	var aps := 1.0 / maxf(p.attack_time, 0.05)
+	var rows: Array = []
+	var hs := p.hero_stats
+	if hs.is_empty():
+		rows.append(["Атака", str(p.cur_atk())])
+		rows.append(["Защита", str(p.defense + p.aura_def)])
+	else:
+		rows.append(["Макс. HP", str(p.max_hp)])
+		rows.append(["Макс. MP", str(p.max_mp)])
+		rows.append(["Физ. атака ★", "%d (%s)" % [p.cur_atk(), _attack_text(p)]])
+		rows.append(["Маг. атака", str(int(hs["matk"]))])
+		rows.append(["Физ. защита", str(p.defense + p.aura_def)])
+		rows.append(["Маг. защита", str(int(hs["mdef"]))])
+		rows.append(["Точность", str(p.accuracy)])
+	rows.append(["Уклонение", "%.1f%%" % (p.cur_eva() * 100.0)])
+	rows.append(["Шанс крита", "%.1f%%" % (p.cur_crit() * 100.0)])
+	if hs.is_empty():
+		rows.append(["Скорость атаки", "%.2f / с" % aps])
+	else:
+		rows.append(["Скорость атаки", "%d%% · %.2f уд./с" % [roundi(p.aspd * 100.0), aps]])
+		rows.append(["Восст. HP", "%.1f/с" % (p.hp_regen + p.aura_regen)])
+		rows.append(["Восст. MP", "%.1f/с" % p.mp_regen_rate(true)])
+	rows.append(["Дальность", "%.1f м" % p.attack_range])
+	rows.append(["Скорость бега", "%.1f м/с" % p.cur_speed()])
+	if hs.is_empty():
+		rows.append(["Атака", _attack_text(p)])
+	return rows
 
 
 func _attack_text(p: Player) -> String:
@@ -239,7 +292,7 @@ func _bar_line(title: String, v: int, mx: int, col: Color, prefix: String = "") 
 	row.add_child(l)
 	var b := ProgressBar.new()
 	b.show_percentage = false
-	b.custom_minimum_size = Vector2(330, 18)
+	b.custom_minimum_size = Vector2(250, 18)
 	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	b.max_value = maxi(1, mx)
 	b.value = clampi(v, 0, maxi(1, mx))

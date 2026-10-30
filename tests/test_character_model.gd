@@ -156,14 +156,31 @@ func run_step() -> void:
 		6:
 			check(create._preview_model != null and is_instance_valid(create._preview_model),
 				"экран создания: 3D-превью построено")
-			create._select_race("dark_elf")
+			# Доступна одна профессия — Бродяга: другие расы и классы затемнены («скоро») и не выбираются
+			check(create._race == "dark_elf" and create._class == "assassin", "по умолчанию — тёмная эльфийка-Бродяга")
+			var hb: Button = create._race_btns["human"]
+			check(hb.disabled and hb.text.contains("скоро"), "раса «Люди» затемнена: %s" % hb.text)
+			check(not (create._race_btns["dark_elf"] as Button).disabled, "тёмные эльфы доступны")
+			var wl: Button = null
+			for b in create._class_box.get_children():
+				if (b as Button).text.begins_with("Чернокнижник"):
+					wl = b as Button
+			check(wl != null and wl.disabled and wl.text.contains("скоро"), "класс «Чернокнижник» затемнён")
+			create._select_race("human")
 			create._select_class("warlock")
+			check(create._race == "dark_elf" and create._class == "assassin", "недоступные раса и класс не выбираются")
+			check(create._class_stats7.visible and create._class_stats7.text.contains("Ловкость"),
+				"у Бродяги 7 статов: %s" % create._class_stats7.text)
 			wait = 5
 			step = 7
 		7:
 			var pm: CharacterModel = create._preview_model
-			check(pm != null and pm._asset != null and pm.has_ears(), "превью обновилось: главный герой из файла")
-			check(create._preview_caption.text.contains("Чернокнижник"), "превью: подпись класса обновилась")
+			check(pm != null and pm._asset != null and pm.has_ears(), "превью: главный герой из файла")
+			check(create._preview_caption.text.contains("Бродяга"), "превью: подпись «%s»" % create._preview_caption.text)
+			var got: Array = []
+			create.created.connect(func(n: String, r: String, c: String): got.append_array([n, r, c]))
+			create._on_start()
+			check(got.size() == 3 and got[1] == "dark_elf" and got[2] == "assassin", "«Начать игру» — Бродяга: %s" % [got])
 			create.queue_free()
 			ok_done()
 

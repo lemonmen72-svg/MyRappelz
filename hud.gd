@@ -295,9 +295,10 @@ func set_target(t: Node3D) -> void:
 	_refresh_target()
 
 
-func show_message(t: String) -> void:
+## Сообщение внизу экрана на sec секунд.
+func show_message(t: String, sec: float = 3.0) -> void:
 	_msg_label.text = t
-	_msg_time = 3.0
+	_msg_time = sec
 
 
 # ---------- Внутреннее ----------

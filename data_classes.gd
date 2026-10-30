@@ -1,6 +1,12 @@
 class_name ClassData
 extends RefCounted
 ## Расы, классы и умения персонажа. Берём только архетипы жанра, названия и описания свои.
+## Пока персонаж один: герой всегда тёмная эльфийка-Бродяга (HERO_RACE, HERO_CLASS). Остальные расы и классы
+## видны на экране создания с подписью «Скоро», их код и умения остаются (проверяются автотестами).
+
+## Единственные доступные игроку раса и класс; старые сохранения с другими переводит Game.from_dict.
+const HERO_RACE := "dark_elf"
+const HERO_CLASS := "assassin"
 
 ## Внешний вид (CharacterModel): skin — кожа, hair — волосы, eyes — радужка, hair_style — причёска
 ## ("short" | "long" | "ponytail"), ears — заострённые уши.
@@ -34,6 +40,8 @@ const RACES := {
 ## (у Бродяги — вид оружия по умолчанию: оно сменное, см. ItemData.STARTER_WEAPONS; atk — без оружия).
 ## mp/mp_lvl: запас MP (у кого нет — умения без MP), eva: шанс уклониться от удара зверя 0..1.
 ## skills: умения класса; у Бродяги это стартовые умения древа HeroSkills (остальные изучаются за JP).
+## У классов со статами (HeroStats.has_stats — Бродяга) hp, mp, atk, def, eva и crit — числа 1-го уровня
+## для калибровки, рост по уровню идёт от 7 статов (HeroStats), а не от *_lvl.
 const CLASSES := {
 	"warrior": {
 		"name": "Воин", "race": "human", "weapon": "axe",
@@ -118,6 +126,19 @@ const SKILLS := {
 
 ## Названия типов атаки для интерфейса.
 const ATTACK_NAMES := {"melee": "ближний бой", "ranged": "лук", "magic": "магия"}
+
+
+## Доступен ли класс игроку (на экране создания).
+static func is_playable(class_id: String) -> bool:
+	return class_id == HERO_CLASS
+
+
+## Доступна ли раса игроку (есть доступный класс).
+static func race_playable(race_id: String) -> bool:
+	for cid in race(race_id)["classes"]:
+		if is_playable(String(cid)):
+			return true
+	return false
 
 
 static func race(id: String) -> Dictionary:

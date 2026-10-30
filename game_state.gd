@@ -1,5 +1,9 @@
 extends Node
 ## Автозагрузка Game: персонаж, сумка, оружие и умения героя, питомцы, сохранение в user://.
+## Герой игрока всегда тёмная эльфийка-Бродяга (ClassData.HERO_RACE / HERO_CLASS): старые сохранения с другой
+## расой или классом переводятся при загрузке (from_dict) — уровень, опыт, золото, сумка и питомцы сохраняются,
+## выдаётся оружие Бродяги, JP — как будто копились с 1 уровня. Новый персонаж другого класса создаётся
+## только автотестами (проверка механики классов).
 
 signal changed
 
@@ -25,6 +29,8 @@ var weapon := ""
 var hero: Dictionary = {}
 ## Переключаемые умения, выключенные последней сменой оружия (для сообщения игроку).
 var last_dropped_toggles: Array = []
+## Сообщение игроку после загрузки (герой переведён в Бродягу); main показывает его при входе и очищает.
+var load_note := ""
 ## Питомцы: {"species": String, "name": String, "level": int, "xp": int, "hp": int, "dead": bool,
 ## "mp": int, "jp": int (очки умений), "jp_part": float (накопленная доля JP), "skills": {id умения: уровень},
 ## "toggles": {id включённого переключаемого умения: true}} (умения — PetSkills). hp, mp = -1: полный запас.
@@ -59,6 +65,7 @@ func reset() -> void:
 	inventory.from_dict({})
 	weapon = ""
 	hero = {}
+	load_note = ""
 	pets.clear()
 	active_pet = -1
 
@@ -166,8 +173,15 @@ func from_dict(d: Dictionary) -> void:
 	reset()
 	has_character = true
 	char_name = String(d.get("name", "Герой"))
-	race_id = String(d.get("race", "human"))
-	class_id = String(d.get("class", "warrior"))
+	race_id = String(d.get("race", ClassData.HERO_RACE))
+	class_id = String(d.get("class", ClassData.HERO_CLASS))
+	# Герой — всегда Бродяга: другие раса и класс (старые сохранения) переводятся, прежние умения класса
+	# не переносятся (у Бродяги своё древо)
+	var converted := race_id != ClassData.HERO_RACE or class_id != ClassData.HERO_CLASS
+	if converted:
+		race_id = ClassData.HERO_RACE
+		class_id = ClassData.HERO_CLASS
+		load_note = "Ваш герой стал Бродягой: остальные профессии появятся позже"
 	level = int(d.get("level", 1))
 	xp = int(d.get("xp", 0))
 	gold = int(d.get("gold", 0))
@@ -196,11 +210,19 @@ func from_dict(d: Dictionary) -> void:
 	active_pet = int(d.get("active_pet", -1))
 	if active_pet >= pets.size():
 		active_pet = -1
-	# Оружие (старые сохранения Бродяги — парные мечи и стартовый набор в сумку, см. ensure_hero)
-	weapon = String(d.get("weapon", ""))
+	# Оружие (старые сохранения Бродяги и переведённые герои — парные мечи и стартовый набор в сумку,
+	# см. ensure_hero)
+	weapon = "" if converted else String(d.get("weapon", ""))
 	# Умения героя: старые сохранения — JP, как будто копились с 1 уровня, стартовые умения
 	var h: Variant = d.get("hero", null)
-	if h is Dictionary:
+	if converted:
+		# Прежний класс тратил JP только на свои умения (бесплатные): ничего не теряется
+		hero = HeroSkills.new_record(class_id, level)
+		if h is Dictionary:
+			var old: Dictionary = h
+			hero["jp"] = maxi(int(hero["jp"]), int(old.get("jp", 0)))
+			hero["jp_part"] = float(old.get("jp_part", 0.0))
+	elif h is Dictionary:
 		hero = (h as Dictionary).duplicate(true)
 		hero["jp"] = int(hero.get("jp", HeroSkills.default_jp(level)))
 		hero["jp_part"] = float(hero.get("jp_part", 0.0))

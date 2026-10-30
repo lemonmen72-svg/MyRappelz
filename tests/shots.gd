@@ -199,7 +199,7 @@ func run_step() -> void:
 		20:
 			shot("18_creature_skills")
 			main.hud.close_window()
-			# Бродяга: окно героя (вкладка «Герой» и древо «Мечи и кинжалы»)
+			# Бродяга: окно героя (вкладка «Герой» с 7 характеристиками и боевыми показателями, древо «Мечи и кинжалы»)
 			main.pets.recall()
 			game.race_id = "dark_elf"
 			game.class_id = "assassin"
@@ -211,6 +211,9 @@ func run_step() -> void:
 					HeroSkills.learn(game.hero, "assassin", game.level, String(e[0]))
 			player.refresh_skills()
 			player.set_toggle("concentration", true)
+			# Вкладка «Герой»: 7 характеристик, боевые показатели, неполные HP и MP
+			player.hp = roundi(player.max_hp * 0.8)
+			player.mp = roundi(player.max_mp * 0.65)
 			main.hero_window.open("hero")
 			wait = 40
 			step = 21

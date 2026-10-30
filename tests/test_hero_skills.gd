@@ -5,8 +5,10 @@ extends "res://tests/test_base.gd"
 ## при смене оружия, пассивки владения — только со своим оружием), изучение за JP (уровень, пререквизит, JP),
 ## пассивки меняют показатели, активные тратят MP и уходят на перезарядку, назначение на кнопки 1–4,
 ## переключаемые (MP, поддержка, выключение без MP), сон / страх / отбрасывание / урон со временем у зверей,
-## JP за опыт, окно героя (вкладка «Герой», выбор оружия, древо по вкладкам, карточка, «+ JP», «На кнопку»),
-## сохранение и загрузка, старые сохранения, древо других классов.
+## JP за опыт, окно героя (вкладка «Герой»: 7 характеристик и боевые показатели, выбор оружия; древо по вкладкам,
+## карточка, «+ JP», «На кнопку»), 7 статов героя и производные (HeroStats: калибровка 1-го уровня, рост, точность
+## и промахи, атака арбалета от Меткости), сохранение и загрузка, старые сохранения (воин → Бродяга),
+## древо других классов.
 
 const MainScript := preload("res://main.gd")
 
@@ -27,6 +29,7 @@ func run_step() -> void:
 		0:
 			_check_data()
 			_check_start(player)
+			_check_stats(player)
 			step = 1
 		1:
 			# Оружие: парные мечи → кинжалы → арбалет
@@ -295,6 +298,75 @@ func _check_start(player: Player) -> void:
 	check(player.eva > 0.0, "у Бродяги есть уклонение: %d%%" % roundi(player.eva * 100.0))
 
 
+## 7 статов героя (HeroStats) и производные: калибровка 1-го уровня под прежние числа Бродяги, рост с уровнем
+## (близко к прежнему ClassData), точность и промахи, атака арбалета от Меткости, общий код со статами питомцев.
+func _check_stats(player: Player) -> void:
+	check(HeroStats.has_stats("assassin") and not HeroStats.has_stats("warrior"), "статы — у Бродяги")
+	var s1 := HeroStats.base_stats("assassin", 1)
+	check(s1 == {"str": 21, "vit": 22, "agi": 25, "int": 18, "wis": 18, "dex": 25, "luck": 12},
+		"статы 1-го уровня (асура, Strider ур. проф. 3): %s" % [s1])
+	var d1 := HeroStats.derived("assassin", 1)
+	var c := ClassData.cls("assassin")
+	check(int(d1["max_hp"]) == int(c["hp"]) and int(d1["patk"]) == int(c["atk"]) and int(d1["ratk"]) == int(c["atk"])
+		and int(d1["def"]) == int(c["def"]) and int(d1["max_mp"]) == int(c["mp"]),
+		"1-й уровень = прежние числа: HP %d, атака %d/%d, защита %d, MP %d" % [int(d1["max_hp"]), int(d1["patk"]),
+		int(d1["ratk"]), int(d1["def"]), int(d1["max_mp"])])
+	check(absf(float(d1["eva"]) - 100.0 * float(c["eva"])) < 0.01 and absf(float(d1["crit"]) - 100.0 * float(c["crit"])) < 0.01,
+		"уклонение %.1f%%, крит %.1f%% на 1-м уровне" % [float(d1["eva"]), float(d1["crit"])])
+	# Рост: статы не убывают, HP / атака / защита / MP растут и близки к прежней формуле (±20%)
+	var prev := d1
+	var bad := ""
+	for lv in range(2, 16):
+		var d := HeroStats.derived("assassin", lv)
+		for k in Stats.STATS:
+			if int(d["stats"][k]) < int(prev["stats"][k]):
+				bad += " ур.%d %s" % [lv, k]
+		for k in ["max_hp", "patk", "max_mp", "acc"]:
+			if int(d[k]) <= int(prev[k]):
+				bad += " ур.%d %s" % [lv, k]
+		var old := ClassData.stats_for("assassin", lv)
+		for pair in [["max_hp", "max_hp"], ["patk", "atk"], ["def", "def"], ["max_mp", "max_mp"]]:
+			var nv := float(d[pair[0]])
+			var ov := float(old[pair[1]])
+			if absf(nv - ov) > maxf(2.0, ov * 0.2):
+				bad += " ур.%d %s %d/%d" % [lv, pair[0], int(nv), int(ov)]
+		prev = d
+	check(bad == "", "рост статов и производных по уровням" + bad)
+	var d15 := HeroStats.derived("assassin", 15)
+	check(float(d15["eva"]) > float(d1["eva"]) and int(d15["aspd"]) > int(d1["aspd"]), "Ловкость растёт: уклонение и скорость атаки выше")
+	# Игрок: статы применены, оружие поверх
+	check(player.hero_stats.size() > 0 and player.max_hp == int(d1["max_hp"]) and player.max_mp == int(d1["max_mp"]),
+		"игрок 1-го ур.: HP %d, MP %d" % [player.max_hp, player.max_mp])
+	var sw := ItemData.get_item("dual_swords_starter")
+	check(player.atk == int(d1["patk"]) + int(sw["atk"]), "атака с мечами: %d = %d + %d" % [player.atk, int(d1["patk"]), int(sw["atk"])])
+	check(is_equal_approx(player.eva, float(d1["eva"]) / 100.0) and is_equal_approx(player.crit, float(d1["crit"]) / 100.0),
+		"уклонение %.1f%% и крит %.1f%% героя — из статов" % [player.eva * 100.0, player.crit * 100.0])
+	check(is_equal_approx(player.aspd, float(d1["aspd"]) / 100.0), "скорость атаки от Ловкости: %d%%" % roundi(player.aspd * 100.0))
+	check(is_equal_approx(player.attack_time, float(sw["cd"]) / player.aspd), "удар раз в %.2f с" % player.attack_time)
+	check(player.accuracy == int(d1["acc"]) and player.hp_regen > 0.0, "точность %d, восстановление HP %.1f/с"
+		% [player.accuracy, player.hp_regen])
+	check(player.mp_regen_rate(true) > 0.0 and player.mp_regen_rate(false) > player.mp_regen_rate(true), "восстановление MP")
+	check(player.equip("crossbow_starter") == "", "арбалет")
+	var cb := ItemData.get_item("crossbow_starter")
+	check(player.atk == int(d1["ratk"]) + int(cb["atk"]), "атака арбалета от Меткости: %d" % player.atk)
+	check(player.equip("dual_swords_starter") == "", "снова мечи")
+	# Точность: по зверям своего уровня без промахов, по сильным — изредка
+	var boar := find_mob("boar")
+	check(boar != null and player.hit_chance(boar) >= 1.0, "по кабану 1-го ур. без промахов")
+	var hc10 := Stats.hit_chance(player.accuracy, 10)
+	check(hc10 >= 0.75 and hc10 < 1.0, "по стражу 10-го ур. попадание %d%%" % roundi(hc10 * 100.0))
+	var acc0 := player.accuracy
+	player.accuracy = 0
+	var miss := 0
+	for i in 200:
+		if not player._basic_hits(boar):
+			miss += 1
+	player.accuracy = acc0
+	check(miss > 0 and miss < 100, "при низкой точности промахи: %d из 200" % miss)
+	check(PetStats.hit_chance(30, 5) == Stats.hit_chance(30, 5) and PetStats.STATS == Stats.STATS,
+		"формулы питомцев и героя общие (Stats)")
+
+
 ## Модель игрока: нужные узлы оружия (модель из файла — ещё метки кистей GripR/GripL).
 func _check_model(player: Player, parts: Array, what: String) -> void:
 	var ok := true
@@ -396,8 +468,14 @@ func _check_window(player: Player) -> void:
 	var hw: CharacterWindow = main.hero_window
 	check(hw.is_open() and hw.tab == "hero", "окно героя открыто на вкладке «Герой»")
 	var t := _window_text()
-	for w in ["Атака", "Защита", "Уклонение", "Шанс крита", "Скорость атаки", "Дальность", "Оружие", "JP", "Бродяга"]:
+	for w in ["Характеристики", "Боевые показатели", "Макс. HP", "Макс. MP", "Физ. атака", "Маг. атака", "Физ. защита",
+			"Маг. защита", "Точность", "Уклонение", "Шанс крита", "Скорость атаки", "Восст. HP", "Восст. MP", "Дальность",
+			"Оружие", "JP", "Бродяга", "MP %d / %d" % [player.mp, player.max_mp]]:
 		check(t.contains(w), "во вкладке «Герой» есть «%s»" % w)
+	for k in Stats.STATS:
+		check(t.contains(String(Stats.STAT_NAMES[k])), "во вкладке «Герой» есть стат «%s»" % Stats.STAT_NAMES[k])
+	check(t.contains("Ловкость\n%d" % int(player.hero_stats["stats"]["agi"])), "значение Ловкости в окне")
+	check(not t.contains("Уклонение\n0.0%"), "уклонение в окне не 0%")
 	for id in ItemData.STARTER_WEAPONS["assassin"]:
 		check(hw.buttons.has("weapon_" + String(id)), "кнопка оружия %s" % String(id))
 	var mv: SubViewportContainer = hw._body.find_children("*", "SubViewportContainer", true, false)[0]
@@ -476,8 +554,15 @@ func _check_save(player: Player) -> void:
 	check(int(game.hero["jp"]) == HeroSkills.default_jp(5), "старое сохранение 5 ур.: %d JP" % int(game.hero["jp"]))
 	check(HeroSkills.skill_level(game.hero, "backstab") == 1 and (game.hero["slots"] as Array)[0] == "backstab",
 		"старое сохранение: стартовые умения на кнопках")
-	game.from_dict({"name": "Старый", "race": "human", "class": "warrior", "level": 3})
-	check(game.weapon == "" and (game.hero["slots"] as Array)[0] == "cleave", "старый воин: без сменного оружия")
+	check(game.load_note == "", "старая Бродяга загружена без сообщения о переводе")
+	# Старый воин без умений героя: становится Бродягой (как сохранение Максима «Люди · Воин»)
+	game.from_dict({"name": "Старый", "race": "human", "class": "warrior", "level": 3, "gold": 77})
+	check(game.race_id == "dark_elf" and game.class_id == "assassin", "старый воин стал Бродягой")
+	check(game.level == 3 and game.gold == 77, "уровень и золото сохранены")
+	check(game.weapon == "dual_swords_starter" and (game.hero["slots"] as Array)[0] == "backstab",
+		"старый воин: парные мечи и «Удар в спину» на кнопке 1")
+	check(int(game.hero["jp"]) == HeroSkills.default_jp(3), "старый воин 3 ур.: %d JP" % int(game.hero["jp"]))
+	check(game.load_note.contains("Бродяг"), "сообщение игроку: %s" % game.load_note)
 	check(game.load_game(), "игра загружена снова")
 	player.apply_class()
 

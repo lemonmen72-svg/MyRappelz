@@ -1,7 +1,8 @@
 class_name Projectile
 extends Node3D
 ## Снаряд игрока: стрела ("arrow"), болт арбалета ("bolt") или светящийся шар ("orb"). Летит к цели с наведением
-## и наносит урон при попадании. Если цель погибла или пропала по пути, снаряд исчезает.
+## и наносит урон при попадании (промах — miss: долетает и показывает «Промах» без урона). Если цель погибла
+## или пропала по пути, снаряд исчезает.
 
 const SPEED := 20.0
 const MAX_LIFE := 3.0
@@ -15,6 +16,8 @@ var color := Color.WHITE
 var size := 1.0
 ## Вызывается после урона: on_hit.call(target: Mob, damage: int).
 var on_hit: Callable = Callable()
+## Промах: урона и on_hit нет.
+var miss := false
 
 var _life := 0.0
 var _spin: Node3D = null
@@ -67,6 +70,11 @@ func _hit() -> void:
 	var t := target
 	var by: Node3D = shooter if is_instance_valid(shooter) else null
 	var hit_pos := t.global_position + Vector3(0, 0.75 * t.body_scale, 0)
+	if miss:
+		Util.float_text(get_parent(), t.global_position + Vector3(0, 2.6 * t.body_scale + 0.4, 0), "Промах",
+			Color(0.8, 0.85, 1.0))
+		queue_free()
+		return
 	t.take_damage(damage, by, is_crit)
 	if is_crit:
 		Util.float_text(get_parent(), t.global_position + Vector3(0, 2.6 * t.body_scale + 0.4, 0),

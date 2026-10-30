@@ -1,7 +1,10 @@
 class_name Player
 extends CharacterBody3D
-## Персонаж игрока. Уровень, опыт и золото хранятся в Game, характеристики считаются из ClassData,
-## надетого оружия (Game.weapon, ItemData) и умений героя (Game.hero, HeroSkills: пассивные и переключаемые).
+## Персонаж игрока. Уровень, опыт и золото хранятся в Game. Характеристики: у Бродяги — из 7 статов
+## (HeroStats: HP, MP, атака, защита, точность, уклонение, крит, скорость атаки, восстановление HP), у остальных
+## классов — из ClassData; поверх — надетое оружие (Game.weapon, ItemData) и умения героя (Game.hero, HeroSkills:
+## пассивные и переключаемые). Обычная атака героя со статами может промахнуться (точность против уровня зверя,
+## Stats.hit_chance), умения бьют без промаха.
 ## Атака по типу класса или оружия: ближний бой (melee), лук или арбалет (ranged) и магия (magic) — снаряд Projectile.
 ## Умения на кнопках "skill1"…"skill4" (Game.hero.slots): умения классов (ClassData) и древа героя (HeroSkills:
 ## требуют MP, подходящее оружие — клинки или арбалет — и перезарядку). MP и уклонение — у классов с полями mp и eva.
@@ -34,6 +37,13 @@ var max_mp := 0
 var mp := 0
 ## Шанс уклониться от удара зверя (0..1, без «Танца теней»: cur_eva()).
 var eva := 0.0
+## Точность (шанс попасть обычной атакой — Stats.hit_chance); -1 — без промахов (классы без статов).
+var accuracy := -1
+## Восстановление HP в секунду (и в бою) от статов.
+var hp_regen := 0.0
+## Характеристики героя из статов (HeroStats.derived: stats, max_hp, patk, ratk, matk, def, mdef, acc, eva, crit,
+## aspd, hp_regen — без оружия и умений) для окна героя; пусто у классов без статов.
+var hero_stats: Dictionary = {}
 ## Базовая атака без усилений (текущая: cur_atk()).
 var atk := 10
 var defense := 0
@@ -46,7 +56,7 @@ var crit := 0.05
 var attack_kind := "melee"
 ## Вид надетого сменного оружия ("daggers" | "dual_swords" | "crossbow"; "" — оружие задано классом).
 var weapon_kind := ""
-## От умений героя: множитель скорости атаки, множитель урона обычной атаки, шанс второго удара (выстрела),
+## Скорость атаки (1.0 = 100%: от Ловкости и умений), множитель урона обычной атаки, шанс второго удара (выстрела),
 ## доля урона выстрела в MP, незаметность (звери замечают ближе, удары реже отвлекают зверя от питомца).
 var aspd := 1.0
 var basic_mult := 1.0
@@ -114,8 +124,9 @@ func _ready() -> void:
 	_build_model()
 
 
-## Пересчитать характеристики: класс и уровень (Game.class_id, Game.level), оружие (Game.weapon),
-## пассивные и включённые переключаемые умения героя (HeroSkills.bonuses — только подходящие оружию).
+## Пересчитать характеристики: класс и уровень (Game.class_id, Game.level) — у Бродяги через 7 статов (HeroStats),
+## оружие (Game.weapon), пассивные и включённые переключаемые умения героя (HeroSkills.bonuses — только
+## подходящие оружию).
 func recalc_stats() -> void:
 	var s := ClassData.stats_for(Game.class_id, Game.level)
 	max_hp = s["max_hp"]
@@ -128,9 +139,28 @@ func recalc_stats() -> void:
 	crit = s["crit"]
 	eva = s["eva"]
 	attack_kind = s["attack"]
+	accuracy = -1
+	hp_regen = 0.0
+	hero_stats = {}
+	var stat_aspd := 1.0
+	if HeroStats.has_stats(Game.class_id):
+		var h := HeroStats.derived(Game.class_id, Game.level)
+		hero_stats = h
+		max_hp = int(h["max_hp"])
+		max_mp = int(h["max_mp"])
+		atk = int(h["patk"])
+		defense = int(h["def"])
+		crit = float(h["crit"]) / 100.0
+		eva = float(h["eva"]) / 100.0
+		accuracy = int(h["acc"])
+		hp_regen = float(h["hp_regen"])
+		stat_aspd = float(h["aspd"]) / 100.0
 	weapon_kind = Game.weapon_kind()
 	if weapon_kind != "":
 		var w := ItemData.get_item(Game.weapon)
+		# Арбалет: атака дальнего боя (от Меткости и Ловкости), клинки — ближнего (от Силы)
+		if weapon_kind == "crossbow" and not hero_stats.is_empty():
+			atk = int(hero_stats["ratk"])
 		atk += int(w.get("atk", 0))
 		attack_time = float(w.get("cd", attack_time))
 		attack_range = float(w.get("range", attack_range))
@@ -142,7 +172,8 @@ func recalc_stats() -> void:
 	eva = clampf(eva + _bv(b, "eva"), 0.0, 0.6)
 	crit += _bv(b, "crit")
 	speed *= 1.0 + _bv(b, "speed_pct")
-	aspd = 1.0 + _bv(b, "aspd")
+	# Как в Rappelz: прибавки скорости атаки от умений складываются со скоростью от Ловкости
+	aspd = stat_aspd + _bv(b, "aspd")
 	attack_time /= aspd
 	basic_mult = 1.0 + _bv(b, "basic_pct")
 	double_chance = _bv(b, "double")
@@ -217,6 +248,30 @@ func cur_speed() -> float:
 	return speed * (1.0 + speed_buff)
 
 
+## Восстановление MP в секунду: в бою (in_combat) или на отдыхе.
+func mp_regen_rate(in_combat: bool) -> float:
+	return float(max_mp) * (MP_REGEN_COMBAT if in_combat else MP_REGEN_REST)
+
+
+## Шанс попасть обычной атакой по зверю t (1.0 — без промахов).
+func hit_chance(t: Mob) -> float:
+	if accuracy < 0 or t == null:
+		return 1.0
+	return Stats.hit_chance(accuracy, t.level)
+
+
+## Попала ли обычная атака по зверю t (бросок по hit_chance).
+func _basic_hits(t: Mob) -> bool:
+	var c := hit_chance(t)
+	return c >= 1.0 or randf() < c
+
+
+func _miss_text(t: Mob) -> void:
+	if is_inside_tree() and is_instance_valid(t):
+		Util.float_text(get_parent(), t.global_position + Vector3(0, 2.6 * t.body_scale + 0.4, 0), "Промах",
+			Color(0.8, 0.85, 1.0))
+
+
 func _physics_process(delta: float) -> void:
 	attack_cd = maxf(0.0, attack_cd - delta)
 	regen_delay = maxf(0.0, regen_delay - delta)
@@ -227,9 +282,10 @@ func _physics_process(delta: float) -> void:
 	if current_target != null and (not is_instance_valid(current_target) or current_target.is_dead):
 		_set_target(null)
 
-	# Восстановление от питомца («Узы зари»), и в бою
-	if aura_regen > 0.0 and hp < max_hp:
-		_aura_acc += delta * aura_regen
+	# Восстановление от статов и от питомца («Узы зари»), и в бою
+	var regen := aura_regen + hp_regen
+	if regen > 0.0 and hp < max_hp:
+		_aura_acc += delta * regen
 		if _aura_acc >= 1.0:
 			var ah := int(_aura_acc)
 			hp = mini(max_hp, hp + ah)
@@ -416,9 +472,13 @@ func try_attack() -> bool:
 	_mp_delay = MP_COMBAT_TIME
 	var dmg := _roll(basic_mult, false)
 	_anim_attack()
+	var hit := _basic_hits(target)
 	var twice := double_chance > 0.0 and randf() < double_chance
 	if attack_kind == "melee":
-		_deal(target, dmg)
+		if hit:
+			_deal(target, dmg)
+		else:
+			_miss_text(target)
 		Vfx.slash_arc(get_parent(), target.global_position + Vector3(0, 0.75 * target.body_scale, 0),
 			target.global_position - global_position, _class_color())
 		if twice:
@@ -428,18 +488,22 @@ func try_attack() -> bool:
 		if mp_drain > 0.0:
 			cb = func(_hit: Mob, dealt: int) -> void:
 				_gain_mp(float(dealt) * mp_drain)
-		_shoot(target, dmg, 1.0, cb)
+		_shoot(target, dmg, 1.0, cb, not hit)
 		if twice:
 			get_tree().create_timer(HIT_GAP).timeout.connect(_late_shot.bind(target, basic_mult, 0.0, false, cb, true))
 	return true
 
 
 ## Второй удар (многоударное умение, «Вихрь клинков»): по цели, если она ещё жива.
+## say_double — второй удар обычной атаки: может промахнуться, как и первый.
 func _late_hit(t: Variant, mult: float, flat: float, force_crit: bool, say_double: bool) -> void:
 	if not is_instance_valid(t) or not is_inside_tree():
 		return
 	var m := t as Mob
 	if m == null or m.is_dead:
+		return
+	if say_double and not _basic_hits(m):
+		_miss_text(m)
 		return
 	_deal(m, _roll(mult, force_crit, flat))
 	Vfx.slash_arc(get_parent(), m.global_position + Vector3(0, 0.75 * m.body_scale, 0),
@@ -455,7 +519,8 @@ func _late_shot(t: Variant, mult: float, flat: float, force_crit: bool, on_hit: 
 	var m := t as Mob
 	if m == null or m.is_dead:
 		return
-	_shoot(m, _roll(mult, force_crit, flat), 1.0, on_hit)
+	var dmg := _roll(mult, force_crit, flat)
+	_shoot(m, dmg, 1.0, on_hit, say_double and not _basic_hits(m))
 	if say_double:
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.6, 0), "Второй болт!", Color(1, 0.75, 0.4))
 
@@ -519,15 +584,17 @@ func _deal(t: Mob, dmg: int) -> void:
 
 
 ## Выпустить снаряд (стрела у лучника, болт у арбалета, шар у мага). on_hit: func(target: Mob, damage: int).
-func _shoot(t: Mob, dmg: int, size: float, on_hit: Callable) -> void:
+## miss — промах: снаряд долетает, но урона нет (обычный выстрел героя со статами).
+func _shoot(t: Mob, dmg: int, size: float, on_hit: Callable, miss: bool = false) -> void:
 	var p := Projectile.new()
 	var k := "orb"
 	if weapon_kind == "crossbow":
 		k = "bolt"
 	elif attack_kind == "ranged":
 		k = "arrow"
-	p.setup(t, self, dmg, _last_crit, k, _class_color(), size)
+	p.setup(t, self, dmg, _last_crit and not miss, k, _class_color(), size)
 	p.on_hit = on_hit
+	p.miss = miss
 	get_parent().add_child(p)
 	p.global_position = global_position + Vector3(0, 1.25, 0) + _forward() * 0.6
 	var aim := t.global_position + Vector3(0, 0.75 * t.body_scale, 0)

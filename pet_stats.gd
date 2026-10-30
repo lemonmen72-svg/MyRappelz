@@ -4,17 +4,15 @@ extends RefCounted
 ## 7 статов: Сила, Выносливость, Ловкость, Интеллект, Мудрость, Меткость, Удача — по таблицам вики
 ## с опорными точками по уровню и стадии эволюции (между точками — линейная интерполяция).
 ## Уровень вики = наш уровень / 0.3 (у нас макс. 50 и эволюция на 15 и 30, в оригинале — 150 и 50/100).
-## Из статов — производные значения нашего масштаба (все формулы — в derived()). Чтобы бой не сломался,
-## у каждого вида они калибруются так, что на 1 уровне равны прежним hp/atk/def из PetData.SPECIES.
+## Из статов — производные значения нашего масштаба (общие формулы с героем — Stats, сборка — derived()).
+## Чтобы бой не сломался, у каждого вида они калибруются так, что на 1 уровне равны прежним hp/atk/def
+## из PetData.SPECIES.
 ## Исходные таблицы и расчёт баланса — tools/rappelz_pet_reference.md.
 
-const STATS := ["str", "vit", "agi", "int", "wis", "dex", "luck"]
-const STAT_NAMES := {
-	"str": "Сила", "vit": "Выносливость", "agi": "Ловкость", "int": "Интеллект",
-	"wis": "Мудрость", "dex": "Меткость", "luck": "Удача",
-}
+const STATS := Stats.STATS
+const STAT_NAMES := Stats.STAT_NAMES
 ## Наш уровень → уровень вики: уровень / WIKI_LEVEL_SCALE.
-const WIKI_LEVEL_SCALE := 0.3
+const WIKI_LEVEL_SCALE := Stats.WIKI_LEVEL_SCALE
 ## Множитель урона крита питомца.
 const CRIT_MULT := 1.5
 
@@ -68,7 +66,7 @@ const DERIVED_NAMES := [
 
 ## Уровень вики для нашего уровня.
 static func wiki_level(lvl: int) -> float:
-	return float(lvl) / WIKI_LEVEL_SCALE
+	return Stats.wiki_level(lvl)
 
 
 ## 7 статов вида на уровне (с обменом под роль, без бонусов умений): {"str": int, ...}.
@@ -96,54 +94,18 @@ static func _interp(tab: Array, st: int, i: int, w: float) -> float:
 	var pts: Array = tab[st]
 	if pts.size() == 1:
 		var p: Array = pts[0]
-		var slope := 0.0
+		var sl := 0.0
 		if st > 0:
-			slope = _slope(tab[st - 1], i)
-		return float(p[1][i]) + slope * (w - float(p[0]))
-	var a: Array = pts[0]
-	var b: Array = pts[1]
-	var wa := float(a[0])
-	var wb := float(b[0])
-	return float(a[1][i]) + (float(b[1][i]) - float(a[1][i])) * (w - wa) / (wb - wa)
-
-
-static func _slope(pts: Array, i: int) -> float:
-	if pts.size() < 2:
-		return 0.0
-	var a: Array = pts[0]
-	var b: Array = pts[1]
-	return (float(b[1][i]) - float(a[1][i])) / (float(b[0]) - float(a[0]))
+			sl = Stats.slope(tab[st - 1], i)
+		return float(p[1][i]) + sl * (w - float(p[0]))
+	return Stats.interp(pts, i, w)
 
 
 # ---------- Производные значения ----------
-# «Сырые» формулы (до калибровки вида). L — наш уровень. Вид ведут: HP — Выносливость, физ. атаку — Сила,
-# маг. атаку — Интеллект, лечение и MP — Мудрость, защиту — Выносливость и Ловкость, точность — Меткость,
+# «Сырые» формулы — общие с героем (Stats.raw_*). L — наш уровень. Вид ведут: HP — Выносливость, физ. атаку —
+# Сила, маг. атаку — Интеллект, лечение и MP — Мудрость, защиту — Выносливость и Ловкость, точность — Меткость,
 # уклонение, крит и скорость атаки — Ловкость и Удача. Прибавка за уровень — как в Rappelz (HP ≈ 33·Vit + 20·Lv),
 # пересчитанная на нашу шкалу уровней; подобрана расчётом (tools/rappelz_pet_reference.md).
-
-static func _raw_hp(s: Dictionary, lvl: int) -> float:
-	return 2.0 * float(s["vit"]) + 3.0 * float(lvl)
-
-
-static func _raw_patk(s: Dictionary, lvl: int) -> float:
-	return float(s["str"]) + 0.2 * float(s["dex"]) + 4.0 * float(lvl)
-
-
-static func _raw_matk(s: Dictionary, lvl: int) -> float:
-	return float(s["int"]) + 0.2 * float(s["wis"]) + 4.0 * float(lvl)
-
-
-static func _raw_heal(s: Dictionary, lvl: int) -> float:
-	return float(s["wis"]) + 0.2 * float(s["int"]) + 4.0 * float(lvl)
-
-
-static func _raw_pdef(s: Dictionary, lvl: int) -> float:
-	return 0.5 * float(s["vit"]) + 0.2 * float(s["agi"]) + 3.0 * float(lvl)
-
-
-static func _raw_mdef(s: Dictionary, lvl: int) -> float:
-	return 0.5 * float(s["wis"]) + 0.2 * float(s["int"]) + 3.0 * float(lvl)
-
 
 ## Главная атака роли: маг и лекарь — магическая (Интеллект), танк и боец — физическая (Сила).
 static func is_magic(species: String) -> bool:
@@ -155,11 +117,11 @@ static func is_magic(species: String) -> bool:
 static func calibration(species: String) -> Dictionary:
 	var sp := PetData.get_species(species)
 	var s1 := base_stats(species, 1)
-	var main1 := _raw_matk(s1, 1) if is_magic(species) else _raw_patk(s1, 1)
+	var main1 := Stats.raw_matk(s1, 1.0) if is_magic(species) else Stats.raw_patk(s1, 1.0)
 	return {
-		"hp": float(sp["hp"]) / _raw_hp(s1, 1),
+		"hp": float(sp["hp"]) / Stats.raw_hp(s1, 1.0),
 		"atk": float(sp["atk"]) / main1,
-		"def": float(sp["def"]) / _raw_pdef(s1, 1),
+		"def": float(sp["def"]) / Stats.raw_pdef(s1, 1.0),
 	}
 
 
@@ -184,25 +146,24 @@ static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles:
 	var atk_mult := 1.0 + float(bon.get("atk_pct", 0.0))
 	var def_mult := 1.0 + float(bon.get("def_pct", 0.0))
 	var r := {"stats": s}
-	r["max_hp"] = roundi(kh * _raw_hp(s, lv) * (1.0 + float(bon.get("hp_pct", 0.0))))
+	var lf := float(lv)
+	r["max_hp"] = roundi(kh * Stats.raw_hp(s, lf) * (1.0 + float(bon.get("hp_pct", 0.0))))
 	# MP — новая величина, без калибровки: Мудрость ×2, Интеллект, 4 за уровень и запас 15
-	r["max_mp"] = roundi((2.0 * float(s["wis"]) + float(s["int"]) + 4.0 * float(lv) + 15.0)
-		* (1.0 + float(bon.get("mp_pct", 0.0))))
-	r["patk"] = maxi(1, roundi(ka * _raw_patk(s, lv) * atk_mult))
-	r["matk"] = maxi(1, roundi(ka * _raw_matk(s, lv) * atk_mult))
-	r["heal"] = maxi(1, roundi(ka * _raw_heal(s, lv)))
+	r["max_mp"] = roundi(Stats.raw_mp(s, lf) * (1.0 + float(bon.get("mp_pct", 0.0))))
+	r["patk"] = maxi(1, roundi(ka * Stats.raw_patk(s, lf) * atk_mult))
+	r["matk"] = maxi(1, roundi(ka * Stats.raw_matk(s, lf) * atk_mult))
+	r["heal"] = maxi(1, roundi(ka * Stats.raw_heal(s, lf)))
 	r["atk"] = int(r["matk"]) if is_magic(species) else int(r["patk"])
-	r["def"] = roundi(kd * _raw_pdef(s, lv) * def_mult) + int(bon.get("def_flat", 0))
+	r["def"] = roundi(kd * Stats.raw_pdef(s, lf) * def_mult) + int(bon.get("def_flat", 0))
 	# Звери пока бьют только физически: маг. защита показана на будущее
-	r["mdef"] = roundi(kd * _raw_mdef(s, lv) * def_mult)
+	r["mdef"] = roundi(kd * Stats.raw_mdef(s, lf) * def_mult)
 	# Точность: шанс попасть по зверю — hit_chance()
-	r["acc"] = roundi(0.5 * float(s["dex"]) + 1.5 * float(lv) + 5.0 + float(bon.get("acc", 0.0)))
-	r["eva"] = snappedf(0.1 * float(s["agi"]) + 0.05 * float(s["luck"]) + 0.05 * float(lv)
-		+ float(bon.get("eva", 0.0)), 0.1)
-	r["crit"] = snappedf(2.0 + 0.1 * float(s["luck"]) + 0.05 * float(s["agi"]) + float(bon.get("crit", 0.0)), 0.1)
-	r["aspd"] = roundi(100.0 * (1.0 + 0.002 * float(s["agi"])))
-	r["hp_regen"] = snappedf(kh * (0.01 * float(s["vit"]) + 0.01 * float(lv)) + float(bon.get("hp_regen", 0.0)), 0.1)
-	r["mp_regen"] = snappedf(0.5 + 0.05 * float(s["wis"]) + 0.02 * float(lv) + float(bon.get("mp_regen", 0.0)), 0.1)
+	r["acc"] = Stats.accuracy(s, lf, float(bon.get("acc", 0.0)))
+	r["eva"] = snappedf(Stats.evasion(s, lf) + float(bon.get("eva", 0.0)), 0.1)
+	r["crit"] = snappedf(Stats.crit_chance(s) + float(bon.get("crit", 0.0)), 0.1)
+	r["aspd"] = Stats.attack_speed(s)
+	r["hp_regen"] = snappedf(kh * Stats.raw_hp_regen(s, lf) + float(bon.get("hp_regen", 0.0)), 0.1)
+	r["mp_regen"] = snappedf(Stats.mp_regen(s, lf) + float(bon.get("mp_regen", 0.0)), 0.1)
 	r["threat"] = float(bon.get("threat", 0.0))
 	r["speed"] = float(sp["speed"])
 	r["range"] = float(sp["range"])
@@ -213,7 +174,7 @@ static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles:
 ## Шанс попасть обычной атакой по зверю уровня mob_level при точности acc (0.75..1.0):
 ## 95% против зверя «своего» уровня, ±1% за единицу точности.
 static func hit_chance(acc: int, mob_level: int) -> float:
-	return clampf(0.95 + 0.01 * float(acc - (8 + 2 * mob_level)), 0.75, 1.0)
+	return Stats.hit_chance(acc, mob_level)
 
 
 ## Очки умений (JP) по умолчанию для питомца уровня lvl (старые сохранения, новые питомцы).

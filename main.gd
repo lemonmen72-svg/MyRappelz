@@ -79,6 +79,10 @@ func _start_world() -> void:
 		hud.update_player(player)
 		refresh_skill_buttons())
 	_started = true
+	# Старое сохранение переведено (герой стал Бродягой): сказать игроку и сохранить уже в новом виде
+	if Game.load_note != "":
+		hud.show_message(Game.load_note, 8.0)
+		Game.load_note = ""
 	Game.save_game()
 
 
