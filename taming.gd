@@ -82,7 +82,8 @@ func on_mob_killed(mob: Mob) -> void:
 	if _rng.randf() < chance_for(mob.rarity):
 		var pet_name := PetData.stage_name(mob.type_id, 1)
 		var idx: int = Game.add_pet(mob.type_id, pet_name, 1)
-		Util.float_text(main, pos + Vector3(0, 3.0, 0), "Приручено!", Color(0.5, 1.0, 0.7))
+		Util.float_text(main, pos + Vector3(0, 3.0, 0), "Приручено!", Color(0.5, 1.0, 0.7), 1.4)
+		Vfx.tame_success(main, pos, clampf(mob.body_scale, 0.8, 1.6))
 		# Если никто не призван, новый питомец сразу выходит к хозяину
 		if idx >= 0 and Game.active_pet == -1 and main.get("pets") != null:
 			main.pets.summon(idx)

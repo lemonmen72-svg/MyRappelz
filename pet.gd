@@ -114,7 +114,8 @@ func _process(delta: float) -> void:
 	if is_down or _model == null:
 		return
 	_anim_t += delta
-	CreatureModels.animate(_model, species, _anim_t)
+	var hv := Vector2(velocity.x, velocity.z).length()
+	CreatureModels.animate(_model, species, _anim_t, clampf(hv / maxf(speed, 0.1), 0.0, 1.0))
 
 
 func _physics_process(delta: float) -> void:
@@ -234,6 +235,7 @@ func _attack(t: Mob) -> void:
 			_shoot(t, dmg, Color(0.6, 1.0, 0.7))
 		_:
 			t.take_damage(dmg, self)
+			_slash(t, 0.8)
 			_bump()
 
 
@@ -250,6 +252,8 @@ func _start_dash() -> void:
 	skill_uses += 1
 	_dash_time = 0.8
 	_say_skill(String(sk["name"]))
+	if is_inside_tree():
+		Vfx.death_puff(get_parent(), global_position + Vector3(0, 0.2, 0), 0.5 * _scale)
 
 
 func _dash_hit(t: Mob) -> void:
@@ -257,6 +261,7 @@ func _dash_hit(t: Mob) -> void:
 	attack_cd = attack_time
 	t.take_damage(maxi(1, roundi(atk * float(sk["power"]))), self)
 	CreatureModels.spawn_ring(get_parent(), t.global_position, 1.2, Color(1.0, 0.9, 0.5), 0.3)
+	_slash(t, 1.3)
 	_bump()
 
 
@@ -284,6 +289,13 @@ func _role_support() -> void:
 				skill_cd = float(sk["cd"])
 				skill_uses += 1
 				_say_skill(String(sk["name"]))
+				Vfx.magic_burst(get_parent(), global_position + Vector3(0, _height * 0.5, 0),
+					CreatureModels.role_color(role), 1.4 * maxf(_scale, 0.8), 0.35)
+				for n in get_tree().get_nodes_in_group("mobs"):
+					var tm := n as Mob
+					if tm != null and tm.target == self and not tm.is_dead:
+						Vfx.hit_spark(get_parent(), tm.global_position + Vector3(0, tm._height + 0.4, 0),
+							Color(1.0, 0.35, 0.3), 0.7)
 				if target == null:
 					target = first
 		"healer":
@@ -296,7 +308,8 @@ func _role_support() -> void:
 			skill_uses += 1
 			_say_skill(String(sk["name"]))
 			owner_node.heal(maxi(1, roundi(float(owner_node.max_hp) * float(sk["power"])) + atk))
-			CreatureModels.spawn_ring(get_parent(), owner_node.global_position, 1.3, Color(0.5, 1.0, 0.6), 0.6)
+			Vfx.heal_sparkles(get_parent(), owner_node.global_position)
+			Vfx.hit_spark(get_parent(), global_position + Vector3(0, _height * 0.6, 0), Vfx.HEAL, 0.6)
 
 
 func _shoot(t: Mob, dmg: int, c: Color) -> void:
@@ -312,7 +325,7 @@ func _shoot(t: Mob, dmg: int, c: Color) -> void:
 
 ## Удар по площади вокруг center.
 func _blast(center: Vector3, radius: float, dmg: int) -> void:
-	CreatureModels.spawn_ring(get_parent(), center, radius, Color(1.0, 0.6, 0.2), 0.4)
+	Vfx.magic_burst(get_parent(), center + Vector3(0, 0.5, 0), Color(1.0, 0.65, 0.25), radius, 0.4)
 	for n in get_tree().get_nodes_in_group("mobs"):
 		var m := n as Mob
 		if m == null or m.is_dead:
@@ -330,6 +343,7 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 	hp -= amount
 	_calm = 0.0
 	Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.5, 0), str(amount), Color(1, 0.5, 0.3))
+	Vfx.hit_spark(get_parent(), global_position + Vector3(0, _height * 0.55, 0), Color(1.0, 0.55, 0.4), 0.7)
 	if hp <= 0:
 		hp = 0
 		_die()
@@ -348,6 +362,7 @@ func heal(amount: int) -> void:
 	hp = mini(max_hp, hp + amount)
 	if is_inside_tree():
 		Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.5, 0), "+%d" % amount, Color(0.4, 1, 0.4))
+		Vfx.heal_sparkles(get_parent(), global_position, 0.6 * maxf(_scale, 0.8))
 	_write_record()
 	_update_label()
 	stats_changed.emit()
@@ -375,6 +390,8 @@ func gain_xp(amount: int) -> void:
 			_say("Эволюция! «%s» теперь «%s» (ур. %d)" % [old_name, pet_name, level])
 		else:
 			_say("Питомец «%s» достиг уровня %d!" % [pet_name, level])
+			if is_inside_tree():
+				Vfx.level_up(get_parent(), global_position, 0.6 * maxf(_scale, 0.8))
 	_write_record()
 	_update_label()
 	stats_changed.emit()
@@ -393,6 +410,7 @@ func _die() -> void:
 	remove_from_group("pets")
 	if is_inside_tree():
 		Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.5, 0), "Погиб", Color(1, 0.4, 0.4))
+		Vfx.death_puff(get_parent(), global_position + Vector3(0, _height * 0.4, 0), maxf(_scale, 0.7))
 	_say("Питомец «%s» погиб. Воскресите его свитком в окне «Питомцы»" % pet_name)
 	stats_changed.emit()
 	died.emit()
@@ -449,6 +467,7 @@ func _build_model() -> void:
 	_model = Node3D.new()
 	add_child(_model)
 	_mat = CreatureModels.build(_model, species, _color, _scale)
+	CreatureModels.decorate_pet(_model, species, _scale, stage, role)
 	_col = CreatureModels.add_collision(self, species, _scale)
 	_height = CreatureModels.height(species, _scale)
 	# Голубой круг под ногами: свой питомец, а не дикий зверь
@@ -459,6 +478,7 @@ func _build_model() -> void:
 	ring.mesh = tm
 	ring.position.y = 0.05
 	ring.material_override = CreatureModels.flat_mat(Color(0.3, 0.8, 1.0))
+	ring.set_meta("no_outline", true)
 	_model.add_child(ring)
 	if _label != null:
 		_label.position = Vector3(0, _height + 0.35, 0)
@@ -468,8 +488,13 @@ func _evolve_fx() -> void:
 	if not is_inside_tree():
 		return
 	_build_model()
-	CreatureModels.spawn_ring(get_parent(), global_position, 2.5, Color(1.0, 0.9, 0.4), 0.8)
-	Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.8, 0), "Эволюция!", Color(1.0, 0.9, 0.4))
+	Vfx.evolution(get_parent(), global_position, maxf(_scale, 0.8))
+	Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.8, 0), "Эволюция!", Color(1.0, 0.9, 0.4), 1.4)
+	# Новая модель «выпрыгивает» из вспышки
+	_model.scale = Vector3.ONE * 0.3
+	var t := create_tween()
+	t.tween_interval(0.35)
+	t.tween_property(_model, "scale", Vector3.ONE, 0.45).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 
 func _say(t: String) -> void:
@@ -480,6 +505,15 @@ func _say(t: String) -> void:
 func _say_skill(skill_name: String) -> void:
 	if is_inside_tree():
 		Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.8, 0), skill_name + "!", Color(1.0, 0.85, 0.4))
+
+
+## Дуга удара по цели t в цвет роли.
+func _slash(t: Mob, size: float) -> void:
+	if not is_inside_tree() or not is_instance_valid(t):
+		return
+	var dir := t.global_position - global_position
+	Vfx.slash_arc(get_parent(), t.global_position + Vector3(0, maxf(0.5, t._height * 0.5), 0), dir,
+		CreatureModels.role_color(role).lightened(0.3), size * clampf(t.body_scale, 0.8, 1.6))
 
 
 func _bump() -> void:
@@ -513,15 +547,27 @@ class Bolt extends Node3D:
 	var life := 3.0
 
 	func _ready() -> void:
+		# Светящийся шарик с ореолом и шлейфом искорок
 		var mi := MeshInstance3D.new()
+		mi.set_meta("no_outline", true)
 		var sm := SphereMesh.new()
-		sm.radius = 0.18
-		sm.height = 0.36
+		sm.radius = 0.13
+		sm.height = 0.26
 		sm.radial_segments = 12
 		sm.rings = 6
 		mi.mesh = sm
-		mi.material_override = CreatureModels.flat_mat(color)
+		mi.material_override = CreatureModels.flat_mat(color.lightened(0.5))
 		add_child(mi)
+		var halo := MeshInstance3D.new()
+		halo.set_meta("no_outline", true)
+		halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		halo.mesh = Vfx._quad()
+		halo.material_override = Vfx.fx_mat(Color(color, 0.8), Vfx.tex("star"), true, BaseMaterial3D.BILLBOARD_ENABLED)
+		halo.scale = Vector3.ONE * 0.75
+		add_child(halo)
+		var trail := Vfx.ambient_sparkles(self, color, 0.08, 10)
+		trail.lifetime = 0.35
+		trail.initial_velocity_max = 0.2
 
 	func _process(delta: float) -> void:
 		life -= delta
@@ -534,6 +580,7 @@ class Bolt extends Node3D:
 		if to.length() <= step + 0.25:
 			var src: Node3D = source if is_instance_valid(source) else null
 			target.call("take_damage", damage, src)
+			Vfx.hit_spark(get_parent(), global_position, color, 0.8)
 			queue_free()
 			return
 		global_position += to.normalized() * step

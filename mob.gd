@@ -113,10 +113,12 @@ func _process(delta: float) -> void:
 	if is_dead:
 		return
 	_anim_t += delta
-	CreatureModels.animate(_model, type_id, _anim_t)
+	var hv := Vector2(velocity.x, velocity.z).length()
+	CreatureModels.animate(_model, type_id, _anim_t, clampf(hv / maxf(speed, 0.1), 0.0, 1.0))
 	if _mark != null and _mark.visible:
 		_mark.rotation.y += delta * 1.5
 		_mark_gem.position.y = _height + 0.9 + sin(_anim_t * 3.0) * 0.12
+		_mark_gem.rotation.y += delta * 2.5
 
 
 func _physics_process(delta: float) -> void:
@@ -166,6 +168,10 @@ func _physics_process(delta: float) -> void:
 			_slam_windup = SLAM_WINDUP
 			_slam_cd = SLAM_CD
 			CreatureModels.spawn_ring(get_parent(), global_position, SLAM_RADIUS, Color(1.0, 0.45, 0.2), SLAM_WINDUP)
+			if _model != null:
+				var wt := create_tween()
+				wt.tween_property(_model, "scale", Vector3(0.92, 1.12, 0.92), SLAM_WINDUP * 0.8)
+				wt.tween_property(_model, "scale", Vector3.ONE, 0.1)
 		elif to.length() > _reach():
 			dir = to.normalized()
 		elif attack_cd <= 0.0:
@@ -215,6 +221,8 @@ func _slam() -> void:
 	var dmg := int(atk * SLAM_POWER)
 	var parent := get_parent()
 	CreatureModels.spawn_ring(parent, global_position, SLAM_RADIUS, Color(0.9, 0.75, 0.5), 0.35)
+	Vfx.death_puff(parent, global_position + Vector3(0, 0.3, 0), 1.6)
+	Vfx.magic_burst(parent, global_position + Vector3(0, 0.4, 0), Color(1.0, 0.65, 0.3), SLAM_RADIUS * 0.6, 0.35)
 	Util.float_text(parent, global_position + Vector3(0, _height + 0.8, 0), "Сотрясение!", Color(1, 0.6, 0.3))
 	for g in ["player", "pets"]:
 		for n in get_tree().get_nodes_in_group(g):
@@ -240,36 +248,68 @@ func taunt(by: Node3D, sec: float) -> void:
 
 ## Показать или убрать метку приручения (светящееся кольцо под зверем и кристалл над головой).
 func set_tame_mark(on: bool) -> void:
+	var was := tame_marked
 	tame_marked = on
 	if on and _mark == null:
 		_build_mark()
 	if _mark != null:
 		_mark.visible = on
+	if on and not was and is_inside_tree():
+		Vfx.magic_burst(get_parent(), global_position + Vector3(0, _height * 0.5, 0), Vfx.TAME, 0.9 * maxf(body_scale, 0.8), 0.35)
 
 
+## Метка приручения: светящийся круг с рунным кольцом под зверем и кристалл души над головой.
 func _build_mark() -> void:
-	var gm := CreatureModels.flat_mat(Color(0.35, 1.0, 0.8))
+	var c := Vfx.TAME
 	_mark = Node3D.new()
 	add_child(_mark)
-	var r := 0.8 * maxf(body_scale, 0.8)
+	var r := 0.85 * maxf(body_scale, 0.8)
+	var disk := MeshInstance3D.new()
+	disk.set_meta("no_outline", true)
+	disk.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	disk.mesh = Vfx._plane()
+	disk.material_override = Vfx.fx_mat(Color(c, 0.85), Vfx.tex("ring"), true)
+	disk.scale = Vector3.ONE * r / 0.82
+	disk.position.y = 0.06
+	_mark.add_child(disk)
 	var ring := MeshInstance3D.new()
+	ring.set_meta("no_outline", true)
 	var tm := TorusMesh.new()
-	tm.inner_radius = r
-	tm.outer_radius = r + 0.12
+	tm.inner_radius = r * 0.62
+	tm.outer_radius = r * 0.62 + 0.05
+	tm.rings = 24
+	tm.ring_segments = 6
 	ring.mesh = tm
-	ring.position.y = 0.06
-	ring.material_override = gm
+	ring.position.y = 0.07
+	ring.material_override = Vfx.fx_mat(Color(c, 0.7), null, true)
 	_mark.add_child(ring)
+	# Кристалл души: два конуса (ромб) и мягкое сияние
 	_mark_gem = Node3D.new()
 	_mark_gem.position.y = _height + 0.9
 	_mark.add_child(_mark_gem)
-	var gem := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.28, 0.28, 0.28)
-	gem.mesh = bm
-	gem.rotation = Vector3(PI / 4.0, 0.0, PI / 4.0)
-	gem.material_override = gm
-	_mark_gem.add_child(gem)
+	var gm := CreatureModels.flat_mat(c.lightened(0.25))
+	for i in 2:
+		var gem := MeshInstance3D.new()
+		gem.set_meta("no_outline", true)
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.0
+		cm.bottom_radius = 0.16
+		cm.height = 0.22 if i == 0 else 0.14
+		cm.radial_segments = 6
+		cm.rings = 1
+		gem.mesh = cm
+		gem.position.y = 0.11 if i == 0 else -0.07
+		if i == 1:
+			gem.rotation.x = PI
+		gem.material_override = gm
+		_mark_gem.add_child(gem)
+	var glow := MeshInstance3D.new()
+	glow.set_meta("no_outline", true)
+	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	glow.mesh = Vfx._quad()
+	glow.material_override = Vfx.fx_mat(Color(c, 0.55), Vfx.tex("star"), true, BaseMaterial3D.BILLBOARD_ENABLED)
+	glow.scale = Vector3.ONE * 0.9
+	_mark_gem.add_child(glow)
 
 
 func _in_safe_zone(n: Node3D) -> bool:
@@ -287,13 +327,18 @@ func _heal(delta: float, frac_per_sec: float) -> void:
 		_update_label()
 
 
-func take_damage(amount: int, attacker: Node3D) -> void:
+## crit: критический удар (крупные цифры и яркая вспышка), только для вида.
+func take_damage(amount: int, attacker: Node3D, crit: bool = false) -> void:
 	if is_dead:
 		return
 	hp -= amount
 	if not returning and attacker != null and taunt_time <= 0.0:
 		target = attacker
-	Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.6, 0), str(amount), Color(1, 1, 1))
+	var parent := get_parent()
+	var num_c := Color(1.0, 0.85, 0.25) if crit else Color(1, 1, 1)
+	Util.float_text(parent, global_position + Vector3(0, _height + 0.6, 0), str(amount), num_c, 1.5 if crit else 1.0)
+	Vfx.hit_spark(parent, global_position + Vector3(0, _height * 0.55, 0),
+		Color(1.0, 0.75, 0.25) if crit else Color(1.0, 0.92, 0.6), (1.4 if crit else 0.9) * clampf(body_scale, 0.7, 1.6))
 	_flash()
 	_update_label()
 	if hp <= 0:
@@ -308,8 +353,11 @@ func _die() -> void:
 	if _mark != null:
 		_mark.hide()
 	gone.emit(self, true)
+	Vfx.death_puff(get_parent(), global_position + Vector3(0, _height * 0.4, 0), clampf(body_scale, 0.7, 2.0))
 	var t := create_tween()
-	t.tween_property(self, "scale", Vector3(1, 0.05, 1), 0.4)
+	t.tween_property(self, "scale", Vector3(1.2, 0.8, 1.2), 0.08)
+	t.tween_property(self, "scale", Vector3(0.2, 1.3, 0.2), 0.12)
+	t.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.2)
 	t.tween_callback(queue_free)
 
 
@@ -325,6 +373,11 @@ func _flash() -> void:
 	_mat.albedo_color = Color(1, 1, 1)
 	var t := create_tween()
 	t.tween_property(_mat, "albedo_color", color, 0.15)
+	# Модель «сплющивается» от удара и пружинит обратно
+	if _model != null:
+		var sq := create_tween()
+		sq.tween_property(_model, "scale", Vector3(1.12, 0.86, 1.12), 0.05)
+		sq.tween_property(_model, "scale", Vector3.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _update_label() -> void:

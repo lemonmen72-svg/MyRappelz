@@ -18,6 +18,7 @@ var age := 0.0
 
 var _taken := false
 var _model: Node3D
+var _sparkle: MeshInstance3D
 
 
 ## Текст вида «Клык кабана, Зелье здоровья ×2».
@@ -39,53 +40,105 @@ func _ready() -> void:
 	_model.position.y = 0.35
 	add_child(_model)
 
+	# Пухлый мешочек с оборкой, золотой ленточкой и монеткой
 	var sack := MeshInstance3D.new()
 	var sm := SphereMesh.new()
 	sm.radius = 0.28
-	sm.height = 0.46
+	sm.height = 0.5
+	sm.radial_segments = 14
+	sm.rings = 7
 	sack.mesh = sm
-	sack.material_override = Util.mat(Color(0.62, 0.45, 0.25))
+	sack.scale = Vector3(1.05, 0.95, 1.05)
+	sack.material_override = Util.mat(Color(0.78, 0.55, 0.32))
 	_model.add_child(sack)
 
 	var neck := MeshInstance3D.new()
 	var nm := CylinderMesh.new()
-	nm.top_radius = 0.12
+	nm.top_radius = 0.16
 	nm.bottom_radius = 0.07
 	nm.height = 0.16
+	nm.radial_segments = 10
+	nm.rings = 1
 	neck.mesh = nm
-	neck.position.y = 0.27
-	neck.material_override = Util.mat(Color(0.55, 0.4, 0.22))
+	neck.position.y = 0.3
+	neck.material_override = Util.mat(Color(0.72, 0.5, 0.28))
 	_model.add_child(neck)
 
 	var tie := MeshInstance3D.new()
 	var tm := TorusMesh.new()
 	tm.inner_radius = 0.06
-	tm.outer_radius = 0.1
+	tm.outer_radius = 0.11
+	tm.rings = 16
+	tm.ring_segments = 6
 	tie.mesh = tm
-	tie.position.y = 0.21
-	tie.material_override = Util.mat(Color(1.0, 0.8, 0.25))
+	tie.position.y = 0.24
+	tie.material_override = Util.mat(Color(1.0, 0.78, 0.25))
 	_model.add_child(tie)
+
+	# Бантик ленточки
+	var bow_m := Util.mat(Color(0.95, 0.35, 0.4))
+	for i in 2:
+		var side := float(i * 2 - 1)
+		var loop := MeshInstance3D.new()
+		var lm := SphereMesh.new()
+		lm.radius = 0.06
+		lm.height = 0.12
+		lm.radial_segments = 8
+		lm.rings = 4
+		loop.mesh = lm
+		loop.scale = Vector3(1.0, 0.6, 0.45)
+		loop.position = Vector3(0.07 * side, 0.25, -0.12)
+		loop.rotation.z = -0.4 * side
+		loop.material_override = bow_m
+		_model.add_child(loop)
+
+	# Монетка, выглядывающая из мешочка
+	var coin := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.075
+	cm.bottom_radius = 0.075
+	cm.height = 0.025
+	cm.radial_segments = 12
+	cm.rings = 1
+	coin.mesh = cm
+	coin.position = Vector3(0.05, 0.38, 0.02)
+	coin.rotation = Vector3(PI / 2.0, 0.0, 0.3)
+	coin.material_override = Util.mat(Color(1.0, 0.85, 0.3))
+	_model.add_child(coin)
+
+	# Подмигивающая искорка над мешочком
+	_sparkle = MeshInstance3D.new()
+	_sparkle.set_meta("no_outline", true)
+	_sparkle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_sparkle.mesh = Vfx._quad()
+	_sparkle.material_override = Vfx.fx_mat(Color(1.0, 0.95, 0.6, 0.95), Vfx.tex("star"), true,
+		BaseMaterial3D.BILLBOARD_ENABLED)
+	_sparkle.position = Vector3(0.18, 0.52, 0)
+	_model.add_child(_sparkle)
 
 	# Светлый круг на земле, чтобы мешочек было легко заметить
 	var glow := MeshInstance3D.new()
-	var gm := CylinderMesh.new()
-	gm.top_radius = 0.6
-	gm.bottom_radius = 0.6
-	gm.height = 0.01
-	glow.mesh = gm
-	glow.position.y = 0.02
+	glow.set_meta("no_outline", true)
+	glow.mesh = Vfx._plane()
+	glow.position.y = 0.03
+	glow.scale = Vector3.ONE * 0.75
 	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var glow_mat := StandardMaterial3D.new()
-	glow_mat.albedo_color = Color(1.0, 0.85, 0.3, 0.35)
-	glow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glow.material_override = glow_mat
+	glow.material_override = Vfx.fx_mat(Color(1.0, 0.85, 0.35, 0.7), Vfx.tex("ring"), false)
 	add_child(glow)
+	var spot := MeshInstance3D.new()
+	spot.set_meta("no_outline", true)
+	spot.mesh = Vfx._plane()
+	spot.position.y = 0.025
+	spot.scale = Vector3.ONE * 0.55
+	spot.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	spot.material_override = Vfx.fx_mat(Color(1.0, 0.85, 0.35, 0.45), Vfx.tex("dot"), true)
+	add_child(spot)
 
 	# Появление: мешочек «выпрыгивает»
 	_model.scale = Vector3.ONE * 0.2
 	var t := create_tween()
 	t.tween_property(_model, "scale", Vector3.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	Vfx.pickup(get_parent(), global_position + Vector3(0, 0.4, 0))
 
 
 func _process(delta: float) -> void:
@@ -97,6 +150,10 @@ func _process(delta: float) -> void:
 		return
 	_model.position.y = 0.35 + sin(age * 3.0) * 0.1
 	_model.rotate_y(delta * 1.8)
+	# Искорка вспыхивает раз в ~1.5 с
+	var tw := fmod(age, 1.5) / 1.5
+	var k := maxf(0.0, sin(tw * PI * 2.0)) if tw < 0.5 else 0.0
+	_sparkle.scale = Vector3.ONE * (0.05 + 0.5 * k)
 	if age > LIFETIME - BLINK_TIME:
 		_model.visible = int(age * 6.0) % 2 == 0
 	if age < PICKUP_DELAY:
@@ -119,5 +176,6 @@ func pick_up() -> void:
 		var n: int = int(items[key])
 		Game.inventory.add(id, n)
 	Util.float_text(get_parent(), global_position + Vector3(0, 1.6, 0), describe(items), Color(1, 0.9, 0.5))
+	Vfx.pickup(get_parent(), global_position + Vector3(0, 0.5, 0))
 	picked_up.emit(items)
 	queue_free()
