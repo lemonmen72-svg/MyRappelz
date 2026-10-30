@@ -32,10 +32,14 @@ func run_step() -> void:
 			_top.position = Vector3(1.0, 250.0, -3.0)
 			main.add_child(_top)
 			_top.current = true
+			main.hud.visible = false
+			_set_fog(false)
 			wait = 90
 			step = 100
 		100:
 			shot("00_island_top")
+			main.hud.visible = true
+			_set_fog(true)
 			_top.current = false
 			main.cam.current = true
 			_top.queue_free()
@@ -101,3 +105,11 @@ func shot(shot_name: String) -> void:
 	var path := SHOTS_DIR + shot_name + ".png"
 	var err := img.save_png(path)
 	check(err == OK, "скриншот %s (%dx%d)" % [shot_name, img.get_width(), img.get_height()])
+
+
+## Туман на высоте 250 м заливает весь кадр — для вида сверху выключаем.
+func _set_fog(on: bool) -> void:
+	for n in main.find_children("*", "WorldEnvironment", true, false):
+		var we := n as WorldEnvironment
+		if we != null and we.environment != null:
+			we.environment.fog_enabled = on
