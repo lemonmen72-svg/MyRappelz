@@ -5,12 +5,12 @@ render_mode cull_back;
 
 #include "res://world_common.gdshaderinc"
 
-uniform vec3 dirt_light : source_color = vec3(0.78, 0.65, 0.45);
-uniform vec3 dirt_dark : source_color = vec3(0.64, 0.50, 0.34);
-uniform vec3 pebble_color : source_color = vec3(0.84, 0.80, 0.72);
-uniform vec3 stone_light : source_color = vec3(0.76, 0.74, 0.70);
-uniform vec3 stone_dark : source_color = vec3(0.58, 0.58, 0.58);
-uniform vec3 border_stone : source_color = vec3(0.56, 0.57, 0.66);
+uniform vec3 dirt_light : source_color = vec3(0.70, 0.56, 0.38);
+uniform vec3 dirt_dark : source_color = vec3(0.56, 0.42, 0.28);
+uniform vec3 pebble_color : source_color = vec3(0.74, 0.70, 0.62);
+uniform vec3 stone_light : source_color = vec3(0.62, 0.60, 0.58);
+uniform vec3 stone_dark : source_color = vec3(0.46, 0.46, 0.48);
+uniform vec3 border_stone : source_color = vec3(0.44, 0.46, 0.56);
 uniform vec3 grout_color : source_color = vec3(0.40, 0.40, 0.38);
 uniform vec3 inlay_color : source_color = vec3(0.88, 0.70, 0.36);
 uniform float plaza_rings = 8.0;
