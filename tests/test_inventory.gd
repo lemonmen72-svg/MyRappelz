@@ -358,7 +358,12 @@ func _save_load() -> void:
 	inv.sort()
 	check(game.load_game(), "игра загружена")
 	check(String(game.inventory.cell(33).get("id", "")) == "boar_tusk", "клыки снова в ячейке 33")
-	check(game.inventory.find_cell(game.weapon) == -1, "надетое оружие после загрузки — в слоте")
+	var in_cells := 0
+	for cd: Dictionary in game.inventory.cells():
+		if not cd.is_empty() and String(cd["id"]) == game.weapon:
+			in_cells += int(cd["n"])
+	# Запасные экземпляры надетого оружия могут лежать в ячейках, сам надетый — нет
+	check(in_cells == game.inventory.count(game.weapon) - 1, "надетое оружие после загрузки — в слоте")
 	game.from_dict({"name": "Старая", "race": "dark_elf", "class": "assassin", "level": 3,
 		"inventory": {"hp_potion": 2, "boar_tusk": 1}})
 	var ids: Array = []
