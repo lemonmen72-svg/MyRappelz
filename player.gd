@@ -404,7 +404,7 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 			global_position = dest
 			velocity = Vector3.ZERO
 			_engage(t)
-			_anim_buff()
+			_anim_dash()
 			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.5, 0.2, 0.7), 1.2, 0.3)
 			_announce(sname, "")
 		"dark_burst":
@@ -593,6 +593,18 @@ func _anim_bash() -> void:
 func _anim_buff() -> void:
 	if _has_model():
 		_model.play_buff()
+
+
+## Рывок к цели (Шаг тени).
+func _anim_dash() -> void:
+	if _has_model():
+		_model.play_dash()
+
+
+## Подбор добычи: присесть и поднять (модель сама решает, уместно ли сейчас).
+func play_pickup() -> void:
+	if _has_model():
+		_model.play_pickup()
 
 
 func _update_guard_fx() -> void:

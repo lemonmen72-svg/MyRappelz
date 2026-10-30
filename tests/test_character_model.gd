@@ -105,13 +105,27 @@ func run_step() -> void:
 			step = 52
 		52:
 			check(hero._act_end < 0.0 and hero._loco == "idle", "герой: после удара — стойка покоя")
+			check(hero._anim.current_animation == hero._clip("idle"),
+				"герой: покой играет клип Idle (%s)" % hero._anim.current_animation)
+			_hero_check_pose("в покое")
+			# Стоя без дела — подбор добычи
+			hero.play_pickup()
+			check(hero._anim.current_animation == hero._pick(CharacterModel.ASSET_ACTIONS["pickup"])[0],
+				"герой: подбор добычи играет свой клип (%s)" % hero._anim.current_animation)
+			# Усиление перебивает подбор; урон во время действия клип не сбивает
 			hero.play_buff()
 			hero.play_hit()
 			wait = 10
 			step = 53
 		53:
+			check(hero._anim.current_animation == hero._pick(CharacterModel.ASSET_ACTIONS["buff"])[0],
+				"герой: усиление играет свой клип (%s)" % hero._anim.current_animation)
+			hero.play_dash()
+			wait = 5
+			step = 55
+		55:
 			check(hero._anim.current_animation == hero._pick(CharacterModel.ASSET_ACTIONS["leap"])[0],
-				"герой: умение «Шаг тени» играет свой клип")
+				"герой: умение «Шаг тени» играет клип рывка (%s)" % hero._anim.current_animation)
 			hero.queue_free()
 			wait = 2
 			step = 54
@@ -167,6 +181,12 @@ func _hero_start() -> void:
 	for kind in CharacterModel.ASSET_ACTIONS:
 		check(not hero._pick(CharacterModel.ASSET_ACTIONS[kind]).is_empty(), "герой: есть клип для «%s»" % kind)
 	check(not hero._pick(CharacterModel.ASSET_IDLE).is_empty(), "герой: есть поза покоя")
+	# Клипы, перенесённые из Quaternius UAL скриптом tools/retarget_animations.py
+	for c in ["idle", "sword_slash", "sword_attack", "sword_combo", "sword_heavy_combo", "sword_dash",
+			"sword_block", "dodge", "hit", "death", "cast", "pickup"]:
+		check(hero._clips.has(c), "герой: есть клип «%s» (Quaternius UAL)" % c)
+	if hero._clips.has("idle"):
+		check(hero._anim.get_animation(hero._clip("idle")).loop_mode == Animation.LOOP_LINEAR, "герой: покой зациклен")
 	check(not hero._pick(CharacterModel.ASSET_WALK).is_empty(), "герой: есть шаг")
 	check(not hero._pick(CharacterModel.ASSET_RUN).is_empty(), "герой: есть бег")
 	check(hero.weapon_kind == "sword" and hero.find_child("Sword", true, false) != null, "герой: меч в руке")
@@ -199,6 +219,30 @@ func _hero_start() -> void:
 	check(a.loop_mode == Animation.LOOP_NONE and
 		hero._anim.get_animation(hero._clip("running")).loop_mode == Animation.LOOP_LINEAR, "герой: бег зациклен")
 	hero.set_move_speed(6.5)
+
+
+## Поза героя по костям скелета: голова на высоте человека, стопы у земли (перенос анимаций цел).
+func _hero_check_pose(when: String) -> void:
+	var skels := hero.find_children("*", "Skeleton3D", true, false)
+	if skels.is_empty():
+		check(false, "герой: нет скелета")
+		return
+	var skel := skels[0] as Skeleton3D
+	var base := hero.global_position.y
+	var ys := {}
+	for i in skel.get_bone_count():
+		var bn := skel.get_bone_name(i)
+		for b in ["Head", "LeftFoot", "RightFoot", "LeftHand", "RightHand"]:
+			if bn == b or bn.ends_with("_" + b) or bn.ends_with(":" + b):
+				ys[b] = (skel.global_transform * skel.get_bone_global_pose(i).origin).y - base
+	check(ys.size() == 5, "герой: найдены кости головы, кистей и стоп")
+	if ys.size() < 5:
+		return
+	check(ys["Head"] > 1.3 and ys["Head"] < 1.65, "герой %s: голова на высоте %.2f м" % [when, ys["Head"]])
+	for b in ["LeftFoot", "RightFoot"]:
+		check(ys[b] > 0.0 and ys[b] < 0.3, "герой %s: стопа %s у земли (%.2f м)" % [when, b, ys[b]])
+	for b in ["LeftHand", "RightHand"]:
+		check(ys[b] > 0.6 and ys[b] < 1.3, "герой %s: кисть %s у бедра (%.2f м)" % [when, b, ys[b]])
 
 
 func _hero_check_run() -> void:

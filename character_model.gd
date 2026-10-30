@@ -49,18 +49,31 @@ const CULL_AABB := AABB(Vector3(-1.7, -0.3, -1.7), Vector3(3.4, 4.0, 3.4))
 ## и классы; своя модель расы или класса задаётся полем "model" в ClassData (у класса или расы).
 const MAIN_ASSET := "res://assets/characters/dark_elf_wanderer.glb"
 ## Клипы модели из файла: у каждого действия варианты [клип, с какой секунды, до какой, скорость],
-## берётся первый, который есть в модели (наборы анимаций Meshy бывают разные). Корневое смещение
-## бёдер по земле убрано (_pin_root), удары идут на месте.
+## берётся первый, который есть в модели (наборы анимаций бывают разные). Первыми стоят клипы,
+## перенесённые из Quaternius UAL (tools/retarget_animations.py), за ними — прежние клипы Meshy.
+## Корневое смещение бёдер по земле убрано (_pin_root), удары идут на месте. Пока действие
+## доигрывается, шаг и бег не включаются, поэтому действия короткие (до ~1.5 с).
 const ASSET_ACTIONS := {
-	"slash": [["left_slash", 0.5, 1.4, 1.6], ["attack", 0.2, 1.4, 2.0]],
-	"chop": [["attack", 0.2, 1.4, 2.0]],
-	"combo": [["double_combo_attack", 0.0, 2.6, 1.8], ["attack", 0.0, 2.4, 2.0]],
-	"leap": [["standard_forward_charge_inplace", 0.0, 0.63, 1.0], ["sword_judgment", 0.4, 3.0, 2.0],
+	"slash": [["sword_slash", 0.0, 1.1, 1.3], ["left_slash", 0.5, 1.4, 1.6], ["attack", 0.2, 1.4, 2.0]],
+	"chop": [["sword_attack", 0.1, 1.45, 1.4], ["attack", 0.2, 1.4, 2.0]],
+	"combo": [["sword_combo", 0.0, 2.8, 1.8], ["double_combo_attack", 0.0, 2.6, 1.8], ["attack", 0.0, 2.4, 2.0]],
+	"spin": [["sword_heavy_combo", 0.0, 2.1, 1.7], ["double_combo_attack", 0.0, 2.6, 1.8],
+		["attack", 0.0, 2.4, 2.0]],
+	"leap": [["sword_dash", 0.0, 1.3, 1.4], ["standard_forward_charge_inplace", 0.0, 0.63, 1.0],
+		["sword_judgment", 0.4, 3.0, 2.0], ["attack", 0.2, 1.4, 2.0]],
+	"buff": [["sword_block", 0.0, 1.2, 1.2], ["standard_forward_charge_inplace", 0.0, 0.63, 1.0],
 		["attack", 0.2, 1.4, 2.0]],
-	"hit": [["hit_reaction", 0.0, 0.45, 1.5]],
+	"cast": [["cast", 0.1, 1.4, 1.3], ["attack", 0.2, 1.4, 2.0]],
+	"wave": [["wave", 0.0, 2.0, 1.2], ["attack", 0.2, 1.4, 2.0]],
+	"hit": [["hit", 0.0, 0.33, 0.8], ["hit_reaction", 0.0, 0.45, 1.5]],
+	"pickup": [["pickup", 0.2, 2.3, 1.8]],
+	"dodge": [["dodge", 0.0, 1.47, 1.3], ["standard_forward_charge_inplace", 0.0, 0.63, 1.0]],
+	# Смерть: клип есть, вызвать пока негде (игрок сразу возрождается)
+	"death": [["death", 0.0, 2.4, 1.0], ["hit_reaction", 0.0, 1.6, 1.0]],
 }
-## Покой: клипа Idle в наборах Meshy нет — кадры с какой секунды по какую проигрываются туда-обратно
-## (дыхание): спокойная стойка в начале прыжка или стойка с мечом в начале «Sword_Judgment».
+## Покой: свой клип Idle (из Quaternius UAL, цикл). Если его нет (наборы Meshy без Idle) — кадры
+## с какой секунды по какую проигрываются туда-обратно (дыхание): спокойная стойка в начале
+## прыжка или стойка с мечом в начале «Sword_Judgment».
 const ASSET_IDLE := [["idle", 0.0, 2.0, 1.0], ["regular_jump", 0.0, 0.07, 0.0],
 	["sword_judgment", 0.0, 0.22, 0.0]]
 const ASSET_WALK := [["walking_woman"], ["walking"]]
@@ -1050,7 +1063,7 @@ func play_shoot() -> void:
 ## Заклинание: посох вскинут вперёд-вверх, навершие вспыхивает; левая рука раскрыта.
 func play_cast() -> void:
 	if _asset != null:
-		_asset_act("chop")
+		_asset_act("cast")
 		return
 	var t := _new_action(0.45, 0.45)
 	if t == null:
@@ -1068,10 +1081,10 @@ func play_cast() -> void:
 		t.chain().tween_property(_orb, "scale", Vector3.ONE, 0.25)
 
 
-## Усиление (клич, щит, рывок): обе руки вверх.
+## Усиление (клич, щит, ускорение): обе руки вверх; у модели из файла — защитная стойка с мечом.
 func play_buff() -> void:
 	if _asset != null:
-		_asset_act("leap")
+		_asset_act("buff")
 		return
 	var t := _new_action(0.5, 0.5)
 	if t == null:
@@ -1080,6 +1093,21 @@ func play_buff() -> void:
 	t.tween_property(_arm_r, "rotation:z", 0.55, 0.14)
 	t.tween_property(_arm_l, "rotation:x", 2.5, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.tween_property(_arm_l, "rotation:z", -0.55, 0.14)
+
+
+## Рывок к цели (Шаг тени): у модели из файла — выпад с мечом, у модели из примитивов — как усиление.
+func play_dash() -> void:
+	if _asset != null:
+		_asset_act("leap")
+		return
+	play_buff()
+
+
+## Подбор добычи: присесть и поднять с земли. Только у модели из файла и только стоя без дела,
+## чтобы не прерывать удар и не скользить в позе приседа на бегу.
+func play_pickup() -> void:
+	if _asset != null and _act_end < 0.0 and _asset_speed < 0.3:
+		_asset_act("pickup")
 
 
 ## Удар щитом: выпад левой рукой, щит остаётся лицом к врагу.
@@ -1098,7 +1126,7 @@ func play_bash() -> void:
 ## Круговой удар: оборот всей модели с вытянутой в сторону рукой.
 func play_spin() -> void:
 	if _asset != null:
-		_asset_act("combo")
+		_asset_act("spin")
 		return
 	var t := _new_action(0.42, 0.0)
 	if t == null:
@@ -1113,7 +1141,7 @@ func play_spin() -> void:
 ## Взмах рукой (приветствие).
 func play_wave() -> void:
 	if _asset != null:
-		_asset_act("chop")
+		_asset_act("wave")
 		return
 	var t := _new_action(1.1, 0.0)
 	if t == null:
