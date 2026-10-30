@@ -21,12 +21,14 @@ func run_step() -> void:
 			check(pois != null, "узел построек создан")
 			var buildings := get_tree().get_nodes_in_group("poi_buildings")
 			check(buildings.size() >= 40, "постройки с коллизией: %d" % buildings.size())
-			# Центр города свободен: ни одна постройка не ближе 9 м к (0,0)
+			# Центр города свободен: ни одна форма коллизии построек не ближе 9 м к (0,0)
+			# (смотрим на формы, а не на тела: тело ограды стоит в центре, а её формы — на кольце)
 			var near := 0
 			for b in buildings:
-				var n := b as Node3D
-				if Vector2(n.global_position.x, n.global_position.z).length() < 9.0:
-					near += 1
+				for sh in (b as Node).find_children("*", "CollisionShape3D", true, false):
+					var n := sh as Node3D
+					if Vector2(n.global_position.x, n.global_position.z).length() < 9.0:
+						near += 1
 			check(near == 0, "центр города свободен (построек ближе 9 м: %d)" % near)
 			for p in [Vector2(0, 0), Vector2(0, -1.5), Vector2(0, 7), Vector2(0, 2)]:
 				var v: Vector2 = p
