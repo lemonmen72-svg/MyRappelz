@@ -11,7 +11,6 @@ const MAX_MESHES := 40
 var w: IslandWorld
 var sails_basis := Basis.IDENTITY
 var ship_y := 0.0
-var sheep_xf := Transform3D.IDENTITY
 
 
 func race_class() -> Array:
@@ -85,8 +84,6 @@ func run_step() -> void:
 			ship_y = ship.global_position.y
 			var flock := pois.find_child("Bodies", true, false) as MultiMeshInstance3D
 			check(flock != null and flock.multimesh.instance_count == 4, "овцы в загоне")
-			if flock != null:
-				sheep_xf = flock.multimesh.get_instance_transform(0)
 			check(pois.find_child("Flames", true, false) is MultiMeshInstance3D, "огни пещеры и лагерей")
 			check(PoiModels.get_mesh("light_elf_house").get_surface_count() >= 2, "модель дома: несколько поверхностей")
 			# Анимации идут только рядом с камерой: переносим игрока в деревню людей у мельницы
@@ -100,6 +97,14 @@ func run_step() -> void:
 			var ship := pois.find_child("Ship", true, false) as Node3D
 			check(absf(ship.global_position.y - ship_y) < 0.5, "корабль качается рядом с уровнем моря")
 			var flock := pois.find_child("Bodies", true, false) as MultiMeshInstance3D
-			check(flock != null and not flock.multimesh.get_instance_transform(0).is_equal_approx(sheep_xf),
-				"овцы пасутся")
+			# Поза из аниматора: headless-рендер не хранит трансформы экземпляров MultiMesh
+			var grazing := 0
+			for e in (pois.get_node("PoiAnimator") as PoiAnimator)._items:
+				if int(e["kind"]) != PoiAnimator.GRAZE_MM or not e.has("last"):
+					continue
+				var last: Transform3D = e["last"]
+				var rest: Transform3D = e["xf"]
+				if not last.is_equal_approx(rest):
+					grazing += 1
+			check(flock != null and grazing == flock.multimesh.instance_count, "овцы пасутся: %d" % grazing)
 			ok_done()

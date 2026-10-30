@@ -122,6 +122,8 @@ func _process(delta: float) -> void:
 				var idx := int(e["idx"])
 				var bodies := n as MultiMeshInstance3D
 				bodies.multimesh.set_instance_transform(idx, body_xf)
+				# Последняя поза — для тестов: в headless-рендере MultiMesh не хранит трансформы
+				e["last"] = body_xf
 				var heads: MultiMeshInstance3D = e["heads"]
 				if is_instance_valid(heads):
 					heads.multimesh.set_instance_transform(idx, head_xf)
