@@ -1,103 +1,302 @@
 class_name CharacterCreate
 extends CanvasLayer
-## Экран создания персонажа: имя, раса, класс.
-## Каркас: рабочий, модуль «Персонаж и бой» может улучшить вид.
+## Экран создания персонажа: имя, раса, класс. Справа — карточка класса:
+## описание, характеристики 1-го уровня и два умения. Рассчитан на 1280×720 и касания пальцем.
 
 signal created(char_name: String, race_id: String, class_id: String)
+
+## [ключ ClassData.stats_for(), подпись]
+const STAT_ROWS := [
+	["max_hp", "Здоровье"], ["atk", "Атака"], ["def", "Защита"],
+	["range", "Дальность"], ["speed", "Скорость"],
+]
+const GOLD := Color(0.95, 0.8, 0.4)
+const MUTED := Color(0.7, 0.72, 0.78)
 
 var _race := "human"
 var _class := "warrior"
 var _name_edit: LineEdit
-var _race_box: HBoxContainer
+var _race_btns: Dictionary = {}
 var _class_box: HBoxContainer
-var _desc: Label
+var _race_desc: Label
+var _class_stripe: ColorRect
+var _class_title: Label
+var _class_sub: Label
+var _class_desc: Label
+var _stat_bars: Dictionary = {}
+var _stat_vals: Dictionary = {}
+var _stat_max: Dictionary = {}
+var _skills_box: VBoxContainer
 
 
 func _ready() -> void:
+	_calc_stat_max()
+
 	var bg := ColorRect.new()
-	bg.color = Color(0.06, 0.08, 0.1)
+	bg.color = Color(0.05, 0.07, 0.1)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
+	var band := ColorRect.new()
+	band.color = Color(0.1, 0.12, 0.17)
+	band.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	band.custom_minimum_size = Vector2(0, 90)
+	add_child(band)
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.theme = Util.ui_theme()
-	add_child(center)
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.theme = Util.ui_theme()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + String(side), 22)
+	add_child(margin)
 
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 12)
+	margin.add_child(root)
+
+	var title := _label("Создание персонажа", 34, GOLD)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(title)
+
+	var cols := HBoxContainer.new()
+	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cols.add_theme_constant_override("separation", 18)
+	root.add_child(cols)
+
+	cols.add_child(_build_left())
+	cols.add_child(_build_right())
+
+	_select_race(_race)
+
+
+func _build_left() -> PanelContainer:
 	var panel := PanelContainer.new()
-	center.add_child(panel)
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = 1.0
 	var v := VBoxContainer.new()
-	v.custom_minimum_size = Vector2(900, 0)
-	v.add_theme_constant_override("separation", 14)
+	v.add_theme_constant_override("separation", 8)
 	panel.add_child(v)
 
-	var title := Label.new()
-	title.text = "Создание персонажа"
-	title.add_theme_font_size_override("font_size", 36)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(title)
-
+	v.add_child(_label("Имя", 20, MUTED))
 	_name_edit = LineEdit.new()
 	_name_edit.placeholder_text = "Имя персонажа"
 	_name_edit.text = "Герой"
 	_name_edit.max_length = 16
+	_name_edit.custom_minimum_size = Vector2(0, 54)
 	v.add_child(_name_edit)
 
-	_race_box = HBoxContainer.new()
-	_race_box.add_theme_constant_override("separation", 10)
-	v.add_child(_race_box)
+	v.add_child(_label("Раса", 20, MUTED))
+	var race_box := HBoxContainer.new()
+	race_box.add_theme_constant_override("separation", 8)
+	v.add_child(race_box)
+	for rid in ClassData.RACES:
+		var b := _choice_button(String(ClassData.race(rid)["name"]))
+		b.pressed.connect(_select_race.bind(String(rid)))
+		race_box.add_child(b)
+		_race_btns[rid] = b
+	_race_desc = _label("", 20, Color(0.88, 0.88, 0.9))
+	_race_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_race_desc.custom_minimum_size = Vector2(0, 56)
+	v.add_child(_race_desc)
+
+	v.add_child(_label("Класс", 20, MUTED))
 	_class_box = HBoxContainer.new()
-	_class_box.add_theme_constant_override("separation", 10)
+	_class_box.add_theme_constant_override("separation", 8)
 	v.add_child(_class_box)
 
-	_desc = Label.new()
-	_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_desc.custom_minimum_size = Vector2(0, 90)
-	v.add_child(_desc)
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(spacer)
 
 	var start := Button.new()
 	start.text = "Начать игру"
+	start.custom_minimum_size = Vector2(0, 70)
+	start.add_theme_font_size_override("font_size", 30)
+	for state in ["normal", "hover", "pressed"]:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.2, 0.5, 0.25) if state != "pressed" else Color(0.3, 0.65, 0.3)
+		if state == "hover":
+			sb.bg_color = Color(0.24, 0.56, 0.3)
+		sb.border_color = GOLD
+		sb.set_border_width_all(2)
+		sb.set_corner_radius_all(10)
+		sb.set_content_margin_all(12)
+		start.add_theme_stylebox_override(state, sb)
 	start.pressed.connect(_on_start)
 	v.add_child(start)
+	return panel
 
-	_rebuild()
+
+func _build_right() -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = 1.25
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	panel.add_child(v)
+
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 12)
+	v.add_child(head)
+	_class_stripe = ColorRect.new()
+	_class_stripe.custom_minimum_size = Vector2(12, 0)
+	head.add_child(_class_stripe)
+	var hv := VBoxContainer.new()
+	hv.add_theme_constant_override("separation", 0)
+	head.add_child(hv)
+	_class_title = _label("", 30, Color.WHITE)
+	hv.add_child(_class_title)
+	_class_sub = _label("", 18, MUTED)
+	hv.add_child(_class_sub)
+
+	_class_desc = _label("", 20, Color(0.9, 0.9, 0.92))
+	_class_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(_class_desc)
+
+	v.add_child(HSeparator.new())
+	v.add_child(_label("Характеристики (1-й уровень)", 20, GOLD))
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 4)
+	v.add_child(grid)
+	for row in STAT_ROWS:
+		var key: String = row[0]
+		var name_l := _label(String(row[1]), 20, Color(0.9, 0.9, 0.92))
+		name_l.custom_minimum_size = Vector2(130, 0)
+		grid.add_child(name_l)
+		var bar := ProgressBar.new()
+		bar.show_percentage = false
+		bar.min_value = 0.0
+		bar.max_value = 1.0
+		bar.custom_minimum_size = Vector2(150, 16)
+		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var back := StyleBoxFlat.new()
+		back.bg_color = Color(0.18, 0.19, 0.24)
+		back.set_corner_radius_all(4)
+		bar.add_theme_stylebox_override("background", back)
+		grid.add_child(bar)
+		_stat_bars[key] = bar
+		var val := _label("", 20, Color.WHITE)
+		val.custom_minimum_size = Vector2(170, 0)
+		grid.add_child(val)
+		_stat_vals[key] = val
+
+	v.add_child(HSeparator.new())
+	v.add_child(_label("Умения", 20, GOLD))
+	_skills_box = VBoxContainer.new()
+	_skills_box.add_theme_constant_override("separation", 6)
+	v.add_child(_skills_box)
+	return panel
 
 
-func _rebuild() -> void:
-	for c in _race_box.get_children():
-		c.queue_free()
-	for c in _class_box.get_children():
-		c.queue_free()
-	for rid in ClassData.RACES:
-		var b := Button.new()
-		b.text = ClassData.race(rid)["name"]
-		b.toggle_mode = true
-		b.button_pressed = rid == _race
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(_select_race.bind(rid))
-		_race_box.add_child(b)
-	for cid in ClassData.race(_race)["classes"]:
-		var b := Button.new()
-		b.text = ClassData.cls(cid)["name"]
-		b.toggle_mode = true
-		b.button_pressed = cid == _class
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(_select_class.bind(cid))
-		_class_box.add_child(b)
-	_desc.text = "%s: %s\n%s: %s" % [
-		ClassData.race(_race)["name"], ClassData.race(_race)["desc"],
-		ClassData.cls(_class)["name"], ClassData.cls(_class)["desc"]]
+func _label(text: String, font_size: int, col: Color) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_color_override("font_color", col)
+	return l
+
+
+func _choice_button(text: String) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.toggle_mode = true
+	b.custom_minimum_size = Vector2(0, 58)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.add_theme_font_size_override("font_size", 20)
+	return b
+
+
+## Максимум каждой характеристики среди классов на 1 уровне (для длины полос).
+func _calc_stat_max() -> void:
+	for cid in ClassData.CLASSES:
+		var s := ClassData.stats_for(String(cid), 1)
+		for row in STAT_ROWS:
+			var key: String = row[0]
+			var val: float = float(s[key])
+			var cur: float = _stat_max.get(key, 0.0)
+			_stat_max[key] = maxf(cur, val)
 
 
 func _select_race(rid: String) -> void:
 	_race = rid
-	_class = ClassData.race(rid)["classes"][0]
-	_rebuild()
+	var r := ClassData.race(rid)
+	for k in _race_btns:
+		var b: Button = _race_btns[k]
+		b.set_pressed_no_signal(k == rid)
+	_race_desc.text = String(r["desc"])
+	var classes: Array = r["classes"]
+	if not classes.has(_class):
+		_class = String(classes[0])
+
+	for c in _class_box.get_children():
+		c.queue_free()
+	for cid in classes:
+		var b := _choice_button(String(ClassData.cls(cid)["name"]))
+		b.set_pressed_no_signal(cid == _class)
+		b.pressed.connect(_select_class.bind(String(cid)))
+		_class_box.add_child(b)
+	_select_class(_class)
 
 
 func _select_class(cid: String) -> void:
 	_class = cid
-	_rebuild()
+	for b in _class_box.get_children():
+		var btn := b as Button
+		if btn != null and not btn.is_queued_for_deletion():
+			btn.set_pressed_no_signal(btn.text == String(ClassData.cls(cid)["name"]))
+
+	var c := ClassData.cls(cid)
+	var col: Color = c["color"]
+	var kind: String = c["attack"]
+	_class_stripe.color = col
+	_class_title.text = String(c["name"])
+	_class_title.add_theme_color_override("font_color", col.lightened(0.25))
+	_class_sub.text = "%s · %s" % [String(ClassData.race(_race)["name"]), ClassData.attack_name(kind)]
+	_class_desc.text = String(c["desc"])
+
+	var s := ClassData.stats_for(cid, 1)
+	for row in STAT_ROWS:
+		var key: String = row[0]
+		var v: float = float(s[key])
+		var bar: ProgressBar = _stat_bars[key]
+		var mx: float = _stat_max.get(key, 1.0)
+		bar.value = v / mx if mx > 0.0 else 0.0
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = col.lightened(0.15)
+		fill.set_corner_radius_all(4)
+		bar.add_theme_stylebox_override("fill", fill)
+		var lbl: Label = _stat_vals[key]
+		match key:
+			"range":
+				lbl.text = "%s м (%s)" % [_num(v), ClassData.attack_name(kind)]
+			"speed":
+				lbl.text = "%s м/с" % _num(v)
+			_:
+				lbl.text = _num(v)
+
+	for ch in _skills_box.get_children():
+		ch.queue_free()
+	for sid in c["skills"]:
+		var sk := ClassData.skill(String(sid))
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 0)
+		var top := HBoxContainer.new()
+		top.add_theme_constant_override("separation", 10)
+		top.add_child(_label(String(sk.get("name", sid)), 22, Color(1, 0.85, 0.5)))
+		top.add_child(_label("перезарядка %s с" % _num(float(sk.get("cd", 0.0))), 17, MUTED))
+		box.add_child(top)
+		var d := _label(String(sk.get("desc", "")), 18, Color(0.85, 0.86, 0.9))
+		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(d)
+		_skills_box.add_child(box)
+
+
+func _num(v: float) -> String:
+	if is_equal_approx(v, roundf(v)):
+		return str(roundi(v))
+	return "%.1f" % v
 
 
 func _on_start() -> void:
