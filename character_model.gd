@@ -12,8 +12,14 @@ extends Node3D
 ## play_shoot(), play_cast(), play_buff(), play_bash(), play_spin(), play_hit(), play_wave();
 ## волосы, плащ и шарф покачиваются сами.
 ##
-## Скелет узлов: Root (отдача при уроне) → LegL/LegR (от бедра), Torso (от бедра) → Head,
+## Скелет узлов (анимация): Root (отдача при уроне) → LegL/LegR (от бедра), Torso (от бедра) → Head,
 ## ArmL/ArmR (от плеча) → GripL/GripR (кисть, оружие вдоль +Y). Плечо повёрнуто по X > 0 — рука вперёд.
+##
+## Отрисовка (бюджет телефона): узлы-кости — пустые Node3D, их анимируют код и твины. Все детали
+## склеены в один меш с жёсткой привязкой к костям (Skeleton3D, вес 1 на кость) и цветами вершин:
+## Body — всё освещаемое (1 материал, 1 контур), Glow — светящиеся детали (без освещения), Face — лицо.
+## Каждый кадр позы костей скелета копируются из узлов (_sync_bones). Итого 2–4 вызова отрисовки
+## на персонажа (+1 на контур). Геометрия кэшируется по параметрам внешности.
 
 ## Высота бёдер над землёй.
 const HIP_Y := 0.9
@@ -22,33 +28,148 @@ const SHOULDER_Y := 0.46
 const SHOULDER_X := 0.215
 const HEAD_Y := 0.69
 const HEAD_R := 0.2
-## Толщина контура (как width в outline.gdshader): основной и для мелких деталей.
+## Толщина контура: основной и для мелких деталей (0 — без контура).
+## Хранится в альфе цвета вершины как доля от OL.
 const OL := 0.017
 const OL_THIN := 0.01
 const FLASH := Color(1.0, 0.32, 0.28)
 const FACE_SEG := 14
 const LASH := Color(0.12, 0.07, 0.1)
 const GOLD := Color(0.95, 0.78, 0.35)
+## Виды деталей: освещаемые, светящиеся, полупрозрачное свечение.
+const SOLID := 0
+const GLOW := 1
+const HALO := 2
+## Рамка для отсечения (кости двигаются: поднятый посох, взмах рук).
+const CULL_AABB := AABB(Vector3(-1.7, -0.3, -1.7), Vector3(3.4, 4.0, 3.4))
 
-## Контур по нормалям («вывернутая оболочка»): у капсул и сфер толщина ровная по всей длине,
-## в отличие от раздувания от центра в outline.gdshader (у вытянутых деталей бока остаются без контура).
+## Контур по нормалям («вывернутая оболочка»): у капсул и сфер толщина ровная по всей длине.
+## Толщина детали — альфа цвета вершины × width (0 — деталь без контура: вершины стягиваются в точку),
+## цвет — тёмный насыщенный оттенок цвета вершины (как Util.outline_mat).
 const OUTLINE_SHADER := """shader_type spatial;
 render_mode unshaded, cull_front, depth_draw_opaque, shadows_disabled, fog_disabled;
 
-uniform vec4 color : source_color = vec4(0.12, 0.09, 0.14, 1.0);
-uniform float width = 0.02;
+uniform float width = 0.017;
+
+varying vec3 ol_color;
+
+vec3 rgb2hsv(vec3 c) {
+	vec4 k = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+	vec4 p = mix(vec4(c.bg, k.wz), vec4(c.gb, k.xy), step(c.b, c.g));
+	vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+	float d = q.x - min(q.w, q.y);
+	float e = 1.0e-10;
+	return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+vec3 hsv2rgb(vec3 c) {
+	vec4 k = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+	vec3 p = abs(fract(c.xxx + k.xyz) * 6.0 - k.www);
+	return c.z * mix(k.xxx, clamp(p - k.xxx, 0.0, 1.0), c.y);
+}
 
 void vertex() {
-	vec3 world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	float dist = length(world - CAMERA_POSITION_WORLD);
-	float scale = length(MODEL_MATRIX[0].xyz);
-	VERTEX += normalize(NORMAL) * width * clamp(dist / 10.0, 0.6, 3.0) / max(scale, 0.001);
+	float w = COLOR.a * width;
+	if (w < 0.0001) {
+		VERTEX = vec3(0.0);
+	} else {
+		vec3 world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+		float dist = length(world - CAMERA_POSITION_WORLD);
+		float scale = length(MODEL_MATRIX[0].xyz);
+		VERTEX += normalize(NORMAL) * w * clamp(dist / 10.0, 0.6, 3.0) / max(scale, 0.001);
+	}
+	vec3 hsv = rgb2hsv(COLOR.rgb);
+	vec3 c = hsv2rgb(vec3(hsv.x, min(1.0, hsv.y * 1.2 + 0.1), hsv.z * 0.28));
+	if (!OUTPUT_IS_SRGB) {
+		c = mix(pow((c + vec3(0.055)) * (1.0 / (1.0 + 0.055)), vec3(2.4)), c * (1.0 / 12.92), lessThan(c, vec3(0.04045)));
+	}
+	ol_color = c;
 }
 
 void fragment() {
-	ALBEDO = color.rgb;
+	ALBEDO = ol_color;
 }
 """
+
+
+## Накопитель геометрии одной поверхности: вершины в пространстве своей кости, цвет, кость (вес 1).
+class GeoBuf:
+	var verts := PackedVector3Array()
+	var norms := PackedVector3Array()
+	var cols := PackedColorArray()
+	var bones := PackedInt32Array()
+	var weights := PackedFloat32Array()
+	var idx := PackedInt32Array()
+	## Кость для tri() (лицо).
+	var tri_bone := 0
+
+	## Добавить меш (массивы PrimitiveMesh.get_mesh_arrays()) с трансформом xf относительно кости.
+	func add(a: Array, xf: Transform3D, col: Color, bone: int) -> void:
+		var pv: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+		var pn := PackedVector3Array()
+		var an: Variant = a[Mesh.ARRAY_NORMAL]
+		if an is PackedVector3Array:
+			pn = an
+		var n := pv.size()
+		var base := verts.size()
+		var nb := xf.basis.inverse().transposed()
+		var has_n := pn.size() == n
+		for i in n:
+			verts.append(xf * pv[i])
+			var nn: Vector3 = (nb * pn[i]) if has_n else pv[i]
+			norms.append(nn.normalized())
+			cols.append(col)
+			bones.append(bone)
+			bones.append(0)
+			bones.append(0)
+			bones.append(0)
+			weights.append(1.0)
+			weights.append(0.0)
+			weights.append(0.0)
+			weights.append(0.0)
+		var ia := PackedInt32Array()
+		var ai: Variant = a[Mesh.ARRAY_INDEX]
+		if ai is PackedInt32Array:
+			ia = ai
+		if not ia.is_empty():
+			for k in ia:
+				idx.append(base + k)
+		else:
+			for k in n:
+				idx.append(base + k)
+
+	## Треугольник лица (нормаль — от центра головы).
+	func tri(a: Vector3, b: Vector3, c: Vector3, col: Color) -> void:
+		for p in [a, b, c]:
+			var v: Vector3 = p
+			idx.append(verts.size())
+			verts.append(v)
+			norms.append(v.normalized())
+			cols.append(col)
+			bones.append(tri_bone)
+			bones.append(0)
+			bones.append(0)
+			bones.append(0)
+			weights.append(1.0)
+			weights.append(0.0)
+			weights.append(0.0)
+			weights.append(0.0)
+
+	func is_empty() -> bool:
+		return verts.is_empty()
+
+	## Добавить накопленное поверхностью в меш.
+	func commit(mesh: ArrayMesh) -> void:
+		var arr := []
+		arr.resize(Mesh.ARRAY_MAX)
+		arr[Mesh.ARRAY_VERTEX] = verts
+		arr[Mesh.ARRAY_NORMAL] = norms
+		arr[Mesh.ARRAY_COLOR] = cols
+		arr[Mesh.ARRAY_BONES] = bones
+		arr[Mesh.ARRAY_WEIGHTS] = weights
+		arr[Mesh.ARRAY_INDEX] = idx
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+
 
 ## Вид оружия: "axe" | "bow" | "sword_shield" | "sword" | "staff" | "daggers" | "" (без оружия).
 var weapon_kind := ""
@@ -70,9 +191,18 @@ var _face: MeshInstance3D
 var _face_open: ArrayMesh
 var _face_closed: ArrayMesh
 var _orb: Node3D
-var _ears: Array[MeshInstance3D] = []
-var _mats: Dictionary = {}
+var _has_ears := false
 var _flash_mats: Array[StandardMaterial3D] = []
+
+# Скелет: кости повторяют узлы-кости; _bone_pre — неподвижные промежуточные узлы между костью
+# и её родительской костью (например, Staff между GripR и Orb).
+var _skel: Skeleton3D
+var _bone_nodes: Array[Node3D] = []
+var _bone_pre: Array[Transform3D] = []
+var _bone_idx: Dictionary = {}
+# Сборка геометрии (только если её нет в кэше)
+var _collect := false
+var _bufs: Array[GeoBuf] = []
 
 # Поза покоя (углы X плеч и кистей), разведение рук, размах при ходьбе
 var _rest_arm_r := 0.1
@@ -100,9 +230,14 @@ var _blink := 3.0
 var _blinking := false
 var _spinning := false
 
-static var _mesh_cache: Dictionary = {}
-static var _outline_cache: Dictionary = {}
+## Массивы примитивов (одинаковые детали у всех персонажей).
+static var _arr_cache: Dictionary = {}
+## Готовая геометрия по параметрам внешности: body, glow (или null), glow_kinds, face_open, face_closed.
+static var _geo_cache: Dictionary = {}
 static var _outline_shader: Shader
+static var _outline_material: ShaderMaterial
+static var _glow_mats: Dictionary = {}
+static var _face_material: StandardMaterial3D
 
 
 # ---------- Параметры внешности ----------
@@ -142,42 +277,75 @@ func setup(s: Dictionary) -> CharacterModel:
 	for ch in get_children():
 		remove_child(ch)
 		ch.queue_free()
-	_mats.clear()
 	_flash_mats.clear()
-	_ears.clear()
+	_bone_nodes.clear()
+	_bone_pre.clear()
+	_bone_idx.clear()
+	_has_ears = false
 	_orb = null
 	_cape = null
 	_hair_back = null
+	_face = null
 	weapon_kind = String(s.get("weapon", ""))
 	_girth = float(s.get("girth", 1.0))
 	_can_blink = String(s.get("eye_style", "normal")) != "smile"
 	var outfit := String(s.get("outfit", "warrior"))
 	var pal := _palette(outfit)
 	_leg_amp = 0.45 if String(pal["skirt_len"]) == "long" else 0.7
+	_cape_rest = -0.1
 
-	_root = _node(self, "Root", Vector3.ZERO)
+	var key := var_to_str(s)
+	var geo: Dictionary = _geo_cache.get(key, {})
+	_collect = geo.is_empty()
+	_bufs.clear()
+	if _collect:
+		for _i in 3:
+			_bufs.append(GeoBuf.new())
+
+	_skel = Skeleton3D.new()
+	_skel.name = "Skeleton"
+	add_child(_skel)
+	_root = _bone(self, "Root", Vector3.ZERO)
 	_build_legs(pal)
-	_torso = _node(_root, "Torso", Vector3(0, HIP_Y, 0))
+	_torso = _bone(_root, "Torso", Vector3(0, HIP_Y, 0))
 	_build_body(pal)
 	_build_arms(pal)
-	_head = _node(_torso, "Head", Vector3(0, HEAD_Y, 0))
+	_head = _bone(_torso, "Head", Vector3(0, HEAD_Y, 0))
 	_build_head()
 	_build_hair()
 	_build_outfit(outfit)
 	_build_weapon()
+
+	if _collect:
+		geo = _bake()
+		_geo_cache[key] = geo
+		_bufs.clear()
+		_collect = false
+	_make_meshes(geo)
 	_apply_rest()
+	_sync_bones()
 	_blink = randf_range(1.5, 4.0)
 	return self
 
 
 ## Есть ли заострённые уши (эльфы).
 func has_ears() -> bool:
-	return not _ears.is_empty()
+	return _has_ears
 
 
 ## Сколько мешей в модели (для проверки бюджета на телефоне).
 func mesh_count() -> int:
 	return find_children("*", "MeshInstance3D", true, false).size()
+
+
+## Сколько поверхностей (вызовов отрисовки без контура) у мешей модели.
+func surface_count() -> int:
+	var n := 0
+	for mi in find_children("*", "MeshInstance3D", true, false):
+		var m := (mi as MeshInstance3D).mesh
+		if m != null:
+			n += m.get_surface_count()
+	return n
 
 
 ## Скорость движения, м/с: от неё зависят шаг, размах рук и наклон.
@@ -243,9 +411,9 @@ func _build_legs(pal: Dictionary) -> void:
 	var hip_x := 0.095 + (_girth - 1.0) * 0.1
 	for sd in [-1.0, 1.0]:
 		var side: float = sd
-		var leg := _node(_root, "LegR" if side > 0.0 else "LegL", Vector3(hip_x * side, HIP_Y, 0))
-		_add(leg, _capsule_mesh(0.075, 0.84), Vector3(0, -0.42, 0), _mat(pal["pants"]))
-		_add(leg, _capsule_mesh(0.088, 0.25), Vector3(0, -0.78, -0.025), _mat(pal["boots"]))
+		var leg := _bone(_root, "LegR" if side > 0.0 else "LegL", Vector3(hip_x * side, HIP_Y, 0))
+		_add(leg, _capsule(0.075, 0.84), Vector3(0, -0.42, 0), pal["pants"])
+		_add(leg, _capsule(0.088, 0.25), Vector3(0, -0.78, -0.025), pal["boots"])
 		if side > 0.0:
 			_leg_r = leg
 		else:
@@ -254,10 +422,9 @@ func _build_legs(pal: Dictionary) -> void:
 
 func _build_body(pal: Dictionary) -> void:
 	var g := _girth
-	var chest := _add(_torso, _capsule_mesh(0.165, 0.6), Vector3(0, 0.27, 0), _mat(pal["chest"]))
-	chest.scale = Vector3(g, 1.0, 0.8 * g)
-	var belt := _add(_torso, _cyl_mesh(0.172, 0.172, 0.07), Vector3(0, 0.07, 0), _mat(pal["belt"], OL_THIN))
-	belt.scale = Vector3(g, 1.0, 0.82 * g)
+	_add(_torso, _capsule(0.165, 0.6), Vector3(0, 0.27, 0), pal["chest"], OL, Vector3.ZERO, Vector3(g, 1.0, 0.8 * g))
+	_add(_torso, _cyl(0.172, 0.172, 0.07), Vector3(0, 0.07, 0), pal["belt"], OL_THIN, Vector3.ZERO,
+		Vector3(g, 1.0, 0.82 * g))
 	var bottom := 0.25
 	var h := 0.3
 	match String(pal["skirt_len"]):
@@ -267,8 +434,8 @@ func _build_body(pal: Dictionary) -> void:
 		"long":
 			bottom = 0.33
 			h = 0.76
-	var skirt := _add(_torso, _cyl_mesh(0.165, bottom, h, 12), Vector3(0, 0.06 - h * 0.5, 0), _mat(pal["skirt"]))
-	skirt.scale = Vector3(g, 1.0, 0.85 * g)
+	_add(_torso, _cyl(0.165, bottom, h, 12), Vector3(0, 0.06 - h * 0.5, 0), pal["skirt"], OL, Vector3.ZERO,
+		Vector3(g, 1.0, 0.85 * g))
 
 
 func _build_arms(pal: Dictionary) -> void:
@@ -276,10 +443,10 @@ func _build_arms(pal: Dictionary) -> void:
 	var sx := SHOULDER_X + (_girth - 1.0) * 0.14
 	for sd in [-1.0, 1.0]:
 		var side: float = sd
-		var arm := _node(_torso, "ArmR" if side > 0.0 else "ArmL", Vector3(sx * side, SHOULDER_Y, 0))
-		_add(arm, _capsule_mesh(0.058, 0.5), Vector3(0, -0.22, 0), _mat(pal["sleeve"]))
-		_add(arm, _sphere_mesh(0.062, 0.124, 10, 5), Vector3(0, -0.5, 0), _mat(skin, OL_THIN))
-		var grip := _node(arm, "GripR" if side > 0.0 else "GripL", Vector3(0, -0.52, -0.01))
+		var arm := _bone(_torso, "ArmR" if side > 0.0 else "ArmL", Vector3(sx * side, SHOULDER_Y, 0))
+		_add(arm, _capsule(0.058, 0.5), Vector3(0, -0.22, 0), pal["sleeve"])
+		_add(arm, _sphere(0.062, 0.124, 10, 5), Vector3(0, -0.5, 0), skin, OL_THIN)
+		var grip := _bone(arm, "GripR" if side > 0.0 else "GripL", Vector3(0, -0.52, -0.01))
 		if side > 0.0:
 			_arm_r = arm
 			_grip_r = grip
@@ -292,41 +459,24 @@ func _build_arms(pal: Dictionary) -> void:
 
 func _build_head() -> void:
 	var skin: Color = spec.get("skin", Color(0.95, 0.8, 0.65))
-	_add(_head, _sphere_mesh(HEAD_R, HEAD_R * 2.0, 16, 8), Vector3.ZERO, _mat(skin))
-
-	# Лицо — один меш с цветами вершин (глаза, брови, рот, румянец): дёшево для телефона.
-	# Моргание — подмена меша на вариант с закрытыми глазами.
-	_face_open = _face_mesh(false)
-	_face_closed = _face_mesh(true) if _can_blink else _face_open
-	var fm := StandardMaterial3D.new()
-	fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	fm.vertex_color_use_as_albedo = true
-	fm.vertex_color_is_srgb = true
-	fm.cull_mode = BaseMaterial3D.CULL_DISABLED
-	fm.set_meta("toon_done", true)
-	_face = _add(_head, _face_open, Vector3.ZERO, fm, false)
-	_face.name = "Face"
-	_face.set_meta("no_outline", true)
+	_add(_head, _sphere(HEAD_R, HEAD_R * 2.0, 16, 8), Vector3.ZERO, skin)
 
 	if bool(spec.get("ears", false)):
+		_has_ears = true
 		for sd in [-1.0, 1.0]:
 			var side: float = sd
 			var base := _dir(1.5 * side, -0.08) * 0.185
 			var d := Vector3(0.88 * side, 0.42, 0.2).normalized()
-			var ear := _add(_head, _cyl_mesh(0.0, 0.046, 0.21, 6), base + d * 0.1, _mat(skin, OL_THIN))
-			ear.basis = _basis_y(d)
-			ear.scale = Vector3(1.0, 1.0, 0.45)
-			ear.name = "EarR" if side > 0.0 else "EarL"
-			_ears.append(ear)
+			_put(_head, _cyl(0.0, 0.046, 0.21, 6),
+				Transform3D(_basis_y(d) * Basis.from_scale(Vector3(1.0, 1.0, 0.45)), base + d * 0.1), skin, OL_THIN)
 
 	if bool(spec.get("beard", false)):
 		var hair: Color = spec.get("hair", Color(0.5, 0.45, 0.4))
 		for sd in [-1.0, 1.0]:
 			var side: float = sd
-			var m := _add(_head, _sphere_mesh(0.035, 0.07, 8, 4),
-				_dir(0.12 * side, -0.42) * (HEAD_R + 0.008) + Vector3(0.012 * side, 0, 0), _mat(hair, OL_THIN), false)
-			m.rotation.z = -0.35 * side
-			m.scale = Vector3(1.3, 0.6, 0.5)
+			_add(_head, _sphere(0.035, 0.07, 8, 4),
+				_dir(0.12 * side, -0.42) * (HEAD_R + 0.008) + Vector3(0.012 * side, 0, 0), hair, OL_THIN,
+				Vector3(0, 0, -0.35 * side), Vector3(1.3, 0.6, 0.5))
 
 
 ## Направление от центра головы: u — поворот (0 = вперёд, + = вправо), v — наклон (+ = вверх).
@@ -334,9 +484,11 @@ static func _dir(u: float, v: float) -> Vector3:
 	return Vector3(sin(u) * cos(v), sin(v), -cos(u) * cos(v))
 
 
+## Лицо — один меш с цветами вершин (глаза, брови, рот, румянец), привязан к кости головы.
+## Моргание — подмена меша на вариант с закрытыми глазами.
 func _face_mesh(closed: bool) -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var b := GeoBuf.new()
+	b.tri_bone = int(_bone_idx[_head])
 	var skin: Color = spec.get("skin", Color(0.95, 0.8, 0.65))
 	var hair: Color = spec.get("hair", Color(0.4, 0.25, 0.12))
 	var iris: Color = spec.get("eyes", Color(0.3, 0.5, 0.85))
@@ -348,27 +500,29 @@ func _face_mesh(closed: bool) -> ArrayMesh:
 		var u := 0.37 * side
 		var v := -0.15
 		# Румянец и бровь
-		_f_ellipse(st, 0.56 * side, -0.36, Vector2.ZERO, 0.032, 0.015, 0.0015, blush)
-		_f_arc(st, 0.38 * side, 0.24, Vector2.ZERO, 0.046, 0.012, 0.12 * PI, 0.88 * PI, 0.011, side, 0.0025, brow)
+		_f_ellipse(b, 0.56 * side, -0.36, Vector2.ZERO, 0.032, 0.015, 0.0015, blush)
+		_f_arc(b, 0.38 * side, 0.24, Vector2.ZERO, 0.046, 0.012, 0.12 * PI, 0.88 * PI, 0.011, side, 0.0025, brow)
 		if smile:
 			# Глаза-улыбки «^ ^»
-			_f_arc(st, u, v, Vector2(0, -0.012), 0.036, 0.03, 0.1 * PI, 0.9 * PI, 0.012, side, 0.003, LASH)
+			_f_arc(b, u, v, Vector2(0, -0.012), 0.036, 0.03, 0.1 * PI, 0.9 * PI, 0.012, side, 0.003, LASH)
 		elif closed:
-			_f_arc(st, u, v, Vector2(0, 0.006), 0.044, 0.014, 1.05 * PI, 1.95 * PI, 0.011, side, 0.003, LASH)
+			_f_arc(b, u, v, Vector2(0, 0.006), 0.044, 0.014, 1.05 * PI, 1.95 * PI, 0.011, side, 0.003, LASH)
 		else:
 			# Белок, радужка с осветлением снизу, зрачок, два блика, ресницы сверху
 			var ic := Vector2(-0.004 * side, -0.006)
-			_f_ellipse(st, u, v, Vector2.ZERO, 0.044, 0.052, 0.0015, Color(0.98, 0.98, 1.0))
-			_f_ellipse(st, u, v, ic, 0.031, 0.042, 0.003, iris)
-			_f_ellipse(st, u, v, ic + Vector2(0, -0.02), 0.022, 0.015, 0.0038, iris.lightened(0.35))
-			_f_ellipse(st, u, v, ic + Vector2(0, 0.004), 0.016, 0.024, 0.0045, iris.darkened(0.72))
-			_f_ellipse(st, u, v, ic + Vector2(0.013 * side, 0.017), 0.011, 0.012, 0.006, Color.WHITE)
-			_f_ellipse(st, u, v, ic + Vector2(-0.011 * side, -0.02), 0.005, 0.005, 0.006, Color.WHITE)
-			_f_arc(st, u, v, Vector2.ZERO, 0.046, 0.054, -0.06 * PI, 0.95 * PI, 0.013, side, 0.0055, LASH)
+			_f_ellipse(b, u, v, Vector2.ZERO, 0.044, 0.052, 0.0015, Color(0.98, 0.98, 1.0))
+			_f_ellipse(b, u, v, ic, 0.031, 0.042, 0.003, iris)
+			_f_ellipse(b, u, v, ic + Vector2(0, -0.02), 0.022, 0.015, 0.0038, iris.lightened(0.35))
+			_f_ellipse(b, u, v, ic + Vector2(0, 0.004), 0.016, 0.024, 0.0045, iris.darkened(0.72))
+			_f_ellipse(b, u, v, ic + Vector2(0.013 * side, 0.017), 0.011, 0.012, 0.006, Color.WHITE)
+			_f_ellipse(b, u, v, ic + Vector2(-0.011 * side, -0.02), 0.005, 0.005, 0.006, Color.WHITE)
+			_f_arc(b, u, v, Vector2.ZERO, 0.046, 0.054, -0.06 * PI, 0.95 * PI, 0.013, side, 0.0055, LASH)
 	# Маленький рот-улыбка
-	_f_arc(st, 0.0, -0.55, Vector2.ZERO, 0.022, 0.009, 1.12 * PI, 1.88 * PI, 0.006, 1.0, 0.002,
+	_f_arc(b, 0.0, -0.55, Vector2.ZERO, 0.022, 0.009, 1.12 * PI, 1.88 * PI, 0.006, 1.0, 0.002,
 		Color(0.5, 0.2, 0.22))
-	return st.commit()
+	var m := ArrayMesh.new()
+	b.commit(m)
+	return m
 
 
 ## Точка на поверхности головы: центр (u, v), смещение off (м) в касательной плоскости, lift — над кожей.
@@ -379,19 +533,19 @@ func _fp(u: float, v: float, off: Vector2, lift: float) -> Vector3:
 	return (d * HEAD_R + tx * off.x + ty * off.y).normalized() * (HEAD_R + lift)
 
 
-func _f_ellipse(st: SurfaceTool, u: float, v: float, c: Vector2, a: float, b: float, lift: float,
+func _f_ellipse(b: GeoBuf, u: float, v: float, c: Vector2, ra: float, rb: float, lift: float,
 		col: Color) -> void:
 	var center := _fp(u, v, c, lift)
-	var prev := _fp(u, v, c + Vector2(a, 0.0), lift)
+	var prev := _fp(u, v, c + Vector2(ra, 0.0), lift)
 	for i in range(1, FACE_SEG + 1):
 		var th := TAU * float(i) / float(FACE_SEG)
-		var cur := _fp(u, v, c + Vector2(a * cos(th), b * sin(th)), lift)
-		_tri(st, center, prev, cur, col)
+		var cur := _fp(u, v, c + Vector2(ra * cos(th), rb * sin(th)), lift)
+		b.tri(center, prev, cur, col)
 		prev = cur
 
 
-## Дуга-мазок по эллипсу (a, b) от угла t0 до t1, толщина сходит на нет к концам. side отражает по X.
-func _f_arc(st: SurfaceTool, u: float, v: float, c: Vector2, a: float, b: float, t0: float, t1: float,
+## Дуга-мазок по эллипсу (ra, rb) от угла t0 до t1, толщина сходит на нет к концам. side отражает по X.
+func _f_arc(b: GeoBuf, u: float, v: float, c: Vector2, ra: float, rb: float, t0: float, t1: float,
 		thick: float, side: float, lift: float, col: Color) -> void:
 	var n := 10
 	var p_in := Vector3.ZERO
@@ -402,22 +556,13 @@ func _f_arc(st: SurfaceTool, u: float, v: float, c: Vector2, a: float, b: float,
 		var k := thick * maxf(0.2, sin(PI * f))
 		var cs := cos(th) * side
 		var sn := sin(th)
-		var a_in := _fp(u, v, c + Vector2(a * cs, b * sn), lift)
-		var a_out := _fp(u, v, c + Vector2((a + k) * cs, (b + k) * sn), lift)
+		var a_in := _fp(u, v, c + Vector2(ra * cs, rb * sn), lift)
+		var a_out := _fp(u, v, c + Vector2((ra + k) * cs, (rb + k) * sn), lift)
 		if i > 0:
-			_tri(st, p_in, p_out, a_out, col)
-			_tri(st, p_in, a_out, a_in, col)
+			b.tri(p_in, p_out, a_out, col)
+			b.tri(p_in, a_out, a_in, col)
 		p_in = a_in
 		p_out = a_out
-
-
-func _tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, col: Color) -> void:
-	st.set_color(col)
-	st.add_vertex(a)
-	st.set_color(col)
-	st.add_vertex(b)
-	st.set_color(col)
-	st.add_vertex(c)
 
 
 # ---------- Причёски ----------
@@ -429,13 +574,12 @@ func _build_hair() -> void:
 	var hat := bool(spec.get("hat", false))
 	# «Шапка» волос сдвинута вверх-назад: лицо открыто, затылок и виски закрыты
 	var cap_c := Vector3(0, 0.035, 0.045)
-	_add(_head, _sphere_mesh(0.218, 0.436, 14, 7), cap_c, _mat(hair))
+	_add(_head, _sphere(0.218, 0.436, 14, 7), cap_c, hair)
 	if not hat:
 		# Светлое кольцо-блик на волосах (аниме-приём)
 		var rh := 0.105
 		var rho := sqrt(0.218 * 0.218 - rh * rh)
-		_add(_head, _torus_mesh(rho - 0.006, rho + 0.012), cap_c + Vector3(0, rh, 0),
-			_mat(hair.lightened(0.4), 0.0), false)
+		_add(_head, _torus(rho - 0.006, rho + 0.012), cap_c + Vector3(0, rh, 0), hair.lightened(0.4), 0.0)
 
 	match style:
 		"long":
@@ -448,14 +592,13 @@ func _build_hair() -> void:
 				var side: float = sd
 				_spike(_head, _dir(1.2 * side, 0.5) * (HEAD_R + 0.012), Vector3(0.175 * side, -0.37, -0.085),
 					0.065, hair)
-			_hair_back = _node(_head, "HairBack", Vector3(0, 0.02, 0.13))
-			var mass := _add(_hair_back, _sphere_mesh(0.17, 0.78, 12, 6), Vector3(0, -0.3, 0.06), _mat(hair))
-			mass.scale = Vector3(1.1, 1.0, 0.55)
+			_hair_back = _bone(_head, "HairBack", Vector3(0, 0.02, 0.13))
+			_add(_hair_back, _sphere(0.17, 0.78, 12, 6), Vector3(0, -0.3, 0.06), hair, OL, Vector3.ZERO,
+				Vector3(1.1, 1.0, 0.55))
 			for sd in [-1.0, 1.0]:
 				var side: float = sd
 				_spike(_hair_back, Vector3(0.1 * side, -0.05, 0.08), Vector3(0.16 * side, -0.66, 0.08), 0.07, hair)
-			_add(_head, _sphere_mesh(0.026, 0.052, 8, 4), _dir(0.95, 0.6) * (HEAD_R + 0.035),
-				_mat(acc, OL_THIN), false)
+			_add(_head, _sphere(0.026, 0.052, 8, 4), _dir(0.95, 0.6) * (HEAD_R + 0.035), acc, OL_THIN)
 		"ponytail":
 			# Асимметричная чёлка, пряди у лица, высокий хвост
 			_strand(-0.3, 1.1, -0.58, 0.25, 0.065, hair)
@@ -464,9 +607,9 @@ func _build_hair() -> void:
 			_strand(0.45, 1.05, 0.78, 0.2, 0.055, hair)
 			_strand(1.2, 0.5, 1.3, -0.48, 0.055, hair)
 			_strand(-1.2, 0.5, -1.3, -0.48, 0.055, hair)
-			_add(_head, _sphere_mesh(0.045, 0.09, 8, 4), Vector3(0, 0.17, 0.2), _mat(acc, OL_THIN), false)
-			_hair_back = _node(_head, "HairBack", Vector3(0, 0.17, 0.22))
-			_add(_hair_back, _sphere_mesh(0.075, 0.13, 10, 5), Vector3(0, -0.01, 0.04), _mat(hair))
+			_add(_head, _sphere(0.045, 0.09, 8, 4), Vector3(0, 0.17, 0.2), acc, OL_THIN)
+			_hair_back = _bone(_head, "HairBack", Vector3(0, 0.17, 0.22))
+			_add(_hair_back, _sphere(0.075, 0.13, 10, 5), Vector3(0, -0.01, 0.04), hair)
 			_spike(_hair_back, Vector3(0, 0.0, 0.05), Vector3(0, -0.72, 0.15), 0.085, hair)
 			_spike(_hair_back, Vector3(0.035, -0.02, 0.04), Vector3(0.08, -0.5, 0.22), 0.055, hair)
 		_:
@@ -477,7 +620,7 @@ func _build_hair() -> void:
 			_strand(0.38, 1.1, 0.55, 0.3, 0.06, hair)
 			_strand(1.25, 0.55, 1.3, -0.55, 0.065, hair)
 			_strand(-1.25, 0.55, -1.3, -0.55, 0.065, hair)
-			_hair_back = _node(_head, "HairBack", Vector3(0, 0.05, 0.1))
+			_hair_back = _bone(_head, "HairBack", Vector3(0, 0.05, 0.1))
 			_spike(_hair_back, Vector3(0.1, 0.07, 0.04), Vector3(0.14, -0.2, 0.11), 0.085, hair)
 			_spike(_hair_back, Vector3(-0.1, 0.07, 0.04), Vector3(-0.14, -0.2, 0.11), 0.085, hair)
 			_spike(_hair_back, Vector3(0, 0.08, 0.06), Vector3(0, -0.24, 0.13), 0.09, hair)
@@ -486,10 +629,9 @@ func _build_hair() -> void:
 
 	if hat:
 		var hat_c := Color(0.78, 0.58, 0.3)
-		var brim := _add(_head, _cyl_mesh(0.36, 0.36, 0.03, 16), Vector3(0, 0.16, 0.03), _mat(hat_c))
-		brim.rotation.x = 0.12
-		_add(_head, _sphere_mesh(0.18, 0.24, 12, 6), Vector3(0, 0.24, 0.04), _mat(hat_c))
-		_add(_head, _cyl_mesh(0.183, 0.183, 0.045, 12), Vector3(0, 0.19, 0.04), _mat(Color(0.72, 0.25, 0.2), OL_THIN))
+		_add(_head, _cyl(0.36, 0.36, 0.03, 16), Vector3(0, 0.16, 0.03), hat_c, OL, Vector3(0.12, 0, 0))
+		_add(_head, _sphere(0.18, 0.24, 12, 6), Vector3(0, 0.24, 0.04), hat_c)
+		_add(_head, _cyl(0.183, 0.183, 0.045, 12), Vector3(0, 0.19, 0.04), Color(0.72, 0.25, 0.2), OL_THIN)
 		_spike(_head, Vector3(0.15, 0.2, 0.08), Vector3(0.27, 0.42, 0.18), 0.03, Color(0.95, 0.92, 0.82))
 
 
@@ -508,70 +650,65 @@ func _build_outfit(outfit: String) -> void:
 		"warrior":
 			# Стальные наплечники, меховой воротник, пряжка, кожаные наручи
 			_pads(0.1, 0.15, metal)
-			var fur := _add(_torso, _sphere_mesh(0.2, 0.13), Vector3(0, 0.47, 0.01), _mat(Color(0.85, 0.75, 0.58)))
-			fur.scale = Vector3(1.0, 1.0, 0.85)
-			_add(_torso, _box_mesh(Vector3(0.075, 0.06, 0.025)), Vector3(0, 0.07, -0.145), _mat(acc, OL_THIN), false)
+			_add(_torso, _sphere(0.2, 0.13), Vector3(0, 0.47, 0.01), Color(0.85, 0.75, 0.58), OL, Vector3.ZERO,
+				Vector3(1.0, 1.0, 0.85))
+			_add(_torso, _box(Vector3(0.075, 0.06, 0.025)), Vector3(0, 0.07, -0.145), acc, OL_THIN)
 			for arm in [_arm_l, _arm_r]:
-				_add(arm, _cyl_mesh(0.066, 0.07, 0.15), Vector3(0, -0.37, 0), _mat(Color(0.42, 0.28, 0.16), OL_THIN))
+				_add(arm, _cyl(0.066, 0.07, 0.15), Vector3(0, -0.37, 0), Color(0.42, 0.28, 0.16), OL_THIN)
 		"ranger":
 			# Короткая накидка с откинутым капюшоном, колчан за спиной, поясная сумка
 			var cape_c := main_c.darkened(0.3)
-			var capelet := _add(_torso, _cyl_mesh(0.1, 0.25, 0.24, 12), Vector3(0, 0.44, 0), _mat(cape_c))
-			capelet.scale = Vector3(1.0, 1.0, 0.88)
-			var hood := _add(_torso, _sphere_mesh(0.13, 0.17), Vector3(0, 0.53, 0.15), _mat(cape_c))
-			hood.scale = Vector3(1.1, 1.0, 0.75)
+			_add(_torso, _cyl(0.1, 0.25, 0.24, 12), Vector3(0, 0.44, 0), cape_c, OL, Vector3.ZERO,
+				Vector3(1.0, 1.0, 0.88))
+			_add(_torso, _sphere(0.13, 0.17), Vector3(0, 0.53, 0.15), cape_c, OL, Vector3.ZERO, Vector3(1.1, 1.0, 0.75))
 			var q := _node(_torso, "Quiver", Vector3(0.08, 0.28, 0.2))
 			q.rotation.z = -0.35
-			_add(q, _cyl_mesh(0.06, 0.055, 0.5), Vector3.ZERO, _mat(Color(0.45, 0.28, 0.15)))
-			_add(q, _cyl_mesh(0.08, 0.035, 0.12, 8), Vector3(0, 0.3, 0), _mat(Color(0.93, 0.9, 0.82), OL_THIN), false)
-			_add(_torso, _box_mesh(Vector3(0.1, 0.1, 0.06)), Vector3(-0.13, 0.02, -0.12),
-				_mat(Color(0.5, 0.35, 0.2), OL_THIN), false)
+			_add(q, _cyl(0.06, 0.055, 0.5), Vector3.ZERO, Color(0.45, 0.28, 0.15))
+			_add(q, _cyl(0.08, 0.035, 0.12, 8), Vector3(0, 0.3, 0), Color(0.93, 0.9, 0.82), OL_THIN)
+			_add(_torso, _box(Vector3(0.1, 0.1, 0.06)), Vector3(-0.13, 0.02, -0.12), Color(0.5, 0.35, 0.2), OL_THIN)
 		"guardian":
 			# Крупные наплечники, плащ цвета акцента, знак на груди
 			_pads(0.125, 0.17, main_c)
-			_cape = _node(_torso, "Cape", Vector3(0, 0.5, 0.12))
+			_cape = _bone(_torso, "Cape", Vector3(0, 0.5, 0.12))
 			_cape_rest = -0.14
-			_add(_cape, _box_mesh(Vector3(0.36, 0.95, 0.025)), Vector3(0, -0.47, 0.03), _mat(acc.darkened(0.1)))
-			var em := _add(_torso, _box_mesh(Vector3(0.08, 0.08, 0.02)), Vector3(0, 0.33, -0.135), _mat(GOLD, OL_THIN), false)
-			em.rotation.z = PI * 0.25
+			_add(_cape, _box(Vector3(0.36, 0.95, 0.025)), Vector3(0, -0.47, 0.03), acc.darkened(0.1))
+			_add(_torso, _box(Vector3(0.08, 0.08, 0.02)), Vector3(0, 0.33, -0.135), GOLD, OL_THIN,
+				Vector3(0, 0, PI * 0.25))
 		"cleric":
 			# Накидка цвета класса, полоса ткани спереди, золотая кайма подола
-			var capelet := _add(_torso, _cyl_mesh(0.1, 0.26, 0.22, 12), Vector3(0, 0.45, 0), _mat(main_c))
-			capelet.scale = Vector3(1.0, 1.0, 0.88)
-			var panel := _add(_torso, _box_mesh(Vector3(0.12, 0.62, 0.02)), Vector3(0, -0.25, -0.2), _mat(main_c))
-			panel.rotation.x = 0.17
-			var hem := _add(_torso, _torus_mesh(0.315, 0.35), Vector3(0, -0.69, 0), _mat(acc, OL_THIN), false)
-			hem.scale = Vector3(1.0, 1.0, 0.85)
+			_add(_torso, _cyl(0.1, 0.26, 0.22, 12), Vector3(0, 0.45, 0), main_c, OL, Vector3.ZERO,
+				Vector3(1.0, 1.0, 0.88))
+			_add(_torso, _box(Vector3(0.12, 0.62, 0.02)), Vector3(0, -0.25, -0.2), main_c, OL, Vector3(0.17, 0, 0))
+			_add(_torso, _torus(0.315, 0.35), Vector3(0, -0.69, 0), acc, OL_THIN, Vector3.ZERO, Vector3(1.0, 1.0, 0.85))
 		"assassin":
 			# Шарф с длинными концами, развевающимися за спиной
-			_add(_torso, _sphere_mesh(0.155, 0.13), Vector3(0, 0.5, -0.005), _mat(acc))
-			_cape = _node(_torso, "Scarf", Vector3(0.06, 0.5, 0.12))
+			_add(_torso, _sphere(0.155, 0.13), Vector3(0, 0.5, -0.005), acc)
+			_cape = _bone(_torso, "Scarf", Vector3(0.06, 0.5, 0.12))
 			_cape_rest = -0.25
-			_add(_cape, _box_mesh(Vector3(0.09, 0.5, 0.02)), Vector3(0, -0.25, 0.02), _mat(acc))
-			var tail := _add(_cape, _box_mesh(Vector3(0.08, 0.38, 0.02)), Vector3(0.07, -0.2, 0.03), _mat(acc.darkened(0.15)))
-			tail.rotation.z = 0.15
+			_add(_cape, _box(Vector3(0.09, 0.5, 0.02)), Vector3(0, -0.25, 0.02), acc)
+			_add(_cape, _box(Vector3(0.08, 0.38, 0.02)), Vector3(0.07, -0.2, 0.03), acc.darkened(0.15), OL,
+				Vector3(0, 0, 0.15))
 		"warlock":
 			# Высокий воротник-веер за головой, длинный плащ, светящийся камень на груди
-			var collar := _add(_torso, _sphere_mesh(0.21, 0.32), Vector3(0, 0.6, 0.13), _mat(main_c.darkened(0.45)))
-			collar.scale = Vector3(1.0, 1.0, 0.3)
-			_cape = _node(_torso, "Cape", Vector3(0, 0.5, 0.12))
+			_add(_torso, _sphere(0.21, 0.32), Vector3(0, 0.6, 0.13), main_c.darkened(0.45), OL, Vector3.ZERO,
+				Vector3(1.0, 1.0, 0.3))
+			_cape = _bone(_torso, "Cape", Vector3(0, 0.5, 0.12))
 			_cape_rest = -0.16
-			_add(_cape, _box_mesh(Vector3(0.4, 1.05, 0.025)), Vector3(0, -0.52, 0.03), _mat(main_c.darkened(0.5)))
-			_add(_torso, _sphere_mesh(0.035, 0.07, 8, 4), Vector3(0, 0.36, -0.14), _glow(acc, 1.0), false)
+			_add(_cape, _box(Vector3(0.4, 1.05, 0.025)), Vector3(0, -0.52, 0.03), main_c.darkened(0.5))
+			_glow(_torso, _sphere(0.035, 0.07, 8, 4), Vector3(0, 0.36, -0.14), acc, 1.0)
 		"merchant":
 			# Большой рюкзак со скаткой и фонариком, фартук, лямки
 			var pack_z := 0.132 * _girth + 0.14
-			_add(_torso, _box_mesh(Vector3(0.48, 0.58, 0.28)), Vector3(0, 0.27, pack_z), _mat(Color(0.55, 0.38, 0.22)))
-			var roll := _add(_torso, _cyl_mesh(0.09, 0.09, 0.6, 10), Vector3(0, 0.62, pack_z), _mat(Color(0.66, 0.27, 0.22)))
-			roll.rotation.z = PI * 0.5
-			_add(_torso, _sphere_mesh(0.05, 0.1, 8, 4), Vector3(0.3, 0.08, pack_z), _glow(Color(1.0, 0.85, 0.45), 1.0), false)
-			var apron := _add(_torso, _box_mesh(Vector3(0.28, 0.42, 0.02)), Vector3(0, -0.12, -0.235),
-				_mat(Color(0.93, 0.87, 0.72)))
-			apron.rotation.x = 0.2
+			_add(_torso, _box(Vector3(0.48, 0.58, 0.28)), Vector3(0, 0.27, pack_z), Color(0.55, 0.38, 0.22))
+			_add(_torso, _cyl(0.09, 0.09, 0.6, 10), Vector3(0, 0.62, pack_z), Color(0.66, 0.27, 0.22), OL,
+				Vector3(0, 0, PI * 0.5))
+			_glow(_torso, _sphere(0.05, 0.1, 8, 4), Vector3(0.3, 0.08, pack_z), Color(1.0, 0.85, 0.45), 1.0)
+			_add(_torso, _box(Vector3(0.28, 0.42, 0.02)), Vector3(0, -0.12, -0.235), Color(0.93, 0.87, 0.72), OL,
+				Vector3(0.2, 0, 0))
 			for sd in [-1.0, 1.0]:
 				var side: float = sd
-				_add(_torso, _box_mesh(Vector3(0.04, 0.3, 0.02)), Vector3(0.1 * side, 0.36, -0.165),
-					_mat(Color(0.42, 0.28, 0.16), OL_THIN), false)
+				_add(_torso, _box(Vector3(0.04, 0.3, 0.02)), Vector3(0.1 * side, 0.36, -0.165),
+					Color(0.42, 0.28, 0.16), OL_THIN)
 
 
 ## Наплечники на обоих плечах (двигаются вместе с рукой).
@@ -579,8 +716,7 @@ func _pads(r: float, h: float, col: Color) -> void:
 	for arm in [_arm_l, _arm_r]:
 		var a: Node3D = arm
 		var side := signf(a.position.x)
-		var pad := _add(a, _sphere_mesh(r, h), Vector3(0.025 * side, 0.01, 0), _mat(col))
-		pad.rotation.z = -0.35 * side
+		_add(a, _sphere(r, h), Vector3(0.025 * side, 0.01, 0), col, OL, Vector3(0, 0, -0.35 * side))
 
 
 # ---------- Оружие (вдоль +Y узла кисти) ----------
@@ -593,48 +729,43 @@ func _build_weapon() -> void:
 	match weapon_kind:
 		"axe":
 			var w := _node(_grip_r, "Axe", Vector3.ZERO)
-			_add(w, _cyl_mesh(0.024, 0.026, 1.0, 8), Vector3(0, 0.3, 0), _mat(wood, OL_THIN))
-			_add(w, _cyl_mesh(0.032, 0.032, 0.14, 8), Vector3(0, 0.0, 0), _mat(acc.darkened(0.3), OL_THIN), false)
-			var blade := _add(w, _cyl_mesh(0.15, 0.15, 0.03, 14), Vector3(0, 0.64, -0.11), _mat(steel, OL_THIN))
-			blade.rotation.z = PI * 0.5
-			_add(w, _box_mesh(Vector3(0.06, 0.15, 0.07)), Vector3(0, 0.64, 0), _mat(Color(0.42, 0.42, 0.48), OL_THIN), false)
+			_add(w, _cyl(0.024, 0.026, 1.0, 8), Vector3(0, 0.3, 0), wood, OL_THIN)
+			_add(w, _cyl(0.032, 0.032, 0.14, 8), Vector3(0, 0.0, 0), acc.darkened(0.3), OL_THIN)
+			_add(w, _cyl(0.15, 0.15, 0.03, 14), Vector3(0, 0.64, -0.11), steel, OL_THIN, Vector3(0, 0, PI * 0.5))
+			_add(w, _box(Vector3(0.06, 0.15, 0.07)), Vector3(0, 0.64, 0), Color(0.42, 0.42, 0.48), OL_THIN)
 		"sword", "sword_shield":
 			var s := _node(_grip_r, "Sword", Vector3.ZERO)
-			_add(s, _cyl_mesh(0.022, 0.022, 0.2, 8), Vector3.ZERO, _mat(Color(0.3, 0.2, 0.15), OL_THIN), false)
-			_add(s, _sphere_mesh(0.03, 0.06, 8, 4), Vector3(0, -0.11, 0), _mat(GOLD, OL_THIN), false)
-			_add(s, _box_mesh(Vector3(0.05, 0.045, 0.22)), Vector3(0, 0.11, 0), _mat(GOLD, OL_THIN), false)
-			_add(s, _box_mesh(Vector3(0.016, 0.7, 0.07)), Vector3(0, 0.48, 0), _mat(steel, OL_THIN))
-			var tip := _add(s, _prism_mesh(Vector3(0.07, 0.12, 0.016)), Vector3(0, 0.89, 0), _mat(steel, OL_THIN), false)
-			tip.rotation.y = PI * 0.5
+			_add(s, _cyl(0.022, 0.022, 0.2, 8), Vector3.ZERO, Color(0.3, 0.2, 0.15), OL_THIN)
+			_add(s, _sphere(0.03, 0.06, 8, 4), Vector3(0, -0.11, 0), GOLD, OL_THIN)
+			_add(s, _box(Vector3(0.05, 0.045, 0.22)), Vector3(0, 0.11, 0), GOLD, OL_THIN)
+			_add(s, _box(Vector3(0.016, 0.7, 0.07)), Vector3(0, 0.48, 0), steel, OL_THIN)
+			_add(s, _prism(Vector3(0.07, 0.12, 0.016)), Vector3(0, 0.89, 0), steel, OL_THIN, Vector3(0, PI * 0.5, 0))
 			if weapon_kind == "sword_shield":
 				var sh := _node(_grip_l, "Shield", Vector3(-0.07, 0.1, -0.05))
-				var disc := _add(sh, _cyl_mesh(0.25, 0.25, 0.05, 16), Vector3.ZERO, _mat(acc))
-				disc.rotation.x = PI * 0.5
-				var rim := _add(sh, _torus_mesh(0.225, 0.265), Vector3.ZERO, _mat(main_c, OL_THIN), false)
-				rim.rotation.x = PI * 0.5
-				_add(sh, _sphere_mesh(0.065, 0.13, 10, 5), Vector3(0, 0, -0.035), _mat(GOLD, OL_THIN), false)
+				_add(sh, _cyl(0.25, 0.25, 0.05, 16), Vector3.ZERO, acc, OL, Vector3(PI * 0.5, 0, 0))
+				_add(sh, _torus(0.225, 0.265), Vector3.ZERO, main_c, OL_THIN, Vector3(PI * 0.5, 0, 0))
+				_add(sh, _sphere(0.065, 0.13, 10, 5), Vector3(0, 0, -0.035), GOLD, OL_THIN)
 		"staff":
 			var st := _node(_grip_r, "Staff", Vector3.ZERO)
 			var dark := String(spec.get("outfit", "")) == "warlock"
 			var wood_c := Color(0.3, 0.19, 0.28) if dark else Color(0.8, 0.66, 0.44)
 			var metal_c := Color(0.55, 0.55, 0.64) if dark else GOLD
 			var glow_c := acc if dark else main_c
-			_add(st, _cyl_mesh(0.022, 0.026, 1.65, 8), Vector3(0, 0.3, 0), _mat(wood_c, OL_THIN))
-			var ring := _add(st, _torus_mesh(0.075, 0.1), Vector3(0, 1.22, 0), _mat(metal_c, OL_THIN), false)
-			ring.rotation.x = PI * 0.5
+			_add(st, _cyl(0.022, 0.026, 1.65, 8), Vector3(0, 0.3, 0), wood_c, OL_THIN)
+			_add(st, _torus(0.075, 0.1), Vector3(0, 1.22, 0), metal_c, OL_THIN, Vector3(PI * 0.5, 0, 0))
 			if dark:
 				for sd in [-1.0, 1.0]:
 					var side: float = sd
 					_spike(st, Vector3(0.06 * side, 1.12, 0), Vector3(0.14 * side, 1.43, 0), 0.026, metal_c)
 			else:
 				_spike(st, Vector3(0, 1.3, 0), Vector3(0, 1.45, 0), 0.026, metal_c)
-			_orb = _node(st, "Orb", Vector3(0, 1.22, 0))
-			_add(_orb, _sphere_mesh(0.06, 0.12, 10, 5), Vector3.ZERO, _glow(glow_c.lightened(0.4), 1.0), false)
-			_add(_orb, _sphere_mesh(0.12, 0.24, 12, 6), Vector3.ZERO, _glow(glow_c, 0.3), false)
+			_orb = _bone(st, "Orb", Vector3(0, 1.22, 0))
+			_glow(_orb, _sphere(0.06, 0.12, 10, 5), Vector3.ZERO, glow_c.lightened(0.4), 1.0)
+			_glow(_orb, _sphere(0.12, 0.24, 12, 6), Vector3.ZERO, glow_c, 0.3)
 		"bow":
 			var b := _node(_grip_l, "Bow", Vector3.ZERO)
 			var bw := Color(0.44, 0.27, 0.14)
-			_add(b, _cyl_mesh(0.027, 0.027, 0.22, 8), Vector3.ZERO, _mat(Color(0.3, 0.2, 0.12), OL_THIN), false)
+			_add(b, _cyl(0.027, 0.027, 0.22, 8), Vector3.ZERO, Color(0.3, 0.2, 0.12), OL_THIN)
 			for sd in [-1.0, 1.0]:
 				var y: float = sd
 				_segment(b, Vector3(0, 0.1 * y, 0), Vector3(0, 0.36 * y, 0.05), 0.022, 0.018, bw)
@@ -645,10 +776,10 @@ func _build_weapon() -> void:
 				var side: float = sd
 				var g: Node3D = _grip_r if side > 0.0 else _grip_l
 				var d := _node(g, "DaggerR" if side > 0.0 else "DaggerL", Vector3.ZERO)
-				_add(d, _cyl_mesh(0.02, 0.02, 0.13, 6), Vector3.ZERO, _mat(acc, OL_THIN), false)
-				_add(d, _box_mesh(Vector3(0.12, 0.025, 0.03)), Vector3(0, 0.075, 0), _mat(Color(0.3, 0.3, 0.36), OL_THIN), false)
-				var bl := _add(d, _cyl_mesh(0.0, 0.034, 0.34, 6), Vector3(0, 0.25, 0), _mat(Color(0.78, 0.75, 0.88), OL_THIN))
-				bl.scale = Vector3(1.0, 1.0, 0.35)
+				_add(d, _cyl(0.02, 0.02, 0.13, 6), Vector3.ZERO, acc, OL_THIN)
+				_add(d, _box(Vector3(0.12, 0.025, 0.03)), Vector3(0, 0.075, 0), Color(0.3, 0.3, 0.36), OL_THIN)
+				_add(d, _cyl(0.0, 0.034, 0.34, 6), Vector3(0, 0.25, 0), Color(0.78, 0.75, 0.88), OL_THIN,
+					Vector3.ZERO, Vector3(1.0, 1.0, 0.35))
 
 
 ## Поза покоя под оружие. Угол оружия = плечо + кисть: 0 — вверх, −π/2 — вперёд.
@@ -762,6 +893,8 @@ func _process(delta: float) -> void:
 			_blinking = true
 			_face.mesh = _face_closed
 			_blink = 0.12
+
+	_sync_bones()
 
 
 ## Обычная атака под оружие: удар, выстрел из лука или взмах посохом.
@@ -918,7 +1051,9 @@ func _reset_spin() -> void:
 	rotation.y = 0.0
 
 
-# ---------- Меши и материалы ----------
+
+
+# ---------- Узлы, кости и сборка геометрии ----------
 
 func _node(parent: Node3D, node_name: String, pos: Vector3) -> Node3D:
 	var n := Node3D.new()
@@ -928,32 +1063,73 @@ func _node(parent: Node3D, node_name: String, pos: Vector3) -> Node3D:
 	return n
 
 
-func _add(parent: Node3D, mesh: Mesh, pos: Vector3, mat: Material, shadow: bool = true) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.position = pos
-	mi.material_override = mat
-	if not shadow:
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	parent.add_child(mi)
-	return mi
+## Узел-кость: его поворот/положение/масштаб каждый кадр копируются в кость скелета.
+## Родитель кости — ближайший узел-кость выше; неподвижные узлы между ними запоминаются в _bone_pre.
+func _bone(parent: Node3D, node_name: String, pos: Vector3) -> Node3D:
+	var n := _node(parent, node_name, pos)
+	var pre := Transform3D.IDENTITY
+	var parent_bone := -1
+	var p: Node3D = parent
+	while p != null and p != self:
+		if _bone_idx.has(p):
+			parent_bone = int(_bone_idx[p])
+			break
+		pre = p.transform * pre
+		p = p.get_parent() as Node3D
+	var i := _skel.get_bone_count()
+	_skel.add_bone(node_name)
+	if parent_bone >= 0:
+		_skel.set_bone_parent(i, parent_bone)
+	_skel.set_bone_rest(i, pre * n.transform)
+	_bone_idx[n] = i
+	_bone_nodes.append(n)
+	_bone_pre.append(pre)
+	return n
+
+
+## Освещаемая деталь: положение pos, поворот rot (как Node3D.rotation), масштаб scl относительно parent.
+## ow — толщина контура (OL, OL_THIN или 0).
+func _add(parent: Node3D, arrays: Array, pos: Vector3, col: Color, ow: float = OL,
+		rot: Vector3 = Vector3.ZERO, scl: Vector3 = Vector3.ONE) -> void:
+	_put(parent, arrays, Transform3D(Basis.from_euler(rot) * Basis.from_scale(scl), pos), col, ow, SOLID)
+
+
+## Светящаяся неосвещаемая деталь (навершие посоха, фонарь, камень); alpha < 1 — полупрозрачная.
+func _glow(parent: Node3D, arrays: Array, pos: Vector3, col: Color, alpha: float) -> void:
+	_put(parent, arrays, Transform3D(Basis.IDENTITY, pos), Color(col.r, col.g, col.b, alpha), 0.0,
+		HALO if alpha < 1.0 else GLOW)
+
+
+## Деталь с трансформом xf относительно parent: вершины переводятся в пространство ближайшей кости.
+## Если геометрия уже в кэше — ничего не делает (узлы-кости всё равно строятся).
+func _put(parent: Node3D, arrays: Array, xf: Transform3D, col: Color, ow: float = OL, kind: int = SOLID) -> void:
+	if not _collect:
+		return
+	var acc := xf
+	var n: Node3D = parent
+	while n != null and not _bone_idx.has(n):
+		acc = n.transform * acc
+		n = n.get_parent() as Node3D
+	if n == null:
+		push_error("CharacterModel: деталь вне костей")
+		return
+	var c := col
+	if kind == SOLID:
+		c = Color(col.r, col.g, col.b, clampf(ow / OL, 0.0, 1.0))
+	_bufs[kind].add(arrays, acc, c, int(_bone_idx[n]))
 
 
 ## Конус от root (основание радиуса r) к острому кончику tip.
-func _spike(parent: Node3D, root: Vector3, tip: Vector3, r: float, col: Color) -> MeshInstance3D:
+func _spike(parent: Node3D, root: Vector3, tip: Vector3, r: float, col: Color) -> void:
 	var d := tip - root
-	var mi := _add(parent, _cyl_mesh(0.0, r, d.length(), 7), (root + tip) * 0.5, _mat(col, OL_THIN), false)
-	mi.basis = _basis_y(d)
-	return mi
+	_put(parent, _cyl(0.0, r, d.length(), 7), Transform3D(_basis_y(d), (root + tip) * 0.5), col, OL_THIN)
 
 
 ## Цилиндр (или усечённый конус) от точки a (радиус ra) до точки b (радиус rb).
 func _segment(parent: Node3D, a: Vector3, b: Vector3, ra: float, rb: float, col: Color,
-		ow: float = OL_THIN) -> MeshInstance3D:
+		ow: float = OL_THIN) -> void:
 	var d := b - a
-	var mi := _add(parent, _cyl_mesh(rb, ra, d.length(), 7), (a + b) * 0.5, _mat(col, ow), false)
-	mi.basis = _basis_y(d)
-	return mi
+	_put(parent, _cyl(rb, ra, d.length(), 7), Transform3D(_basis_y(d), (a + b) * 0.5), col, ow)
 
 
 ## Поворот, переводящий ось +Y в направление dir.
@@ -964,124 +1140,193 @@ static func _basis_y(dir: Vector3) -> Basis:
 	return Basis(Quaternion(Vector3.UP, d))
 
 
-## Toon-материал с контуром по нормалям (ow = 0 — без контура). Кэш по цвету внутри модели;
-## эмиссия включена заранее (чёрная), чтобы вспышка урона не перекомпилировала шейдер.
-func _mat(c: Color, ow: float = OL) -> StandardMaterial3D:
-	var key := "%s|%.3f" % [c.to_html(false), ow]
-	if _mats.has(key):
-		return _mats[key]
-	var m := Util.mat(c)
-	m.emission_enabled = true
-	m.emission = Color.BLACK
-	if ow > 0.0 and Quality.outlines():
-		m.next_pass = _outline(c, ow)
+## Собрать накопленные детали в меши: Body (освещаемое), Glow (свечение по видам), лицо.
+func _bake() -> Dictionary:
+	var body := ArrayMesh.new()
+	_bufs[SOLID].commit(body)
+	var glow: ArrayMesh = null
+	var kinds: Array[int] = []
+	for kind: int in [GLOW, HALO]:
+		var b: GeoBuf = _bufs[kind]
+		if b.is_empty():
+			continue
+		if glow == null:
+			glow = ArrayMesh.new()
+		b.commit(glow)
+		kinds.append(kind)
+	var face_open := _face_mesh(false)
+	var face_closed := _face_mesh(true) if _can_blink else face_open
+	return {"body": body, "glow": glow, "glow_kinds": kinds, "face_open": face_open, "face_closed": face_closed}
+
+
+## Меши модели под скелетом: одна привязка (Skin) на все, позы привязки единичные
+## (вершины уже в пространстве своей кости).
+func _make_meshes(geo: Dictionary) -> void:
+	var skin := Skin.new()
+	for i in _skel.get_bone_count():
+		skin.add_bind(i, Transform3D.IDENTITY)
+
+	var body := _skinned("Body", geo["body"], skin)
+	var bm := StandardMaterial3D.new()
+	bm.vertex_color_use_as_albedo = true
+	bm.vertex_color_is_srgb = true
+	Util.toon(bm)
+	# Эмиссия включена заранее (чёрная), чтобы вспышка урона не перекомпилировала шейдер
+	bm.emission_enabled = true
+	bm.emission = Color.BLACK
+	if Quality.outlines():
+		bm.next_pass = _outline_mat()
 	# Хук main.gd (Util.toonify_mesh) уже не тронет: свет и контур настроены здесь
-	m.set_meta("toon_done", true)
-	_mats[key] = m
-	_flash_mats.append(m)
-	return m
+	bm.set_meta("toon_done", true)
+	body.material_override = bm
+	_flash_mats.append(bm)
+
+	var glow: ArrayMesh = geo["glow"]
+	if glow != null:
+		var gi := _skinned("Glow", glow, skin)
+		gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		gi.set_meta("no_outline", true)
+		var kinds: Array[int] = geo["glow_kinds"]
+		for si in kinds.size():
+			gi.set_surface_override_material(si, _glow_mat(kinds[si]))
+
+	_face_open = geo["face_open"]
+	_face_closed = geo["face_closed"]
+	_face = _skinned("Face", _face_open, skin)
+	_face.material_override = _face_mat()
+	_face.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_face.set_meta("no_outline", true)
 
 
-## Светящийся неосвещаемый материал (навершие посоха, фонарь, камень).
-func _glow(c: Color, alpha: float) -> StandardMaterial3D:
+func _skinned(node_name: String, mesh: ArrayMesh, skin: Skin) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = node_name
+	mi.mesh = mesh
+	mi.skin = skin
+	mi.custom_aabb = CULL_AABB
+	mi.skeleton = NodePath("..")
+	_skel.add_child(mi)
+	return mi
+
+
+## Позы костей скелета = текущие трансформы узлов-костей (их двигают _process и твины).
+func _sync_bones() -> void:
+	if _skel == null:
+		return
+	for i in _bone_nodes.size():
+		var t: Transform3D = _bone_pre[i] * _bone_nodes[i].transform
+		_skel.set_bone_pose_position(i, t.origin)
+		_skel.set_bone_pose_rotation(i, t.basis.get_rotation_quaternion())
+		_skel.set_bone_pose_scale(i, t.basis.get_scale())
+
+
+# ---------- Материалы (общие для всех моделей, кроме освещаемого: у него своя вспышка) ----------
+
+## Контур по нормалям: толщина и цвет — из цвета вершины.
+static func _outline_mat() -> ShaderMaterial:
+	if _outline_material != null:
+		return _outline_material
+	_outline_shader = Shader.new()
+	_outline_shader.code = OUTLINE_SHADER
+	_outline_material = ShaderMaterial.new()
+	_outline_material.shader = _outline_shader
+	_outline_material.set_shader_parameter("width", OL)
+	return _outline_material
+
+
+## Свечение: неосвещаемый цвет вершины; HALO — полупрозрачное (альфа вершины).
+static func _glow_mat(kind: int) -> StandardMaterial3D:
+	if _glow_mats.has(kind):
+		return _glow_mats[kind]
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.albedo_color = Color(c.r, c.g, c.b, alpha)
-	if alpha < 1.0:
+	m.vertex_color_use_as_albedo = true
+	m.vertex_color_is_srgb = true
+	if kind == HALO:
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.set_meta("toon_done", true)
+	_glow_mats[kind] = m
 	return m
 
 
-## Материал контура: тёмный оттенок базового цвета (как Util.outline_mat), с кэшем.
-static func _outline(base: Color, width: float) -> ShaderMaterial:
-	var key := "%s|%.3f" % [base.to_html(false), width]
-	if _outline_cache.has(key):
-		return _outline_cache[key]
-	if _outline_shader == null:
-		_outline_shader = Shader.new()
-		_outline_shader.code = OUTLINE_SHADER
-	var om := ShaderMaterial.new()
-	om.shader = _outline_shader
-	var c := Color.from_hsv(base.h, minf(1.0, base.s * 1.2 + 0.1), base.v * 0.28)
-	om.set_shader_parameter("color", c)
-	om.set_shader_parameter("width", width)
-	_outline_cache[key] = om
-	return om
+## Лицо: неосвещаемое, цвета вершин, видно с обеих сторон.
+static func _face_mat() -> StandardMaterial3D:
+	if _face_material != null:
+		return _face_material
+	var fm := StandardMaterial3D.new()
+	fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fm.vertex_color_use_as_albedo = true
+	fm.vertex_color_is_srgb = true
+	fm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	fm.set_meta("toon_done", true)
+	_face_material = fm
+	return fm
 
 
-# Низкополигональные меши с общим кэшем (одинаковые детали у всех персонажей).
+# ---------- Низкополигональные примитивы (массивы вершин, общий кэш) ----------
 
-static func _sphere_mesh(r: float, h: float, seg: int = 12, rings: int = 6) -> SphereMesh:
+static func _sphere(r: float, h: float, seg: int = 12, rings: int = 6) -> Array:
 	var key := "s%.4f|%.4f|%d|%d" % [r, h, seg, rings]
-	if _mesh_cache.has(key):
-		return _mesh_cache[key]
-	var m := SphereMesh.new()
-	m.radius = r
-	m.height = h
-	m.radial_segments = seg
-	m.rings = rings
-	_mesh_cache[key] = m
-	return m
+	if not _arr_cache.has(key):
+		var m := SphereMesh.new()
+		m.radius = r
+		m.height = h
+		m.radial_segments = seg
+		m.rings = rings
+		_arr_cache[key] = m.get_mesh_arrays()
+	return _arr_cache[key]
 
 
-static func _capsule_mesh(r: float, h: float) -> CapsuleMesh:
+static func _capsule(r: float, h: float) -> Array:
 	var key := "c%.4f|%.4f" % [r, h]
-	if _mesh_cache.has(key):
-		return _mesh_cache[key]
-	var m := CapsuleMesh.new()
-	m.radius = r
-	m.height = h
-	m.radial_segments = 10
-	m.rings = 3
-	_mesh_cache[key] = m
-	return m
+	if not _arr_cache.has(key):
+		var m := CapsuleMesh.new()
+		m.radius = r
+		m.height = h
+		m.radial_segments = 10
+		m.rings = 3
+		_arr_cache[key] = m.get_mesh_arrays()
+	return _arr_cache[key]
 
 
-static func _cyl_mesh(top: float, bottom: float, h: float, seg: int = 10, caps: bool = true) -> CylinderMesh:
-	var key := "y%.4f|%.4f|%.4f|%d|%s" % [top, bottom, h, seg, caps]
-	if _mesh_cache.has(key):
-		return _mesh_cache[key]
-	var m := CylinderMesh.new()
-	m.top_radius = top
-	m.bottom_radius = bottom
-	m.height = h
-	m.radial_segments = seg
-	m.rings = 1
-	m.cap_top = caps
-	m.cap_bottom = caps
-	_mesh_cache[key] = m
-	return m
+static func _cyl(top: float, bottom: float, h: float, seg: int = 10) -> Array:
+	var key := "y%.4f|%.4f|%.4f|%d" % [top, bottom, h, seg]
+	if not _arr_cache.has(key):
+		var m := CylinderMesh.new()
+		m.top_radius = top
+		m.bottom_radius = bottom
+		m.height = h
+		m.radial_segments = seg
+		m.rings = 1
+		_arr_cache[key] = m.get_mesh_arrays()
+	return _arr_cache[key]
 
 
-static func _torus_mesh(inner: float, outer: float) -> TorusMesh:
+static func _torus(inner: float, outer: float) -> Array:
 	var key := "t%.4f|%.4f" % [inner, outer]
-	if _mesh_cache.has(key):
-		return _mesh_cache[key]
-	var m := TorusMesh.new()
-	m.inner_radius = inner
-	m.outer_radius = outer
-	m.rings = 16
-	m.ring_segments = 6
-	_mesh_cache[key] = m
-	return m
+	if not _arr_cache.has(key):
+		var m := TorusMesh.new()
+		m.inner_radius = inner
+		m.outer_radius = outer
+		m.rings = 16
+		m.ring_segments = 6
+		_arr_cache[key] = m.get_mesh_arrays()
+	return _arr_cache[key]
 
 
-static func _box_mesh(size: Vector3) -> BoxMesh:
+static func _box(size: Vector3) -> Array:
 	var key := "b%s" % size
-	if _mesh_cache.has(key):
-		return _mesh_cache[key]
-	var m := BoxMesh.new()
-	m.size = size
-	_mesh_cache[key] = m
-	return m
+	if not _arr_cache.has(key):
+		var m := BoxMesh.new()
+		m.size = size
+		_arr_cache[key] = m.get_mesh_arrays()
+	return _arr_cache[key]
 
 
-static func _prism_mesh(size: Vector3) -> PrismMesh:
+static func _prism(size: Vector3) -> Array:
 	var key := "p%s" % size
-	if _mesh_cache.has(key):
-		return _mesh_cache[key]
-	var m := PrismMesh.new()
-	m.size = size
-	_mesh_cache[key] = m
-	return m
+	if not _arr_cache.has(key):
+		var m := PrismMesh.new()
+		m.size = size
+		_arr_cache[key] = m.get_mesh_arrays()
+	return _arr_cache[key]
