@@ -180,7 +180,14 @@ func run_step() -> void:
 			check(game.gold == gold + price and inv.count("wolf_pelt") == have - 1, "продана шкура")
 			_press("act_sell_all")
 			check(game.gold == gold + price * have and inv.count("wolf_pelt") == 0, "проданы все шкуры")
-			check(inv.find_cell(game.weapon) == -1, "надетое оружие в ячейках не лежит (продать нельзя)")
+			# Выше в сумку добавлялось по одному каждому предмету — запасной экземпляр надетого оружия лежит в
+			# ячейке, а сам надетый ячейку не занимает
+			var in_cells := 0
+			for cd: Dictionary in inv.cells():
+				if not cd.is_empty() and String(cd["id"]) == game.weapon:
+					in_cells += int(cd["count"])
+			check(in_cells == inv.count(game.weapon) - 1, "надетое оружие в ячейках не лежит (продать нельзя): %d из %d"
+				% [in_cells, inv.count(game.weapon)])
 			# Окно торговца: товары, сумка и карточка
 			main._on_action("shop")
 			check(eco.is_shop_open(), "окно торговца открыто")
