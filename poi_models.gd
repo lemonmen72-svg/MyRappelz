@@ -1,13 +1,63 @@
 class_name PoiModels
 extends RefCounted
 ## Низкополигональные модели построек и декора острова (заглушки из примитивов; позже их можно
-## заменить настоящими ассетами — одна функция = один тип объекта, см. get_mesh()).
-## Каждая модель собирается в один меш: поверхности по материалам (toon-цвет из вершин, свечение,
-## кристаллы), поэтому постройка — это один MeshInstance3D и 1–3 вызова отрисовки.
-## Одинаковые модели делят меш и материалы (кэш). Оси модели: низ на y = 0, фасад (дверь) на +Z.
+## заменить настоящими ассетами — одна функция = один тип объекта, см. get_kit()/get_mesh()).
+## Модель собирается в Kit: поверхности по материалам (toon-цвет из вершин, кристаллы, ткань...).
+## Свечение (окна, огни) — вершины toon-поверхности с флагом UV2.y = 1 (см. toon.gdshader),
+## поэтому дом — 1–2 поверхности. IslandPois склеивает неподвижные модели зоны в общие меши
+## (Kit.append_kit): на зону — пара MeshInstance3D, по вызову отрисовки на материал.
+## Одинаковые модели делят Kit, меш и материалы (кэш). Оси модели: низ на y = 0, фасад (дверь) на +Z.
+##
+## Каналы UV у вершин (их читают шейдеры склеенных мешей):
+## - "crystal_*": UV.x — высота над основанием модели (градиент), UV.y — фаза пульсации;
+## - "cloth": UV.x — высота над основанием модели (покачивание);
+## - "toon_ol": UV.xy и UV2.x — центр детали (контур раздувается от него);
+## - "halo": UV — угол квадрата, UV2.x — размер ореола;
+## - toon-поверхности: UV2.y = 1 — светящаяся вершина.
 
 const TOON_SHADER := "res://toon.gdshader"
 const CRYSTAL_SHADER := "res://crystal.gdshader"
+
+## Ореолы склеенным мешем: каждый ореол — четыре вершины в центре, вершинный шейдер разворачивает
+## их к камере (UV — угол квадрата, UV2.x — размер, цвет — в вершинах). Аддитивно, как Vfx.fx_mat.
+const HALO_SHADER_CODE := """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled, skip_vertex_transform;
+
+uniform sampler2D dot_tex : hint_default_white, filter_linear;
+
+void vertex() {
+	VERTEX = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz + vec3((UV - vec2(0.5)) * UV2.x, 0.0);
+}
+
+void fragment() {
+	ALBEDO = COLOR.rgb;
+	ALPHA = COLOR.a * texture(dot_tex, UV).a;
+}
+"""
+
+## Контур склеенного меша (как outline.gdshader, но раздувание — от центра своей детали:
+## он записан при склейке в UV.xy и UV2.x; у несклеенной модели там ноль — центр модели).
+const OUTLINE_SHADER_CODE := """
+shader_type spatial;
+render_mode unshaded, cull_front, depth_draw_opaque, shadows_disabled, fog_disabled;
+
+uniform vec4 color : source_color = vec4(0.12, 0.09, 0.14, 1.0);
+uniform float width = 0.02;
+
+void vertex() {
+	vec3 d = VERTEX - vec3(UV.x, UV.y, UV2.x);
+	vec3 dir = length(d) > 0.0001 ? normalize(d) : NORMAL;
+	vec3 world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	float dist = length(world - CAMERA_POSITION_WORLD);
+	float scale = length(MODEL_MATRIX[0].xyz);
+	VERTEX += dir * width * clamp(dist / 10.0, 0.6, 3.0) / max(scale, 0.001);
+}
+
+void fragment() {
+	ALBEDO = color.rgb;
+}
+"""
 
 # ---------- Палитра (sRGB) ----------
 const WOOD := Color(0.56, 0.38, 0.24)
@@ -42,6 +92,7 @@ const FIRE_CORE := Color(1.0, 0.9, 0.45)
 static var _mats := {}
 static var _meshes := {}
 static var _prims := {}
+static var _kits := {}
 
 
 # ---------- Сборщик мешей ----------
@@ -51,34 +102,57 @@ class Surf:
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
+	var uvs := PackedVector2Array()
+	var uv2s := PackedVector2Array()
 	var indices := PackedInt32Array()
 
 
 ## Накопитель модели: примитивы (бокс, цилиндр/конус, шар, призма) и плоские грани с цветом
-## в вершинах; поверхности по ключу материала ("toon", "toon_ol", "glow", "crystal_blue", ...).
+## в вершинах; поверхности по ключу материала ("toon", "toon_ol", "crystal_blue", ...).
+## Ключ "glow" (свечение) пишется в поверхность "toon" с флагом UV2.y = 1.
 ## base — текущее преобразование, применяется ко всему добавляемому.
+## mats — свои материалы по ключу (иначе PoiModels.material(key)).
 class Kit:
 	var surfs := {}
 	var base := Transform3D.IDENTITY
+	var mats := {}
 
 	func surf(key: String) -> Surf:
 		if not surfs.has(key):
 			surfs[key] = Surf.new()
 		return surfs[key]
 
+	func is_empty() -> bool:
+		for key in surfs:
+			var s: Surf = surfs[key]
+			if not s.verts.is_empty():
+				return false
+		return true
+
+	## Каналы UV вершины p (координаты модели) для поверхности key.
+	static func _uv(key: String, p: Vector3) -> Vector2:
+		if key == "cloth" or key.begins_with("crystal"):
+			return Vector2(p.y, 0.0)
+		return Vector2.ZERO
+
 	## Массивы примитива с преобразованием xf и цветом c (sRGB).
 	func add_arrays(arr: Array, xf: Transform3D, c: Color, key: String) -> void:
-		var s := surf(key)
+		var sk := "toon" if key == "glow" else key
+		var s := surf(sk)
 		var full := base * xf
 		var nb := full.basis.inverse().transposed()
 		var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
 		var n: PackedVector3Array = arr[Mesh.ARRAY_NORMAL]
 		var lc := c.srgb_to_linear()
+		var uv2 := Vector2(0.0, 1.0 if key == "glow" else 0.0)
 		var start := s.verts.size()
 		for i in v.size():
-			s.verts.append(full * v[i])
+			var p := full * v[i]
+			s.verts.append(p)
 			s.normals.append((nb * n[i]).normalized())
 			s.colors.append(lc)
+			s.uvs.append(_uv(sk, p))
+			s.uv2s.append(uv2)
 		var idx = arr[Mesh.ARRAY_INDEX]
 		if idx == null:
 			for i in v.size():
@@ -109,7 +183,8 @@ class Kit:
 
 	## Плоский треугольник. hint — примерное направление лица (нормаль развернётся к нему).
 	func tri(a: Vector3, b: Vector3, cc: Vector3, c: Color, key: String = "toon", hint: Vector3 = Vector3.ZERO) -> void:
-		var s := surf(key)
+		var sk := "toon" if key == "glow" else key
+		var s := surf(sk)
 		var pa := base * a
 		var pb := base * b
 		var pc := base * cc
@@ -121,11 +196,15 @@ class Kit:
 			pc = tmp
 			n = -n
 		var lc := c.srgb_to_linear()
+		var uv2 := Vector2(0.0, 1.0 if key == "glow" else 0.0)
 		var start := s.verts.size()
 		for p in [pa, pb, pc]:
-			s.verts.append(p)
+			var pv: Vector3 = p
+			s.verts.append(pv)
 			s.normals.append(n)
 			s.colors.append(lc)
+			s.uvs.append(_uv(sk, pv))
+			s.uv2s.append(uv2)
 		s.indices.append(start)
 		s.indices.append(start + 1)
 		s.indices.append(start + 2)
@@ -139,6 +218,74 @@ class Kit:
 		tri(a, b, cc, c, key, h)
 		tri(a, cc, d, c, key, h)
 
+	## Горизонтальный квадрат с текстурными координатами 0..1 (туман и т. п.): центр pos, размер size.
+	func plane_uv(pos: Vector3, size: Vector2, c: Color, key: String) -> void:
+		var s := surf(key)
+		var lc := c.srgb_to_linear()
+		var start := s.verts.size()
+		var n := (base.basis * Vector3.UP).normalized()
+		for k in 4:
+			var u := float(k == 1 or k == 2)
+			var v := float(k >= 2)
+			s.verts.append(base * (pos + Vector3((u - 0.5) * size.x, 0.0, (v - 0.5) * size.y)))
+			s.normals.append(n)
+			s.colors.append(lc)
+			s.uvs.append(Vector2(u, v))
+			s.uv2s.append(Vector2.ZERO)
+		for i in [0, 1, 2, 0, 2, 3]:
+			s.indices.append(start + int(i))
+
+	## Ореол-свечение в точке pos (поверхность "halo"): цвет c с альфой (sRGB), размер size, м.
+	func halo(pos: Vector3, c: Color, size: float) -> void:
+		var s := surf("halo")
+		var lc := c.srgb_to_linear()
+		lc.a = c.a
+		var p := base * pos
+		var start := s.verts.size()
+		for k in 4:
+			s.verts.append(p)
+			s.normals.append(Vector3.UP)
+			s.colors.append(lc)
+			s.uvs.append(Vector2(float(k == 1 or k == 2), float(k >= 2)))
+			s.uv2s.append(Vector2(size, 0.0))
+		for i in [0, 1, 2, 0, 2, 3]:
+			s.indices.append(start + int(i))
+
+	## Добавляет всю модель src с преобразованием xf (склейка неподвижных объектов в один меш).
+	## phase — фаза пульсации кристаллов этого объекта.
+	func append_kit(src: Kit, xf: Transform3D, phase: float = 0.0) -> void:
+		var full := base * xf
+		var nb := full.basis.inverse().transposed()
+		for key in src.surfs:
+			var sk := String(key)
+			var s: Surf = src.surfs[key]
+			if s.verts.is_empty():
+				continue
+			if src.mats.has(sk) and not mats.has(sk):
+				mats[sk] = src.mats[sk]
+			var d := surf(sk)
+			var start := d.verts.size()
+			d.verts.append_array(full * s.verts)
+			for nv: Vector3 in s.normals:
+				d.normals.append((nb * nv).normalized())
+			d.colors.append_array(s.colors)
+			if sk.begins_with("crystal"):
+				for uv: Vector2 in s.uvs:
+					d.uvs.append(Vector2(uv.x, phase))
+				d.uv2s.append_array(s.uv2s)
+			elif sk == "toon_ol":
+				for i in s.uvs.size():
+					var uv: Vector2 = s.uvs[i]
+					var u2: Vector2 = s.uv2s[i]
+					var cp := full * Vector3(uv.x, uv.y, u2.x)
+					d.uvs.append(Vector2(cp.x, cp.y))
+					d.uv2s.append(Vector2(cp.z, u2.y))
+			else:
+				d.uvs.append_array(s.uvs)
+				d.uv2s.append_array(s.uv2s)
+			for i: int in s.indices:
+				d.indices.append(start + i)
+
 	func to_mesh() -> ArrayMesh:
 		var m := ArrayMesh.new()
 		for key in surfs:
@@ -150,9 +297,12 @@ class Kit:
 			arrays[Mesh.ARRAY_VERTEX] = s.verts
 			arrays[Mesh.ARRAY_NORMAL] = s.normals
 			arrays[Mesh.ARRAY_COLOR] = s.colors
+			arrays[Mesh.ARRAY_TEX_UV] = s.uvs
+			arrays[Mesh.ARRAY_TEX_UV2] = s.uv2s
 			arrays[Mesh.ARRAY_INDEX] = s.indices
 			m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-			m.surface_set_material(m.get_surface_count() - 1, PoiModels.material(String(key)))
+			var mat: Material = mats[key] if mats.has(key) else PoiModels.material(String(key))
+			m.surface_set_material(m.get_surface_count() - 1, mat)
 		return m
 
 
@@ -220,26 +370,27 @@ static func crystal_material(c: Color, core: Color, edge: Color) -> ShaderMateri
 	return m
 
 
-## Общие материалы по ключу поверхности Kit.
+## Общие материалы по ключу поверхности Kit. Toon-материалы Kit понимают флаг свечения (UV2.y).
 static func material(key: String) -> Material:
 	if _mats.has(key):
 		return _mats[key]
 	var m: Material
 	match key:
 		"toon_ol":
-			# Мелкий декор и животные: toon и тонкий контур
+			# Мелкий декор и животные: toon и тонкий контур (контур — только если включён в качестве)
 			var t := toon_material(Color.WHITE, true, 2, 0.25)
-			t.next_pass = Util.outline_mat(Color(0.42, 0.32, 0.26), 0.012)
+			t.set_shader_parameter("uv2_glow", true)
+			if Quality.outlines():
+				t.next_pass = outline_material()
 			m = t
 		"toon3":
 			# Постройки с полутоном (3 тона)
-			m = toon_material(Color.WHITE, true, 3, 0.15)
+			var t3 := toon_material(Color.WHITE, true, 3, 0.15)
+			t3.set_shader_parameter("uv2_glow", true)
+			m = t3
 		"glow":
-			var g := StandardMaterial3D.new()
-			g.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			g.vertex_color_use_as_albedo = true
-			g.disable_receive_shadows = true
-			m = g
+			# Свечение теперь — вершины toon-поверхности (UV2.y = 1); ключ оставлен для совместимости
+			m = material("toon")
 		"crystal_blue":
 			m = crystal_material(Color(0.5, 0.86, 1.0), Color(0.2, 0.42, 0.85), Color(0.95, 1.0, 1.0))
 		"crystal_gold":
@@ -256,11 +407,47 @@ static func material(key: String) -> Material:
 			var cl := toon_material(Color.WHITE, true, 2, 0.15)
 			cl.set_shader_parameter("sway", 0.025)
 			cl.set_shader_parameter("sway_speed", 2.6)
+			# Высота над основанием модели — из UV.x (у склеенного меша начало координат — центр зоны)
+			cl.set_shader_parameter("sway_uv_height", true)
+			cl.set_shader_parameter("uv2_glow", true)
 			m = cl
+		"halo":
+			var hs := Shader.new()
+			hs.code = HALO_SHADER_CODE
+			var hm := ShaderMaterial.new()
+			hm.shader = hs
+			hm.set_shader_parameter("dot_tex", Vfx.tex("dot"))
+			m = hm
+		"fog_dark":
+			m = soft_material(Color(0.58, 0.46, 0.74, 0.22), false, "dot")
 		_:
-			m = toon_material(Color.WHITE, true, 2, 0.2)
+			var d := toon_material(Color.WHITE, true, 2, 0.2)
+			d.set_shader_parameter("uv2_glow", true)
+			m = d
 	_mats[key] = m
 	return m
+
+
+## Контур мелкого декора (второй проход "toon_ol"): цвет — тёмный оттенок дерева, как раньше.
+static func outline_material() -> ShaderMaterial:
+	if _mats.has("outline"):
+		return _mats["outline"]
+	var sh := Shader.new()
+	sh.code = OUTLINE_SHADER_CODE
+	var om := ShaderMaterial.new()
+	om.shader = sh
+	var base := Color(0.42, 0.32, 0.26)
+	om.set_shader_parameter("color", Color.from_hsv(base.h, minf(1.0, base.s * 1.2 + 0.1), base.v * 0.28))
+	om.set_shader_parameter("width", 0.012)
+	_mats["outline"] = om
+	return om
+
+
+## Применяет качество к общим материалам: контур мелочей только при Quality.outlines().
+## Вызывается при постройке острова; при смене качества без перестройки — из Quality.apply().
+static func apply_quality() -> void:
+	var t := material("toon_ol") as ShaderMaterial
+	t.next_pass = outline_material() if Quality.outlines() else null
 
 
 ## Материал эффекта-ореола (аддитивное мягкое пятно, всегда лицом к камере).
@@ -288,11 +475,20 @@ static func soft_material(c: Color, add: bool, texture: String = "") -> Standard
 
 # ---------- Модели по имени (кэш) ----------
 
-## Меш модели по имени. Модели, которые зависят от места (ограды, причал, пещера),
-## строятся в IslandPois на своём Kit.
+## Меш модели по имени (для отдельных, анимированных объектов: крылья мельницы, корабль, овцы, огонь).
 static func get_mesh(kind: String) -> ArrayMesh:
 	if _meshes.has(kind):
 		return _meshes[kind]
+	var m := get_kit(kind).to_mesh()
+	_meshes[kind] = m
+	return m
+
+
+## Модель по имени как Kit (для склейки в меш зоны: Kit.append_kit). Модели, которые зависят
+## от места (ограды, причал, пещера), строятся в IslandPois на своём Kit. Kit из кэша не менять.
+static func get_kit(kind: String) -> Kit:
+	if _kits.has(kind):
+		return _kits[kind]
 	var k := Kit.new()
 	match kind:
 		"town_house":
@@ -380,9 +576,8 @@ static func get_mesh(kind: String) -> ArrayMesh:
 			weapon_rack(k)
 		_:
 			k.box(Vector3(0, 1, 0), Vector3(2, 2, 2), Color(0.8, 0.6, 0.4))
-	var m := k.to_mesh()
-	_meshes[kind] = m
-	return m
+	_kits[kind] = k
+	return k
 
 
 # ---------- Части построек ----------

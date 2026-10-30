@@ -1,11 +1,17 @@
 extends "res://tests/test_base.gd"
 ## Постройки острова (IslandPois): здания поставлены с коллизией, центр города свободен (торговец,
 ## точка старта), точки старта рас проходимы и не заняты, по настилу причала можно ходить,
-## над деревнями есть подписи, анимации (мельница, корабль) работают.
+## над деревнями есть подписи, анимации (мельница, корабль, овцы) работают.
+## Отрисовка: неподвижное склеено в меши зон — MeshInstance3D в узле построек немного,
+## в телах построек мешей нет (кроме анимированных: мельница, маяк).
+
+## Предел MeshInstance3D в узле построек (было ~200, по одному на объект).
+const MAX_MESHES := 40
 
 var w: IslandWorld
 var sails_basis := Basis.IDENTITY
 var ship_y := 0.0
+var sheep_xf := Transform3D.IDENTITY
 
 
 func race_class() -> Array:
@@ -36,13 +42,36 @@ func run_step() -> void:
 			for race in ["human", "light_elf", "dark_elf"]:
 				var sp := w.spawn_point(race)
 				check(w.is_walkable(sp.x, sp.z), "точка старта %s проходима" % race)
-			# В каждой деревне и в городе — постройки
+			# В каждой деревне и в городе — постройки (тела) и склеенный меш построек зоны
 			for id in ["town", "light_elf_village", "dark_elf_village", "human_village"]:
 				var holder := pois.get_node_or_null(id)
 				check(holder != null and holder.get_child_count() >= 5, "постройки в %s" % id)
 				check(holder.get_node_or_null("Label") is Label3D, "подпись над %s" % id)
+				var st := holder.get_node_or_null("Static") as MeshInstance3D
+				check(st != null and st.mesh != null and st.mesh.get_surface_count() >= 1,
+					"склеенный меш построек в %s" % id)
+				check(holder.get_node_or_null("Props") is MeshInstance3D, "склеенный меш мелочей в %s" % id)
 			check(w.has_meta("poi_footprints") and (w.get_meta("poi_footprints") as Array).size() > 30,
 				"следы построек для других модулей")
+			# Вызовы отрисовки: мешей немного, у каждого — по поверхности на материал
+			var meshes := pois.find_children("*", "MeshInstance3D", true, false)
+			var surfaces := 0
+			for m in meshes:
+				var mi := m as MeshInstance3D
+				if mi.mesh != null:
+					surfaces += mi.mesh.get_surface_count()
+			print("Постройки: MeshInstance3D %d, поверхностей %d, MultiMesh %d" % [meshes.size(), surfaces,
+				pois.find_children("*", "MultiMeshInstance3D", true, false).size()])
+			check(meshes.size() <= MAX_MESHES, "MeshInstance3D в узле построек: %d (не больше %d)" % [
+				meshes.size(), MAX_MESHES])
+			# В телах построек мешей нет: геометрия в мешах зон (кроме анимированных частей)
+			var in_bodies := 0
+			for b in buildings:
+				var body := b as Node
+				if body.name == "Windmill" or body.name == "Lighthouse":
+					continue
+				in_bodies += body.find_children("*", "MeshInstance3D", true, false).size()
+			check(in_bodies == 0, "в телах построек нет мешей (найдено %d)" % in_bodies)
 			# Причал проходим, маяк и мельница стоят
 			var pier: Dictionary = w.poi("pier")
 			var pc := IslandWorld.v2(pier["center"])
@@ -54,6 +83,11 @@ func run_step() -> void:
 			var ship := pois.find_child("Ship", true, false) as Node3D
 			check(ship != null and ship.global_position.y < 0.0, "корабль на воде")
 			ship_y = ship.global_position.y
+			var flock := pois.find_child("Bodies", true, false) as MultiMeshInstance3D
+			check(flock != null and flock.multimesh.instance_count == 4, "овцы в загоне")
+			if flock != null:
+				sheep_xf = flock.multimesh.get_instance_transform(0)
+			check(pois.find_child("Flames", true, false) is MultiMeshInstance3D, "огни пещеры и лагерей")
 			check(PoiModels.get_mesh("light_elf_house").get_surface_count() >= 2, "модель дома: несколько поверхностей")
 			# Анимации идут только рядом с камерой: переносим игрока в деревню людей у мельницы
 			main.player.global_position = w.spawn_point("human")
@@ -65,4 +99,7 @@ func run_step() -> void:
 			check(not sails.transform.basis.is_equal_approx(sails_basis), "крылья мельницы вращаются")
 			var ship := pois.find_child("Ship", true, false) as Node3D
 			check(absf(ship.global_position.y - ship_y) < 0.5, "корабль качается рядом с уровнем моря")
+			var flock := pois.find_child("Bodies", true, false) as MultiMeshInstance3D
+			check(flock != null and not flock.multimesh.get_instance_transform(0).is_equal_approx(sheep_xf),
+				"овцы пасутся")
 			ok_done()
