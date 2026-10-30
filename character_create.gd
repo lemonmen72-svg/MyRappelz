@@ -1,7 +1,9 @@
 class_name CharacterCreate
 extends CanvasLayer
-## Экран создания персонажа: имя, раса, класс. Справа — карточка класса:
-## описание, характеристики 1-го уровня и два умения. Рассчитан на 1280×720 и касания пальцем.
+## Экран создания персонажа: слева имя, раса, класс; в центре — 3D-превью персонажа
+## (SubViewport, медленно вращается, можно крутить пальцем, касание — показать атаку);
+## справа — карточка класса: описание, характеристики 1-го уровня и два умения.
+## Рассчитан на 1280×720 и касания пальцем.
 
 signal created(char_name: String, race_id: String, class_id: String)
 
@@ -27,6 +29,10 @@ var _stat_bars: Dictionary = {}
 var _stat_vals: Dictionary = {}
 var _stat_max: Dictionary = {}
 var _skills_box: VBoxContainer
+var _preview_pivot: Node3D
+var _preview_model: CharacterModel
+var _preview_caption: Label
+var _drag_pause := 0.0
 
 
 func _ready() -> void:
@@ -63,6 +69,7 @@ func _ready() -> void:
 	root.add_child(cols)
 
 	cols.add_child(_build_left())
+	cols.add_child(_build_preview())
 	cols.add_child(_build_right())
 
 	_select_race(_race)
@@ -85,17 +92,17 @@ func _build_left() -> PanelContainer:
 	v.add_child(_name_edit)
 
 	v.add_child(_label("Раса", 20, MUTED))
-	var race_box := HBoxContainer.new()
-	race_box.add_theme_constant_override("separation", 8)
+	var race_box := VBoxContainer.new()
+	race_box.add_theme_constant_override("separation", 6)
 	v.add_child(race_box)
 	for rid in ClassData.RACES:
-		var b := _choice_button(String(ClassData.race(rid)["name"]))
+		var b := _choice_button(String(ClassData.race(rid)["name"]), 50)
 		b.pressed.connect(_select_race.bind(String(rid)))
 		race_box.add_child(b)
 		_race_btns[rid] = b
-	_race_desc = _label("", 20, Color(0.88, 0.88, 0.9))
+	_race_desc = _label("", 18, Color(0.88, 0.88, 0.9))
 	_race_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_race_desc.custom_minimum_size = Vector2(0, 56)
+	_race_desc.custom_minimum_size = Vector2(0, 50)
 	v.add_child(_race_desc)
 
 	v.add_child(_label("Класс", 20, MUTED))
@@ -109,7 +116,7 @@ func _build_left() -> PanelContainer:
 
 	var start := Button.new()
 	start.text = "Начать игру"
-	start.custom_minimum_size = Vector2(0, 70)
+	start.custom_minimum_size = Vector2(0, 64)
 	start.add_theme_font_size_override("font_size", 30)
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
@@ -126,10 +133,120 @@ func _build_left() -> PanelContainer:
 	return panel
 
 
+## Центральная колонка: 3D-превью в отдельном мире (свой свет и фон, не зависит от игрового мира).
+func _build_preview() -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = 0.9
+	panel.custom_minimum_size = Vector2(240, 0)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	panel.add_child(v)
+
+	var svc := SubViewportContainer.new()
+	svc.stretch = true
+	svc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	svc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	svc.gui_input.connect(_on_preview_input)
+	v.add_child(svc)
+
+	var vp := SubViewport.new()
+	vp.own_world_3d = true
+	vp.msaa_3d = Viewport.MSAA_2X
+	vp.size = Vector2i(240, 400)
+	svc.add_child(vp)
+
+	var env := Environment.new()
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color(0.11, 0.13, 0.19)
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.62, 0.64, 0.76)
+	env.ambient_light_energy = 0.55
+	var cam := Camera3D.new()
+	cam.environment = env
+	cam.fov = 32.0
+	cam.transform = Transform3D(Basis.IDENTITY, Vector3(0, 1.1, 3.9)).looking_at(Vector3(0, 0.93, 0), Vector3.UP)
+	vp.add_child(cam)
+
+	var key := DirectionalLight3D.new()
+	key.rotation_degrees = Vector3(-32, -35, 0)
+	key.light_energy = 1.15
+	vp.add_child(key)
+	var rim := DirectionalLight3D.new()
+	rim.rotation_degrees = Vector3(-20, 155, 0)
+	rim.light_color = Color(0.7, 0.8, 1.0)
+	rim.light_energy = 0.6
+	vp.add_child(rim)
+
+	# Подиум под ногами
+	var podium := MeshInstance3D.new()
+	var pm := CylinderMesh.new()
+	pm.top_radius = 0.7
+	pm.bottom_radius = 0.78
+	pm.height = 0.08
+	pm.radial_segments = 32
+	podium.mesh = pm
+	podium.position.y = -0.04
+	podium.set_meta("no_outline", true)
+	podium.material_override = Util.mat(Color(0.24, 0.26, 0.34))
+	vp.add_child(podium)
+
+	_preview_pivot = Node3D.new()
+	_preview_pivot.rotation.y = -0.45
+	vp.add_child(_preview_pivot)
+
+	_preview_caption = _label("", 18, MUTED)
+	_preview_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(_preview_caption)
+	return panel
+
+
+## Пересобрать модель превью под выбранные расу и класс и показать атаку.
+func _update_preview() -> void:
+	if _preview_pivot == null:
+		return
+	if _preview_model != null and is_instance_valid(_preview_model):
+		_preview_model.queue_free()
+	_preview_model = CharacterModel.new()
+	_preview_model.setup(CharacterModel.spec_for(_race, _class))
+	_preview_pivot.add_child(_preview_model)
+	if _preview_model.is_inside_tree():
+		_preview_model.play_attack()
+	_preview_caption.text = "%s · %s" % [String(ClassData.race(_race)["name"]), String(ClassData.cls(_class)["name"])]
+
+
+## Перетаскивание по превью вращает персонажа, касание — показать атаку.
+## Касания приходят как мышь (pointing/emulate_mouse_from_touch в project.godot).
+func _on_preview_input(e: InputEvent) -> void:
+	if _preview_pivot == null:
+		return
+	var dx := 0.0
+	if e is InputEventMouseMotion:
+		var mm := e as InputEventMouseMotion
+		if (int(mm.button_mask) & int(MOUSE_BUTTON_MASK_LEFT)) != 0:
+			dx = mm.relative.x
+	elif e is InputEventMouseButton:
+		var mb := e as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and is_instance_valid(_preview_model):
+			_preview_model.play_attack()
+	if dx != 0.0:
+		_preview_pivot.rotation.y += dx * 0.012
+		_drag_pause = 2.0
+
+
+func _process(delta: float) -> void:
+	if _preview_pivot == null:
+		return
+	if _drag_pause > 0.0:
+		_drag_pause -= delta
+	else:
+		_preview_pivot.rotation.y += delta * 0.5
+
+
 func _build_right() -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.size_flags_stretch_ratio = 1.25
+	panel.size_flags_stretch_ratio = 1.3
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
 	panel.add_child(v)
@@ -161,14 +278,14 @@ func _build_right() -> PanelContainer:
 	v.add_child(grid)
 	for row in STAT_ROWS:
 		var key: String = row[0]
-		var name_l := _label(String(row[1]), 20, Color(0.9, 0.9, 0.92))
-		name_l.custom_minimum_size = Vector2(130, 0)
+		var name_l := _label(String(row[1]), 18, Color(0.9, 0.9, 0.92))
+		name_l.custom_minimum_size = Vector2(110, 0)
 		grid.add_child(name_l)
 		var bar := ProgressBar.new()
 		bar.show_percentage = false
 		bar.min_value = 0.0
 		bar.max_value = 1.0
-		bar.custom_minimum_size = Vector2(150, 16)
+		bar.custom_minimum_size = Vector2(90, 16)
 		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		var back := StyleBoxFlat.new()
@@ -177,8 +294,8 @@ func _build_right() -> PanelContainer:
 		bar.add_theme_stylebox_override("background", back)
 		grid.add_child(bar)
 		_stat_bars[key] = bar
-		var val := _label("", 20, Color.WHITE)
-		val.custom_minimum_size = Vector2(170, 0)
+		var val := _label("", 18, Color.WHITE)
+		val.custom_minimum_size = Vector2(140, 0)
 		grid.add_child(val)
 		_stat_vals[key] = val
 
@@ -198,11 +315,11 @@ func _label(text: String, font_size: int, col: Color) -> Label:
 	return l
 
 
-func _choice_button(text: String) -> Button:
+func _choice_button(text: String, height: float = 54.0) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.toggle_mode = true
-	b.custom_minimum_size = Vector2(0, 58)
+	b.custom_minimum_size = Vector2(0, height)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.add_theme_font_size_override("font_size", 20)
 	return b
@@ -287,10 +404,12 @@ func _select_class(cid: String) -> void:
 		top.add_child(_label(String(sk.get("name", sid)), 22, Color(1, 0.85, 0.5)))
 		top.add_child(_label("перезарядка %s с" % _num(float(sk.get("cd", 0.0))), 17, MUTED))
 		box.add_child(top)
-		var d := _label(String(sk.get("desc", "")), 18, Color(0.85, 0.86, 0.9))
+		var d := _label(String(sk.get("desc", "")), 17, Color(0.85, 0.86, 0.9))
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(d)
 		_skills_box.add_child(box)
+
+	_update_preview()
 
 
 func _num(v: float) -> String:
