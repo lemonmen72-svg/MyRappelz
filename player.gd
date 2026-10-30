@@ -185,6 +185,8 @@ func try_attack() -> bool:
 	_anim_attack()
 	if attack_kind == "melee":
 		_deal(target, dmg)
+		Vfx.slash_arc(get_parent(), target.global_position + Vector3(0, 0.75 * target.body_scale, 0),
+			target.global_position - global_position, _class_color())
 	else:
 		_shoot(target, dmg, 1.0, Callable())
 	return true
@@ -230,10 +232,10 @@ func _roll(mult: float, force_crit: bool) -> int:
 
 func _deal(t: Mob, dmg: int) -> void:
 	var crit_hit := _last_crit
-	t.take_damage(dmg, self)
+	t.take_damage(dmg, self, crit_hit)
 	if crit_hit:
 		Util.float_text(get_parent(), t.global_position + Vector3(0, 2.6 * t.body_scale + 0.4, 0),
-			"Крит!", Color(1, 0.85, 0.2))
+			"Крит!", Color(1, 0.85, 0.2), 1.4)
 
 
 ## Выпустить снаряд (стрела у лучника, шар у мага). on_hit: func(target: Mob, damage: int).
@@ -315,6 +317,8 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 			_anim_spin()
 			for m in hits:
 				_deal(m, _roll(mult, false))
+			Vfx.slash_arc(fx_parent, global_position + Vector3(0, 0.9, 0) + _forward() * radius * 0.5,
+				_forward(), Color(1, 0.6, 0.3), radius * 0.8)
 			Projectile.burst(fx_parent, global_position + Vector3(0, 0.5, 0), Color(1, 0.55, 0.25), radius, 0.3)
 			_announce(sname, "урон по %d врагам" % hits.size())
 		"war_cry":
@@ -344,6 +348,7 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 			_engage(t)
 			_anim_bash()
 			_deal(t, _roll(mult, false))
+			Vfx.hit_spark(fx_parent, t.global_position + Vector3(0, 0.75 * t.body_scale, 0), Color(1, 1, 0.5), 1.5)
 			if not t.is_dead:
 				t.stun(time)
 				Util.float_text(fx_parent, t.global_position + Vector3(0, 2.4 * t.body_scale + 0.8, 0),
@@ -382,6 +387,8 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 			_engage(t)
 			_anim_attack()
 			_deal(t, _roll(mult, true))
+			Vfx.slash_arc(fx_parent, t.global_position + Vector3(0, 0.75 * t.body_scale, 0),
+				t.global_position - global_position, Color(0.75, 0.4, 1.0), 1.2)
 			_announce(sname, "")
 		"shadow_step":
 			var t := _find_target(radius)
@@ -475,6 +482,7 @@ func _active_pet() -> Node3D:
 func heal(amount: int) -> void:
 	hp = mini(max_hp, hp + amount)
 	Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "+%d" % amount, Color(0.4, 1, 0.4))
+	Vfx.heal_sparkles(get_parent(), global_position)
 	stats_changed.emit()
 
 
@@ -494,10 +502,12 @@ func take_damage(amount: int, _attacker: Node3D) -> void:
 	if _has_model():
 		_model.play_hit()
 	Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), str(amount), Color(1, 0.3, 0.3))
+	Vfx.hit_spark(get_parent(), global_position + Vector3(0, 1.2, 0), Color(1, 0.4, 0.35), 0.8)
 	if hp <= 0:
 		hp = max_hp
 		Game.gold = int(Game.gold * 0.8)
 		global_position = Vector3(0, 0.1, 0)
+		Vfx.heal_sparkles(get_parent(), global_position, 1.3)
 		last_target = null
 		_set_target(null)
 		clear_buffs()
@@ -520,6 +530,7 @@ func gain_xp(amount: int) -> void:
 		recalc_stats()
 		hp = max_hp
 		message.emit("Новый уровень: %d!" % Game.level)
+		Vfx.level_up(get_parent(), global_position)
 	Game.changed.emit()
 	stats_changed.emit()
 

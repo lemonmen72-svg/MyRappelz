@@ -42,10 +42,14 @@
 
 ### Модули
 - Персонаж и бой: `data_classes.gd` (`ClassData`: расы, классы, умения), `player.gd`, `projectile.gd`
-  (снаряды лука и магии), `character_create.gd`. Тесты `tests/test_combat*.gd`.
+  (снаряды лука и магии), `character_create.gd` (с 3D-превью), `character_model.gd` (`CharacterModel`:
+  аниме-модель персонажа и торговца, анимации). Тесты `tests/test_combat*.gd`, `tests/test_character_model.gd`.
 - Питомцы и звери: `data_mobs.gd` (`MobData`), `data_pets.gd` (`PetData`: роли, стадии эволюции),
   `creature_models.gd` (модели зверей), `mob.gd`, `pet.gd`, `pet_manager.gd` (призыв, команды, окно), `taming.gd`.
   Тесты `tests/test_pets*.gd`.
+- Графика: `util.gd` (toon-материалы, `toonify_mesh`, контуры), `outline.gdshader`, `vfx.gd` (`Vfx`: эффекты),
+  `world_builder.gd` + шейдеры мира (`sky`, `terrain`, `grass`, `flower`, `flag`, `world_common.gdshaderinc`).
+  Тест `tests/test_vfx.gd`, скриншоты `tests/shots.gd` (CI-задача visual → ветка `ci-screenshots`).
 - Предметы и торговля: `data_items.gd` (`ItemData`), `economy.gd` (добыча, сумка, магазин, зелья),
   `merchant.gd` (торговец и круг безопасной зоны), `loot_drop.gd` (мешочек с добычей). Тест `tests/test_economy.gd`.
 
@@ -91,7 +95,7 @@
 
 ## План
 1. Механики: персонаж и бой, питомцы и приручение, предметы и торговец (готово, версия 0.2.0).
-2. Графика в стиле аниме cel-shading.
+2. Графика в стиле аниме cel-shading (готово, версия 0.3.0; модели из примитивов, позже можно заменить на VRoid).
 3. Дальше (не согласовано): экипировка, квесты и NPC, слияние питомцев, сервер и мультиплеер.
 
 ## Соглашения
