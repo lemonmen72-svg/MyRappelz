@@ -3,7 +3,7 @@ extends CanvasLayer
 ## Интерфейс: плавающий джойстик (левая нижняя часть экрана), круглые кнопки действий справа,
 ## панели игрока, питомца и цели, окна (питомцы, сумка, торговец).
 ## На ПК: WASD/стрелки, Пробел = атака, 1/2 = умения, T = приручить, Q = зелье,
-## P = питомцы, I = сумка, E = торговец, F = питомец атакует, G = питомец за мной, O = настройки.
+## P = питомцы, C = окно существа, I = сумка, E = торговец, F = питомец атакует, G = питомец за мной, O = настройки.
 
 ## Нажатие кнопки действия (касание, клавиша или кнопка меню).
 signal action(id: String)
@@ -16,6 +16,7 @@ const CAM_TOP := 90.0
 const KEYS := {
 	KEY_SPACE: "attack", KEY_1: "skill1", KEY_2: "skill2", KEY_T: "tame", KEY_Q: "potion",
 	KEY_P: "pets_window", KEY_I: "bag_window", KEY_E: "shop", KEY_F: "pet_attack", KEY_G: "pet_follow", KEY_O: "settings_window",
+	KEY_C: "creature_window",
 }
 
 var move_vec := Vector2.ZERO
@@ -41,6 +42,7 @@ var _stats_label: Label
 var _pet_box: Control
 var _pet_label: Label
 var _pet_bar: ProgressBar
+var _pet_mp_bar: ProgressBar
 var _target_box: Control
 var _target_label: Label
 var _target_bar: ProgressBar
@@ -63,12 +65,14 @@ func _ready() -> void:
 	add_child(_pet_box)
 	_pet_label = _label(_pet_box, Vector2(0, 0), 20)
 	_pet_bar = _bar(_pet_box, Vector2(0, 30), Vector2(240, 14), Color(0.3, 0.75, 1.0))
+	_pet_mp_bar = _bar(_pet_box, Vector2(0, 47), Vector2(240, 9), Color(0.55, 0.45, 1.0))
 	var pet_btns := HBoxContainer.new()
-	pet_btns.position = Vector2(0, 52)
+	pet_btns.position = Vector2(0, 62)
 	pet_btns.add_theme_constant_override("separation", 8)
 	_pet_box.add_child(pet_btns)
 	pet_btns.add_child(_menu_button("Атакуй", "pet_attack"))
 	pet_btns.add_child(_menu_button("За мной", "pet_follow"))
+	pet_btns.add_child(_menu_button("Существо", "creature_window"))
 
 	_target_box = Control.new()
 	_target_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -215,7 +219,7 @@ func update_player(p: Player) -> void:
 		Game.char_name, Game.level, p.hp, p.max_hp, Game.gold]
 
 
-## pet: узел питомца с полями pet_name, level, hp, max_hp (или null).
+## pet: узел питомца с полями pet_name, level, hp, max_hp и (необязательно) mp, max_mp, или null.
 func update_pet(pet: Node) -> void:
 	if pet == null or not is_instance_valid(pet):
 		_pet_box.visible = false
@@ -224,6 +228,11 @@ func update_pet(pet: Node) -> void:
 	_pet_label.text = "%s  Ур.%d  HP %d/%d" % [pet.pet_name, pet.level, pet.hp, pet.max_hp]
 	_pet_bar.max_value = pet.max_hp
 	_pet_bar.value = pet.hp
+	var mmp = pet.get("max_mp")
+	_pet_mp_bar.visible = mmp is int and int(mmp) > 0
+	if _pet_mp_bar.visible:
+		_pet_mp_bar.max_value = int(mmp)
+		_pet_mp_bar.value = int(pet.get("mp"))
 
 
 ## Цель игрока: узел с полями mob_name, level, hp, max_hp, is_dead (или null).

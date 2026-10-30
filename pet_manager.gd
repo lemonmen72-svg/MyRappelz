@@ -1,11 +1,11 @@
 class_name PetManager
 extends Node
 ## Питомцы: призыв из коллекции Game.pets, команды «Атакуй» / «За мной», опыт за убийства,
-## окно питомцев (призвать, отозвать, воскресить свитком, отпустить).
+## окно питомцев (подробнее — окно существа, призвать, отозвать, воскресить свитком, отпустить).
 ## Призванный питомец всегда соответствует Game.active_pet: сверка идёт каждый кадр,
 ## поэтому после загрузки сохранения или отпускания другого питомца узел пересоздаётся сам.
 
-const WINDOW_SIZE := Vector2(820, 560)
+const WINDOW_SIZE := Vector2(1040, 600)
 ## Радиус поиска цели для команды «Атакуй», если у игрока нет цели.
 const ATTACK_RANGE := 12.0
 
@@ -13,8 +13,10 @@ var main: Node
 ## Призванный питомец (узел в мире) или null. Контракт узла (используют HUD и другие модули):
 ## поля pet_name, level, hp, max_hp, is_down (погиб/скрыт), метод heal(amount: int), сигнал stats_changed.
 var active_pet: Pet = null
-## Кнопки открытого окна питомцев: "summon_<i>", "recall_<i>", "revive_<i>", "release_<i>".
+## Кнопки открытого окна питомцев: "info_<i>", "summon_<i>", "recall_<i>", "revive_<i>", "release_<i>".
 var window_buttons: Dictionary = {}
+## Окно существа (характеристики и умения питомца).
+var creature: CreatureWindow = null
 
 var _window_body: VBoxContainer = null
 ## Индекс питомца, ждущего подтверждения «Отпустить» (второе нажатие), -1: никого.
@@ -23,6 +25,10 @@ var _release_confirm := -1
 
 func setup(m: Node) -> void:
 	main = m
+	creature = CreatureWindow.new()
+	creature.name = "CreatureWindow"
+	add_child(creature)
+	creature.setup(m, self)
 	_sync()
 
 
@@ -31,7 +37,7 @@ func _process(_delta: float) -> void:
 		_sync()
 
 
-## Обрабатывает действия: "pet_attack", "pet_follow", "pets_window". true, если действие своё.
+## Обрабатывает действия: "pet_attack", "pet_follow", "pets_window", "creature_window". true, если действие своё.
 func handle_action(id: String) -> bool:
 	match id:
 		"pet_attack":
@@ -44,7 +50,19 @@ func handle_action(id: String) -> bool:
 			_release_confirm = -1
 			open_window()
 			return true
+		"creature_window":
+			open_creature(Game.active_pet if Game.active_pet >= 0 else 0)
+			return true
 	return false
+
+
+## Открыть окно существа для питомца i (вкладка which: "stats" | "skills" | "" — прежняя). true — открыто.
+func open_creature(i: int, which: String = "") -> bool:
+	if i < 0 or i >= Game.pets.size():
+		_msg("Питомцев пока нет")
+		return false
+	_release_confirm = -1
+	return creature.open(i, which)
 
 
 ## Зверь убит (игроком или питомцем): опыт призванному живому питомцу.
@@ -208,7 +226,8 @@ func _add_row(body: VBoxContainer, i: int) -> void:
 	var sp := String(rec.get("species", "boar"))
 	var lvl := int(rec.get("level", 1))
 	var dead := bool(rec.get("dead", false))
-	var st := PetData.stats_for(sp, lvl)
+	PetSkills.ensure_record(rec)
+	var st := PetData.stats_for(sp, lvl, rec["skills"], rec["toggles"])
 	var mhp := int(st["max_hp"])
 	var cur := int(rec.get("hp", -1))
 	if cur < 0 or cur > mhp:
@@ -221,15 +240,16 @@ func _add_row(body: VBoxContainer, i: int) -> void:
 	var info := Label.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var status: String = "погиб" if dead else "HP %d/%d" % [cur, mhp]
-	info.text = "%s%s\n%s · %s, ур. %d, %s" % [
+	info.text = "%s%s\n%s · %s, ур. %d, %s, JP %d" % [
 		String(rec.get("name", "Питомец")), "  [призван]" if active else "",
-		PetData.role_name(sp), MobData.rarity_name(sp), lvl, status]
+		PetData.role_name(sp), MobData.rarity_name(sp), lvl, status, int(rec.get("jp", 0))]
 	if dead:
 		info.modulate = Color(1.0, 0.55, 0.5)
 	elif active:
 		info.modulate = Color(0.6, 0.95, 1.0)
 	row.add_child(info)
 
+	_add_button(row, "info_%d" % i, "Подробнее", _on_info.bind(i))
 	if dead:
 		_add_button(row, "revive_%d" % i, "Воскресить", _on_revive.bind(i))
 	elif active:
@@ -247,6 +267,10 @@ func _add_button(row: HBoxContainer, key: String, text: String, cb: Callable) ->
 	b.pressed.connect(cb)
 	row.add_child(b)
 	window_buttons[key] = b
+
+
+func _on_info(i: int) -> void:
+	open_creature(i, "stats")
 
 
 func _on_summon(i: int) -> void:
@@ -273,7 +297,8 @@ func _on_revive(i: int) -> void:
 		_msg("Нужен «%s» (продаётся у торговца)" % ItemData.item_name("revive_scroll"))
 		_refresh_window()
 		return
-	var st := PetData.stats_for(String(rec.get("species", "boar")), int(rec.get("level", 1)))
+	PetSkills.ensure_record(rec)
+	var st := PetData.stats_for(String(rec.get("species", "boar")), int(rec.get("level", 1)), rec["skills"], rec["toggles"])
 	rec["dead"] = false
 	rec["hp"] = maxi(1, int(float(st["max_hp"]) * 0.5))
 	_msg("Питомец «%s» воскрешён" % String(rec.get("name", "")))

@@ -38,6 +38,15 @@ var is_dead := false
 var stun_time := 0.0
 ## Провокация: пока > 0, зверь не меняет цель (танк-питомец, умения).
 var taunt_time := 0.0
+## Ослабления от умений питомцев (время, с, и сила 0..1): замедление, морок (все удары мимо),
+## сбитый прицел (доля промахов), уязвимость (урон по зверю больше).
+var slow_time := 0.0
+var slow_frac := 0.0
+var blind_time := 0.0
+var miss_time := 0.0
+var miss_frac := 0.0
+var vuln_time := 0.0
+var vuln_frac := 0.0
 var returning := false
 var target: Node3D = null
 ## На звере метка приручения (ставит и снимает Taming).
@@ -171,6 +180,7 @@ func _physics_process(delta: float) -> void:
 		return
 	attack_cd = maxf(0.0, attack_cd - delta)
 	taunt_time = maxf(0.0, taunt_time - delta)
+	_tick_debuffs(delta)
 	if type_id == "golem":
 		_slam_cd = maxf(0.0, _slam_cd - delta)
 	if stun_time > 0.0:
@@ -190,6 +200,8 @@ func _physics_process(delta: float) -> void:
 	var dir := Vector3.ZERO
 	var face := Vector3.ZERO
 	var spd := speed
+	if slow_time > 0.0:
+		spd *= 1.0 - slow_frac
 
 	if returning:
 		# Возвращается домой и лечится
@@ -233,7 +245,7 @@ func _physics_process(delta: float) -> void:
 				_hit_target = target
 				_hit_left = delay
 				_hit_dmg = dmg
-			else:
+			elif not _missed(target):
 				target.call("take_damage", dmg, self)
 	else:
 		# Ищем игрока
@@ -281,7 +293,7 @@ func _land_hit() -> void:
 		return
 	var d := t.global_position - global_position
 	d.y = 0.0
-	if d.length() <= _reach() + 1.5:
+	if d.length() <= _reach() + 1.5 and not _missed(t):
 		t.call("take_damage", _hit_dmg, self)
 
 
@@ -311,6 +323,44 @@ func _slam() -> void:
 ## Оглушить на sec секунд.
 func stun(sec: float) -> void:
 	stun_time = maxf(stun_time, sec)
+
+
+## Замедлить на долю frac (0..1) на sec секунд.
+func slow(frac: float, sec: float) -> void:
+	slow_frac = maxf(slow_frac if slow_time > 0.0 else 0.0, clampf(frac, 0.0, 0.9))
+	slow_time = maxf(slow_time, sec)
+
+
+## Морок: sec секунд все удары зверя мимо.
+func blind(sec: float) -> void:
+	blind_time = maxf(blind_time, sec)
+
+
+## Сбить прицел: доля frac ударов мимо на sec секунд.
+func weaken_aim(frac: float, sec: float) -> void:
+	miss_frac = maxf(miss_frac if miss_time > 0.0 else 0.0, clampf(frac, 0.0, 0.9))
+	miss_time = maxf(miss_time, sec)
+
+
+## Уязвимость: урон по зверю больше на долю frac на sec секунд.
+func expose(frac: float, sec: float) -> void:
+	vuln_frac = maxf(vuln_frac if vuln_time > 0.0 else 0.0, maxf(frac, 0.0))
+	vuln_time = maxf(vuln_time, sec)
+
+
+func _tick_debuffs(delta: float) -> void:
+	slow_time = maxf(0.0, slow_time - delta)
+	blind_time = maxf(0.0, blind_time - delta)
+	miss_time = maxf(0.0, miss_time - delta)
+	vuln_time = maxf(0.0, vuln_time - delta)
+
+
+## Удар мимо (морок или сбитый прицел): над целью «Промах», урона нет.
+func _missed(t: Node3D) -> bool:
+	var miss := blind_time > 0.0 or (miss_time > 0.0 and randf() < miss_frac)
+	if miss and is_inside_tree() and is_instance_valid(t):
+		Util.float_text(get_parent(), t.global_position + Vector3(0, 2.2, 0), "Промах", Color(0.8, 0.85, 1.0))
+	return miss
 
 
 ## Заставить атаковать by в течение sec секунд.
@@ -408,6 +458,8 @@ func _heal(delta: float, frac_per_sec: float) -> void:
 func take_damage(amount: int, attacker: Node3D, crit: bool = false) -> void:
 	if is_dead:
 		return
+	if vuln_time > 0.0:
+		amount = roundi(float(amount) * (1.0 + vuln_frac))
 	hp -= amount
 	if not returning and attacker != null and taunt_time <= 0.0:
 		target = attacker

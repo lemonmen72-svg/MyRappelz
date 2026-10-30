@@ -7,6 +7,11 @@ const SHOTS_DIR := "user://shots/"
 
 ## Новые звери (пантера, черепаха, фазан) крупно в ряд — кадры 15 и 16.
 const ROW := ["panther", "turtle", "pheasant"]
+## Окно существа (кадры 17 и 18): пантера 20 ур. (2-я стадия) с изученными умениями [id, уровень].
+const SHOWCASE_SKILLS := [
+	["inner_fire", 6], ["hardening", 3], ["shadow_rend", 6], ["dusk_rupture", 3], ["vitality", 3],
+	["daze", 2], ["shadow_fang", 3], ["provoke", 1], ["calm_mind", 2], ["shadow_bond", 2],
+]
 
 var _create: Node = null
 var _top: Camera3D = null
@@ -23,6 +28,12 @@ func before_start() -> void:
 	Quality.set_level(Quality.HIGH, false)
 	game.add_pet("wolf", "Серохвост", 5)
 	game.active_pet = 0
+	var i: int = game.add_pet("panther", PetData.stage_name("panther", 20), 20)
+	var rec: Dictionary = game.pets[i]
+	for e in SHOWCASE_SKILLS:
+		for k in int(e[1]):
+			PetSkills.learn(rec, String(e[0]))
+	(rec["toggles"] as Dictionary)["shadow_bond"] = true
 
 
 func run_step() -> void:
@@ -169,7 +180,23 @@ func run_step() -> void:
 				_top.queue_free()
 				main.cam.current = true
 				main.hud.visible = true
-				ok_done()
+				# Окно существа: пантера с изученными умениями, обе вкладки
+				main.pets.summon(1)
+				wait = 5
+				step = 18
+		18:
+			main.pets.open_creature(1, "stats")
+			wait = 30
+			step = 19
+		19:
+			shot("17_creature_stats")
+			main.pets.open_creature(1, "skills")
+			wait = 10
+			step = 20
+		20:
+			shot("18_creature_skills")
+			main.hud.close_window()
+			ok_done()
 
 
 ## Пантера, черепаха и фазан в ряд перед камерой (вид три четверти), игрок и питомец скрыты.
