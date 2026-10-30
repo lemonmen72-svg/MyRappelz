@@ -52,6 +52,9 @@ const DEFAULT_FPS := 60
 
 static var _level := -1
 static var _fps := -1
+static var _menu_open := false
+## Предел кадров при открытом окне.
+const MENU_FPS := 30
 
 
 ## Текущий пресет (LOW, MEDIUM, HIGH).
@@ -94,7 +97,16 @@ static func set_fps_limit(v: int, save: bool = true) -> void:
 static func apply_fps() -> void:
 	if DisplayServer.get_name() == "headless":
 		return
-	Engine.max_fps = fps_limit()
+	Engine.max_fps = mini(fps_limit(), MENU_FPS) if _menu_open else fps_limit()
+
+
+## Открыто окно (герой, питомцы, сумка, настройки): мир под окном рисуется не чаще MENU_FPS кадров
+## в секунду — меньше нагрев, на вид разницы нет.
+static func set_menu_open(on: bool) -> void:
+	if _menu_open == on:
+		return
+	_menu_open = on
+	apply_fps()
 
 
 ## Записать ключ секции [graphics] (другие ключи и секции файла сохраняются).

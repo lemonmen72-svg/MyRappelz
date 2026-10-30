@@ -75,6 +75,9 @@ var _skel_xf := Transform3D.IDENTITY
 var _decor: Node3D = null
 var _charm: Node3D = null
 var _halo: Node3D = null
+# AnimationPlayer крутится, только пока зверь не спит и виден на экране (бережём процессор телефона)
+var _asleep := false
+var _onscreen := true
 
 
 ## Путь к модели вида.
@@ -196,7 +199,25 @@ func setup(id: String, s: float, color: Color = Color.WHITE, tint: Color = Color
 		if not _prepared.has(path):
 			_prepared[path] = true
 			_prepare_clips()
+		# За кадром анимация стоит (кости не считаются); рамка с запасом на прыжки и взмахи
+		var vis := VisibleOnScreenNotifier3D.new()
+		vis.name = "OnScreen"
+		var hw := maxf(float(info["length"]), float(info["width"])) * 0.6 * _s
+		vis.aabb = AABB(Vector3(-hw, -0.2, -hw), Vector3(hw * 2.0, float(info["height"]) * 1.4 * _s + 0.4, hw * 2.0))
+		vis.screen_entered.connect(_on_screen_changed.bind(true))
+		vis.screen_exited.connect(_on_screen_changed.bind(false))
+		add_child(vis)
 	return true
+
+
+func _on_screen_changed(on: bool) -> void:
+	_onscreen = on
+	_apply_active()
+
+
+func _apply_active() -> void:
+	if anim != null:
+		anim.active = not _asleep and _onscreen
 
 
 func _ready() -> void:
@@ -391,8 +412,8 @@ func play_death() -> float:
 
 ## Зверь спит (далеко от игрока): анимации не считаются.
 func set_sleeping(on: bool) -> void:
-	if anim != null:
-		anim.active = not on
+	_asleep = on
+	_apply_active()
 
 
 # ---------- Питомец ----------

@@ -213,6 +213,7 @@ func take_camera_zoom() -> float:
 ## Пока окно открыто, джойстик и круглые кнопки не работают. Открыто только одно окно.
 func create_window(title: String, sz: Vector2) -> VBoxContainer:
 	close_window()
+	Quality.set_menu_open(true)
 	var panel := PanelContainer.new()
 	panel.theme = Util.ui_theme()
 	panel.size = sz
@@ -249,6 +250,7 @@ func close_window() -> void:
 	if _window != null and is_instance_valid(_window):
 		_window.queue_free()
 	_window = null
+	Quality.set_menu_open(false)
 
 
 func is_window_open() -> bool:
