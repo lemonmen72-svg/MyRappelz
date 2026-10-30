@@ -1,8 +1,17 @@
 class_name Mob
 extends CharacterBody3D
+## Дикий зверь: бродит около дома, нападает на игрока рядом, уходит домой с лечением.
+## Модели видов строит CreatureModels. Метка приручения (Taming) видна кольцом и кристаллом над головой.
+## Уникальный каменный страж раз в несколько секунд бьёт по площади (с замахом).
 
-## killed = true: зверя убили, false: его приручили
+## killed = true: зверя убили, false: его забрали из мира (consume)
 signal gone(mob: Mob, killed: bool)
+
+## Удар по площади каменного стража: перезарядка, замах, радиус, множитель атаки.
+const SLAM_CD := 8.0
+const SLAM_WINDUP := 0.9
+const SLAM_RADIUS := 4.5
+const SLAM_POWER := 1.3
 
 var slot := -1
 var type_id := "boar"
@@ -27,17 +36,28 @@ var stun_time := 0.0
 var taunt_time := 0.0
 var returning := false
 var target: Node3D = null
+## На звере метка приручения (ставит и снимает Taming).
+var tame_marked := false
+## Сколько раз зверь применил своё умение (удар по площади стража).
+var skill_uses := 0
 
 var _wander_to := Vector3.ZERO
 var _wander_wait := 0.0
 var _regen_acc := 0.0
 var _mat: StandardMaterial3D
 var _label: Label3D
+var _model: Node3D
+var _height := 1.4
+var _anim_t := 0.0
+var _mark: Node3D = null
+var _mark_gem: Node3D = null
+var _slam_cd := 4.0
+var _slam_windup := 0.0
 
 
 func setup(id: String, spawn_slot: int, pos: Vector3) -> void:
 	var d := MobData.get_type(id)
-	type_id = id
+	type_id = id if MobData.TYPES.has(id) else "boar"
 	rarity = d["rarity"]
 	slot = spawn_slot
 	mob_name = d["name"]
@@ -57,14 +77,25 @@ func _ready() -> void:
 	add_to_group("mobs")
 	collision_layer = 2
 	collision_mask = 1
-	_mat = Util.creature_body(self, color, body_scale)
+	_model = Node3D.new()
+	add_child(_model)
+	_mat = CreatureModels.build(_model, type_id, color, body_scale)
+	CreatureModels.add_collision(self, type_id, body_scale)
+	_height = CreatureModels.height(type_id, body_scale)
+	_anim_t = randf() * 10.0
+
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.no_depth_test = true
 	_label.pixel_size = 0.01
 	_label.font_size = 40
 	_label.outline_size = 10
-	_label.position = Vector3(0, 1.9 * body_scale + 0.3, 0)
+	_label.position = Vector3(0, _height + 0.35, 0)
+	match rarity:
+		"rare":
+			_label.modulate = Color(0.6, 0.85, 1.0)
+		"unique":
+			_label.modulate = Color(1.0, 0.8, 0.3)
 	add_child(_label)
 	_wander_to = home
 	_update_label()
@@ -78,17 +109,31 @@ func _target_gone() -> bool:
 	return false
 
 
+func _process(delta: float) -> void:
+	if is_dead:
+		return
+	_anim_t += delta
+	CreatureModels.animate(_model, type_id, _anim_t)
+	if _mark != null and _mark.visible:
+		_mark.rotation.y += delta * 1.5
+		_mark_gem.position.y = _height + 0.9 + sin(_anim_t * 3.0) * 0.12
+
+
 func _physics_process(delta: float) -> void:
 	if is_dead:
 		return
 	attack_cd = maxf(0.0, attack_cd - delta)
 	taunt_time = maxf(0.0, taunt_time - delta)
+	if type_id == "golem":
+		_slam_cd = maxf(0.0, _slam_cd - delta)
 	if stun_time > 0.0:
 		stun_time -= delta
+		_slam_windup = 0.0
 		return
 
 	if target != null and _target_gone():
 		target = null
+		_slam_windup = 0.0
 
 	var dir := Vector3.ZERO
 	var face := Vector3.ZERO
@@ -111,7 +156,17 @@ func _physics_process(delta: float) -> void:
 		if global_position.distance_to(home) > leash or _in_safe_zone(target):
 			target = null
 			returning = true
-		elif to.length() > 1.9:
+			_slam_windup = 0.0
+		elif _slam_windup > 0.0:
+			# Замах удара по площади: стоит на месте
+			_slam_windup -= delta
+			if _slam_windup <= 0.0:
+				_slam()
+		elif type_id == "golem" and _slam_cd <= 0.0 and to.length() < SLAM_RADIUS - 0.5:
+			_slam_windup = SLAM_WINDUP
+			_slam_cd = SLAM_CD
+			CreatureModels.spawn_ring(get_parent(), global_position, SLAM_RADIUS, Color(1.0, 0.45, 0.2), SLAM_WINDUP)
+		elif to.length() > _reach():
 			dir = to.normalized()
 		elif attack_cd <= 0.0:
 			attack_cd = 1.3
@@ -149,6 +204,27 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, atan2(-face.x, -face.z), 8.0 * delta)
 
 
+## Дальность ближней атаки: крупные звери достают дальше.
+func _reach() -> float:
+	return maxf(1.9, 1.0 + 0.7 * body_scale)
+
+
+## Удар по площади каменного стража: урон игроку и питомцам вокруг.
+func _slam() -> void:
+	skill_uses += 1
+	var dmg := int(atk * SLAM_POWER)
+	var parent := get_parent()
+	CreatureModels.spawn_ring(parent, global_position, SLAM_RADIUS, Color(0.9, 0.75, 0.5), 0.35)
+	Util.float_text(parent, global_position + Vector3(0, _height + 0.8, 0), "Сотрясение!", Color(1, 0.6, 0.3))
+	for g in ["player", "pets"]:
+		for n in get_tree().get_nodes_in_group(g):
+			var node := n as Node3D
+			if node == null or not is_instance_valid(node) or node.get("is_down") == true:
+				continue
+			if node.global_position.distance_to(global_position) <= SLAM_RADIUS:
+				node.call("take_damage", dmg, self)
+
+
 ## Оглушить на sec секунд.
 func stun(sec: float) -> void:
 	stun_time = maxf(stun_time, sec)
@@ -160,6 +236,40 @@ func taunt(by: Node3D, sec: float) -> void:
 		return
 	target = by
 	taunt_time = sec
+
+
+## Показать или убрать метку приручения (светящееся кольцо под зверем и кристалл над головой).
+func set_tame_mark(on: bool) -> void:
+	tame_marked = on
+	if on and _mark == null:
+		_build_mark()
+	if _mark != null:
+		_mark.visible = on
+
+
+func _build_mark() -> void:
+	var gm := CreatureModels.flat_mat(Color(0.35, 1.0, 0.8))
+	_mark = Node3D.new()
+	add_child(_mark)
+	var r := 0.8 * maxf(body_scale, 0.8)
+	var ring := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = r
+	tm.outer_radius = r + 0.12
+	ring.mesh = tm
+	ring.position.y = 0.06
+	ring.material_override = gm
+	_mark.add_child(ring)
+	_mark_gem = Node3D.new()
+	_mark_gem.position.y = _height + 0.9
+	_mark.add_child(_mark_gem)
+	var gem := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.28, 0.28, 0.28)
+	gem.mesh = bm
+	gem.rotation = Vector3(PI / 4.0, 0.0, PI / 4.0)
+	gem.material_override = gm
+	_mark_gem.add_child(gem)
 
 
 func _in_safe_zone(n: Node3D) -> bool:
@@ -183,7 +293,7 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 	hp -= amount
 	if not returning and attacker != null and taunt_time <= 0.0:
 		target = attacker
-	Util.float_text(get_parent(), global_position + Vector3(0, 2.2 * body_scale, 0), str(amount), Color(1, 1, 1))
+	Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.6, 0), str(amount), Color(1, 1, 1))
 	_flash()
 	_update_label()
 	if hp <= 0:
@@ -195,13 +305,15 @@ func _die() -> void:
 	remove_from_group("mobs")
 	collision_layer = 0
 	_label.hide()
+	if _mark != null:
+		_mark.hide()
 	gone.emit(self, true)
 	var t := create_tween()
 	t.tween_property(self, "scale", Vector3(1, 0.05, 1), 0.4)
 	t.tween_callback(queue_free)
 
 
-## Вызывается, когда зверя приручили.
+## Убрать зверя из мира без убийства.
 func consume() -> void:
 	is_dead = true
 	remove_from_group("mobs")
