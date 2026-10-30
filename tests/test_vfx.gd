@@ -1,10 +1,13 @@
 extends "res://tests/test_base.gd"
-## Графика зверей и эффекты: модели всех зверей и всех стадий питомцев собираются (с разумным
-## числом мешей), анимация работает; все функции Vfx создают эффекты, которые сами удаляются;
-## всплывающий текст исчезает; метка приручения и крит-удар по зверю не ломают бой.
+## Графика зверей и эффекты: модели всех зверей и всех стадий питомцев собираются (с малым
+## числом вызовов отрисовки: детали слиты в один меш на скелете), анимация работает и двигает кости;
+## все функции Vfx создают эффекты, которые сами удаляются; всплывающий текст исчезает;
+## метка приручения и крит-удар по зверю не ломают бой.
 
-const MAX_MOB_MESHES := 26
-const MAX_PET_MESHES := 36
+## Вызовов отрисовки на модель без контура: поверхности мешей + системы частиц.
+## Цель оптимизации — зверь не дороже 8 вызовов (было ~25 мешей, у питомца до 36).
+const MAX_MOB_DRAWS := 6
+const MAX_PET_DRAWS := 8
 
 var box: Node3D = null
 var models: Array[Node3D] = []
@@ -31,6 +34,7 @@ func run_step() -> void:
 				CreatureModels.animate(n, sp, float(timer) * 0.05, 1.0 if timer % 2 == 0 else 0.0)
 			if timer >= 30:
 				check(_effects_left() > 0, "эффекты ещё видны: %d" % _effects_left())
+				_check_bones()
 				wait = 60 * 4
 				step = 2
 		2:
@@ -52,9 +56,11 @@ func _build_models() -> void:
 		var n := _holder(id, Vector3(x, 0, 0))
 		var m := CreatureModels.build(n, id, d["color"], float(d["scale"]))
 		check(m != null, "модель зверя %s собрана" % id)
-		var cnt := _meshes(n)
-		check(cnt >= 10 and cnt <= MAX_MOB_MESHES, "мешей у зверя %s: %d" % [id, cnt])
+		var cnt := _draws(n)
+		check(cnt >= 1 and cnt <= MAX_MOB_DRAWS, "вызовов отрисовки у зверя %s: %d (мешей %d)" % [id, cnt, _meshes(n)])
 		check(n.has_meta("anim"), "у модели %s есть части для анимации" % id)
+		if CreatureModels.skinned:
+			check(n.find_child("Skeleton", true, false) is Skeleton3D, "у модели %s слитый меш на скелете" % id)
 		for st in PetData.STAGE_LEVELS.size():
 			var lvl := int(PetData.STAGE_LEVELS[st])
 			var sc := PetData.stage_scale(id, lvl)
@@ -65,8 +71,8 @@ func _build_models() -> void:
 			if st >= 1:
 				check(p.find_child("Mark0", true, false) != null, "узоры у питомца %s (стадия %d)" % [id, st + 1])
 			check((p.find_child("Halo", true, false) != null) == (st == 2), "нимб только на 3-й стадии: %s" % id)
-			var pc := _meshes(p)
-			check(pc <= MAX_PET_MESHES, "мешей у питомца %s стадии %d: %d" % [id, st + 1, pc])
+			var pc := _draws(p)
+			check(pc >= 1 and pc <= MAX_PET_DRAWS, "вызовов отрисовки у питомца %s стадии %d: %d" % [id, st + 1, pc])
 		x += 4.0
 
 
@@ -128,3 +134,40 @@ func _effects_left() -> int:
 
 func _meshes(n: Node) -> int:
 	return n.find_children("*", "MeshInstance3D", true, false).size()
+
+
+## Вызовы отрисовки модели без контура и теней: по одному на поверхность меша и на систему частиц.
+func _draws(n: Node) -> int:
+	var c := 0
+	for x in n.find_children("*", "GeometryInstance3D", true, false):
+		if x is MeshInstance3D:
+			var mesh := (x as MeshInstance3D).mesh
+			if mesh is ArrayMesh:
+				c += mesh.get_surface_count()
+			elif mesh != null:
+				c += 1
+		elif x is CPUParticles3D or x is GPUParticles3D:
+			c += 1
+	return c
+
+
+## После анимации кости скелета повторяют узлы-шарниры (лапы, голова и т. п.).
+func _check_bones() -> void:
+	if not CreatureModels.skinned:
+		return
+	var moved := 0
+	for n in models:
+		var a: Dictionary = n.get_meta("anim", {})
+		var skel: Skeleton3D = a.get("skel")
+		var bones: Array = a.get("bones", [])
+		check(skel != null and skel.get_bone_count() == bones.size(),
+			"кости скелета у %s: %d" % [String(n.get_meta("species")), bones.size()])
+		if skel == null:
+			continue
+		for i in range(1, bones.size()):
+			var node := bones[i] as Node3D
+			if node.rotation.length() > 0.001 \
+					and not skel.get_bone_pose_rotation(i).is_equal_approx(Quaternion.IDENTITY):
+				moved += 1
+				break
+	check(moved == models.size(), "анимация двигает кости у всех моделей: %d/%d" % [moved, models.size()])
