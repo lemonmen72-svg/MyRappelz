@@ -17,8 +17,9 @@ var level := 1
 var xp := 0
 var gold := 0
 var inventory := Inventory.new()
-## Питомцы: {"species": String, "name": String, "level": int, "xp": int, "hp": int, "dead": bool}.
-## hp = -1: полное здоровье.
+## Питомцы: {"species": String, "name": String, "level": int, "xp": int, "hp": int, "dead": bool,
+## "mp": int, "jp": int (очки умений), "jp_part": float (накопленная доля JP), "skills": {id умения: уровень},
+## "toggles": {id включённого переключаемого умения: true}} (умения — PetSkills). hp, mp = -1: полный запас.
 var pets: Array[Dictionary] = []
 ## Индекс призванного питомца в pets, -1: никого.
 var active_pet := -1
@@ -69,7 +70,10 @@ func new_character(n: String, race: String, cls: String) -> void:
 func add_pet(species: String, pet_name: String, lvl: int = 1) -> int:
 	if pets.size() >= MAX_PETS:
 		return -1
-	pets.append({"species": species, "name": pet_name, "level": lvl, "xp": 0, "hp": -1, "dead": false})
+	pets.append({
+		"species": species, "name": pet_name, "level": lvl, "xp": 0, "hp": -1, "dead": false,
+		"mp": -1, "jp": PetStats.default_jp(lvl), "jp_part": 0.0, "skills": {}, "toggles": {},
+	})
 	changed.emit()
 	return pets.size() - 1
 
@@ -120,11 +124,42 @@ func from_dict(d: Dictionary) -> void:
 			"species": sp, "name": pet_name,
 			"level": lvl, "xp": int(r.get("xp", 0)),
 			"hp": int(r.get("hp", -1)), "dead": bool(r.get("dead", false)),
+			"mp": int(r.get("mp", -1)),
+			# Старые сохранения без JP: столько, сколько питомец накопил бы к своему уровню
+			"jp": int(r.get("jp", PetStats.default_jp(lvl))),
+			"jp_part": float(r.get("jp_part", 0.0)),
+			"skills": _load_skills(sp, r.get("skills", {})),
+			"toggles": _load_toggles(r.get("toggles", {})),
 		})
 	active_pet = int(d.get("active_pet", -1))
 	if active_pet >= pets.size():
 		active_pet = -1
 	changed.emit()
+
+
+## Изученные умения из сохранения: только известные виду, уровни — целые (JSON хранит числа как float).
+static func _load_skills(species: String, src: Variant) -> Dictionary:
+	var res: Dictionary = {}
+	if not (src is Dictionary):
+		return res
+	var d: Dictionary = src
+	for k in d:
+		var id := String(k)
+		var n := mini(int(d[k]), PetSkills.max_level(id))
+		if n > 0 and PetSkills.has_skill(species, id):
+			res[id] = n
+	return res
+
+
+static func _load_toggles(src: Variant) -> Dictionary:
+	var res: Dictionary = {}
+	if not (src is Dictionary):
+		return res
+	var d: Dictionary = src
+	for k in d:
+		if bool(d[k]):
+			res[String(k)] = true
+	return res
 
 
 ## Сумка из сохранения с прежними id предметов (bear_claw и т. п.) → новые id, количества складываются.

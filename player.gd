@@ -42,6 +42,14 @@ var speed_buff_time := 0.0
 var speed_buff := 0.0
 var guard_time := 0.0
 var guard := 0.0
+## Бонусы от переключаемых умений призванного питомца («Узы …»): доля атаки, защита, HP в секунду.
+## Ставит и снимает питомец (set_pet_aura / clear_pet_aura).
+var aura_atk := 0.0
+var aura_def := 0
+var aura_regen := 0.0
+## Кто поставил бонусы: id объекта питомца (0 — никто).
+var _aura_src := 0
+var _aura_acc := 0.0
 
 var _model: CharacterModel
 var _weapon_kind := ""
@@ -93,7 +101,7 @@ func apply_class() -> void:
 
 
 func cur_atk() -> int:
-	return roundi(float(atk) * (1.0 + atk_buff))
+	return roundi(float(atk) * (1.0 + atk_buff + aura_atk))
 
 
 func cur_speed() -> float:
@@ -107,6 +115,15 @@ func _physics_process(delta: float) -> void:
 
 	if current_target != null and (not is_instance_valid(current_target) or current_target.is_dead):
 		_set_target(null)
+
+	# Восстановление от питомца («Узы зари»), и в бою
+	if aura_regen > 0.0 and hp < max_hp:
+		_aura_acc += delta * aura_regen
+		if _aura_acc >= 1.0:
+			var ah := int(_aura_acc)
+			hp = mini(max_hp, hp + ah)
+			_aura_acc -= ah
+			stats_changed.emit()
 
 	# Регенерация вне боя
 	if regen_delay <= 0.0 and hp < max_hp:
@@ -158,6 +175,21 @@ func _tick_skills(delta: float) -> void:
 			guard = 0.0
 			_update_guard_fx()
 			stats_changed.emit()
+
+
+## Бонусы хозяину от включённых умений питомца src (атака — доля, защита, HP в секунду).
+func set_pet_aura(src: Object, atk_pct: float, def_bonus: int, regen: float) -> void:
+	_aura_src = src.get_instance_id() if src != null else 0
+	aura_atk = atk_pct
+	aura_def = def_bonus
+	aura_regen = regen
+	stats_changed.emit()
+
+
+## Снять бонусы питомца src (если их ставил он: новый питомец мог уже поставить свои).
+func clear_pet_aura(src: Object) -> void:
+	if src != null and _aura_src == src.get_instance_id():
+		set_pet_aura(null, 0.0, 0, 0.0)
 
 
 func clear_buffs() -> void:
@@ -495,7 +527,7 @@ func _set_target(t: Mob) -> void:
 
 
 func take_damage(amount: int, _attacker: Node3D) -> void:
-	amount = maxi(1, amount - int(defense * 0.5))
+	amount = maxi(1, amount - int((defense + aura_def) * 0.5))
 	if guard_time > 0.0:
 		amount = maxi(1, roundi(float(amount) * (1.0 - guard)))
 	hp -= amount
