@@ -15,13 +15,13 @@ uniform sampler2D screen_tex : hint_screen_texture, repeat_disable, filter_linea
 uniform sampler2D screen_tex : hint_screen_texture, repeat_disable, filter_linear_mipmap;
 #endif
 
-uniform float saturation = 1.1;
+uniform float saturation = 1.0;
 uniform float contrast = 1.04;
 uniform vec3 warm_tint = vec3(1.035, 1.0, 0.95);
 uniform vec3 cool_tint = vec3(0.97, 0.99, 1.04);
 uniform float vignette = 0.18;
 uniform float bloom_strength = 0.3;
-uniform float bloom_threshold = 0.72;
+uniform float bloom_threshold = 0.86;
 
 void fragment() {
 	vec2 uv = SCREEN_UV;

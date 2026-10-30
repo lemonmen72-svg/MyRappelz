@@ -112,7 +112,7 @@ static func _build_environment(root: Node3D) -> void:
 	env.fog_density = 0.0045
 	env.fog_sky_affect = 0.0
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.08
+	env.adjustment_saturation = 1.0
 	var we := WorldEnvironment.new()
 	we.environment = env
 	root.add_child(we)

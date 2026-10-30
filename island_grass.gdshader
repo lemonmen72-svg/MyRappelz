@@ -22,7 +22,7 @@ void vertex() {
 	vec3 root = MODEL_MATRIX[3].xyz;
 	float height = length(MODEL_MATRIX[1].xyz);
 	vec3 base = INSTANCE_CUSTOM.rgb;
-	vec3 tip = mix(base * 1.3, tip_color, tip_mix);
+	vec3 tip = mix(base * 1.12, tip_color, tip_mix);
 	v_color = mix(base * 0.62, tip, smoothstep(0.0, 0.95, h));
 
 	float t = TIME * wind_speed + INSTANCE_CUSTOM.a * 6.28;

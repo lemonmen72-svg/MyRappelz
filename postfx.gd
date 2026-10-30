@@ -46,7 +46,7 @@ func apply_quality() -> void:
 	var sh := _shader(bloom)
 	if _mat.shader != sh:
 		_mat.shader = sh
-	_mat.set_shader_parameter("bloom_strength", 0.3 if bloom else 0.0)
+	_mat.set_shader_parameter("bloom_strength", 0.2 if bloom else 0.0)
 
 
 ## Полный шейдер или облегчённый (тот же код с #define POSTFX_LITE вместо строки-метки).
