@@ -31,7 +31,7 @@ const PRESETS := [
 	{
 		"grass_density": 0.65, "grass_distance": 38.0, "grass_blades": 5, "flower_density": 0.75,
 		"detail_distance": 65.0, "tree_distance": 125.0,
-		"shadows": true, "shadow_distance": 32.0, "shadow_splits": false, "shadow_atlas": 2048,
+		"shadows": true, "shadow_distance": 28.0, "shadow_splits": false, "shadow_atlas": 1024,
 		"small_shadows": false, "postfx": false, "bloom": false, "outlines": true,
 		"render_scale": 0.75, "rich_shaders": false,
 	},
@@ -44,7 +44,13 @@ const PRESETS := [
 	},
 ]
 
+## Ограничение частоты кадров. Без него экраны 90–120 Гц рисуют в 1.5–2 раза больше кадров,
+## чем нужно, и телефон греется. 30 — меньше всего греется и дольше держит батарея.
+const FPS_OPTIONS := [30, 45, 60]
+const DEFAULT_FPS := 60
+
 static var _level := -1
+static var _fps := -1
 
 
 ## Текущий пресет (LOW, MEDIUM, HIGH).
@@ -60,11 +66,41 @@ static func level() -> int:
 ## Выбирает пресет; save — записать в user://settings.cfg (другие секции файла сохраняются).
 static func set_level(l: int, save: bool = true) -> void:
 	_level = clampi(l, LOW, HIGH)
-	if not save:
+	if save:
+		_save("quality", _level)
+
+
+## Предел кадров в секунду (одно из FPS_OPTIONS), по умолчанию 60.
+static func fps_limit() -> int:
+	if _fps < 0:
+		_fps = DEFAULT_FPS
+		var cf := ConfigFile.new()
+		if cf.load(PATH) == OK:
+			_fps = int(cf.get_value("graphics", "fps", DEFAULT_FPS))
+		if not FPS_OPTIONS.has(_fps):
+			_fps = DEFAULT_FPS
+	return _fps
+
+
+static func set_fps_limit(v: int, save: bool = true) -> void:
+	_fps = v if FPS_OPTIONS.has(v) else DEFAULT_FPS
+	if save:
+		_save("fps", _fps)
+	apply_fps()
+
+
+## Включить предел кадров (в headless-тестах не ограничиваем — они идут быстрее реального времени).
+static func apply_fps() -> void:
+	if DisplayServer.get_name() == "headless":
 		return
+	Engine.max_fps = fps_limit()
+
+
+## Записать ключ секции [graphics] (другие ключи и секции файла сохраняются).
+static func _save(key: String, value: Variant) -> void:
 	var cf := ConfigFile.new()
 	cf.load(PATH)  # нет файла — начнём с пустого
-	cf.set_value("graphics", "quality", _level)
+	cf.set_value("graphics", key, value)
 	var err := cf.save(PATH)
 	if err != OK:
 		push_warning("Не удалось сохранить настройки графики: %d" % err)
@@ -73,6 +109,7 @@ static func set_level(l: int, save: bool = true) -> void:
 ## Перечитать выбор из файла при следующем запросе.
 static func reload() -> void:
 	_level = -1
+	_fps = -1
 
 
 static func level_name(l: int = -1) -> String:
@@ -150,6 +187,7 @@ static func apply(tree: SceneTree) -> void:
 		return
 	apply_lights(tree.root)
 	apply_resolution(tree)
+	apply_fps()
 	if IslandWorld.current != null and IslandWorld.current.terrain_material != null:
 		IslandWorld.current.terrain_material.set_shader_parameter("rich", rich_shaders())
 	if IslandWater.material != null:

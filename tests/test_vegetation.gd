@@ -80,6 +80,12 @@ func run_step() -> void:
 				"качество сохранено в settings.cfg")
 			Quality.reload()
 			check(Quality.level() == Quality.HIGH, "качество прочитано из settings.cfg")
+			Quality.set_fps_limit(30)
+			Quality.reload()
+			check(Quality.fps_limit() == 30, "предел кадров сохранён и прочитан")
+			check(Quality.level() == Quality.HIGH, "предел кадров не сбросил качество")
+			Quality.set_fps_limit(999, false)
+			check(Quality.fps_limit() == Quality.DEFAULT_FPS, "неверный предел кадров — по умолчанию")
 			Quality.set_level(Quality.MEDIUM, false)
 			Quality.apply(get_tree())
 			check(sun.shadow_enabled and not _fx.visible, "«Среднее»: тени без постобработки (экономия на телефоне)")
@@ -96,6 +102,7 @@ func run_step() -> void:
 			main.hud.close_window()
 			# Вернуть настройки как было
 			Quality.set_level(_old_level, _had_cfg)
+			Quality.set_fps_limit(Quality.DEFAULT_FPS, _had_cfg)
 			if not _had_cfg:
 				DirAccess.remove_absolute(ProjectSettings.globalize_path(Quality.PATH))
 			ok_done()
