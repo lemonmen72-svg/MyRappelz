@@ -17,6 +17,9 @@ var _create: Node = null
 var _top: Camera3D = null
 var _row: Node3D = null
 var _frames := 0
+## Умения Бродяги для кадров окна героя [id, уровень].
+const HERO_SKILLS := [["blade_mastery", 2], ["charge_stab", 2], ["dark_strike", 1], ["evasion_expert", 2],
+	["concentration", 1], ["crossbow_mastery", 1], ["dual_shot", 1]]
 
 
 func race_class() -> Array:
@@ -196,7 +199,81 @@ func run_step() -> void:
 		20:
 			shot("18_creature_skills")
 			main.hud.close_window()
+			# Бродяга: окно героя (вкладка «Герой» и древо «Мечи и кинжалы»)
+			main.pets.recall()
+			game.race_id = "dark_elf"
+			game.class_id = "assassin"
+			game.level = 7
+			player.apply_class()
+			game.hero["jp"] = 40
+			for e in HERO_SKILLS:
+				for k in int(e[1]):
+					HeroSkills.learn(game.hero, "assassin", game.level, String(e[0]))
+			player.refresh_skills()
+			player.set_toggle("concentration", true)
+			main.hero_window.open("hero")
+			wait = 40
+			step = 21
+		21:
+			shot("19_hero_window")
+			main.hero_window.selected = "dark_strike"
+			main.hero_window.open("blades")
+			wait = 10
+			step = 22
+		22:
+			shot("20_hero_tree")
+			main.hero_window.open("crossbow")
+			wait = 10
+			step = 23
+		23:
+			shot("21_hero_tree_crossbow")
+			main.hud.close_window()
+			# Герой крупно: арбалет на изготовку, выстрел, парные мечи, парные кинжалы
+			player.equip("crossbow_starter")
+			_front_camera()
+			wait = 40
+			step = 24
+		24:
+			shot("22_hero_crossbow")
+			player._model.play_attack()
+			wait = 5
+			step = 25
+		25:
+			shot("23_hero_crossbow_shot")
+			player.equip("dual_swords_starter")
+			wait = 40
+			step = 26
+		26:
+			shot("24_hero_dual_swords")
+			player._model.play_attack()
+			wait = 10
+			step = 27
+		27:
+			shot("25_hero_dual_attack")
+			player.equip("daggers_starter")
+			wait = 40
+			step = 28
+		28:
+			shot("26_hero_daggers")
+			_top.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
 			ok_done()
+
+
+## Камера спереди на героя (как кадры 09–11), HUD скрыт.
+func _front_camera() -> void:
+	var player: Player = main.player
+	_top = Camera3D.new()
+	main.add_child(_top)
+	var front := player._model.global_transform.basis * Vector3(0, 0, -1)
+	front.y = 0.0
+	# Чуть сбоку: видно обе руки и оружие
+	var side := front.normalized().rotated(Vector3.UP, 0.45)
+	_top.global_position = player.global_position + side * 2.6 + Vector3(0, 1.35, 0)
+	_top.look_at(player.global_position + Vector3(0, 1.0, 0))
+	_top.current = true
+	main.hud.visible = false
 
 
 ## Пантера, черепаха и фазан в ряд перед камерой (вид три четверти), игрок и питомец скрыты.

@@ -1,8 +1,8 @@
 class_name HUD
 extends CanvasLayer
 ## Интерфейс: плавающий джойстик (левая нижняя часть экрана), круглые кнопки действий справа,
-## панели игрока, питомца и цели, окна (питомцы, сумка, торговец).
-## На ПК: WASD/стрелки, Пробел = атака, 1/2 = умения, T = приручить, Q = зелье,
+## панели игрока (HP, MP, опыт), питомца и цели, окна (герой, питомцы, сумка, торговец).
+## На ПК: WASD/стрелки, Пробел = атака, 1–4 = умения, T = приручить, Q = зелье, K = окно героя,
 ## P = питомцы, C = окно существа, I = сумка, E = торговец, F = питомец атакует, G = питомец за мной, O = настройки.
 
 ## Нажатие кнопки действия (касание, клавиша или кнопка меню).
@@ -14,14 +14,16 @@ const JOY_TOP := 230.0
 ## Вращение камеры не начинается выше этой линии (кнопки меню справа вверху).
 const CAM_TOP := 90.0
 const KEYS := {
-	KEY_SPACE: "attack", KEY_1: "skill1", KEY_2: "skill2", KEY_T: "tame", KEY_Q: "potion",
+	KEY_SPACE: "attack", KEY_1: "skill1", KEY_2: "skill2", KEY_3: "skill3", KEY_4: "skill4", KEY_T: "tame",
+	KEY_Q: "potion", KEY_K: "hero_window",
 	KEY_P: "pets_window", KEY_I: "bag_window", KEY_E: "shop", KEY_F: "pet_attack", KEY_G: "pet_follow", KEY_O: "settings_window",
 	KEY_C: "creature_window",
 }
 
 var move_vec := Vector2.ZERO
 
-## id -> {"panel": Panel, "label": Label, "offset": Vector2, "r": float, "hold": bool, "touch": int}
+## id -> {"panel": Panel, "label": Label, "offset": Vector2, "r": float, "hold": bool, "touch": int,
+## "color": Color (заливка), "blocked": bool (не подходит оружие — затемнена)}
 var _buttons := {}
 var _joy_idx := -1
 ## Касания камеры (индекс → последняя позиция): один палец в правой половине экрана вне кнопок
@@ -37,6 +39,7 @@ var _target: Node3D = null
 var _joy_base: Panel
 var _joy_knob: Panel
 var _hp_bar: ProgressBar
+var _mp_bar: ProgressBar
 var _xp_bar: ProgressBar
 var _stats_label: Label
 var _pet_box: Control
@@ -56,11 +59,12 @@ func _ready() -> void:
 	_joy_knob = _circle(45.0, Color(1, 1, 1, 0.35))
 
 	_hp_bar = _bar(self, Vector2(20, 20), Vector2(340, 26), Color(0.85, 0.2, 0.2))
-	_xp_bar = _bar(self, Vector2(20, 50), Vector2(340, 10), Color(0.9, 0.8, 0.2))
-	_stats_label = _label(self, Vector2(20, 64), 22)
+	_mp_bar = _bar(self, Vector2(20, 49), Vector2(340, 11), Color(0.35, 0.5, 1.0))
+	_xp_bar = _bar(self, Vector2(20, 63), Vector2(340, 7), Color(0.9, 0.8, 0.2))
+	_stats_label = _label(self, Vector2(20, 72), 22)
 
 	_pet_box = Control.new()
-	_pet_box.position = Vector2(20, 100)
+	_pet_box.position = Vector2(20, 108)
 	_pet_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_pet_box)
 	_pet_label = _label(_pet_box, Vector2(0, 0), 20)
@@ -90,6 +94,7 @@ func _ready() -> void:
 	_menu = HBoxContainer.new()
 	_menu.add_theme_constant_override("separation", 10)
 	add_child(_menu)
+	_menu.add_child(_menu_button("Герой", "hero_window"))
 	_menu.add_child(_menu_button("Питомцы", "pets_window"))
 	_menu.add_child(_menu_button("Сумка", "bag_window"))
 	_menu.add_child(_menu_button("Настройки", "settings_window"))
@@ -115,7 +120,8 @@ func add_button(id: String, text: String, offset: Vector2, radius: float, color:
 	l.add_theme_constant_override("outline_size", 5)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(l)
-	_buttons[id] = {"panel": p, "label": l, "offset": offset, "r": radius, "hold": hold, "touch": -1}
+	_buttons[id] = {"panel": p, "label": l, "offset": offset, "r": radius, "hold": hold, "touch": -1,
+		"color": color, "blocked": false}
 	_layout()
 
 
@@ -129,10 +135,51 @@ func set_button_text(id: String, text: String) -> void:
 		_buttons[id]["label"].text = text
 
 
-## frac > 0: кнопка на перезарядке (затемнена).
+## frac > 0: кнопка на перезарядке (затемнена). Кнопка с неподходящим оружием (set_blocked) — темнее всегда.
 func set_cooldown(id: String, frac: float) -> void:
 	if _buttons.has(id):
-		_buttons[id]["panel"].modulate = Color(1, 1, 1, 0.35 if frac > 0.0 else 1.0)
+		var a := 0.35 if frac > 0.0 else 1.0
+		if bool(_buttons[id]["blocked"]):
+			a = 0.28
+		_buttons[id]["panel"].modulate = Color(1, 1, 1, a)
+
+
+## Кнопка недоступна (например, умение не подходит к оружию): затемнена, нажатие всё равно шлёт действие
+## (модуль объясняет, почему нельзя).
+func set_blocked(id: String, blocked: bool) -> void:
+	if _buttons.has(id):
+		_buttons[id]["blocked"] = blocked
+
+
+func is_blocked(id: String) -> bool:
+	return _buttons.has(id) and bool(_buttons[id]["blocked"])
+
+
+## Цвет заливки круглой кнопки (включённое переключаемое умение и т. п.); null-цвет не бывает — передайте исходный.
+func set_button_color(id: String, c: Color) -> void:
+	if not _buttons.has(id):
+		return
+	var p: Panel = _buttons[id]["panel"]
+	var sb := p.get_theme_stylebox("panel") as StyleBoxFlat
+	if sb != null:
+		sb.bg_color = c
+
+
+## Исходный цвет кнопки (как при add_button).
+func button_color(id: String) -> Color:
+	if _buttons.has(id):
+		return _buttons[id]["color"]
+	return Color.WHITE
+
+
+func button_text(id: String) -> String:
+	if _buttons.has(id):
+		return (_buttons[id]["label"] as Label).text
+	return ""
+
+
+func is_button_visible(id: String) -> bool:
+	return _buttons.has(id) and (_buttons[id]["panel"] as Panel).visible
 
 
 func is_held(id: String) -> bool:
@@ -213,10 +260,15 @@ func is_window_open() -> bool:
 func update_player(p: Player) -> void:
 	_hp_bar.max_value = p.max_hp
 	_hp_bar.value = p.hp
+	_mp_bar.visible = p.max_mp > 0
+	if _mp_bar.visible:
+		_mp_bar.max_value = p.max_mp
+		_mp_bar.value = p.mp
 	_xp_bar.max_value = Game.xp_to_next(Game.level)
 	_xp_bar.value = Game.xp
-	_stats_label.text = "%s  Ур. %d   HP %d/%d   Золото: %d" % [
-		Game.char_name, Game.level, p.hp, p.max_hp, Game.gold]
+	var mp_text := ("   MP %d/%d" % [p.mp, p.max_mp]) if p.max_mp > 0 else ""
+	_stats_label.text = "%s  Ур. %d   HP %d/%d%s   Золото: %d" % [
+		Game.char_name, Game.level, p.hp, p.max_hp, mp_text, Game.gold]
 
 
 ## pet: узел питомца с полями pet_name, level, hp, max_hp и (необязательно) mp, max_mp, или null.
@@ -313,7 +365,8 @@ func _layout() -> void:
 		p.position = _view - b["offset"] - p.size / 2.0
 	_msg_label.position = Vector2(0, 190)
 	_msg_label.size = Vector2(_view.x, 40)
-	_target_box.position = Vector2((_view.x - 320.0) / 2.0, 14)
+	# Чуть левее центра: справа вверху кнопки меню
+	_target_box.position = Vector2((_view.x - 320.0) / 2.0 - 50.0, 14)
 	_menu.position = Vector2(_view.x - _menu.get_combined_minimum_size().x - 20.0, 16)
 	if _window != null and is_instance_valid(_window):
 		_window.position = (_view - _window.size) / 2.0

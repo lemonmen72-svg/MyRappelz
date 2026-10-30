@@ -1,7 +1,8 @@
 extends Node3D
 ## Главная сцена: создание персонажа (если нет сохранения), затем мир (тренировочный остров
 ## из конфига world/training_island.json), игрок в деревне своей расы, звери по зонам,
-## модули (питомцы, приручение, предметы) и интерфейс.
+## модули (питомцы, приручение, предметы, окно героя) и интерфейс. Кнопки умений skill1…skill4 показывают
+## умения, назначенные в окне героя (Game.hero.slots); неподходящие оружию — затемнены с подсказкой.
 
 const RESPAWN_TIME := 20.0
 const AUTOSAVE_TIME := 30.0
@@ -17,6 +18,15 @@ const CAM_PITCH_MIN := deg_to_rad(18.0)
 const CAM_PITCH_MAX := deg_to_rad(75.0)
 ## Чувствительность вращения камеры, радиан на пиксель.
 const CAM_SENS := 0.006
+## Кнопки умений: центр от правого нижнего угла, радиус, цвет.
+const SKILL_BUTTONS := [
+	["skill1", Vector2(330, 110), 55.0, Color(0.9, 0.55, 0.15, 0.45)],
+	["skill2", Vector2(310, 270), 55.0, Color(0.6, 0.3, 0.9, 0.45)],
+	["skill3", Vector2(440, 330), 50.0, Color(0.85, 0.3, 0.45, 0.45)],
+	["skill4", Vector2(270, 400), 50.0, Color(0.25, 0.6, 0.8, 0.45)],
+]
+## Цвет кнопки включённого переключаемого умения.
+const TOGGLE_ON_COLOR := Color(0.3, 0.85, 0.45, 0.6)
 
 var player: Player
 var hud: HUD
@@ -25,6 +35,8 @@ var pets: PetManager
 var taming: Taming
 var economy: Economy
 var world: IslandWorld
+## Окно героя (характеристики, оружие, древо умений).
+var hero_window: CharacterWindow
 ## Поворот камеры вокруг игрока (0 — смотрим на север) и наклон над горизонтом.
 var cam_yaw := 0.0
 var cam_pitch := atan2(9.0, 8.5)
@@ -62,7 +74,10 @@ func _start_world() -> void:
 	for i in _slots.size():
 		_spawn_slot(i)
 	hud.update_player(player)
-	Game.changed.connect(func(): hud.update_player(player))
+	refresh_skill_buttons()
+	Game.changed.connect(func():
+		hud.update_player(player)
+		refresh_skill_buttons())
 	_started = true
 	Game.save_game()
 
@@ -89,9 +104,8 @@ func _build_hud() -> void:
 	hud.action.connect(_on_action)
 	# Центры кнопок отсчитываются от правого нижнего угла экрана
 	hud.add_button("attack", "Атака", Vector2(170, 180), 85.0, Color(0.9, 0.2, 0.2, 0.45), true)
-	var skills: Array = ClassData.cls(Game.class_id)["skills"]
-	hud.add_button("skill1", ClassData.SKILLS[skills[0]]["name"], Vector2(330, 110), 55.0, Color(0.9, 0.55, 0.15, 0.45))
-	hud.add_button("skill2", ClassData.SKILLS[skills[1]]["name"], Vector2(310, 270), 55.0, Color(0.6, 0.3, 0.9, 0.45))
+	for b in SKILL_BUTTONS:
+		hud.add_button(String(b[0]), "", b[1], float(b[2]), b[3])
 	hud.add_button("tame", "Приручить", Vector2(130, 345), 48.0, Color(0.2, 0.7, 0.3, 0.45))
 	hud.add_button("potion", "Зелье", Vector2(470, 80), 45.0, Color(0.85, 0.15, 0.3, 0.45))
 	hud.add_button("shop", "Торговец", Vector2(480, 210), 50.0, Color(0.85, 0.7, 0.2, 0.45))
@@ -102,7 +116,9 @@ func _build_player() -> void:
 	player = Player.new()
 	player.position = world.spawn_point(Game.race_id)
 	add_child(player)
-	player.stats_changed.connect(func(): hud.update_player(player))
+	player.stats_changed.connect(func():
+		hud.update_player(player)
+		refresh_skill_buttons())
 	player.message.connect(func(t: String): hud.show_message(t))
 	player.target_changed.connect(func(t: Node3D): hud.set_target(t))
 
@@ -123,6 +139,10 @@ func _build_modules() -> void:
 	pets = PetManager.new()
 	add_child(pets)
 	pets.setup(self)
+	hero_window = CharacterWindow.new()
+	hero_window.name = "CharacterWindow"
+	add_child(hero_window)
+	hero_window.setup(self)
 
 
 func _build_slots() -> void:
@@ -151,8 +171,13 @@ func _on_action(id: String) -> void:
 	match id:
 		"attack":
 			pass  # удержание обрабатывается в _process
-		"skill1", "skill2":
+		"skill1", "skill2", "skill3", "skill4":
 			player.use_skill(id)
+		"hero_window":
+			if hero_window.is_open():
+				hud.close_window()
+			else:
+				hero_window.open()
 		"settings_window":
 			SettingsMenu.open(hud)
 		_:
@@ -181,8 +206,9 @@ func _process(delta: float) -> void:
 	player.move_input = Vector2(dir.x, dir.z)
 	if hud.is_held("attack"):
 		player.try_attack()
-	hud.set_cooldown("skill1", player.cooldown_frac("skill1"))
-	hud.set_cooldown("skill2", player.cooldown_frac("skill2"))
+	for b in SKILL_BUTTONS:
+		var bid := String(b[0])
+		hud.set_cooldown(bid, player.cooldown_frac(bid))
 
 	var want := player.global_position + _cam_offset()
 	# Не прятать камеру в холм
@@ -198,6 +224,28 @@ func _process(delta: float) -> void:
 	if _autosave >= AUTOSAVE_TIME:
 		_autosave = 0.0
 		Game.save_game()
+
+
+## Подписи, видимость и вид кнопок умений по назначенным умениям (Game.hero.slots) и надетому оружию:
+## пустая кнопка скрыта, неподходящая оружию — затемнена с подсказкой, включённое переключаемое — зелёная.
+func refresh_skill_buttons() -> void:
+	if hud == null or player == null:
+		return
+	for b in SKILL_BUTTONS:
+		var bid := String(b[0])
+		var sid := player.skill_id(bid)
+		hud.set_button_visible(bid, sid != "")
+		if sid == "":
+			continue
+		var sk := HeroSkills.get_skill(sid)
+		var text := String(sk.get("name", sid))
+		var why := player.slot_block(bid)
+		hud.set_blocked(bid, why != "")
+		if why != "":
+			text += "\n(" + why.to_lower() + ")"
+		var on := HeroSkills.kind(sid) == "toggle" and HeroSkills.toggle_on(Game.hero, sid)
+		hud.set_button_color(bid, TOGGLE_ON_COLOR if on else hud.button_color(bid))
+		hud.set_button_text(bid, text)
 
 
 func _cam_offset() -> Vector3:

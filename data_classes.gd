@@ -30,7 +30,10 @@ const RACES := {
 
 ## attack: "melee" | "ranged" | "magic". range: дальность атаки, м. cd: перезарядка атаки, с.
 ## hp/atk/def: на 1 уровне, *_lvl: прибавка за уровень. crit: шанс крита 0..1.
-## Внешний вид: color — основной цвет одежды, accent — акцент (плащ, пояс, щит, свечение), weapon — оружие.
+## Внешний вид: color — основной цвет одежды, accent — акцент (плащ, пояс, щит, свечение), weapon — оружие
+## (у Бродяги — вид оружия по умолчанию: оно сменное, см. ItemData.STARTER_WEAPONS; atk — без оружия).
+## mp/mp_lvl: запас MP (у кого нет — умения без MP), eva: шанс уклониться от удара зверя 0..1.
+## skills: умения класса; у Бродяги это стартовые умения древа HeroSkills (остальные изучаются за JP).
 const CLASSES := {
 	"warrior": {
 		"name": "Воин", "race": "human", "weapon": "axe",
@@ -65,11 +68,12 @@ const CLASSES := {
 		"skills": ["holy_bolt", "heal"],
 	},
 	"assassin": {
-		"name": "Бродяга", "race": "dark_elf", "weapon": "sword",
-		"desc": "Странствующая мечница: быстрые удары клинком, частые криты.",
+		"name": "Бродяга", "race": "dark_elf", "weapon": "dual_swords",
+		"desc": "Странница, что пробует любое оружие: парные кинжалы, парные мечи или арбалет. Уклоняется и часто бьёт критом.",
 		"attack": "melee", "range": 2.4, "cd": 0.55,
-		"hp": 95, "hp_lvl": 17, "atk": 9, "atk_lvl": 2.5, "def": 2, "def_lvl": 0.7,
+		"hp": 95, "hp_lvl": 17, "atk": 7, "atk_lvl": 2.5, "def": 2, "def_lvl": 0.7,
 		"speed": 7.2, "crit": 0.2, "color": Color(0.35, 0.2, 0.45), "accent": Color(0.82, 0.16, 0.26),
+		"mp": 30, "mp_lvl": 6, "eva": 0.05,
 		"skills": ["backstab", "shadow_step"],
 	},
 	"warlock": {
@@ -133,12 +137,14 @@ static func attack_name(kind: String) -> String:
 	return String(ATTACK_NAMES.get(kind, kind))
 
 
-## Характеристики класса на уровне: max_hp, atk, def, speed, range, cd, crit, attack.
+## Характеристики класса на уровне: max_hp, max_mp, atk, def, speed, range, cd, crit, eva, attack.
 static func stats_for(class_id: String, level: int) -> Dictionary:
 	var c := cls(class_id)
 	var l := level - 1
 	return {
 		"max_hp": int(c["hp"] + c["hp_lvl"] * l),
+		"max_mp": int(float(c.get("mp", 0)) + float(c.get("mp_lvl", 0)) * l),
+		"eva": float(c.get("eva", 0.0)),
 		"atk": int(c["atk"] + c["atk_lvl"] * l),
 		"def": int(c["def"] + c["def_lvl"] * l),
 		"speed": float(c["speed"]),

@@ -3,8 +3,8 @@ extends "res://tests/test_base.gd"
 ## статы по уровням и стадиям (рост, скачок на эволюции, обмен статов под роль), баланс против прежних формул,
 ## данные умений и бюджет JP, изучение (уровень, стадия, пререквизит, JP), пассивки меняют характеристики,
 ## JP за опыт, активные умения в бою (MP, перезарядка, урон, оглушение, замедление, морок), переключаемые
-## (MP при включении и поддержка, бонус хозяину, выключение без MP), окно существа (обе вкладки, кнопки),
-## сохранение и загрузка умений, старые сохранения.
+## (MP при включении и поддержка, бонус хозяину, выключение без MP), окно существа (обе вкладки, древо умений
+## SkillTree: ярусы, пререквизиты, значки, карточка с кнопками), сохранение и загрузка умений, старые сохранения.
 
 ## Прежние формулы PetData (до системы статов): [HP, HP за ур., атака, атака за ур.] и множители стадий.
 const OLD := {
@@ -197,19 +197,32 @@ func run_step() -> void:
 			check(cw.buttons.has("tab_stats") and cw.buttons.has("tab_skills") and cw.buttons.has("back"), "кнопки вкладок")
 			press_cw("tab_skills")
 			check(cw.tab == "skills" and cw.is_open(), "вкладка «Умения»")
+			_check_tree(cw)
 			t = _window_text()
-			for w in ["Двойной росчерк", "Сумрачный разрыв", "Узы тени", "Стадия 2", "Стадия 3", "переключаемое",
-					"пассивное", "активное", "JP"]:
-				check(t.contains(w), "во вкладке «Умения» есть «%s»" % w)
+			check(t.contains("JP"), "во вкладке «Умения» есть очки умений")
+			press_cw("skill_dusk_rupture")
+			t = _window_text()
+			for w in ["Сумрачный разрыв", "активное", "Двойной росчерк"]:
+				check(t.contains(w), "карточка «Сумрачного разрыва»: есть «%s»" % w)
+			press_cw("skill_shadow_bond")
+			check(_window_text().contains("переключаемое"), "карточка «Уз тени»: переключаемое")
+			press_cw("skill_inner_fire")
+			check(_window_text().contains("пассивное"), "карточка «Внутреннего огня»: пассивное")
+			press_cw("skill_shadow_squall")
+			check(_window_text().contains("стадия 2"), "«Теневой шквал» — со 2-й стадии")
 			var locked: Button = cw.buttons.get("learn_shadow_squall")
 			check(locked != null and locked.disabled, "умение 2-й стадии недоступно (кнопка «+» выключена)")
+			press_cw("skill_shadow_rend")
 			var full: Button = cw.buttons.get("learn_shadow_rend")
 			check(full != null and full.disabled, "«Двойной росчерк» на пределе стадии")
 			var rec: Dictionary = game.pets[0]
 			var jp0 := int(rec["jp"])
+			press_cw("skill_calm_mind")
+			check(cw.selected == "calm_mind", "касание значка выбрало «Тихий разум»")
 			press_cw("learn_calm_mind")
 			check(PetSkills.skill_level(rec, "calm_mind") == 1 and int(rec["jp"]) == jp0 - 1, "«+» изучил «Тихий разум»")
-			check(cw.is_open() and cw.tab == "skills", "окно перестроено на той же вкладке")
+			check(cw.is_open() and cw.tab == "skills" and cw.selected == "calm_mind", "окно перестроено на той же вкладке")
+			press_cw("skill_shadow_bond")
 			press_cw("toggle_shadow_bond")
 			check(not PetSkills.toggle_on(rec, "shadow_bond"), "кнопка «Выкл» выключила «Узы тени»")
 			press_cw("toggle_shadow_bond")
@@ -222,15 +235,16 @@ func run_step() -> void:
 			check(_window_text().contains("отдыхает"), "черепаха отдыхает")
 			press_cw("tab_skills")
 			var rt: Dictionary = game.pets[1]
+			press_cw("skill_provoke")
 			press_cw("learn_provoke")
 			check(PetSkills.skill_level(rt, "provoke") == 1, "черепаха выучила «Дерзкий вызов» в окне")
 			press_cw("toggle_provoke")
 			check(PetSkills.toggle_on(rt, "provoke"), "у не призванного питомца переключаемое отмечено включённым")
-			check(_window_text().contains("Таран"), "у черепахи свои умения: «Таран»")
+			check(cw.buttons.has("skill_ram") and not cw.buttons.has("skill_shadow_rend"), "у черепахи свои умения: «Таран»")
 			for i in [2, 3]:
 				check(pm.open_creature(i, "stats") and cw.is_open(), "окно существа: питомец %d, «Существо»" % i)
 				check(pm.open_creature(i, "skills") and cw.is_open(), "окно существа: питомец %d, «Умения»" % i)
-			check(_window_text().contains("Свирепый натиск"), "у кабана — активное умение роли")
+			check(cw.buttons.has("skill_fierce_rush") and cw.tree.icons.size() == 4, "у кабана — 4 умения, есть «Свирепый натиск»")
 			main.hud.close_window()
 			wait = 2
 			step = 7
@@ -408,6 +422,54 @@ func _check_skill_data() -> void:
 		+ PetSkills.effect_text("shadow_rend", 1))
 	check(PetSkills.effect_text("shadow_rend", 15).contains("200%"), "на 15 ур. — по 200%")
 	check(PetSkills.mp_cost("shadow_rend", 1) == 5, "MP из вики × 0.1: 54 → 5")
+
+
+## Древо умений пантеры: значок на каждое умение, ярусы помещаются, сверху вниз по уровню, пререквизиты выше,
+## значки из assets/icons/pets/<вид>/<id>.png или кружок с буквой, подсветка доступных.
+func _check_tree(cw: CreatureWindow) -> void:
+	var tr := cw.tree
+	check(tr != null and is_instance_valid(tr), "древо умений построено")
+	if tr == null:
+		return
+	var ids := PetSkills.list_for("panther")
+	check(tr.icons.size() == ids.size(), "древо: значок на каждое умение (%d)" % tr.icons.size())
+	var max_rows := int(floor(CreatureWindow.TREE_SIZE.y / SkillTree.ROW_MIN))
+	check(tr.rows.size() >= 3 and tr.rows.size() <= max_rows, "ярусов %d — помещаются (до %d)" % [tr.rows.size(), max_rows])
+	check(tr.icon_size >= SkillTree.ICON_MIN, "значки не мельче %d px: %.0f" % [int(SkillTree.ICON_MIN), tr.icon_size])
+	check(tr.row_of("inner_fire") == 0 and tr.row_of("inner_fire") < tr.row_of("shadow_bond")
+		and tr.row_of("shadow_bond") < tr.row_of("midnight_vortex"), "ярусы сверху вниз по требуемому уровню")
+	check(tr.row_of("shadow_rend") < tr.row_of("dusk_rupture") and tr.row_of("shadow_squall") < tr.row_of("midnight_vortex"),
+		"пререквизит выше умения")
+	check(tr.icon_center("dusk_rupture").y > tr.icon_center("shadow_rend").y, "линия пререквизита идёт сверху вниз")
+	var inside := true
+	for id in tr.icons:
+		var b: Button = tr.icons[id]
+		if b.position.x < 0.0 or b.position.y < 0.0 or b.position.x + b.size.x > tr.size.x + 1.0 \
+				or b.position.y + b.size.y > tr.size.y + 1.0:
+			inside = false
+	check(inside, "все значки внутри древа %s" % tr.size)
+	check(CreatureWindow.icon_path("panther", "inner_fire") == "res://assets/icons/pets/panther/inner_fire.png",
+		"значок питомца: assets/icons/pets/<вид>/<id>.png")
+	var b0: Button = tr.icons["inner_fire"]
+	var tex := SkillTree.load_icon(CreatureWindow.icon_path("panther", "inner_fire"))
+	if tex != null:
+		check(not b0.find_children("*", "TextureRect", false, false).is_empty(), "значок из файла показан")
+	else:
+		check(not b0.find_children("*", "Label", false, false).is_empty(), "файла значка нет — кружок с буквой")
+	# Доступные к изучению подсвечены (тень у рамки), недоступные — затемнены
+	var rec: Dictionary = game.pets[0]
+	var lit := 0
+	var dim := 0
+	for id in tr.icons:
+		var b: Button = tr.icons[id]
+		var sb := b.get_theme_stylebox("normal") as StyleBoxFlat
+		var can := PetSkills.learn_block(rec, String(id)) == ""
+		if can and sb != null and sb.shadow_size > 0:
+			lit += 1
+		if PetSkills.skill_level(rec, String(id)) == 0 and not can and b.modulate.r < 0.9:
+			dim += 1
+	check(lit > 0, "доступные к изучению подсвечены: %d" % lit)
+	check(dim > 0, "недоступные затемнены: %d" % dim)
 
 
 # ---------- Помощники ----------
