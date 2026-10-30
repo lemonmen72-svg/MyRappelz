@@ -227,8 +227,10 @@ func run_step() -> void:
 			win.refresh()
 			_press("good_crossbow_heavy")
 			gold = game.gold
+			# Тяжёлый арбалет мог остаться в сумке с проверки карточек выше — сравниваем количество
+			var heavy := inv.count("crossbow_heavy")
 			_press("act_buy")
-			check(game.gold == gold and not inv.has("crossbow_heavy"), "в полную сумку не купить")
+			check(game.gold == gold and inv.count("crossbow_heavy") == heavy, "в полную сумку не купить")
 			check(last_hud_text() == "Сумка полна", "сообщение «Сумка полна»: %s" % last_hud_text())
 			main.hud.close_window()
 			# Добыча при полной сумке остаётся лежать
