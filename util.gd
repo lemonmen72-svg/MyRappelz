@@ -103,7 +103,7 @@ static func toonify_mesh(mi: MeshInstance3D) -> void:
 	toon(m)
 	var solid := m.shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED \
 		and m.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED
-	if solid and not mi.has_meta("no_outline") and m.next_pass == null:
+	if solid and Quality.outlines() and not mi.has_meta("no_outline") and m.next_pass == null:
 		m.next_pass = outline_mat(m.albedo_color)
 
 

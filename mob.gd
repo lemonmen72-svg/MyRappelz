@@ -8,6 +8,8 @@ extends CharacterBody3D
 signal gone(mob: Mob, killed: bool)
 
 ## Удар по площади каменного стража: перезарядка, замах, радиус, множитель атаки.
+## Дальше этого расстояния от игрока зверь «спит»: не думает, не анимируется и не рисуется.
+const SLEEP_DIST := 55.0
 const SLAM_CD := 8.0
 const SLAM_WINDUP := 0.9
 const SLAM_RADIUS := 4.5
@@ -53,6 +55,8 @@ var _mark: Node3D = null
 var _mark_gem: Node3D = null
 var _slam_cd := 4.0
 var _slam_windup := 0.0
+var _asleep := false
+var _sleep_check := 0.0
 
 
 ## lvl > 0: уровень из зоны острова (характеристики и опыт масштабируются от базового уровня вида).
@@ -117,8 +121,27 @@ func _target_gone() -> bool:
 	return false
 
 
+## Раз в 0.5 с: далеко ли игрок. Зверь в погоне или по пути домой не засыпает.
+func _update_sleep(delta: float) -> void:
+	_sleep_check -= delta
+	if _sleep_check > 0.0:
+		return
+	_sleep_check = 0.5
+	var far := false
+	if target == null and not returning and not tame_marked:
+		var p := get_tree().get_first_node_in_group("player") as Node3D
+		if p != null:
+			far = global_position.distance_squared_to(p.global_position) > SLEEP_DIST * SLEEP_DIST
+	if far != _asleep:
+		_asleep = far
+		visible = not far
+
+
 func _process(delta: float) -> void:
 	if is_dead:
+		return
+	_update_sleep(delta)
+	if _asleep:
 		return
 	_anim_t += delta
 	var hv := Vector2(velocity.x, velocity.z).length()
@@ -130,7 +153,7 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if is_dead:
+	if is_dead or _asleep:
 		return
 	attack_cd = maxf(0.0, attack_cd - delta)
 	taunt_time = maxf(0.0, taunt_time - delta)

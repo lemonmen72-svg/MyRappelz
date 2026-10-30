@@ -18,25 +18,29 @@ const DESCRIPTIONS := [
 ]
 ## grass_density — доля от полной густоты травы; *_distance — дальность видимости, м;
 ## shadow_atlas — размер карты теней солнца; postfx — цветокоррекция и виньетка; bloom — свечение;
-## outlines — контуры у мелочей (кусты, камни); small_shadows — тени от кустов и камней.
+## outlines — контуры (персонажи, звери, постройки, растительность); small_shadows — тени от кустов и камней;
+## render_scale — меньше 1: кадр рисуется высотой 720 px и растягивается (см. apply_resolution).
 const PRESETS := [
 	{
 		"grass_density": 0.35, "grass_distance": 24.0, "grass_blades": 4, "flower_density": 0.45,
 		"detail_distance": 45.0, "tree_distance": 90.0,
 		"shadows": false, "shadow_distance": 0.0, "shadow_splits": false, "shadow_atlas": 1024,
 		"small_shadows": false, "postfx": false, "bloom": false, "outlines": false,
+		"render_scale": 0.6,
 	},
 	{
 		"grass_density": 0.65, "grass_distance": 38.0, "grass_blades": 5, "flower_density": 0.75,
 		"detail_distance": 65.0, "tree_distance": 125.0,
 		"shadows": true, "shadow_distance": 32.0, "shadow_splits": false, "shadow_atlas": 2048,
-		"small_shadows": false, "postfx": true, "bloom": false, "outlines": true,
+		"small_shadows": false, "postfx": false, "bloom": false, "outlines": true,
+		"render_scale": 0.75,
 	},
 	{
 		"grass_density": 1.0, "grass_distance": 58.0, "grass_blades": 6, "flower_density": 1.0,
 		"detail_distance": 95.0, "tree_distance": 175.0,
 		"shadows": true, "shadow_distance": 60.0, "shadow_splits": true, "shadow_atlas": 4096,
 		"small_shadows": true, "postfx": true, "bloom": true, "outlines": true,
+		"render_scale": 1.0,
 	},
 ]
 
@@ -140,10 +144,28 @@ static func apply(tree: SceneTree) -> void:
 	if tree == null or tree.root == null:
 		return
 	apply_lights(tree.root)
+	apply_resolution(tree)
 	for n in tree.get_nodes_in_group("postfx"):
 		if n.has_method("apply_quality"):
 			n.call("apply_quality")
 	IslandVegetation.apply_quality(tree)
+
+
+## Разрешение рендера: на «Низком» и «Среднем» кадр рисуется высотой 720 пикселей (ширина — по
+## пропорциям экрана) и растягивается на экран. У телефонов 2400×1080 и больше это в 2–3 раза меньше
+## пикселей. Интерфейс свёрстан под высоту 720, поэтому раскладка не меняется. «Высокое» — родное разрешение.
+static func apply_resolution(tree: SceneTree) -> void:
+	var win := tree.root
+	if float(_p("render_scale")) >= 0.999:
+		win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+		win.content_scale_size = Vector2i(1280, 720)
+		return
+	var screen := Vector2(DisplayServer.window_get_size())
+	if screen.x < 2.0 or screen.y < 2.0:
+		return
+	var h := minf(720.0, screen.y)
+	win.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+	win.content_scale_size = Vector2i(int(roundf(h * screen.x / screen.y)), int(h))
 
 
 ## Тени направленных источников света (солнце) в поддереве root.

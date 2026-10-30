@@ -33,6 +33,7 @@ var _transition_cd := 0.0
 
 func _ready() -> void:
 	_rng.seed = 1234
+	Quality.apply_resolution(get_tree())
 	get_tree().node_added.connect(_on_node_added)
 	if Game.has_character or Game.load_game():
 		_start_world()

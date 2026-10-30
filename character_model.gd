@@ -973,7 +973,7 @@ func _mat(c: Color, ow: float = OL) -> StandardMaterial3D:
 	var m := Util.mat(c)
 	m.emission_enabled = true
 	m.emission = Color.BLACK
-	if ow > 0.0:
+	if ow > 0.0 and Quality.outlines():
 		m.next_pass = _outline(c, ow)
 	# Хук main.gd (Util.toonify_mesh) уже не тронет: свет и контур настроены здесь
 	m.set_meta("toon_done", true)
