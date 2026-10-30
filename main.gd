@@ -4,6 +4,9 @@ extends Node3D
 
 const RESPAWN_TIME := 20.0
 const AUTOSAVE_TIME := 30.0
+## Камера сверху-сзади: смещение от игрока и точка взгляда над ним.
+const CAM_OFFSET := Vector3(0, 9, 8.5)
+const CAM_LOOK_Y := 1.2
 
 var player: Player
 var hud: HUD
@@ -83,7 +86,7 @@ func _build_player() -> void:
 	cam = Camera3D.new()
 	cam.fov = 55.0
 	add_child(cam)
-	cam.global_position = player.global_position + Vector3(0, 12, 9.5)
+	cam.global_position = player.global_position + CAM_OFFSET
 	cam.current = true
 
 
@@ -153,9 +156,9 @@ func _process(delta: float) -> void:
 	hud.set_cooldown("skill1", player.cooldown_frac("skill1"))
 	hud.set_cooldown("skill2", player.cooldown_frac("skill2"))
 
-	var want := player.global_position + Vector3(0, 12, 9.5)
+	var want := player.global_position + CAM_OFFSET
 	cam.global_position = cam.global_position.lerp(want, 1.0 - exp(-8.0 * delta))
-	cam.look_at(player.global_position + Vector3(0, 1, 0), Vector3.UP)
+	cam.look_at(player.global_position + Vector3(0, CAM_LOOK_Y, 0), Vector3.UP)
 
 	_autosave += delta
 	if _autosave >= AUTOSAVE_TIME:
