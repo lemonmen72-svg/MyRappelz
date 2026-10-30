@@ -1,8 +1,9 @@
 class_name Economy
 extends Node
-## Предметы и деньги: добыча со зверей (мешочки на земле), торговец в безопасной зоне,
-## окна сумки и магазина, зелья здоровья с перезарядкой. Оружие Бродяги: продаётся у торговца,
-## в сумке — кнопка «Надеть» (надетое оружие продать нельзя, пока оно одно).
+## Предметы и деньги: добыча со зверей (мешочки на земле; сумка полна — мешочек остаётся лежать), торговец
+## в безопасной зоне, покупка и продажа, зелья здоровья с перезарядкой. Окна сумки и торговца — InventoryWindow
+## (window): сетка ячеек, экипировка, карточка предмета. Надетое оружие лежит не в ячейке, а в слоте «Оружие»,
+## поэтому его нельзя продать или выбросить.
 
 ## Где стоит торговец (внутри безопасной зоны MobData.SAFE_RADIUS).
 const MERCHANT_POS := Vector3(0, 0, -4)
@@ -12,18 +13,14 @@ const POTION_CD := 5.0
 ## Зелье лечит такую долю максимального здоровья.
 const POTION_HEAL := 0.5
 const GOLD_COLOR := Color(1.0, 0.85, 0.3)
-const DIM_COLOR := Color(0.72, 0.72, 0.76)
 
 var main: Node
 var merchant: Merchant
+## Окно сумки и торговца.
+var window: InventoryWindow
 
 var _potion_cd := 0.0
 var _shop_near := false
-## Окно модуля: "" (нет), "shop", "bag". _win_body — тело окна из HUD, чтобы понять, что оно ещё наше.
-var _win_kind := ""
-var _win_body: Control = null
-var _win_dirty := false
-var _win_gold := 0
 
 
 func setup(m: Node) -> void:
@@ -32,6 +29,10 @@ func setup(m: Node) -> void:
 	merchant = Merchant.new()
 	merchant.position = MERCHANT_POS
 	main.add_child(merchant)
+	window = InventoryWindow.new()
+	window.name = "InventoryWindow"
+	add_child(window)
+	window.setup(main, self)
 	Game.inventory.changed.connect(_on_inventory_changed)
 	main.hud.set_button_visible("shop", false)
 	_update_potion_button()
@@ -97,6 +98,7 @@ func spawn_drop(pos: Vector3, items: Dictionary) -> LootDrop:
 	drop.items = items.duplicate()
 	drop.position = Vector3(pos.x, 0.0, pos.z)
 	drop.picked_up.connect(_on_drop_picked)
+	drop.bag_full.connect(_on_bag_full)
 	main.add_child(drop)
 	return drop
 
@@ -146,234 +148,68 @@ func is_near_merchant() -> bool:
 
 
 func is_shop_open() -> bool:
-	return _win_kind == "shop" and _window_alive()
+	return window != null and window.mode == "shop" and window.is_open()
 
 
 func is_bag_open() -> bool:
-	return _win_kind == "bag" and _window_alive()
+	return window != null and window.mode == "bag" and window.is_open()
 
 
+## Окно торговца: товары, сумка и карточка (InventoryWindow).
 func open_shop() -> void:
-	var body: VBoxContainer = main.hud.create_window("Торговец", Vector2(880, 620))
-	_set_window("shop", body)
-	body.add_child(_label("Золото: %d" % Game.gold, 26, GOLD_COLOR))
-
-	body.add_child(HSeparator.new())
-	body.add_child(_label("Купить", 26, Color.WHITE))
-	for key in ItemData.ITEMS:
-		var id: String = key
-		var it := ItemData.get_item(id)
-		var price: int = int(it.get("buy", 0))
-		if price <= 0:
-			continue
-		# Оружие — только то, что подходит классу героя
-		if ItemData.is_weapon(id) and not ItemData.weapon_fits(id, Game.class_id):
-			continue
-		var desc := _item_desc(id)
-		var have: int = Game.inventory.count(id)
-		if have > 0:
-			desc += "  В сумке: %d" % have
-		var row := _item_row(id, ItemData.item_name(id), desc, "%d зол." % price)
-		row.add_child(_button("Купить", "buy_" + id, _buy.bind(id, 1)))
-		row.add_child(_button("×5", "buy5_" + id, _buy.bind(id, 5)))
-		body.add_child(row)
-
-	body.add_child(HSeparator.new())
-	body.add_child(_label("Продать", 26, Color.WHITE))
-	var any := false
-	var ids: Array = Game.inventory.ids()
-	for key in ids:
-		var id: String = key
-		var price: int = int(ItemData.get_item(id).get("sell", 0))
-		if price <= 0 or _sellable(id) <= 0:
-			continue
-		any = true
-		var cnt: int = Game.inventory.count(id)
-		var title := "%s  ×%d" % [ItemData.item_name(id), cnt]
-		var row := _item_row(id, title, _item_desc(id), "%d зол./шт." % price)
-		row.add_child(_button("Продать 1", "sell1_" + id, _sell.bind(id, 1)))
-		row.add_child(_button("Продать все", "sellall_" + id, _sell.bind(id, -1)))
-		body.add_child(row)
-	if not any:
-		body.add_child(_label("Нечего продавать: трофеи выпадают со зверей.", 20, DIM_COLOR))
+	window.open("shop")
 
 
-func _buy(id: String, n: int) -> void:
+## Окно сумки: экипировка, сетка ячеек и карточка (InventoryWindow).
+func open_bag() -> void:
+	window.open("bag")
+
+
+## Купить n штук предмета id у торговца. true — куплено.
+func buy(id: String, n: int = 1) -> bool:
 	var price: int = int(ItemData.get_item(id).get("buy", 0)) * n
-	if price <= 0:
-		return
+	if price <= 0 or n <= 0:
+		_msg("Торговец это не продаёт")
+		return false
 	if Game.gold < price:
 		_msg("Не хватает золота: нужно %d, есть %d" % [price, Game.gold])
-		return
+		return false
+	if Game.inventory.room_for(id) < n:
+		_msg("Сумка полна")
+		return false
 	# Сначала золото: сигнал сумки обновит HUD уже с новым золотом
 	Game.gold -= price
 	Game.inventory.add(id, n)
 	_msg("Куплено: %s ×%d за %d зол." % [ItemData.item_name(id), n, price])
-	_rebuild_window()
-
-
-## Сколько штук предмета можно продать: надетое оружие остаётся в сумке.
-func _sellable(id: String) -> int:
-	var have: int = Game.inventory.count(id)
-	if id == Game.weapon:
-		have -= 1
-	return maxi(0, have)
-
-
-## Описание предмета; у оружия — ещё характеристики.
-func _item_desc(id: String) -> String:
-	var desc := String(ItemData.get_item(id).get("desc", ""))
-	if ItemData.is_weapon(id):
-		var st := ItemData.weapon_stats_text(id)
-		desc += " " + st.substr(0, 1).to_upper() + st.substr(1) + "."
-	return desc
-
-
-## n < 0: продать все.
-func _sell(id: String, n: int) -> void:
-	var have: int = _sellable(id)
-	var cnt: int = have if n < 0 else mini(n, have)
-	var price: int = int(ItemData.get_item(id).get("sell", 0))
-	if cnt <= 0 or price <= 0:
-		_msg("Нечего продать")
-		_rebuild_window()
-		return
-	Game.gold += price * cnt
-	Game.inventory.remove(id, cnt)
-	_msg("Продано: %s ×%d за %d зол." % [ItemData.item_name(id), cnt, price * cnt])
-	_rebuild_window()
-
-
-# ---------- Сумка ----------
-
-func open_bag() -> void:
-	var body: VBoxContainer = main.hud.create_window("Сумка", Vector2(780, 600))
-	_set_window("bag", body)
-	body.add_child(_label("Золото: %d" % Game.gold, 26, GOLD_COLOR))
-	var ids: Array = Game.inventory.ids()
-	if ids.is_empty():
-		var l := _label("Сумка пуста. Добыча со зверей и покупки у торговца появятся здесь.", 22, DIM_COLOR)
-		l.name = "empty_label"
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		body.add_child(l)
-		return
-	for key in ids:
-		var id: String = key
-		var title := "%s  ×%d" % [ItemData.item_name(id), Game.inventory.count(id)]
-		var row := _item_row(id, title, _item_desc(id), "")
-		if id == "hp_potion":
-			row.add_child(_button("Использовать", "use_" + id, _use_from_bag.bind(id)))
-		elif ItemData.is_weapon(id):
-			if id == Game.weapon:
-				var worn := _button("В руках", "equip_" + id, Callable())
-				worn.disabled = true
-				row.add_child(worn)
-			elif ItemData.weapon_fits(id, Game.class_id):
-				row.add_child(_button("Надеть", "equip_" + id, _equip_from_bag.bind(id)))
-			else:
-				var no := _button("Не для класса", "equip_" + id, Callable())
-				no.disabled = true
-				row.add_child(no)
-		body.add_child(row)
-
-
-func _use_from_bag(id: String) -> void:
-	if id == "hp_potion":
-		use_potion()
-	_rebuild_window()
-
-
-## Надеть оружие из сумки (касание «Надеть»).
-func _equip_from_bag(id: String) -> void:
-	var p: Player = main.player
-	var err := p.equip(id)
-	if err != "":
-		_msg(err)
-	_rebuild_window()
-
-
-# ---------- Окна: общее ----------
-
-func _set_window(kind: String, body: Control) -> void:
-	_win_kind = kind
-	_win_body = body
-	_win_dirty = false
-	_win_gold = Game.gold
-
-
-func _close_window() -> void:
-	main.hud.close_window()
-	_win_kind = ""
-	_win_body = null
-
-
-## Окно модуля ещё открыто (его не закрыли и не заменили другим окном).
-func _window_alive() -> bool:
-	if _win_kind == "" or not is_instance_valid(_win_body):
-		return false
-	if not main.hud.is_window_open():
-		return false
-	var n: Node = _win_body
-	while n != null:
-		if n.is_queued_for_deletion():
-			return false
-		n = n.get_parent()
 	return true
 
 
-## Перестроить открытое окно модуля (после покупки, продажи, изменения сумки или золота).
-func _rebuild_window() -> void:
-	if is_shop_open():
-		open_shop()
-	elif is_bag_open():
-		open_bag()
+## Продать торговцу n штук из ячейки сумки i (n < 0 — всю стопку). Возвращает, сколько продано.
+## Надетое оружие в ячейках не лежит — его продать нельзя.
+func sell_cell(i: int, n: int = 1) -> int:
+	var c: Dictionary = Game.inventory.cell(i)
+	if c.is_empty():
+		return 0
+	var id := String(c["id"])
+	var price: int = int(ItemData.get_item(id).get("sell", 0))
+	if price <= 0:
+		_msg("Торговец это не купит")
+		return 0
+	if not is_near_merchant():
+		_msg("Продать можно только торговцу")
+		return 0
+	var have := int(c["n"])
+	var cnt := have if n < 0 else mini(n, have)
+	if cnt <= 0:
+		return 0
+	Game.gold += price * cnt
+	Game.inventory.remove_at(i, cnt)
+	_msg("Продано: %s ×%d за %d зол." % [ItemData.item_name(id), cnt, price * cnt])
+	return cnt
 
 
-func _item_row(id: String, title: String, desc: String, price_text: String) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	var info := VBoxContainer.new()
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 0)
-	info.add_child(_label(title, 24, _item_color(id)))
-	if desc != "":
-		info.add_child(_label(desc, 18, DIM_COLOR))
-	row.add_child(info)
-	if price_text != "":
-		var pl := _label(price_text, 22, GOLD_COLOR)
-		pl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(pl)
-	return row
-
-
-## Цвет названия предмета; тёмные цвета осветляются, чтобы читались на тёмном окне.
-func _item_color(id: String) -> Color:
-	var c: Color = ItemData.get_item(id).get("color", Color.WHITE)
-	if c.get_luminance() < 0.45:
-		c = c.lightened(0.4)
-	return c
-
-
-func _label(text: String, font_size: int, color: Color) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", font_size)
-	l.add_theme_color_override("font_color", color)
-	l.add_theme_color_override("font_outline_color", Color.BLACK)
-	l.add_theme_constant_override("outline_size", 4)
-	return l
-
-
-func _button(text: String, node_name: String, cb: Callable) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.name = node_name
-	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(0, 56)
-	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	if cb.is_valid():
-		b.pressed.connect(cb)
-	return b
+func _close_window() -> void:
+	window.close()
 
 
 func _msg(t: String) -> void:
@@ -416,12 +252,18 @@ func _zone_mat(c: Color) -> StandardMaterial3D:
 
 func _on_inventory_changed() -> void:
 	_update_potion_button()
-	_win_dirty = true
+	if window != null:
+		window.dirty = true
 
 
 func _on_drop_picked(items: Dictionary) -> void:
 	if main != null and main.hud != null:
 		_msg("Подобрано: " + LootDrop.describe(items))
+
+
+func _on_bag_full(_left: Dictionary) -> void:
+	if main != null and main.hud != null:
+		_msg("Сумка полна")
 
 
 func _process(delta: float) -> void:
@@ -439,5 +281,5 @@ func _process(delta: float) -> void:
 	if is_shop_open() and not near:
 		_close_window()
 		_msg("Вы отошли от торговца")
-	elif (is_shop_open() or is_bag_open()) and (_win_dirty or Game.gold != _win_gold):
-		_rebuild_window()
+	elif window.is_open() and (window.dirty or Game.gold != window.seen_gold):
+		window.refresh()

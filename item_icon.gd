@@ -1,0 +1,325 @@
+class_name ItemIcon
+extends Control
+## Значок предмета (ячейки сумки, слоты экипировки, товары торговца, карточка предмета).
+## Картинка: res://assets/icons/items/<id предмета>.png (PNG 128×128 с прозрачными углами), загружается только
+## через ResourceLoader/load() — так находится и в собранном APK. Нет картинки — процедурный значок по полю
+## "icon" предмета (ItemData.icon_shape): мягкий круг цвета типа и простой силуэт (колба, свиток, кристалл,
+## клинки, арбалет, клык, шкура, перо, пластина, осколок); неизвестный — первая буква названия.
+
+## Цвет контуров силуэтов.
+const INK := Color(0.08, 0.06, 0.12, 0.95)
+
+## Предмет; "" — пустой значок.
+var item_id := ""
+
+static var _tex_cache: Dictionary = {}
+
+
+## Картинка значка предмета или null (файла нет).
+static func texture(id: String) -> Texture2D:
+	if id == "":
+		return null
+	if _tex_cache.has(id):
+		return _tex_cache[id]
+	var tex: Texture2D = null
+	var path := ItemData.icon_path(id)
+	if ResourceLoader.exists(path):
+		tex = load(path) as Texture2D
+	_tex_cache[id] = tex
+	return tex
+
+
+static func make(id: String, sz: float) -> ItemIcon:
+	var ic := ItemIcon.new()
+	ic.item_id = id
+	ic.custom_minimum_size = Vector2(sz, sz)
+	ic.size = Vector2(sz, sz)
+	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return ic
+
+
+func set_item(id: String) -> void:
+	item_id = id
+	queue_redraw()
+
+
+func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	resized.connect(queue_redraw)
+
+
+func _draw() -> void:
+	if item_id == "":
+		return
+	var tex := texture(item_id)
+	if tex != null:
+		draw_texture_rect(tex, Rect2(Vector2.ZERO, size), false)
+		return
+	var base: Color = ItemData.get_item(item_id).get("color", Color.WHITE)
+	# Мягкий фон цвета рамки
+	var fc := ItemData.frame_color(item_id)
+	draw_circle(_p(0.5, 0.5), _s(0.46), Color(fc.r, fc.g, fc.b, 0.16))
+	draw_circle(_p(0.5, 0.5), _s(0.36), Color(fc.r, fc.g, fc.b, 0.14))
+	match ItemData.icon_shape(item_id):
+		"flask":
+			_flask(base)
+		"scroll":
+			_scroll(base)
+		"crystal":
+			_crystal(base)
+		"daggers":
+			_blade(_p(0.30, 0.74), Vector2(1.0, -1.25), 0.40, 0.085, base)
+			_blade(_p(0.70, 0.74), Vector2(-1.0, -1.25), 0.40, 0.085, base)
+		"swords":
+			_blade(_p(0.24, 0.80), Vector2(1.0, -1.1), 0.62, 0.075, base)
+			_blade(_p(0.76, 0.80), Vector2(-1.0, -1.1), 0.62, 0.075, base)
+		"crossbow":
+			_crossbow(base)
+		"fang":
+			_fang(base)
+		"pelt":
+			_pelt(base)
+		"feather":
+			_feather(base)
+		"plate":
+			_plate(base)
+		"shard":
+			_shard(base)
+		_:
+			_letter(base)
+
+
+# ---------- Координаты: доли размера значка ----------
+
+func _p(x: float, y: float) -> Vector2:
+	return Vector2(x * size.x, y * size.y)
+
+
+func _s(v: float) -> float:
+	return v * minf(size.x, size.y)
+
+
+func _poly(pts: Array) -> PackedVector2Array:
+	var res := PackedVector2Array()
+	for e in pts:
+		var v: Vector2 = e
+		res.append(_p(v.x, v.y))
+	return res
+
+
+func _outline(pts: PackedVector2Array, c: Color, w: float) -> void:
+	var closed := pts.duplicate()
+	closed.append(pts[0])
+	draw_polyline(closed, c, w, true)
+
+
+# ---------- Силуэты ----------
+
+## Колба с зельем: круглое донышко, горлышко, пробка, блик.
+func _flask(c: Color) -> void:
+	var glass := Color(0.85, 0.92, 1.0, 0.55)
+	draw_rect(Rect2(_p(0.42, 0.22), _p(0.16, 0.22)), glass)
+	draw_circle(_p(0.5, 0.62), _s(0.25), INK)
+	draw_circle(_p(0.5, 0.62), _s(0.23), glass)
+	draw_circle(_p(0.5, 0.64), _s(0.19), c)
+	draw_circle(_p(0.5, 0.68), _s(0.14), c.darkened(0.2))
+	draw_rect(Rect2(_p(0.39, 0.13), _p(0.22, 0.11)), Color(0.62, 0.42, 0.24))
+	draw_rect(Rect2(_p(0.39, 0.13), _p(0.22, 0.11)), INK, false, _s(0.025))
+	draw_rect(Rect2(_p(0.42, 0.24), _p(0.16, 0.18)), INK, false, _s(0.02))
+	draw_circle(_p(0.42, 0.56), _s(0.05), Color(1, 1, 1, 0.85))
+	draw_circle(_p(0.58, 0.72), _s(0.025), Color(1, 1, 1, 0.5))
+
+
+## Свиток: лист с двумя валиками, строчки и печать.
+func _scroll(c: Color) -> void:
+	var paper := _poly([Vector2(0.26, 0.28), Vector2(0.74, 0.28), Vector2(0.74, 0.74), Vector2(0.26, 0.74)])
+	draw_colored_polygon(paper, c)
+	_outline(paper, INK, _s(0.025))
+	var roll := c.darkened(0.35)
+	for yv in [0.26, 0.74]:
+		var y := float(yv)
+		var r := Rect2(_p(0.18, y - 0.055), _p(0.64, 0.11))
+		draw_rect(r, roll)
+		draw_rect(r, INK, false, _s(0.022))
+		draw_circle(_p(0.18, y), _s(0.055), roll.darkened(0.2))
+		draw_circle(_p(0.82, y), _s(0.055), roll.darkened(0.2))
+	var ink := Color(0.45, 0.32, 0.2, 0.9)
+	for i in 3:
+		var y := 0.4 + 0.08 * float(i)
+		draw_line(_p(0.33, y), _p(0.67 - 0.08 * float(i), y), ink, _s(0.025), true)
+	draw_circle(_p(0.64, 0.62), _s(0.065), Color(0.85, 0.2, 0.25))
+	draw_circle(_p(0.64, 0.62), _s(0.03), Color(1.0, 0.75, 0.4))
+
+
+## Кристалл души: ромб с гранями и искоркой.
+func _crystal(c: Color) -> void:
+	var gem := _poly([Vector2(0.5, 0.1), Vector2(0.76, 0.42), Vector2(0.5, 0.9), Vector2(0.24, 0.42)])
+	draw_colored_polygon(gem, c)
+	draw_colored_polygon(_poly([Vector2(0.5, 0.1), Vector2(0.24, 0.42), Vector2(0.5, 0.9)]), c.lightened(0.35))
+	draw_colored_polygon(_poly([Vector2(0.5, 0.1), Vector2(0.76, 0.42), Vector2(0.5, 0.42)]), c.lightened(0.15))
+	draw_colored_polygon(_poly([Vector2(0.5, 0.42), Vector2(0.76, 0.42), Vector2(0.5, 0.9)]), c.darkened(0.25))
+	var hl := Color(1, 1, 1, 0.55)
+	draw_line(_p(0.24, 0.42), _p(0.76, 0.42), hl, _s(0.018), true)
+	draw_line(_p(0.5, 0.1), _p(0.5, 0.9), hl, _s(0.018), true)
+	_outline(gem, INK, _s(0.03))
+	var sp := _p(0.72, 0.2)
+	var a := _s(0.08)
+	var b := _s(0.02)
+	draw_colored_polygon(PackedVector2Array([sp + Vector2(0, -a), sp + Vector2(b, -b), sp + Vector2(a, 0),
+		sp + Vector2(b, b), sp + Vector2(0, a), sp + Vector2(-b, b), sp + Vector2(-a, 0), sp + Vector2(-b, -b)]),
+		Color(1, 1, 0.9, 0.95))
+
+
+## Клинок: рукоять у base, лезвие по направлению dir длиной len_k (доля размера), ширина w.
+func _blade(base: Vector2, dir: Vector2, len_k: float, w: float, c: Color) -> void:
+	var d := dir.normalized()
+	var n := Vector2(-d.y, d.x)
+	var blade_len := _s(len_k)
+	var hw := _s(w) * 0.5
+	var steel := c.lightened(0.25)
+	var tip := base + d * blade_len
+	var blade := PackedVector2Array([base + n * hw, base + d * blade_len * 0.8 + n * hw, tip,
+		base + d * blade_len * 0.8 - n * hw, base - n * hw])
+	draw_colored_polygon(blade, steel)
+	draw_line(base + d * _s(0.03), base + d * blade_len * 0.82, Color(1, 1, 1, 0.7), maxf(1.0, hw * 0.35), true)
+	_outline(blade, INK, _s(0.022))
+	# Гарда, рукоять, навершие
+	var gold := Color(0.95, 0.75, 0.3)
+	draw_line(base + n * hw * 2.6, base - n * hw * 2.6, INK, _s(0.075), true)
+	draw_line(base + n * hw * 2.4, base - n * hw * 2.4, gold, _s(0.045), true)
+	var grip_end := base - d * _s(0.17)
+	draw_line(base, grip_end, INK, _s(0.075), true)
+	draw_line(base, grip_end, Color(0.42, 0.26, 0.18), _s(0.045), true)
+	draw_circle(grip_end, _s(0.04), INK)
+	draw_circle(grip_end, _s(0.028), gold)
+
+
+## Арбалет: дуга плеч, тетива, ложе и болт.
+func _crossbow(c: Color) -> void:
+	var center := _p(0.5, 0.6)
+	var r := _s(0.36)
+	var a0 := deg_to_rad(200.0)
+	var a1 := deg_to_rad(340.0)
+	var left := center + Vector2(cos(a0), sin(a0)) * r
+	var right := center + Vector2(cos(a1), sin(a1)) * r
+	var nock := _p(0.5, 0.62)
+	draw_line(left, nock, Color(0.95, 0.92, 0.85), _s(0.02), true)
+	draw_line(right, nock, Color(0.95, 0.92, 0.85), _s(0.02), true)
+	draw_arc(center, r, a0, a1, 24, INK, _s(0.085), true)
+	draw_arc(center, r, a0, a1, 24, Color(0.75, 0.78, 0.85), _s(0.05), true)
+	# Ложе
+	draw_line(_p(0.5, 0.2), _p(0.5, 0.9), INK, _s(0.11), true)
+	draw_line(_p(0.5, 0.21), _p(0.5, 0.89), c, _s(0.075), true)
+	# Болт
+	draw_line(_p(0.5, 0.62), _p(0.5, 0.14), Color(0.92, 0.9, 0.85), _s(0.025), true)
+	var head := PackedVector2Array([_p(0.5, 0.06), _p(0.55, 0.16), _p(0.45, 0.16)])
+	draw_colored_polygon(head, Color(0.8, 0.85, 0.95))
+	_outline(head, INK, _s(0.015))
+
+
+## Клык: изогнутый рог, сужающийся к острию.
+func _fang(c: Color) -> void:
+	var p0 := Vector2(0.32, 0.84)
+	var p1 := Vector2(0.30, 0.34)
+	var p2 := Vector2(0.72, 0.16)
+	var left := PackedVector2Array()
+	var right := PackedVector2Array()
+	var steps := 12
+	for i in steps + 1:
+		var t := float(i) / float(steps)
+		var pt := p0 * (1.0 - t) * (1.0 - t) + p1 * 2.0 * t * (1.0 - t) + p2 * t * t
+		var dv := (p1 - p0) * 2.0 * (1.0 - t) + (p2 - p1) * 2.0 * t
+		var nv := Vector2(-dv.y, dv.x).normalized()
+		var w := 0.11 * (1.0 - t) + 0.004
+		left.append(_p(pt.x + nv.x * w, pt.y + nv.y * w))
+		right.append(_p(pt.x - nv.x * w, pt.y - nv.y * w))
+	var shape := PackedVector2Array()
+	shape.append_array(left)
+	right.reverse()
+	shape.append_array(right)
+	draw_colored_polygon(shape, c)
+	_outline(shape, INK, _s(0.025))
+	draw_line(_p(0.25, 0.78), _p(0.42, 0.84), c.darkened(0.35), _s(0.04), true)
+
+
+## Шкура: распластанный мех с полосами.
+func _pelt(c: Color) -> void:
+	var shape := _poly([Vector2(0.30, 0.18), Vector2(0.42, 0.28), Vector2(0.58, 0.28), Vector2(0.70, 0.18),
+		Vector2(0.74, 0.36), Vector2(0.68, 0.50), Vector2(0.80, 0.70), Vector2(0.66, 0.80), Vector2(0.56, 0.72),
+		Vector2(0.50, 0.88), Vector2(0.44, 0.72), Vector2(0.34, 0.80), Vector2(0.20, 0.70), Vector2(0.32, 0.50),
+		Vector2(0.26, 0.36)])
+	draw_colored_polygon(shape, c)
+	var dark := c.darkened(0.35)
+	for i in 3:
+		var y := 0.4 + 0.1 * float(i)
+		draw_line(_p(0.4, y), _p(0.6, y + 0.02), dark, _s(0.035), true)
+	draw_line(_p(0.5, 0.3), _p(0.5, 0.78), c.lightened(0.25), _s(0.02), true)
+	_outline(shape, INK, _s(0.025))
+
+
+## Перо: стержень и опахало с тёмными полосками.
+func _feather(c: Color) -> void:
+	var a := Vector2(0.30, 0.88)
+	var b := Vector2(0.70, 0.12)
+	var d := (b - a).normalized()
+	var n := Vector2(-d.y, d.x)
+	var left := PackedVector2Array()
+	var right := PackedVector2Array()
+	var steps := 12
+	for i in steps + 1:
+		var t := 0.18 + 0.82 * float(i) / float(steps)
+		var pt := a.lerp(b, t)
+		var w := 0.15 * sin(PI * (t - 0.18) / 0.82) + 0.005
+		left.append(_p(pt.x + n.x * w, pt.y + n.y * w))
+		right.append(_p(pt.x - n.x * w * 0.8, pt.y - n.y * w * 0.8))
+	var shape := PackedVector2Array()
+	shape.append_array(left)
+	right.reverse()
+	shape.append_array(right)
+	draw_colored_polygon(shape, c)
+	var dark := c.darkened(0.4)
+	for kv in [0.45, 0.6, 0.75]:
+		var pt := a.lerp(b, float(kv))
+		draw_line(_p(pt.x, pt.y), _p(pt.x + n.x * 0.12, pt.y + n.y * 0.12 + 0.03), dark, _s(0.025), true)
+	_outline(shape, INK, _s(0.022))
+	draw_line(_p(a.x, a.y), _p(b.x, b.y), Color(0.98, 0.95, 0.85), _s(0.025), true)
+
+
+## Пластина панциря: шестиугольник с внутренним узором.
+func _plate(c: Color) -> void:
+	var outer := PackedVector2Array()
+	var inner := PackedVector2Array()
+	for i in 6:
+		var ang := PI / 6.0 + float(i) * PI / 3.0
+		outer.append(_p(0.5 + cos(ang) * 0.36, 0.52 + sin(ang) * 0.36))
+		inner.append(_p(0.5 + cos(ang) * 0.18, 0.52 + sin(ang) * 0.18))
+	draw_colored_polygon(outer, c)
+	draw_colored_polygon(inner, c.lightened(0.25))
+	for i in 6:
+		draw_line(inner[i], outer[i], c.darkened(0.35), _s(0.025), true)
+	_outline(inner, c.darkened(0.35), _s(0.022))
+	_outline(outer, INK, _s(0.03))
+
+
+## Осколок стража: угловатый камень со светящейся руной.
+func _shard(c: Color) -> void:
+	var shape := _poly([Vector2(0.42, 0.1), Vector2(0.68, 0.28), Vector2(0.74, 0.62), Vector2(0.52, 0.9),
+		Vector2(0.28, 0.72), Vector2(0.26, 0.38)])
+	draw_colored_polygon(shape, c)
+	draw_colored_polygon(_poly([Vector2(0.42, 0.1), Vector2(0.68, 0.28), Vector2(0.5, 0.42), Vector2(0.26, 0.38)]),
+		c.lightened(0.25))
+	_outline(shape, INK, _s(0.03))
+	var rune := Color(0.45, 0.95, 1.0)
+	var pts := _poly([Vector2(0.44, 0.36), Vector2(0.56, 0.52), Vector2(0.46, 0.62), Vector2(0.56, 0.76)])
+	draw_polyline(pts, Color(rune.r, rune.g, rune.b, 0.35), _s(0.07), true)
+	draw_polyline(pts, rune, _s(0.03), true)
+
+
+## Неизвестный предмет: первая буква названия.
+func _letter(c: Color) -> void:
+	draw_circle(_p(0.5, 0.5), _s(0.3), c.darkened(0.3))
+	var font := ThemeDB.fallback_font
+	var fs := int(_s(0.4))
+	var t := ItemData.item_name(item_id).substr(0, 1).to_upper()
+	var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	draw_string(font, _p(0.5, 0.5) + Vector2(-tw * 0.5, fs * 0.35), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
