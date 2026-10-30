@@ -1,181 +1,80 @@
-extends SceneTree
-## Автотест без экрана: запускает main.tscn и проходит основной цикл игры:
-## сенсорный ввод HUD, бой, приручение, помощь питомца, смерть игрока и питомца, респавн зверей.
-## Запуск: godot --headless --fixed-fps 60 --path . -s tests/smoke_test.gd
+extends "res://tests/test_base.gd"
+## Общий автотест: мир, сенсорный HUD, бой, опыт и золото, зелье, смерть, сохранение, респавн.
 
-const MAX_FRAMES := 60 * 240
-
-var main: Node
-var frame := 0
-var step := 0
-var wait := 0
 var mob: Mob = null
-var xp_before := 0
 var gold_before := 0
-var pet_fought := false
-var done := false
-var last_msg := ""
+var potions_before := 0
 
 
-func _initialize() -> void:
-	main = load("res://main.tscn").instantiate()
-	root.add_child(main)
-
-
-func _process(_delta: float) -> bool:
-	if done:
-		return true
-	frame += 1
-	if frame > MAX_FRAMES:
-		_fail("таймаут на шаге %d" % step)
-		return true
-	if wait > 0:
-		wait -= 1
-		return false
-
+func run_step() -> void:
 	var player: Player = main.player
-	_log_messages()
 	match step:
 		0:
-			_check(player != null and main.hud != null, "игрок и HUD созданы")
-			_check(_count_mobs() == main._slots.size(), "звери заспавнены: %d" % _count_mobs())
-			_test_touch(main.hud)
+			check(player != null and main.hud != null, "игрок и HUD созданы")
+			check(count_mobs() == main._slots.size(), "звери заспавнены: %d" % count_mobs())
+			_test_touch()
+			gold_before = game.gold
 			step = 1
 		1:
-			mob = _find_mob("Кабан")
-			_check(mob != null, "найден кабан")
+			mob = find_mob("boar")
+			check(mob != null, "найден кабан")
 			step = 2
 		2:
-			# Ослабляем кабана ниже 50% HP
-			if not _mob_ok():
-				step = 1
-				return false
-			_stand_near(player)
-			if mob.hp > mob.max_hp * 0.5:
-				player.try_attack()
-			else:
-				print("Кабан ослаблен: %d/%d" % [mob.hp, mob.max_hp])
+			if not mob_ok(mob):
+				check(game.xp > 0 or game.level > 1, "игрок получил опыт")
+				check(game.gold > gold_before, "игрок получил золото")
 				step = 3
+				return
+			stand_near(mob)
+			player.try_attack()
 		3:
-			# Приручаем (шанс 65%, кулдаун 1.5 с)
-			if main.pet != null:
-				print("Приручён питомец: %s" % main.pet.pet_name)
-				xp_before = player.xp + player.level * 100000
-				gold_before = player.gold
-				step = 4
-				return false
-			if not _mob_ok():
-				step = 1
-				return false
-			_stand_near(player)
-			main._on_tame()
+			player.hp = 10
+			potions_before = game.inventory.count("hp_potion")
+			main._on_action("potion")
+			check(player.hp > 10, "зелье лечит")
+			check(game.inventory.count("hp_potion") == potions_before - 1, "зелье потрачено")
+			step = 4
 		4:
-			mob = _find_mob("Кабан")
-			_check(mob != null, "найден второй кабан")
+			player.take_damage(99999, null)
+			check(player.hp == player.max_hp, "игрок возродился с полным HP")
+			check(player.global_position.length() < 1.0, "игрок возродился в центре")
 			step = 5
 		5:
-			# Убиваем зверя вместе с питомцем
-			if main.pet.target != null:
-				pet_fought = true
-			if not _mob_ok():
-				_check(player.xp + player.level * 100000 > xp_before, "игрок получил опыт")
-				_check(player.gold > gold_before, "игрок получил золото")
-				_check(pet_fought, "питомец участвовал в бою")
-				step = 6
-				return false
-			_stand_near(player)
-			player.try_attack()
-		6:
-			player.take_damage(99999, null)
-			_check(player.hp == player.max_hp, "игрок возродился с полным HP")
-			_check(player.global_position.length() < 1.0, "игрок возродился в центре")
-			main.pet.take_damage(99999, null)
-			_check(main.pet.is_down, "питомец обессилел")
-			wait = 60 * 11
-			step = 7
-		7:
-			_check(not main.pet.is_down, "питомец вернулся через 10 с")
+			check(game.save_game(), "игра сохранена")
+			var lvl: int = game.level
+			var gold: int = game.gold
+			game.level = 99
+			game.gold = 0
+			game.inventory.from_dict({})
+			check(game.load_game(), "игра загружена")
+			check(game.level == lvl and game.gold == gold, "уровень и золото восстановлены")
+			check(game.inventory.count("crystal_common") == 3, "сумка восстановлена")
+			check(game.char_name == "Тест" and game.class_id == "warrior", "персонаж восстановлен")
 			wait = 60 * 21
-			step = 8
-		8:
-			_check(_count_mobs() == main._slots.size(), "звери респавнятся: %d/%d" % [_count_mobs(), main._slots.size()])
-			print("SMOKE TEST OK (кадров: %d)" % frame)
-			done = true
-			quit(0)
-	return false
+			step = 6
+		6:
+			check(count_mobs() == main._slots.size(), "звери респавнятся: %d/%d" % [count_mobs(), main._slots.size()])
+			ok_done()
 
 
-func _test_touch(hud: HUD) -> void:
+func _test_touch() -> void:
+	var hud: HUD = main.hud
 	var view: Vector2 = hud._view
 	if view.x < 400.0:
 		print("Пропуск теста касаний: размер окна %s" % view)
 		return
-	var t := InputEventScreenTouch.new()
-	t.index = 0
-	t.pressed = true
-	t.position = Vector2(view.x * 0.2, view.y * 0.6)
-	hud._input(t)
+	var start := Vector2(view.x * 0.2, view.y * 0.7)
+	touch(true, 0, start)
 	var d := InputEventScreenDrag.new()
 	d.index = 0
-	d.position = t.position + Vector2(80, 0)
+	d.position = start + Vector2(80, 0)
 	hud._input(d)
-	_check(hud.move_vec.x > 0.5, "джойстик двигает вправо: %s" % hud.move_vec)
-
-	var a := InputEventScreenTouch.new()
-	a.index = 1
-	a.pressed = true
-	a.position = hud._attack_c
-	hud._input(a)
-	_check(hud._attack_idx == 1 and hud._joy_idx == 0, "мультитач: джойстик + атака")
-
-	t.pressed = false
-	hud._input(t)
-	a.pressed = false
-	hud._input(a)
-	_check(hud._joy_idx == -1 and hud._attack_idx == -1, "касания отпущены")
-
-
-## Ставит игрока вплотную к зверю (в радиусе его атаки, чтобы зверь не бегал) и держит HP полным.
-func _stand_near(player: Player) -> void:
-	player.global_position = mob.global_position + Vector3(0, 0, 1.5)
-	player.hp = player.max_hp
-
-
-func _log_messages() -> void:
-	var t: String = main.hud._msg_label.text
-	if t != last_msg:
-		last_msg = t
-		print("  HUD: " + t)
-
-
-func _find_mob(mob_name: String) -> Mob:
-	var best: Mob = null
-	for n in get_nodes_in_group("mobs"):
-		var m := n as Mob
-		if m != null and not m.is_dead and m.mob_name == mob_name:
-			if best == null or m.global_position.length() < best.global_position.length():
-				best = m
-	return best
-
-
-func _mob_ok() -> bool:
-	return is_instance_valid(mob) and not mob.is_dead
-
-
-func _count_mobs() -> int:
-	return get_nodes_in_group("mobs").size()
-
-
-func _check(ok: bool, what: String) -> void:
-	if ok:
-		print("[OK] " + what)
-	else:
-		_fail(what)
-
-
-func _fail(what: String) -> void:
-	if done:
-		return
-	printerr("[FAIL] " + what)
-	done = true
-	quit(1)
+	check(hud.move_vec.x > 0.5, "джойстик двигает вправо: %s" % hud.move_vec)
+	touch(true, 1, button_center("attack"))
+	check(hud.is_held("attack") and hud._joy_idx == 0, "мультитач: джойстик + атака")
+	touch(false, 0, start)
+	touch(false, 1, button_center("attack"))
+	check(hud._joy_idx == -1 and not hud.is_held("attack"), "касания отпущены")
+	touch(true, 0, Vector2(view.x * 0.2, 100.0))
+	check(hud._joy_idx == -1, "джойстик не начинается в зоне панелей")
+	touch(false, 0, Vector2(view.x * 0.2, 100.0))

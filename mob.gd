@@ -5,6 +5,8 @@ extends CharacterBody3D
 signal gone(mob: Mob, killed: bool)
 
 var slot := -1
+var type_id := "boar"
+var rarity := "common"
 var mob_name := "Зверь"
 var level := 1
 var max_hp := 30
@@ -29,7 +31,10 @@ var _mat: StandardMaterial3D
 var _label: Label3D
 
 
-func setup(d: Dictionary, spawn_slot: int, pos: Vector3) -> void:
+func setup(id: String, spawn_slot: int, pos: Vector3) -> void:
+	var d := MobData.get_type(id)
+	type_id = id
+	rarity = d["rarity"]
 	slot = spawn_slot
 	mob_name = d["name"]
 	level = d["level"]
@@ -95,7 +100,7 @@ func _physics_process(delta: float) -> void:
 		var to := target.global_position - global_position
 		to.y = 0.0
 		face = to
-		if global_position.distance_to(home) > leash:
+		if global_position.distance_to(home) > leash or _in_safe_zone(target):
 			target = null
 			returning = true
 		elif to.length() > 1.9:
@@ -106,7 +111,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		# Ищем игрока
 		var p := get_tree().get_first_node_in_group("player") as Node3D
-		if p != null and global_position.distance_to(p.global_position) < aggro_range:
+		if p != null and global_position.distance_to(p.global_position) < aggro_range and not _in_safe_zone(p):
 			target = p
 		# Бродим около дома
 		var to_w := _wander_to - global_position
@@ -134,6 +139,10 @@ func _physics_process(delta: float) -> void:
 		face = dir
 	if face.length() > 0.01:
 		rotation.y = lerp_angle(rotation.y, atan2(-face.x, -face.z), 8.0 * delta)
+
+
+func _in_safe_zone(n: Node3D) -> bool:
+	return Vector2(n.global_position.x, n.global_position.z).length() < MobData.SAFE_RADIUS
 
 
 func _heal(delta: float, frac_per_sec: float) -> void:

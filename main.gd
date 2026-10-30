@@ -1,41 +1,48 @@
 extends Node3D
-## Главная сцена: строит мир, игрока, зверей и интерфейс из кода.
-
-var MOB_TYPES := [
-	{"name": "Кабан", "level": 1, "hp": 30, "atk": 5, "speed": 3.0, "xp": 12, "color": Color(0.55, 0.35, 0.2), "scale": 0.9},
-	{"name": "Волк", "level": 3, "hp": 50, "atk": 9, "speed": 4.4, "xp": 25, "color": Color(0.5, 0.5, 0.55), "scale": 1.0},
-	{"name": "Медведь", "level": 6, "hp": 130, "atk": 16, "speed": 3.0, "xp": 70, "color": Color(0.3, 0.2, 0.15), "scale": 1.5},
-]
-
-# [тип зверя, количество, мин. радиус от центра, макс. радиус]
-var SPAWNS := [
-	[0, 8, 10.0, 24.0],
-	[1, 6, 24.0, 38.0],
-	[2, 4, 38.0, 55.0],
-]
+## Главная сцена: создание персонажа (если нет сохранения), затем мир, игрок, звери,
+## модули (питомцы, приручение, предметы) и интерфейс.
 
 const RESPAWN_TIME := 20.0
+const AUTOSAVE_TIME := 30.0
 
 var player: Player
-var pet: Pet = null
 var hud: HUD
 var cam: Camera3D
+var pets: PetManager
+var taming: Taming
+var economy: Economy
 
 var _slots: Array = []
-var _tame_cd := 0.0
 var _rng := RandomNumberGenerator.new()
+var _started := false
+var _autosave := 0.0
 
 
 func _ready() -> void:
 	_rng.seed = 1234
+	if Game.has_character or Game.load_game():
+		_start_world()
+		return
+	var cc := CharacterCreate.new()
+	add_child(cc)
+	cc.created.connect(func(n: String, r: String, c: String):
+		Game.new_character(n, r, c)
+		cc.queue_free()
+		_start_world())
+
+
+func _start_world() -> void:
 	_build_world()
 	_build_hud()
 	_build_player()
+	_build_modules()
 	_build_slots()
 	for i in _slots.size():
 		_spawn_slot(i)
 	hud.update_player(player)
-	hud.update_pet(null)
+	Game.changed.connect(func(): hud.update_player(player))
+	_started = true
+	Game.save_game()
 
 
 func _build_world() -> void:
@@ -71,7 +78,7 @@ func _build_world() -> void:
 
 	for i in 90:
 		var pos := Vector3(_rng.randf_range(-75, 75), 0.0, _rng.randf_range(-75, 75))
-		if Vector2(pos.x, pos.z).length() < 6.0:
+		if Vector2(pos.x, pos.z).length() < MobData.SAFE_RADIUS + 2.0:
 			continue
 		_add_tree(pos)
 
@@ -112,15 +119,25 @@ func _add_tree(pos: Vector3) -> void:
 func _build_hud() -> void:
 	hud = HUD.new()
 	add_child(hud)
-	hud.tame_pressed.connect(_on_tame)
+	hud.action.connect(_on_action)
+	# Центры кнопок отсчитываются от правого нижнего угла экрана
+	hud.add_button("attack", "Атака", Vector2(170, 180), 85.0, Color(0.9, 0.2, 0.2, 0.45), true)
+	var skills: Array = ClassData.cls(Game.class_id)["skills"]
+	hud.add_button("skill1", ClassData.SKILLS[skills[0]]["name"], Vector2(330, 110), 55.0, Color(0.9, 0.55, 0.15, 0.45))
+	hud.add_button("skill2", ClassData.SKILLS[skills[1]]["name"], Vector2(310, 270), 55.0, Color(0.6, 0.3, 0.9, 0.45))
+	hud.add_button("tame", "Приручить", Vector2(130, 345), 48.0, Color(0.2, 0.7, 0.3, 0.45))
+	hud.add_button("potion", "Зелье", Vector2(470, 80), 45.0, Color(0.85, 0.15, 0.3, 0.45))
+	hud.add_button("shop", "Торговец", Vector2(480, 210), 50.0, Color(0.85, 0.7, 0.2, 0.45))
+	hud.set_button_visible("shop", false)
 
 
 func _build_player() -> void:
 	player = Player.new()
-	player.position = Vector3(0, 0.1, 0)
+	player.position = Vector3(0, 0.1, 2.0)
 	add_child(player)
 	player.stats_changed.connect(func(): hud.update_player(player))
 	player.message.connect(func(t: String): hud.show_message(t))
+	player.target_changed.connect(func(t: Node3D): hud.set_target(t))
 
 	cam = Camera3D.new()
 	cam.fov = 55.0
@@ -129,8 +146,20 @@ func _build_player() -> void:
 	cam.current = true
 
 
+func _build_modules() -> void:
+	economy = Economy.new()
+	add_child(economy)
+	economy.setup(self)
+	taming = Taming.new()
+	add_child(taming)
+	taming.setup(self)
+	pets = PetManager.new()
+	add_child(pets)
+	pets.setup(self)
+
+
 func _build_slots() -> void:
-	for group in SPAWNS:
+	for group in MobData.SPAWNS:
 		var cnt: int = group[1]
 		for i in cnt:
 			var ang := _rng.randf() * TAU
@@ -141,7 +170,7 @@ func _build_slots() -> void:
 func _spawn_slot(i: int) -> void:
 	var s: Dictionary = _slots[i]
 	var m := Mob.new()
-	m.setup(MOB_TYPES[s["type"]], i, s["pos"])
+	m.setup(s["type"], i, s["pos"])
 	m.gone.connect(_on_mob_gone)
 	add_child(m)
 
@@ -149,55 +178,43 @@ func _spawn_slot(i: int) -> void:
 func _on_mob_gone(mob: Mob, killed: bool) -> void:
 	if killed:
 		player.gain_xp(mob.xp_reward)
-		if pet != null and not pet.is_down:
-			pet.gain_xp(int(mob.xp_reward * 0.6))
-		var g := randi_range(mob.level * 2, mob.level * 5)
-		player.gold += g
-		Util.float_text(self, mob.global_position + Vector3(0, 2.8, 0),
-			"+%d оп.  +%d зол." % [mob.xp_reward, g], Color(1, 0.9, 0.3))
-		hud.update_player(player)
+		Util.float_text(self, mob.global_position + Vector3(0, 3.4, 0), "+%d оп." % mob.xp_reward, Color(0.6, 0.9, 1))
+		pets.on_mob_killed(mob)
+		taming.on_mob_killed(mob)
+		economy.on_mob_killed(mob)
 	get_tree().create_timer(RESPAWN_TIME).timeout.connect(_spawn_slot.bind(mob.slot))
 
 
-func _on_tame() -> void:
-	if _tame_cd > 0.0:
-		return
-	_tame_cd = 1.5
-	if pet != null:
-		hud.show_message("У вас уже есть питомец")
-		return
-	var m := Util.nearest(player, "mobs", 4.5) as Mob
-	if m == null:
-		hud.show_message("Рядом нет зверя")
-		return
-	if m.hp > m.max_hp * 0.5:
-		hud.show_message("Сначала ослабьте зверя (HP ниже 50%)")
-		return
-	if randf() > 0.65:
-		hud.show_message("Зверь вырвался! Попробуйте ещё раз")
-		return
-
-	pet = Pet.new()
-	pet.setup(player, m.mob_name, m.color, m.body_scale, m.max_hp,
-		int(m.atk * 0.9), maxf(m.speed * 1.4, 5.0))
-	pet.position = m.position
-	pet.stats_changed.connect(func(): hud.update_pet(pet))
-	add_child(pet)
-	m.consume()
-	hud.update_pet(pet)
-	hud.show_message("Вы приручили: %s!" % pet.pet_name)
+func _on_action(id: String) -> void:
+	match id:
+		"attack":
+			pass  # удержание обрабатывается в _process
+		"skill1", "skill2":
+			player.use_skill(id)
+		_:
+			if pets.handle_action(id):
+				return
+			if taming.handle_action(id):
+				return
+			economy.handle_action(id)
 
 
 func _process(delta: float) -> void:
-	_tame_cd = maxf(0.0, _tame_cd - delta)
+	if not _started:
+		return
 
 	var mv := hud.move_vec
 	if mv.length() < 0.15:
 		mv = Vector2.ZERO
 	player.move_input = mv
-	if hud.attack_held:
+	if hud.is_held("attack"):
 		player.try_attack()
 
 	var want := player.global_position + Vector3(0, 12, 9.5)
 	cam.global_position = cam.global_position.lerp(want, 1.0 - exp(-8.0 * delta))
 	cam.look_at(player.global_position + Vector3(0, 1, 0), Vector3.UP)
+
+	_autosave += delta
+	if _autosave >= AUTOSAVE_TIME:
+		_autosave = 0.0
+		Game.save_game()

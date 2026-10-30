@@ -2,6 +2,38 @@ class_name Util
 extends RefCounted
 ## Общие вспомогательные функции.
 
+static var _theme: Theme
+
+
+## Общая тема окон и кнопок: крупный шрифт и кнопки под палец.
+static func ui_theme() -> Theme:
+	if _theme != null:
+		return _theme
+	_theme = Theme.new()
+	_theme.default_font_size = 24
+	var panel := StyleBoxFlat.new()
+	panel.bg_color = Color(0.08, 0.09, 0.12, 0.94)
+	panel.border_color = Color(0.85, 0.7, 0.35)
+	panel.set_border_width_all(2)
+	panel.set_corner_radius_all(10)
+	panel.set_content_margin_all(18)
+	_theme.set_stylebox("panel", "PanelContainer", panel)
+	_theme.set_stylebox("panel", "Panel", panel)
+	var colors := {
+		"normal": Color(0.22, 0.25, 0.32), "hover": Color(0.3, 0.34, 0.44),
+		"pressed": Color(0.45, 0.38, 0.2), "disabled": Color(0.15, 0.15, 0.17),
+		"focus": Color(0, 0, 0, 0),
+	}
+	for state in colors:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = colors[state]
+		if state == "focus":
+			sb.draw_center = false
+		sb.set_corner_radius_all(8)
+		sb.set_content_margin_all(12)
+		_theme.set_stylebox(state, "Button", sb)
+	return _theme
+
 
 static func mat(c: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
