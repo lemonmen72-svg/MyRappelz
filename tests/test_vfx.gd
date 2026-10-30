@@ -1,6 +1,8 @@
 extends "res://tests/test_base.gd"
 ## Графика зверей и эффекты: модели всех зверей и всех стадий питомцев собираются (с малым
 ## числом вызовов отрисовки: детали слиты в один меш на скелете), анимация работает и двигает кости;
+## пантера, черепаха и фазан — из файла (если он есть: клипы, украшения питомца, действия) и запасные
+## из примитивов (всегда проверяются, с выключенными моделями из файлов);
 ## все функции Vfx создают эффекты, которые сами удаляются; всплывающий текст исчезает;
 ## метка приручения и крит-удар по зверю не ломают бой.
 
@@ -31,7 +33,11 @@ func run_step() -> void:
 			timer += 1
 			for n in models:
 				var sp := String(n.get_meta("species"))
-				CreatureModels.animate(n, sp, float(timer) * 0.05, 1.0 if timer % 2 == 0 else 0.0)
+				var ca := CreatureModels.asset_of(n)
+				if ca != null:
+					ca.update(1.0 / 60.0, float(ca.info["run_speed"]) if timer % 20 < 10 else 0.0)
+				else:
+					CreatureModels.animate(n, sp, float(timer) * 0.05, 1.0 if timer % 2 == 0 else 0.0)
 			if timer >= 30:
 				check(_effects_left() > 0, "эффекты ещё видны: %d" % _effects_left())
 				_check_bones()
@@ -56,24 +62,89 @@ func _build_models() -> void:
 		var n := _holder(id, Vector3(x, 0, 0))
 		var m := CreatureModels.build(n, id, d["color"], float(d["scale"]))
 		check(m != null, "модель зверя %s собрана" % id)
+		var ca := CreatureModels.asset_of(n)
+		check((ca != null) == CreatureAsset.has_asset(id), "модель зверя %s: %s" % [id, "из файла" if ca != null else "из примитивов"])
 		var cnt := _draws(n)
 		check(cnt >= 1 and cnt <= MAX_MOB_DRAWS, "вызовов отрисовки у зверя %s: %d (мешей %d)" % [id, cnt, _meshes(n)])
-		check(n.has_meta("anim"), "у модели %s есть части для анимации" % id)
-		if CreatureModels.skinned:
-			check(n.find_child("Skeleton", true, false) is Skeleton3D, "у модели %s слитый меш на скелете" % id)
+		if ca != null:
+			_check_asset(ca, id)
+		else:
+			_check_procedural(n, id)
 		for st in PetData.STAGE_LEVELS.size():
 			var lvl := int(PetData.STAGE_LEVELS[st])
 			var sc := PetData.stage_scale(id, lvl)
 			var p := _holder(id, Vector3(x, 0, 3.0 + 3.0 * float(st)))
-			check(CreatureModels.build(p, id, PetData.stage_color(id, lvl), sc) != null, "модель питомца %s собрана" % id)
+			check(CreatureModels.build(p, id, PetData.stage_color(id, lvl), sc, PetData.asset_tint(id, lvl)) != null,
+				"модель питомца %s собрана" % id)
 			CreatureModels.decorate_pet(p, id, sc, PetData.stage_for(lvl), PetData.role(id))
-			check(p.find_child("Collar", true, false) != null, "ошейник у питомца %s (стадия %d)" % [id, st + 1])
-			if st >= 1:
-				check(p.find_child("Mark0", true, false) != null, "узоры у питомца %s (стадия %d)" % [id, st + 1])
+			if CreatureModels.asset_of(p) != null:
+				check(p.find_child("Charm", true, false) != null, "самоцвет роли у питомца %s (стадия %d)" % [id, st + 1])
+				var am := CreatureModels.asset_of(p).material
+				if am.albedo_texture != null:
+					var tint := am.albedo_color
+					check((st == 0) == tint.is_equal_approx(Color.WHITE), "оттенок стадии %d у %s: %s" % [st + 1, id, tint])
+			else:
+				check(p.find_child("Collar", true, false) != null, "ошейник у питомца %s (стадия %d)" % [id, st + 1])
+				if st >= 1:
+					check(p.find_child("Mark0", true, false) != null, "узоры у питомца %s (стадия %d)" % [id, st + 1])
 			check((p.find_child("Halo", true, false) != null) == (st == 2), "нимб только на 3-й стадии: %s" % id)
 			var pc := _draws(p)
 			check(pc >= 1 and pc <= MAX_PET_DRAWS, "вызовов отрисовки у питомца %s стадии %d: %d" % [id, st + 1, pc])
 		x += 4.0
+	_build_fallbacks()
+
+
+## Модель из примитивов: части для анимации и слитый меш на скелете.
+func _check_procedural(n: Node3D, id: String) -> void:
+	check(n.has_meta("anim"), "у модели %s есть части для анимации" % id)
+	if CreatureModels.skinned:
+		check(n.find_child("Skeleton", true, false) is Skeleton3D, "у модели %s слитый меш на скелете" % id)
+
+
+## Модель из файла: свой toon-материал, скелет, клипы, действия не ломаются.
+func _check_asset(ca: CreatureAsset, id: String) -> void:
+	check(ca.material != null and ca.material.metallic == 0.0 and ca.material.emission_enabled,
+		"материал модели %s свой (без металла, с эмиссией для вспышки)" % id)
+	check(ca.skeleton != null, "у модели %s есть скелет" % id)
+	check(ca.anim != null, "у модели %s есть AnimationPlayer" % id)
+	print("  клипы %s: %s" % [id, ca.clips])
+	for k in CreatureAsset.LOOPED:
+		if ca.clips.has(k):
+			var a := ca.anim.get_animation(ca.clips[k])
+			check(a.loop_mode == Animation.LOOP_LINEAR, "клип %s у %s зациклен" % [k, id])
+	check(ca.play_attack(1.3) >= 0.0, "атака %s" % id)
+	ca.play_hit()
+	ca.play_cast()
+	ca.set_sleeping(true)
+	check(ca.anim == null or not ca.anim.active, "спящий %s: анимации стоят" % id)
+	ca.set_sleeping(false)
+	check(ca.anim == null or ca.anim.active, "проснувшийся %s: анимации идут" % id)
+
+
+## Запасные модели (файлов нет): пантера, черепаха, фазан из примитивов, высота и коллизия — по размерам вида.
+func _build_fallbacks() -> void:
+	check(CreatureAsset.clip_key("Armature|Walk") == "walk" and CreatureAsset.clip_key("lib/IDLE") == "idle",
+		"имена клипов распознаются без учёта регистра и приставок")
+	check(CreatureAsset.clip_key("Take 001") == "", "чужой клип не распознан")
+	CreatureAsset.use_assets = false
+	var x := -12.0
+	for id in ["panther", "turtle", "pheasant"]:
+		var d := MobData.get_type(id)
+		var n := _holder(id, Vector3(x, 0, -4.0))
+		var m := CreatureModels.build(n, id, d["color"], 1.0)
+		check(m != null and CreatureModels.asset_of(n) == null, "запасная модель %s собрана" % id)
+		_check_procedural(n, id)
+		var cnt := _draws(n)
+		check(cnt >= 1 and cnt <= MAX_MOB_DRAWS, "вызовов отрисовки у запасной модели %s: %d" % [id, cnt])
+		var inf := CreatureAsset.info_for(id)
+		check(is_equal_approx(CreatureModels.height(id, 2.0), float(inf["height"]) * 2.0), "высота %s по размерам вида" % id)
+		var body := Node3D.new()
+		var col := CreatureModels.add_collision(body, id, 1.0)
+		var size := (col.shape as BoxShape3D).size
+		check(is_equal_approx(size.y, float(inf["height"])) and size.x > 0.25, "коллизия %s: %s" % [id, size])
+		body.free()
+		x += 4.0
+	CreatureAsset.use_assets = true
 
 
 func _holder(id: String, pos: Vector3) -> Node3D:
@@ -156,7 +227,11 @@ func _check_bones() -> void:
 	if not CreatureModels.skinned:
 		return
 	var moved := 0
+	var total := 0
 	for n in models:
+		if not n.has_meta("anim"):
+			continue
+		total += 1
 		var a: Dictionary = n.get_meta("anim", {})
 		var skel: Skeleton3D = a.get("skel")
 		var bones: Array = a.get("bones", [])
@@ -170,4 +245,4 @@ func _check_bones() -> void:
 					and not skel.get_bone_pose_rotation(i).is_equal_approx(Quaternion.IDENTITY):
 				moved += 1
 				break
-	check(moved == models.size(), "анимация двигает кости у всех моделей: %d/%d" % [moved, models.size()])
+	check(moved == total, "анимация двигает кости у всех моделей из примитивов: %d/%d" % [moved, total])

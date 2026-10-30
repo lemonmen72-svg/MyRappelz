@@ -172,7 +172,7 @@ static func death_puff(parent: Node, pos: Vector3, size: float = 1.0) -> Node3D:
 	return root
 
 
-## Постоянные искорки вокруг узла (фея, питомец 3-й стадии). Возвращает частицы (не удаляются сами).
+## Постоянные искорки вокруг узла (питомец старших стадий). Возвращает частицы (не удаляются сами).
 static func ambient_sparkles(parent: Node3D, color: Color, radius: float, amount: int = 6) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	p.amount = amount

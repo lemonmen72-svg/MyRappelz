@@ -52,7 +52,8 @@ func try_tame() -> bool:
 		return false
 	var crystal := pick_crystal(mob.type_id)
 	if crystal == "":
-		_msg("Для зверя «%s» нужен: %s" % [mob.mob_name, ItemData.item_name(needed_crystal(mob.type_id))])
+		_msg("Для зверя «%s» (%s) нужен: %s" % [mob.mob_name, MobData.rarity_label(mob.rarity),
+			ItemData.item_name(needed_crystal(mob.type_id))])
 		return false
 	if is_instance_valid(marked) and marked != mob:
 		marked.set_tame_mark(false)
@@ -87,7 +88,8 @@ func on_mob_killed(mob: Mob) -> void:
 		# Если никто не призван, новый питомец сразу выходит к хозяину
 		if idx >= 0 and Game.active_pet == -1 and main.get("pets") != null:
 			main.pets.summon(idx)
-		_msg("Приручен новый питомец: «%s» (%s)!" % [pet_name, PetData.role_name(mob.type_id)])
+		_msg("Приручен новый питомец: «%s» (%s, %s)!" % [pet_name, PetData.role_name(mob.type_id),
+			MobData.rarity_label(mob.rarity).to_lower()])
 	else:
 		Util.float_text(main, pos + Vector3(0, 3.0, 0), "Кристалл треснул", Color(1.0, 0.5, 0.4))
 		_msg("Кристалл треснул: зверь «%s» не приручен" % mob.mob_name)

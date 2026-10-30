@@ -1,9 +1,10 @@
 extends "res://tests/test_base.gd"
 ## Роли питомцев: танк провоцирует, лекарь лечит, маг бьёт снарядами и по площади, боец делает рывок.
-## Модели всех видов, удар по площади каменного стража, выбор кристалла, редкий кристалл,
+## Новые виды: черепаха — танк, фазан — лекарь, пантера — маг (модели из файлов или запасные).
+## Удар по площади каменного стража, выбор кристалла, старший кристалл для базового зверя,
 ## полная коллекция, снятие метки со зверя, ушедшего домой.
 
-const SPECIES := ["bear", "fairy", "sparkbug", "wolf", "golem"]
+const SPECIES := ["turtle", "pheasant", "panther", "wolf", "golem"]
 
 var mob: Mob = null
 var timer := 0
@@ -23,8 +24,10 @@ func run_step() -> void:
 	var tm: Taming = main.taming
 	match step:
 		0:
-			check(pm.active_pet != null and pm.active_pet.species == "bear", "при запуске призван активный питомец")
-			check(pm.active_pet.role == "tank", "медведь — танк")
+			check(pm.active_pet != null and pm.active_pet.species == "turtle", "при запуске призван активный питомец")
+			check(pm.active_pet.role == "tank", "черепаха — танк")
+			var has_file := CreatureAsset.has_asset("turtle")
+			check((pm.active_pet._asset != null) == has_file, "черепаха: модель %s" % ("из файла" if has_file else "запасная"))
 			mob = find_mob("boar")
 			check(mob != null, "найден кабан")
 			timer = 0
@@ -51,12 +54,12 @@ func run_step() -> void:
 			if timer > 60 * 5:
 				fail("танк не провоцирует зверя")
 		2:
-			check(pm.summon(1), "фея призвана")
+			check(pm.summon(1), "фазан призван")
 			wait = 2
 			step = 3
 		3:
 			var pet: Pet = pm.active_pet
-			check(pet != null and pet.role == "healer", "фея — лекарь")
+			check(pet != null and pet.role == "healer", "фазан — лекарь")
 			pet.global_position = player.global_position + Vector3(1.0, 0.2, 1.0)
 			player.hp = int(player.max_hp * 0.3)
 			hp_low = player.hp
@@ -76,7 +79,7 @@ func run_step() -> void:
 			mob = find_mob("boar")
 			if mob == null:
 				return
-			check(pm.summon(2), "искрожук призван")
+			check(pm.summon(2), "пантера призвана")
 			timer = 0
 			wait = 1
 			step = 6
@@ -121,8 +124,8 @@ func run_step() -> void:
 				fail("страж не применяет удар по площади")
 		11:
 			# Выбор кристалла: самый дешёвый подходящий
-			check(tm.pick_crystal("boar") == "crystal_common", "для кабана — обычный кристалл")
-			check(tm.pick_crystal("fairy") == "crystal_rare", "для феи — редкий кристалл")
+			check(tm.pick_crystal("boar") == "crystal_common", "для кабана — базовый кристалл")
+			check(tm.pick_crystal("pheasant") == "crystal_common", "для фазана — базовый кристалл")
 			check(tm.pick_crystal("golem") == "", "для стража кристалла нет")
 			check(tm.needed_crystal("golem") == "crystal_unique", "для стража нужен древний кристалл")
 			# Полная коллекция
@@ -148,20 +151,23 @@ func run_step() -> void:
 			step = 12
 		12:
 			check(tm.marked == null and not mob.tame_marked, "метка снята со зверя, ушедшего домой")
-			# Редкий зверь с редким кристаллом
-			mob = find_mob("fairy")
-			check(mob != null, "найдена фея")
+			# Базовый зверь без базовых кристаллов: подходит старший (редкий)
+			game.inventory.remove("crystal_common", game.inventory.count("crystal_common"))
+			check(tm.pick_crystal("pheasant") == "crystal_rare", "без базового кристалла для фазана — редкий")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан")
 			stand_near(mob, 3.0)
 			player.current_target = mob
 			tm.cooldown = 0.0
 			main._on_action("tame")
-			check(tm.marked == mob and mob.tame_marked, "фея помечена (есть редкий кристалл)")
+			check(tm.marked == mob and mob.tame_marked, "фазан помечен (редким кристаллом)")
 			var used: int = tm.crystals_used
 			var pets_before: int = game.pets.size()
 			mob.take_damage(mob.hp + 5, player)
 			check(tm.crystals_used == used + 1, "редкий кристалл потрачен")
+			check(not game.inventory.has("crystal_rare"), "редкого кристалла больше нет")
 			if game.pets.size() > pets_before:
-				check(String(game.pets[pets_before]["species"]) == "fairy", "приручена фея")
+				check(String(game.pets[pets_before]["species"]) == "pheasant", "приручен фазан")
 			ok_done()
 
 

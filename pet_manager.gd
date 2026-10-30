@@ -221,9 +221,9 @@ func _add_row(body: VBoxContainer, i: int) -> void:
 	var info := Label.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var status: String = "погиб" if dead else "HP %d/%d" % [cur, mhp]
-	info.text = "%s%s\n%s, ур. %d, %s" % [
+	info.text = "%s%s\n%s · %s, ур. %d, %s" % [
 		String(rec.get("name", "Питомец")), "  [призван]" if active else "",
-		PetData.role_name(sp), lvl, status]
+		PetData.role_name(sp), MobData.rarity_name(sp), lvl, status]
 	if dead:
 		info.modulate = Color(1.0, 0.55, 0.5)
 	elif active:

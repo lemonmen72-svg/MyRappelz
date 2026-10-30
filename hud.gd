@@ -73,9 +73,9 @@ func _ready() -> void:
 	_target_box = Control.new()
 	_target_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_target_box)
-	_target_label = _label(_target_box, Vector2(0, 0), 22)
+	_target_label = _label(_target_box, Vector2(-80, 0), 22)
 	_target_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_target_label.size = Vector2(320, 30)
+	_target_label.size = Vector2(480, 30)
 	_target_bar = _bar(_target_box, Vector2(0, 32), Vector2(320, 16), Color(0.9, 0.35, 0.2))
 	_target_box.visible = false
 
@@ -436,6 +436,10 @@ func _refresh_target() -> void:
 		_target_box.visible = false
 		return
 	_target_box.visible = true
-	_target_label.text = "%s  Ур.%d" % [_target.get("mob_name"), _target.get("level")]
+	var rarity = _target.get("rarity")
+	if rarity is String:
+		_target_label.text = "%s · %s  Ур.%d" % [_target.get("mob_name"), MobData.rarity_label(rarity), _target.get("level")]
+	else:
+		_target_label.text = "%s  Ур.%d" % [_target.get("mob_name"), _target.get("level")]
 	_target_bar.max_value = _target.get("max_hp")
 	_target_bar.value = _target.get("hp")
