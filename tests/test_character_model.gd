@@ -98,7 +98,7 @@ func run_step() -> void:
 			step = 51
 		51:
 			var slash := hero._anim.current_animation
-			check(slash == hero._clip("left_slash") or slash == hero._clip("attack"),
+			check(slash == hero._pick(CharacterModel.ASSET_ACTIONS["slash"])[0],
 				"герой: удар играет клип атаки (%s)" % slash)
 			hero.set_move_speed(0.0)
 			wait = 70
@@ -110,7 +110,8 @@ func run_step() -> void:
 			wait = 10
 			step = 53
 		53:
-			check(hero._anim.current_animation == hero._clip("sword_judgment"), "герой: умение — прыжок с мечом")
+			check(hero._anim.current_animation == hero._pick(CharacterModel.ASSET_ACTIONS["leap"])[0],
+				"герой: умение «Шаг тени» играет свой клип")
 			hero.queue_free()
 			wait = 2
 			step = 54
@@ -163,8 +164,11 @@ func _hero_start() -> void:
 	check(hero._anim != null, "герой: есть проигрыватель анимаций")
 	if hero._asset == null or hero._anim == null:
 		return
-	for c in ["walking", "running", "left_slash", "attack", "double_combo_attack", "sword_judgment"]:
-		check(hero._clip(String(c)) != "", "герой: клип %s" % String(c))
+	for kind in CharacterModel.ASSET_ACTIONS:
+		check(not hero._pick(CharacterModel.ASSET_ACTIONS[kind]).is_empty(), "герой: есть клип для «%s»" % kind)
+	check(not hero._pick(CharacterModel.ASSET_IDLE).is_empty(), "герой: есть поза покоя")
+	check(not hero._pick(CharacterModel.ASSET_WALK).is_empty(), "герой: есть шаг")
+	check(not hero._pick(CharacterModel.ASSET_RUN).is_empty(), "герой: есть бег")
 	check(hero.weapon_kind == "sword" and hero.find_child("Sword", true, false) != null, "герой: меч в руке")
 	check(hero.has_ears(), "герой: эльфийские уши")
 	var head := hero.find_child("Head", true, false) as Node3D
@@ -180,14 +184,17 @@ func _hero_start() -> void:
 		check(m != null and m.diffuse_mode == BaseMaterial3D.DIFFUSE_TOON, "герой: toon-материал у %s" % mi.name)
 		if m != null and mi.name != "Sword":
 			check(m.albedo_texture != null, "герой: текстура у %s" % mi.name)
-	var a := hero._anim.get_animation(hero._clip("sword_judgment"))
+	var a := hero._anim.get_animation(hero._pick(CharacterModel.ASSET_ACTIONS["leap"])[0])
 	var pinned := false
 	for t in a.get_track_count():
 		if a.track_get_type(t) == Animation.TYPE_POSITION_3D \
 				and String(a.track_get_path(t).get_concatenated_subnames()).ends_with("Hips"):
 			var k0: Vector3 = a.track_get_key_value(t, 0)
-			var k1: Vector3 = a.track_get_key_value(t, a.track_get_key_count(t) - 1)
-			pinned = absf(k0.z - k1.z) < 0.001 and absf(k0.x - k1.x) < 0.001
+			pinned = true
+			for k in a.track_get_key_count(t):
+				var v: Vector3 = a.track_get_key_value(t, k)
+				if absf(v.z - k0.z) > 0.001 or absf(v.x - k0.x) > 0.001:
+					pinned = false
 	check(pinned, "герой: смещение бёдер по земле убрано (удары на месте)")
 	check(a.loop_mode == Animation.LOOP_NONE and
 		hero._anim.get_animation(hero._clip("running")).loop_mode == Animation.LOOP_LINEAR, "герой: бег зациклен")

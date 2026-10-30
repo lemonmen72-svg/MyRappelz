@@ -48,19 +48,26 @@ const CULL_AABB := AABB(Vector3(-1.7, -0.3, -1.7), Vector3(3.4, 4.0, 3.4))
 ## Главный герой — модель из файла (тёмная эльфийка-Бродяга). Пока она одна, её получают все расы
 ## и классы; своя модель расы или класса задаётся полем "model" в ClassData (у класса или расы).
 const MAIN_ASSET := "res://assets/characters/dark_elf_wanderer.glb"
-## Клипы модели из файла: [клип, с какой секунды, до какой, скорость]. Корневое смещение бёдер
-## по земле убрано (_pin_root), удары идут на месте.
+## Клипы модели из файла: у каждого действия варианты [клип, с какой секунды, до какой, скорость],
+## берётся первый, который есть в модели (наборы анимаций Meshy бывают разные). Корневое смещение
+## бёдер по земле убрано (_pin_root), удары идут на месте.
 const ASSET_ACTIONS := {
-	"slash": ["left_slash", 0.5, 1.4, 1.6],
-	"chop": ["attack", 0.2, 1.4, 2.0],
-	"combo": ["double_combo_attack", 0.0, 2.6, 1.8],
-	"leap": ["sword_judgment", 0.4, 3.0, 2.0],
+	"slash": [["left_slash", 0.5, 1.4, 1.6], ["attack", 0.2, 1.4, 2.0]],
+	"chop": [["attack", 0.2, 1.4, 2.0]],
+	"combo": [["double_combo_attack", 0.0, 2.6, 1.8], ["attack", 0.0, 2.4, 2.0]],
+	"leap": [["standard_forward_charge_inplace", 0.0, 0.63, 1.0], ["sword_judgment", 0.4, 3.0, 2.0],
+		["attack", 0.2, 1.4, 2.0]],
+	"hit": [["hit_reaction", 0.0, 0.45, 1.5]],
 }
-## Покоя в наборе Meshy нет: стойка с мечом — начало «Sword_Judgment», кадры с IDLE_FROM по
-## IDLE_TO проигрываются туда-обратно (дыхание).
-const ASSET_IDLE := "sword_judgment"
-const IDLE_FROM := 0.0
-const IDLE_TO := 0.22
+## Покой: клипа Idle в наборах Meshy нет — кадры с какой секунды по какую проигрываются туда-обратно
+## (дыхание): спокойная стойка в начале прыжка или стойка с мечом в начале «Sword_Judgment».
+const ASSET_IDLE := [["idle", 0.0, 2.0, 1.0], ["regular_jump", 0.0, 0.07, 0.0],
+	["sword_judgment", 0.0, 0.22, 0.0]]
+const ASSET_WALK := [["walking_woman"], ["walking"]]
+const ASSET_RUN := [["running"]]
+## Рамка отсечения модели из файла (с запасом на прыжок и взмахи); не больше нужного — по ней же
+## выбирается уровень детализации меша.
+const ASSET_AABB := AABB(Vector3(-1.2, -0.2, -1.2), Vector3(2.4, 2.8, 2.4))
 ## Скорость, с которой клипы шага и бега выглядят без проскальзывания, м/с.
 const WALK_NATIVE := 1.4
 const RUN_NATIVE := 4.2
@@ -68,8 +75,8 @@ const RUN_NATIVE := 4.2
 const ASSET_GLOW := 0.3
 ## Меч в правой руке модели из файла (кость RightHand, Mixamo): центр кулака и направление клинка
 ## (от мизинца к указательному) в пространстве кости.
-const GRIP_POS := Vector3(-0.023, 0.07, 0.019)
-const GRIP_DIR := Vector3(0.79, 0.15, 0.6)
+const GRIP_POS := Vector3(-0.02, 0.072, 0.017)
+const GRIP_DIR := Vector3(0.76, 0.12, 0.64)
 
 ## Контур модели из файла: оболочка по нормалям, один тёмный цвет.
 const ASSET_OUTLINE_SHADER := """shader_type spatial;
@@ -1124,6 +1131,9 @@ func play_hit() -> void:
 	_flash = 1.0
 	if _asset != null:
 		_asset_recoil()
+		# Клип реакции на удар — только когда стоит и ничего не делает
+		if _act_end < 0.0 and _asset_speed < 0.3:
+			_asset_act("hit")
 		return
 	if _root == null or not is_inside_tree():
 		return
@@ -1187,11 +1197,11 @@ func _setup_asset(path: String) -> bool:
 	for n in _asset.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
 		mi.set_meta("no_toon", true)
-		mi.custom_aabb = CULL_AABB
-		var src := mi.get_active_material(0) as StandardMaterial3D
+		mi.custom_aabb = ASSET_AABB
+		# Свой материал вместо импортированного: у того металличность glTF по умолчанию 1
+		# (без карты металла модель выглядит тёмным металлом)
 		var m := StandardMaterial3D.new()
-		if src != null:
-			m = src.duplicate() as StandardMaterial3D
+		m.metallic = 0.0
 		if tex != null:
 			m.albedo_texture = tex
 			# Тёмная кожа и одежда в тени почти чёрные: слабое собственное свечение текстуры
@@ -1242,7 +1252,7 @@ func _setup_asset(path: String) -> bool:
 			for an in _anim.get_animation_list():
 				var a := _anim.get_animation(an)
 				var k := String(an).to_lower()
-				if k.ends_with("walking") or k.ends_with("running") or k.ends_with("walk"):
+				if k.contains("walk") or k.ends_with("running") or k == "idle":
 					a.loop_mode = Animation.LOOP_LINEAR
 				_pin_root(a, skel)
 	return true
@@ -1279,6 +1289,18 @@ static func _pin_root(a: Animation, skel: Skeleton3D) -> void:
 			a.track_set_key_value(t, k, Vector3(rest.x, v.y, rest.z))
 
 
+## Первый вариант из options, чей клип есть в модели: копия с настоящим именем клипа или [].
+func _pick(options: Array) -> Array:
+	for o in options:
+		var c := _clip(String(o[0]))
+		if c != "":
+			var src: Array = o
+			var r := src.duplicate()
+			r[0] = c
+			return r
+	return []
+
+
 ## Имя клипа по ключу в нижнем регистре (или "").
 func _clip(key: String) -> String:
 	if _clips.has(key):
@@ -1312,18 +1334,22 @@ func _asset_process(delta: float) -> void:
 	elif _asset_speed > 0.3:
 		want = "walk"
 	if want == "idle":
-		var c := _clip(ASSET_IDLE)
-		if c == "":
+		var idle := _pick(ASSET_IDLE)
+		if idle.is_empty():
 			return
+		var looped := float(idle[3]) > 0.0
 		if _loco != "idle":
 			_loco = "idle"
 			_anim.speed_scale = 1.0
-			_anim.play(c, 0.25, 0.0)
-		_anim.seek(IDLE_FROM + (0.5 - 0.5 * cos(_t * 1.6)) * (IDLE_TO - IDLE_FROM), true)
+			_anim.play(String(idle[0]), 0.25, float(idle[3]))
+		if not looped:
+			var t0 := float(idle[1])
+			_anim.seek(t0 + (0.5 - 0.5 * cos(_t * 1.6)) * (float(idle[2]) - t0), true)
 		return
-	var c := _clip("walking" if want == "walk" else "running")
-	if c == "":
+	var loco := _pick(ASSET_WALK if want == "walk" else ASSET_RUN)
+	if loco.is_empty():
 		return
+	var c := String(loco[0])
 	if _loco != want:
 		_loco = want
 		_anim.play(c, 0.2)
@@ -1334,10 +1360,10 @@ func _asset_process(delta: float) -> void:
 func _asset_act(kind: String) -> void:
 	if _anim == null or not is_inside_tree():
 		return
-	var a: Array = ASSET_ACTIONS[kind]
-	var c := _clip(String(a[0]))
-	if c == "":
+	var a := _pick(ASSET_ACTIONS[kind])
+	if a.is_empty():
 		return
+	var c := String(a[0])
 	_anim.speed_scale = 1.0
 	_anim.play(c, 0.08, float(a[3]))
 	_anim.seek(float(a[1]), true)
