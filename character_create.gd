@@ -192,7 +192,8 @@ func _build_preview() -> PanelContainer:
 	vp.add_child(podium)
 
 	_preview_pivot = Node3D.new()
-	_preview_pivot.rotation.y = -0.45
+	# Модель смотрит в -Z, камера стоит на +Z: разворачиваем лицом к камере (и чуть вполоборота)
+	_preview_pivot.rotation.y = PI - 0.45
 	vp.add_child(_preview_pivot)
 
 	_preview_caption = _label("", 18, MUTED)
