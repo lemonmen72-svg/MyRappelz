@@ -170,20 +170,51 @@ static func creature_body(parent: Node3D, color: Color, s: float) -> StandardMat
 	return m
 
 
-## Всплывающий текст (урон, опыт).
-static func float_text(parent: Node, pos: Vector3, text: String, color: Color) -> void:
+static var _float_font: FontVariation
+
+
+## Всплывающий текст в аниме-стиле (урон, опыт, названия умений): жирный шрифт, цветная тёмная
+## обводка, «выпрыгивает» с увеличением и улетает вверх, тая. Числа (урон, лечение) крупнее
+## и чуть разбросаны в стороны, чтобы не слипались. size: множитель размера (крит — 1.4–1.6).
+static func float_text(parent: Node, pos: Vector3, text: String, color: Color, size: float = 1.0) -> void:
+	if parent == null or not is_instance_valid(parent) or not parent.is_inside_tree():
+		return
+	if _float_font == null:
+		_float_font = FontVariation.new()
+		_float_font.base_font = ThemeDB.fallback_font
+		_float_font.variation_embolden = 0.9
+	var numeric := text.is_valid_int()
+	var big := size > 1.2
 	var l := Label3D.new()
 	l.text = text
-	l.modulate = color
+	l.font = _float_font
+	l.font_size = 60 if numeric else 46
+	l.outline_size = 18 if big else 14
+	# Заливка — светлый вариант цвета, обводка — тёмный насыщенный оттенок того же цвета
+	l.modulate = color.lerp(Color.WHITE, 0.15)
+	if color.s < 0.15:
+		l.outline_modulate = Color(0.16, 0.12, 0.28)
+	else:
+		l.outline_modulate = Color.from_hsv(color.h, minf(1.0, color.s * 0.9 + 0.35), color.v * 0.32)
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = true
-	l.pixel_size = 0.012
-	l.font_size = 48
-	l.outline_size = 12
+	l.render_priority = 2
+	l.outline_render_priority = 1
+	var px := 0.012 * size
+	l.pixel_size = px * 0.3
 	parent.add_child(l)
-	l.global_position = pos
+	var start := pos
+	if numeric:
+		start += Vector3(randf_range(-0.35, 0.35), randf_range(-0.1, 0.15), 0.0)
+	l.global_position = start
+	# «Выпрыгивание»: резкое увеличение с перелётом, потом к обычному размеру
+	var pop := l.create_tween()
+	pop.tween_property(l, "pixel_size", px * (1.5 if big else 1.3), 0.11).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	pop.tween_property(l, "pixel_size", px, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# Подъём с замедлением и таяние
 	var t := l.create_tween()
 	t.set_parallel(true)
-	t.tween_property(l, "global_position:y", pos.y + 1.5, 0.8)
-	t.tween_property(l, "modulate:a", 0.0, 0.8)
+	t.tween_property(l, "global_position:y", start.y + (1.1 if numeric else 1.4), 0.95).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	t.tween_property(l, "modulate:a", 0.0, 0.35).set_delay(0.6)
+	t.tween_property(l, "outline_modulate:a", 0.0, 0.35).set_delay(0.6)
 	t.chain().tween_callback(l.queue_free)
