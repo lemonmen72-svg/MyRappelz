@@ -1,0 +1,458 @@
+{
+	"panther": {
+		"height": 1.15,
+		"length": 2.123,
+		"width": 0.587,
+		"bounds": [
+			[
+				-0.293,
+				0.0,
+				-1.062
+			],
+			[
+				0.294,
+				1.15,
+				1.061
+			]
+		],
+		"walk_speed": 0.645,
+		"run_speed": 4.348,
+		"attack_hit_time": 0.36,
+		"cast_time": 0.42,
+		"clips": {
+			"Idle": {
+				"length": 2.4,
+				"loop": true
+			},
+			"Walk": {
+				"length": 1.0,
+				"loop": true,
+				"speed": 0.645,
+				"stride": 0.4,
+				"duty": 0.62
+			},
+			"Run": {
+				"length": 0.46,
+				"loop": true,
+				"speed": 4.348,
+				"stride": 0.6,
+				"duty": 0.3
+			},
+			"Attack": {
+				"length": 0.75,
+				"loop": false
+			},
+			"Hit": {
+				"length": 0.35,
+				"loop": false
+			},
+			"Death": {
+				"length": 1.1,
+				"loop": false
+			},
+			"Cast": {
+				"length": 0.8,
+				"loop": false
+			}
+		},
+		"head_rest": [
+			0.004,
+			0.988,
+			0.867
+		],
+		"tris": 7000,
+		"verts": 6722,
+		"bones": {
+			"root": "Root",
+			"hips": "Hips",
+			"chest": "Chest",
+			"head": "Head",
+			"spine": [
+				"Spine1",
+				"Hips",
+				"Spine2",
+				"Spine3",
+				"Spine4",
+				"Chest"
+			],
+			"back": [],
+			"neck": [
+				"Neck1",
+				"Neck2"
+			],
+			"tail": [
+				"Tail1",
+				"Tail2",
+				"Tail3",
+				"Tail4",
+				"Tail5",
+				"Tail6"
+			],
+			"legs": {
+				"BL": [
+					"LegBL1",
+					"LegBL2",
+					"LegBL3",
+					"LegBL4",
+					"LegBL5",
+					"LegBL6"
+				],
+				"BR": [
+					"LegBR1",
+					"LegBR2",
+					"LegBR3",
+					"LegBR4",
+					"LegBR5",
+					"LegBR6"
+				],
+				"FL": [
+					"LegFL1",
+					"LegFL2",
+					"LegFL3",
+					"LegFL4",
+					"LegFL5",
+					"LegFL6"
+				],
+				"FR": [
+					"LegFR1",
+					"LegFR2",
+					"LegFR3",
+					"LegFR4",
+					"LegFR5",
+					"LegFR6"
+				]
+			},
+			"feet": {
+				"BL": "LegBL6",
+				"BR": "LegBR6",
+				"FL": "LegFL6",
+				"FR": "LegFR6"
+			},
+			"toes": {},
+			"ears": {
+				"L": [
+					"EarL1",
+					"EarL2"
+				],
+				"R": [
+					"EarR1",
+					"EarR2"
+				]
+			},
+			"wings": {},
+			"other": []
+		},
+		"source": "41958d0b-Meshy_AI_Character_output.glb"
+	},
+	"turtle": {
+		"height": 0.85,
+		"length": 1.483,
+		"width": 0.778,
+		"bounds": [
+			[
+				-0.389,
+				0.0,
+				-0.741
+			],
+			[
+				0.389,
+				0.85,
+				0.742
+			]
+		],
+		"walk_speed": 0.234,
+		"run_speed": 0.517,
+		"attack_hit_time": 0.36,
+		"cast_time": 0.42,
+		"clips": {
+			"Idle": {
+				"length": 3.0,
+				"loop": true
+			},
+			"Walk": {
+				"length": 1.1,
+				"loop": true,
+				"speed": 0.234,
+				"stride": 0.17,
+				"duty": 0.66
+			},
+			"Run": {
+				"length": 0.7,
+				"loop": true,
+				"speed": 0.517,
+				"stride": 0.21,
+				"duty": 0.58
+			},
+			"Attack": {
+				"length": 0.7,
+				"loop": false
+			},
+			"Hit": {
+				"length": 0.35,
+				"loop": false
+			},
+			"Death": {
+				"length": 1.2,
+				"loop": false
+			},
+			"Cast": {
+				"length": 0.8,
+				"loop": false
+			}
+		},
+		"head_rest": [
+			0.003,
+			0.504,
+			0.52
+		],
+		"tris": 6999,
+		"verts": 6897,
+		"bones": {
+			"root": "Root",
+			"hips": "Hips",
+			"chest": "Chest",
+			"head": "Head",
+			"spine": [
+				"Spine1",
+				"Spine2",
+				"Chest"
+			],
+			"back": [
+				"Back1",
+				"Hips"
+			],
+			"neck": [
+				"Neck"
+			],
+			"tail": [
+				"Tail1",
+				"Tail2",
+				"Tail3",
+				"Tail4"
+			],
+			"legs": {
+				"BL": [
+					"LegBL1",
+					"LegBL2",
+					"LegBL3",
+					"LegBL4",
+					"LegBL5"
+				],
+				"BR": [
+					"LegBR1",
+					"LegBR2",
+					"LegBR3",
+					"LegBR4",
+					"LegBR5"
+				],
+				"FL": [
+					"LegFL1",
+					"LegFL2",
+					"LegFL3",
+					"LegFL4",
+					"LegFL5",
+					"LegFL6"
+				],
+				"FR": [
+					"LegFR1",
+					"LegFR2",
+					"LegFR3",
+					"LegFR4",
+					"LegFR5",
+					"LegFR6"
+				]
+			},
+			"feet": {
+				"BL": "LegBL5",
+				"BR": "LegBR5",
+				"FL": "LegFL6",
+				"FR": "LegFR6"
+			},
+			"toes": {},
+			"ears": {},
+			"wings": {},
+			"other": [
+				"HeadEnd"
+			]
+		},
+		"source": "9e7d01d4-Meshy_AI_Character_output_1.glb"
+	},
+	"pheasant": {
+		"height": 0.85,
+		"length": 0.956,
+		"width": 0.407,
+		"bounds": [
+			[
+				-0.203,
+				0.0,
+				-0.477
+			],
+			[
+				0.203,
+				0.85,
+				0.479
+			]
+		],
+		"walk_speed": 0.394,
+		"run_speed": 1.625,
+		"attack_hit_time": 0.38,
+		"cast_time": 0.42,
+		"clips": {
+			"Idle": {
+				"length": 2.6,
+				"loop": true
+			},
+			"Walk": {
+				"length": 0.72,
+				"loop": true,
+				"speed": 0.394,
+				"stride": 0.17,
+				"duty": 0.6
+			},
+			"Run": {
+				"length": 0.4,
+				"loop": true,
+				"speed": 1.625,
+				"stride": 0.26,
+				"duty": 0.4
+			},
+			"Attack": {
+				"length": 0.7,
+				"loop": false
+			},
+			"Hit": {
+				"length": 0.35,
+				"loop": false
+			},
+			"Death": {
+				"length": 1.1,
+				"loop": false
+			},
+			"Cast": {
+				"length": 0.8,
+				"loop": false
+			}
+		},
+		"head_rest": [
+			0.002,
+			0.782,
+			0.342
+		],
+		"tris": 6997,
+		"verts": 7273,
+		"bones": {
+			"root": "Root",
+			"hips": "Hips",
+			"chest": "Hips",
+			"head": "Head",
+			"spine": [
+				"Spine1",
+				"Spine2",
+				"Hips"
+			],
+			"back": [],
+			"neck": [
+				"Neck1",
+				"Neck2",
+				"Neck3",
+				"Neck4",
+				"Neck5",
+				"Neck6",
+				"Neck7",
+				"Neck8"
+			],
+			"tail": [
+				"Tail1",
+				"Tail2",
+				"Tail3",
+				"Tail4",
+				"Tail5"
+			],
+			"legs": {
+				"L": [
+					"LegL1",
+					"LegL2",
+					"LegL3",
+					"LegL4",
+					"LegL5"
+				],
+				"R": [
+					"LegR1",
+					"LegR2",
+					"LegR3",
+					"LegR4",
+					"LegR5"
+				]
+			},
+			"feet": {
+				"L": "ToeL2_3",
+				"R": "ToeR3_3"
+			},
+			"toes": {
+				"L": [
+					[
+						"ToeL1_1",
+						"ToeL1_2",
+						"ToeL1_3"
+					],
+					[
+						"ToeL2_1",
+						"ToeL2_2",
+						"ToeL2_3"
+					],
+					[
+						"ToeL3_1",
+						"ToeL3_2",
+						"ToeL3_3"
+					],
+					[
+						"ToeL4_1",
+						"ToeL4_2",
+						"ToeL4_3"
+					]
+				],
+				"R": [
+					[
+						"ToeR1_1",
+						"ToeR1_2",
+						"ToeR1_3"
+					],
+					[
+						"ToeR2_1",
+						"ToeR2_2",
+						"ToeR2_3"
+					],
+					[
+						"ToeR3_1",
+						"ToeR3_2",
+						"ToeR3_3"
+					],
+					[
+						"ToeR4_1",
+						"ToeR4_2",
+						"ToeR4_3"
+					]
+				]
+			},
+			"ears": {
+				"L": [
+					"EarL1",
+					"EarL2"
+				],
+				"R": [
+					"EarR1",
+					"EarR2"
+				]
+			},
+			"wings": {
+				"L": "WingL",
+				"R": "WingR"
+			},
+			"other": [
+				"Throat1",
+				"Throat2"
+			]
+		},
+		"source": "27501d8c-Meshy_AI_Character_output_2.glb"
+	}
+}
