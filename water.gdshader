@@ -25,6 +25,9 @@ uniform vec3 glint_color : source_color = vec3(1.0, 0.97, 0.86);
 uniform float wave_height = 0.12;
 uniform float wave_speed = 1.0;
 uniform float flow_speed = 1.0;
+// false — облегчённый режим для слабых пресетов (Quality): 2 шума на пиксель вместо ~10,
+// без линий бликов, штрихов течения, рваных полос прибоя и искр солнца.
+uniform bool rich = true;
 
 varying vec3 v_pos;
 varying vec3 v_nrm;
@@ -94,20 +97,22 @@ void fragment() {
 	float alpha = mix(sea_a, riv_a, v_river);
 
 	// --- Линии бликов (как каустика на мелководье): изолиния суммы двух шумов
-	vec2 q = p * 0.42;
-	float r1 = wt_noise(q + vec2(t * 0.11, t * 0.06));
-	float r2 = wt_noise(q * 1.6 + vec2(-t * 0.08, t * 0.12) + 5.2);
-	float lines = smoothstep(0.90, 0.95, 1.0 - abs(r1 + r2 - 1.0));
-	// Течение: вытянутые вдоль русла светлые штрихи, плывут по течению
-	float fs = v_speed * flow_speed;
-	vec2 fq = vec2(v_flow.y * 0.55, v_flow.x * 0.16 - t * fs * 0.25);
-	float s1 = wt_noise(fq + 3.0);
-	float s2 = wt_noise(fq * vec2(1.7, 1.3) + vec2(7.1, -t * fs * 0.12));
-	float streak = smoothstep(0.66, 0.70, s1 * 0.65 + s2 * 0.35);
-	float shine = mix(lines * mix(0.38, 0.16, smoothstep(2.0, 24.0, off)),
-		mix(lines * 0.32, streak * 0.4, v_speed), v_river);
-	col = mix(col, foam_color, shine);
-	alpha = max(alpha, shine);
+	if (rich) {
+		vec2 q = p * 0.42;
+		float r1 = wt_noise(q + vec2(t * 0.11, t * 0.06));
+		float r2 = wt_noise(q * 1.6 + vec2(-t * 0.08, t * 0.12) + 5.2);
+		float lines = smoothstep(0.90, 0.95, 1.0 - abs(r1 + r2 - 1.0));
+		// Течение: вытянутые вдоль русла светлые штрихи, плывут по течению
+		float fs = v_speed * flow_speed;
+		vec2 fq = vec2(v_flow.y * 0.55, v_flow.x * 0.16 - t * fs * 0.25);
+		float s1 = wt_noise(fq + 3.0);
+		float s2 = wt_noise(fq * vec2(1.7, 1.3) + vec2(7.1, -t * fs * 0.12));
+		float streak = smoothstep(0.66, 0.70, s1 * 0.65 + s2 * 0.35);
+		float shine = mix(lines * mix(0.38, 0.16, smoothstep(2.0, 24.0, off)),
+			mix(lines * 0.32, streak * 0.4, v_speed), v_river);
+		col = mix(col, foam_color, shine);
+		alpha = max(alpha, shine);
+	}
 
 	// --- Пена
 	float fn = wt_noise(p * 0.55 + vec2(t * 0.15, t * 0.1));
@@ -118,7 +123,9 @@ void fragment() {
 	float b = fract(off * 0.32 + t * 0.14 + fn * 0.35);
 	float band = smoothstep(0.0, 0.06, b) * (1.0 - smoothstep(0.10, 0.17, b));
 	band *= (1.0 - smoothstep(1.5, 8.0, off)) * smoothstep(-0.8, 0.5, off) * (1.0 - v_river);
-	band *= smoothstep(0.38, 0.5, wt_noise(p * 0.22 + 11.0));
+	if (rich) {
+		band *= smoothstep(0.38, 0.5, wt_noise(p * 0.22 + 11.0));
+	}
 	// Вокруг камней в воде (пульсирует)
 	float rf = rock + (fn - 0.5) * 0.25 + 0.06 * sin(t * 2.2 + p.x * 0.7 + p.y * 0.4);
 	float foam = max(max(edge, band), smoothstep(0.42, 0.5, rf));
@@ -131,18 +138,20 @@ void fragment() {
 	// --- Френель (отражение неба под углом), широкий отблеск и искры солнца
 	vec3 cam = INV_VIEW_MATRIX[3].xyz;
 	vec3 V = normalize(cam - v_pos);
-	vec2 nn = vec2(wt_noise(p * 0.9 + t * 0.4), wt_noise(p * 0.9 - t * 0.35 + 3.3)) - 0.5;
-	vec3 N = normalize(v_nrm + vec3(nn.x, 0.0, nn.y) * 0.35);
 	float fres = pow(1.0 - clamp(dot(V, v_nrm), 0.0, 1.0), 4.0);
 	col = mix(col, sky_color, fres * 0.55 * (1.0 - fm));
 	alpha = mix(alpha, 1.0, fres * 0.6);
 	vec3 H = normalize(normalize(sun_dir) + V);
 	float wide = pow(clamp(dot(v_nrm, H), 0.0, 1.0), 40.0);
 	col += glint_color * wide * 0.18 * (1.0 - fm);
-	float spec = pow(clamp(dot(N, H), 0.0, 1.0), 220.0);
-	float glint = smoothstep(0.35, 0.45, spec) * (1.0 - fm);
-	col = mix(col, glint_color, glint);
-	alpha = max(alpha, glint);
+	if (rich) {
+		vec2 nn = vec2(wt_noise(p * 0.9 + t * 0.4), wt_noise(p * 0.9 - t * 0.35 + 3.3)) - 0.5;
+		vec3 N = normalize(v_nrm + vec3(nn.x, 0.0, nn.y) * 0.35);
+		float spec = pow(clamp(dot(N, H), 0.0, 1.0), 220.0);
+		float glint = smoothstep(0.35, 0.45, spec) * (1.0 - fm);
+		col = mix(col, glint_color, glint);
+		alpha = max(alpha, glint);
+	}
 
 	ALBEDO = col;
 	ALPHA = clamp(alpha, 0.0, 1.0);

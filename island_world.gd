@@ -41,6 +41,8 @@ var water_d := PackedFloat32Array()
 var water_level := PackedFloat32Array()
 var sea_level := -2.5
 var river_level := -2.2
+## Материал рельефа (Quality переключает облегчённый режим шейдера).
+var terrain_material: ShaderMaterial = null
 ## Мосты: {"a": Vector3, "b": Vector3, "width": float}
 var bridges: Array[Dictionary] = []
 
@@ -391,6 +393,8 @@ func _build_terrain_mesh() -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://island_terrain.gdshader")
 	mat.set_shader_parameter("road_half", float(cfg.get("roads", {}).get("width", 3.2)) * 0.45)
+	mat.set_shader_parameter("rich", Quality.rich_shaders())
+	terrain_material = mat
 	var holder := Node3D.new()
 	holder.name = "Terrain"
 	add_child(holder)

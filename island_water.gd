@@ -28,6 +28,9 @@ const ROCK_FOAM := 2.4
 ## Концы реки у моря продлеваются в море на столько, м.
 const MOUTH_EXTEND := 10.0
 
+## Материал воды (Quality переключает облегчённый режим шейдера).
+static var material: ShaderMaterial = null
+
 
 static func build(world: IslandWorld) -> void:
 	var rng := RandomNumberGenerator.new()
@@ -45,6 +48,8 @@ static func build(world: IslandWorld) -> void:
 	mat.set_shader_parameter("cd_range", CD_RANGE)
 	mat.set_shader_parameter("depth_range", DEPTH_RANGE)
 	mat.set_shader_parameter("sun_dir", _sun_dir(world))
+	mat.set_shader_parameter("rich", Quality.rich_shaders())
+	material = mat
 
 	var mi := MeshInstance3D.new()
 	mi.name = "Water"

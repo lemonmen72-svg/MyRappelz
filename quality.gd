@@ -26,21 +26,21 @@ const PRESETS := [
 		"detail_distance": 45.0, "tree_distance": 90.0,
 		"shadows": false, "shadow_distance": 0.0, "shadow_splits": false, "shadow_atlas": 1024,
 		"small_shadows": false, "postfx": false, "bloom": false, "outlines": false,
-		"render_scale": 0.6,
+		"render_scale": 0.6, "rich_shaders": false,
 	},
 	{
 		"grass_density": 0.65, "grass_distance": 38.0, "grass_blades": 5, "flower_density": 0.75,
 		"detail_distance": 65.0, "tree_distance": 125.0,
 		"shadows": true, "shadow_distance": 32.0, "shadow_splits": false, "shadow_atlas": 2048,
 		"small_shadows": false, "postfx": false, "bloom": false, "outlines": true,
-		"render_scale": 0.75,
+		"render_scale": 0.75, "rich_shaders": false,
 	},
 	{
 		"grass_density": 1.0, "grass_distance": 58.0, "grass_blades": 6, "flower_density": 1.0,
 		"detail_distance": 95.0, "tree_distance": 175.0,
 		"shadows": true, "shadow_distance": 60.0, "shadow_splits": true, "shadow_atlas": 4096,
 		"small_shadows": true, "postfx": true, "bloom": true, "outlines": true,
-		"render_scale": 1.0,
+		"render_scale": 1.0, "rich_shaders": true,
 	},
 ]
 
@@ -135,6 +135,11 @@ static func bloom() -> bool:
 
 
 ## Контуры у мелочей (кусты, камни). У деревьев, персонажей и зверей контуры есть всегда.
+## Полные (дорогие) версии шейдеров земли и воды; иначе — облегчённые.
+static func rich_shaders() -> bool:
+	return bool(_p("rich_shaders"))
+
+
 static func outlines() -> bool:
 	return bool(_p("outlines"))
 
@@ -145,6 +150,10 @@ static func apply(tree: SceneTree) -> void:
 		return
 	apply_lights(tree.root)
 	apply_resolution(tree)
+	if IslandWorld.current != null and IslandWorld.current.terrain_material != null:
+		IslandWorld.current.terrain_material.set_shader_parameter("rich", rich_shaders())
+	if IslandWater.material != null:
+		IslandWater.material.set_shader_parameter("rich", rich_shaders())
 	for n in tree.get_nodes_in_group("postfx"):
 		if n.has_method("apply_quality"):
 			n.call("apply_quality")
