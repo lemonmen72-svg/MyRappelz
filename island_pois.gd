@@ -10,13 +10,26 @@ extends RefCounted
 ## и crystal.gdshader. Постройки — StaticBody3D (слой 1) с простыми боксами/цилиндрами; клетки под
 ## ними помечаются непроходимыми (звери и растительность туда не попадут), настил причала — проходимым.
 ## Следы построек для других модулей: world.get_meta("poi_footprints") — [{"c": Vector2, "r": float}].
+##
+## Отрисовка (телефон: важно число вызовов). Всё неподвижное склеивается по зонам (город, деревня с
+## мельницей, полями и загоном, порт с маяком и причалом, пещера с лагерями, ...): у зоны два меша —
+## «Static» (постройки, ограды, отбрасывают тень, видны всегда) и «Props» (мелочи, кристаллы, ореолы,
+## туман; без теней, до NEAR_RANGE) — по одной поверхности на материал. Тела StaticBody3D остаются
+## (коллизия, группа poi_buildings), но мешей в них нет. Отдельно — только анимированное: крылья
+## мельницы, луч маяка, корабль, овцы и огни (MultiMesh), полотнища флажков; частицы и подписи.
 
 ## Свободный круг в центре города, м.
 const TOWN_FREE := 9.5
 ## Дальность видимости мелочей (ящики, бочки, фонари, кристаллы), м.
 const PROP_RANGE := 75.0
-## Дальность видимости колосьев и перил, м.
+## Дальность видимости колосьев, м.
 const DECOR_RANGE := 120.0
+## Дальность видимости меша мелочей зоны (от его центра), м.
+const NEAR_RANGE := 110.0
+## POI ближе этого к центру зоны склеиваются в её меши, м.
+const ZONE_JOIN := 45.0
+## Типы POI — центры своих зон.
+const BIG_ZONES := ["town", "light_elf_village", "dark_elf_village", "human_village", "port", "cave"]
 const LABEL_COLORS := {
 	"town": Color(1.0, 0.9, 0.55),
 	"light_elf_village": Color(0.8, 0.95, 1.0),
@@ -26,6 +39,23 @@ const LABEL_COLORS := {
 	"cave": Color(0.85, 0.85, 0.9),
 	"tent": Color(1.0, 0.9, 0.75),
 }
+
+
+## Зона склейки: неподвижная геометрия рядом стоящих POI — в двух Kit (координаты от origin).
+class Zone:
+	## Центр зоны на карте (для поиска ближайшей).
+	var c := Vector2.ZERO
+	## Узел, в который ставятся меши зоны, и их положение в нём.
+	var node: Node3D
+	var origin := Vector3.ZERO
+	## Координаты острова → координаты мешей зоны.
+	var inv := Transform3D.IDENTITY
+	## Постройки (тени, без ограничения дальности) и мелочи (без теней, до NEAR_RANGE).
+	var far := PoiModels.Kit.new()
+	var near := PoiModels.Kit.new()
+	## Огни (MultiMesh, мерцают) в координатах мешей зоны.
+	var flames: Array[Transform3D] = []
+
 
 var w: IslandWorld
 var rng := RandomNumberGenerator.new()
@@ -40,8 +70,11 @@ var rects: Array[Dictionary] = []
 var footprints: Array = []
 ## Сдвинутые с дороги центры POI (id → Vector2).
 var moved := {}
-## Общие квадраты ореолов по размеру.
-var _quads := {}
+## Зоны склейки мешей и текущая (куда идут модели строящегося POI).
+var zones: Array[Zone] = []
+var _zone: Zone
+## Общий меш полотнища флажка.
+var _flag_cloth: ArrayMesh
 
 
 static func build(world: IslandWorld, _rng: RandomNumberGenerator) -> void:
@@ -54,6 +87,7 @@ func _build(world: IslandWorld) -> void:
 	# Своё зерно: раскладка декора не сдвигает общий генератор мира (звери, растительность)
 	rng.seed = 7311
 	road_half = float(w.cfg.get("roads", {}).get("width", 3.2)) * 0.5
+	PoiModels.apply_quality()
 	root = Node3D.new()
 	root.name = "Pois"
 	w.add_child(root)
@@ -61,11 +95,22 @@ func _build(world: IslandWorld) -> void:
 	anim.name = "PoiAnimator"
 	root.add_child(anim)
 	_register()
+	# Узлы POI и зоны крупных POI заранее: мелкие POI рядом склеиваются с ними
+	var holders: Array[Node3D] = []
 	for p in w.cfg.get("pois", []):
 		var poi: Dictionary = p
 		var holder := Node3D.new()
 		holder.name = String(poi.get("id", "poi"))
 		root.add_child(holder)
+		holders.append(holder)
+		if BIG_ZONES.has(String(poi.get("type", ""))):
+			_new_zone(v2(poi["center"]), holder)
+	var hi := 0
+	for p in w.cfg.get("pois", []):
+		var poi: Dictionary = p
+		var holder := holders[hi]
+		hi += 1
+		_zone = _zone_at(v2(poi["center"]), holder)
 		var type := String(poi.get("type", ""))
 		match type:
 			"town":
@@ -99,6 +144,7 @@ func _build(world: IslandWorld) -> void:
 		if LABEL_COLORS.has(type):
 			_poi_label(holder, poi, type)
 	_bridge_rails()
+	_finish_zones()
 	w.set_meta("poi_footprints", footprints)
 
 
@@ -314,6 +360,7 @@ func _cyl_shape(body: Node3D, r: float, h: float, pos: Vector3) -> void:
 	body.add_child(col)
 
 
+## Отдельный меш-узел (только для анимированного: крылья мельницы, корабль).
 func _mesh(parent: Node3D, mesh: Mesh, pos: Vector3, yaw: float = 0.0, range_end: float = 0.0,
 		shadow: bool = true) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -329,14 +376,14 @@ func _mesh(parent: Node3D, mesh: Mesh, pos: Vector3, yaw: float = 0.0, range_end
 	return mi
 
 
-## Постройка: тело с коллизией-боксом size (по центру основания) и мешем модели kind.
+## Постройка: тело с коллизией-боксом size (по центру основания), модель kind — в меш зоны.
 ## Фасад (+Z) смотрит на face. cyl_r > 0 — коллизия цилиндром этого радиуса.
 func _building(parent: Node3D, kind: String, p: Vector2, face: Vector2, size: Vector3, r_place: float,
 		cyl_r: float = 0.0) -> StaticBody3D:
 	var yaw := _yaw_to(p, face)
 	var body := _body(parent, Vector3(p.x, _floor_y(p, maxf(size.x, size.z) * 0.45), p.y), yaw)
 	body.name = kind
-	_mesh(body, PoiModels.get_mesh(kind), Vector3.ZERO)
+	_put(body, kind)
 	if cyl_r > 0.0:
 		_cyl_shape(body, cyl_r, size.y, Vector3.ZERO)
 		_occupy(p, r_place, Vector2(cyl_r, cyl_r) * 0.75, 0.0)
@@ -346,39 +393,135 @@ func _building(parent: Node3D, kind: String, p: Vector2, face: Vector2, size: Ve
 	return body
 
 
-## Мелкий предмет без коллизии (или с маленьким цилиндром col_r > 0).
-func _prop(parent: Node3D, kind: String, p: Vector2, yaw: float, col_r: float = 0.0, col_h: float = 1.0,
-		range_end: float = PROP_RANGE) -> Node3D:
+## Мелкий предмет (в меш мелочей зоны) без коллизии или с маленьким цилиндром col_r > 0.
+## Возвращает тело (если есть коллизия) — к нему можно привязать ореол.
+func _prop(parent: Node3D, kind: String, p: Vector2, yaw: float, col_r: float = 0.0,
+		col_h: float = 1.0) -> StaticBody3D:
 	var pos := Vector3(p.x, w.height_at(p.x, p.y) - 0.03, p.y)
 	if col_r > 0.0:
 		var body := _body(parent, pos, yaw)
 		body.name = kind
-		_mesh(body, PoiModels.get_mesh(kind), Vector3.ZERO, 0.0, range_end, false)
+		_put(body, kind, Transform3D.IDENTITY, true)
 		_cyl_shape(body, col_r, col_h, Vector3.ZERO)
 		_occupy(p, col_r + 0.3)
 		return body
-	var mi := _mesh(parent, PoiModels.get_mesh(kind), pos, yaw, range_end, false)
-	mi.name = kind
+	_put(parent, kind, _xf(pos, yaw), true)
 	_take(p, 0.5)
-	return mi
+	return null
 
 
-## Ореол-свечение (аддитивный спрайт) — дешёвая замена bloom у кристаллов и огней.
-func _halo(parent: Node3D, pos: Vector3, c: Color, size: float, range_end: float = PROP_RANGE) -> MeshInstance3D:
-	var key := snappedf(size, 0.1)
-	if not _quads.has(key):
-		var q := QuadMesh.new()
-		q.size = Vector2(key, key)
-		_quads[key] = q
+## Ореол-свечение (аддитивное пятно лицом к камере) — дешёвая замена bloom у кристаллов и огней.
+## Все ореолы зоны — одна поверхность меша мелочей (разворот к камере в шейдере).
+func _halo(parent: Node3D, pos: Vector3, c: Color, size: float) -> void:
+	var p := _zone.inv * (_world_xf(parent) * pos)
+	_zone.near.halo(p, c, snappedf(size, 0.1))
+
+
+## Огонь (мерцает): экземпляр MultiMesh огней зоны; parent и local — как у _put.
+func _flame(parent: Node3D, local: Transform3D) -> void:
+	_zone.flames.append(_zone.inv * _world_xf(parent) * local)
+
+
+# ---------- Зоны: склейка мешей ----------
+
+static func _xf(pos: Vector3, yaw: float = 0.0, s: Vector3 = Vector3.ONE) -> Transform3D:
+	return Transform3D(Basis(Vector3.UP, yaw) * Basis.from_scale(s), pos)
+
+
+## Фаза пульсации кристаллов объекта в точке p (у каждого своя).
+static func _phase(p: Vector3) -> float:
+	return fposmod(sin(p.x * 12.9898 + p.z * 78.233) * 43758.5453, 1.0) * TAU
+
+
+## Преобразование узла n в координатах острова (w) — по цепочке родителей, без дерева сцены.
+func _world_xf(n: Node3D) -> Transform3D:
+	var xf := Transform3D.IDENTITY
+	var cur: Node = n
+	while cur != null and cur != w:
+		var n3 := cur as Node3D
+		if n3 != null:
+			xf = n3.transform * xf
+		cur = cur.get_parent()
+	return xf
+
+
+func _new_zone(c: Vector2, node: Node3D) -> Zone:
+	var z := Zone.new()
+	z.c = c
+	z.node = node
+	var nw := _world_xf(node)
+	z.origin = nw.affine_inverse() * w.ground(c.x, c.y, 0.0)
+	z.inv = (nw * Transform3D(Basis.IDENTITY, z.origin)).affine_inverse()
+	zones.append(z)
+	return z
+
+
+## Зона для POI в точке p: ближайшая не дальше ZONE_JOIN, иначе новая (меши — в node).
+func _zone_at(p: Vector2, node: Node3D) -> Zone:
+	var best: Zone = null
+	var best_d := ZONE_JOIN
+	for z in zones:
+		var d := z.c.distance_to(p)
+		if d < best_d:
+			best_d = d
+			best = z
+	if best == null:
+		best = _new_zone(p, node)
+	return best
+
+
+## Модель kind в меш текущей зоны: parent — узел-опора (тело постройки, ограда...), local —
+## положение относительно него; near — в меш мелочей (без теней, до NEAR_RANGE), иначе построек.
+func _put(parent: Node3D, kind: String, local: Transform3D = Transform3D.IDENTITY, near: bool = false) -> void:
+	_put_kit(parent, PoiModels.get_kit(kind), local, near)
+
+
+func _put_kit(parent: Node3D, kit: PoiModels.Kit, local: Transform3D = Transform3D.IDENTITY,
+		near: bool = false) -> void:
+	var wx := _world_xf(parent) * local
+	var layer: PoiModels.Kit = _zone.near if near else _zone.far
+	layer.append_kit(kit, _zone.inv * wx, _phase(wx.origin))
+
+
+## Собирает меши зон: «Static» (постройки) и «Props» (мелочи), огни — MultiMesh «Flames».
+func _finish_zones() -> void:
+	for z in zones:
+		_zone_mesh(z, z.far, "Static", false)
+		_zone_mesh(z, z.near, "Props", true)
+		if z.flames.is_empty():
+			continue
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = PoiModels.get_mesh("flame")
+		mm.instance_count = z.flames.size()
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = "Flames"
+		mmi.multimesh = mm
+		mmi.position = z.origin
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi.visibility_range_end = NEAR_RANGE
+		mmi.visibility_range_end_margin = 8.0
+		z.node.add_child(mmi)
+		for i in z.flames.size():
+			mm.set_instance_transform(i, z.flames[i])
+			anim.flicker_mm(mmi, i, z.flames[i])
+
+
+func _zone_mesh(z: Zone, kit: PoiModels.Kit, mesh_name: String, near: bool) -> void:
+	if kit.is_empty():
+		return
 	var mi := MeshInstance3D.new()
-	mi.mesh = _quads[key]
-	mi.material_override = PoiModels.halo_material(c)
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.name = mesh_name
+	mi.mesh = kit.to_mesh()
+	mi.position = z.origin
 	mi.set_meta("no_outline", true)
-	mi.position = pos
-	mi.visibility_range_end = range_end
-	parent.add_child(mi)
-	return mi
+	if near:
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.visibility_range_end = NEAR_RANGE
+		mi.visibility_range_end_margin = 8.0
+		# Ореолы разворачиваются в шейдере, AABB меша — по их центрам: запас на их размер
+		mi.extra_cull_margin = 4.0
+	z.node.add_child(mi)
 
 
 func _label(parent: Node3D, text: String, pos: Vector3, c: Color, font: int, px: float) -> Label3D:
@@ -417,7 +560,7 @@ func _marker(parent: Node3D, poi: Dictionary) -> void:
 
 ## Деревянная ограда по кругу (центр c, радиус r): столбики через ~step м и две жерди.
 ## gaps — углы проёмов (рад), gap_half — полуширина проёма (рад). Жерди над дорогой не ставятся.
-## Коллизия — бокс на каждый пролёт (одно тело на всю ограду).
+## Коллизия — бокс на каждый пролёт (одно тело на всю ограду), модель — в меш построек зоны.
 func _fence_ring(parent: Node3D, c: Vector2, r: float, gaps: Array, gap_half: float, post_h: float,
 		step: float, color: Color) -> void:
 	var base_y := w.height_at(c.x, c.y)
@@ -460,8 +603,7 @@ func _fence_ring(parent: Node3D, c: Vector2, r: float, gaps: Array, gap_half: fl
 			var yy: float = float(hy) * post_h
 			k.box(mid + Vector3(0, yy, 0), Vector3(length + 0.1, 0.12, 0.08), color, Vector3(0, yaw, pitch))
 		_box_shape(body, Vector3(length, post_h, 0.25), mid + Vector3(0, post_h * 0.5, 0), yaw)
-	var mi := _mesh(node, k.to_mesh(), Vector3.ZERO, 0.0, DECOR_RANGE * 1.5, false)
-	mi.name = "FenceMesh"
+	_put_kit(node, k)
 
 
 ## Углы (рад), под которыми дороги пересекают окружность радиуса r вокруг c
@@ -529,7 +671,7 @@ func _gate_arch(parent: Node3D, c: Vector2, r: float, ang: float, half_w: float)
 	k.box(Vector3(0, 3.35, 0.0), Vector3(1.8, 0.55, 0.1), PoiModels.WOOD_LIGHT)
 	k.box(Vector3(0, 3.35, 0.0), Vector3(1.4, 0.12, 0.13), PoiModels.ROOF_ORANGE)
 	PoiModels.gable_roof(k, 4.0, 0.9, half_w * 2.0 + 0.8, 0.45, 0.2, 0.12, PoiModels.ROOF_ORANGE, wood)
-	_mesh(body, k.to_mesh(), Vector3.ZERO)
+	_put_kit(body, k)
 
 
 # ---------- Город новичков ----------
@@ -573,7 +715,7 @@ func _town(h: Node3D, poi: Dictionary) -> void:
 	if wp.is_finite():
 		var wb := _body(h, Vector3(wp.x, _floor_y(wp, 1.0), wp.y), _yaw_to(wp, c))
 		wb.name = "Well"
-		_mesh(wb, PoiModels.get_mesh("well"), Vector3.ZERO, 0.0, DECOR_RANGE)
+		_put(wb, "well")
 		_cyl_shape(wb, 1.05, 2.6, Vector3.ZERO)
 		_occupy(wp, 1.4, Vector2(0.9, 0.9))
 	for a in [125.0, 158.0]:
@@ -581,7 +723,7 @@ func _town(h: Node3D, poi: Dictionary) -> void:
 		if bp.is_finite():
 			var bb := _body(h, Vector3(bp.x, _floor_y(bp, 1.0), bp.y), _yaw_to(bp, c))
 			bb.name = "NoticeBoard"
-			_mesh(bb, PoiModels.get_mesh("notice_board"), Vector3.ZERO, 0.0, DECOR_RANGE)
+			_put(bb, "notice_board")
 			_box_shape(bb, Vector3(2.2, 2.6, 0.4), Vector3(0, 1.3, 0))
 			_occupy(bp, 1.4)
 	# Фонари по кругу вокруг площади
@@ -617,19 +759,9 @@ func _arena(parent: Node3D, p: Vector2, town_c: Vector2) -> void:
 	parent.add_child(node)
 	var r := 3.6
 	var to_town := (town_c - p).angle()
-	var floor_mi := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
-	cm.top_radius = r + 0.2
-	cm.bottom_radius = r + 0.3
-	cm.height = 0.12
-	cm.radial_segments = 20
-	cm.rings = 1
-	floor_mi.mesh = cm
-	floor_mi.material_override = PoiModels.toon_material(Color(0.9, 0.78, 0.55))
-	floor_mi.set_meta("no_outline", true)
-	floor_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	floor_mi.position = Vector3(p.x, w.height_at(p.x, p.y) + 0.02, p.y)
-	node.add_child(floor_mi)
+	var fk := PoiModels.Kit.new()
+	fk.cyl(Vector3(p.x, w.height_at(p.x, p.y) + 0.02, p.y), r + 0.3, r + 0.2, 0.12, Color(0.9, 0.78, 0.55), 20)
+	_put_kit(node, fk)
 	_fence_ring(node, p, r, [to_town], 0.42, 0.9, 1.3, PoiModels.WOOD_LIGHT)
 	var back := p - Vector2(cos(to_town), sin(to_town)) * (r - 0.9)
 	_prop(node, "weapon_rack", back, _yaw_to(back, p), 0.5, 1.3)
@@ -637,16 +769,52 @@ func _arena(parent: Node3D, p: Vector2, town_c: Vector2) -> void:
 	_prop(node, "dummy", dummy, _yaw_to(dummy, town_c), 0.35, 2.2)
 	_occupy(p, r + 0.4)
 	# Флажки у входа
-	var mats := {
-		"stone": Util.mat(PoiModels.STONE),
-		"pole": Util.mat(Color(0.82, 0.74, 0.6)),
-		"gold": Util.mat(PoiModels.GOLD),
-	}
 	for s in [-1.0, 1.0]:
 		var a: float = to_town + float(s) * 0.62
 		var fp := p + Vector2(cos(a), sin(a)) * (r + 0.6)
-		WorldBuilder._add_flag(node, w.ground(fp.x, fp.y, -0.05), mats,
+		_flag(node, w.ground(fp.x, fp.y, -0.05),
 			Color(0.95, 0.42, 0.38) if s < 0.0 else Color(0.16, 0.66, 0.74), Color(1.0, 0.92, 0.6), float(s) * 1.3)
+
+
+## Флажок на шесте (как WorldBuilder._add_flag): основание, шест и шарик — в меш построек зоны,
+## полотнище — своим мешем (flag.gdshader, волнуется), коллизия — тонкий цилиндр.
+func _flag(parent: Node3D, pos: Vector3, main: Color, stripe: Color, phase: float) -> void:
+	var body := WorldBuilder._small_body(parent, pos, 0.12, 4.4)
+	body.name = "Flag"
+	var k := PoiModels.Kit.new()
+	k.box(Vector3(0, 0.125, 0), Vector3(0.5, 0.25, 0.5), PoiModels.STONE)
+	k.cyl(Vector3(0, 2.3, 0), 0.06, 0.045, 4.4, Color(0.82, 0.74, 0.6), 8)
+	k.ball(Vector3(0, 4.56, 0), Vector3(0.1, 0.1, 0.1), PoiModels.GOLD, 10, 6)
+	_put_kit(body, k)
+	if _flag_cloth == null:
+		var acc := WorldBuilder.MeshAcc.new()
+		var segs := 10
+		for sg in segs + 1:
+			var u := float(sg) / float(segs)
+			var x := u * 1.7
+			var hh := lerpf(0.42, 0.06, u)
+			var cy := -0.42 - u * 0.12
+			acc.add(Vector3(x, cy + hh, 0), Vector3.BACK, Color.WHITE, Vector2(u, 0))
+			acc.add(Vector3(x, cy - hh, 0), Vector3.BACK, Color.WHITE, Vector2(u, 1))
+		for sg in segs:
+			var t0 := sg * 2
+			acc.tri(t0, t0 + 2, t0 + 1)
+			acc.tri(t0 + 2, t0 + 3, t0 + 1)
+		_flag_cloth = acc.to_mesh()
+	var fm := WorldBuilder._shader_mat("res://flag.gdshader")
+	fm.set_shader_parameter("main_color", main)
+	fm.set_shader_parameter("stripe_color", stripe)
+	fm.set_shader_parameter("phase", phase)
+	var cloth := MeshInstance3D.new()
+	cloth.name = "FlagCloth"
+	cloth.mesh = _flag_cloth
+	cloth.material_override = fm
+	cloth.set_meta("no_outline", true)
+	cloth.position = Vector3(0.05, 4.35, 0)
+	# Локальная +X смотрит по ветру
+	cloth.rotation.y = -atan2(WorldBuilder.WIND_DIR.y, WorldBuilder.WIND_DIR.x)
+	cloth.visibility_range_end = NEAR_RANGE
+	body.add_child(cloth)
 
 
 ## Ряд из трёх тренировочных манекенов лицом к центру города.
@@ -655,7 +823,7 @@ func _dummies(parent: Node3D, p: Vector2, town_c: Vector2) -> void:
 	var side := Vector2(-to_town.y, to_town.x)
 	for i in 3:
 		var q := p + side * (float(i) - 1.0) * 1.9
-		_prop(parent, "dummy", q, _yaw_to(q, town_c), 0.35, 2.2, DECOR_RANGE)
+		_prop(parent, "dummy", q, _yaw_to(q, town_c), 0.35, 2.2)
 	_occupy(p, 2.6)
 
 
@@ -681,7 +849,7 @@ func _central(h: Node3D, c: Vector2, kind: String, r: float, col_h: float) -> Ve
 			if _clear(p, r, 0.5):
 				var body := _body(h, Vector3(p.x, _floor_y(p, r * 0.8), p.y), rng.randf() * TAU)
 				body.name = kind
-				_mesh(body, PoiModels.get_mesh(kind), Vector3.ZERO)
+				_put(body, kind)
 				_cyl_shape(body, r * 0.85, col_h, Vector3.ZERO)
 				_occupy(p, r, Vector2(r, r) * 0.6)
 				return p
@@ -702,10 +870,8 @@ func _crystals(h: Node3D, c: Vector2, kinds: Array, count: int, r0: float, r1: f
 			continue
 		var kind: String = kinds[placed % kinds.size()]
 		var s := rng.randf_range(0.8, 1.35)
-		var mi := _mesh(h, PoiModels.get_mesh(kind), Vector3(p.x, w.height_at(p.x, p.y) - 0.1, p.y),
-			rng.randf() * TAU, PROP_RANGE * 1.4, false)
-		mi.scale = Vector3(s, s, s)
-		_halo(h, Vector3(p.x, w.height_at(p.x, p.y) + 1.0 * s, p.y), halo, 2.8 * s, PROP_RANGE)
+		_put(h, kind, _xf(Vector3(p.x, w.height_at(p.x, p.y) - 0.1, p.y), rng.randf() * TAU, Vector3(s, s, s)), true)
+		_halo(h, Vector3(p.x, w.height_at(p.x, p.y) + 1.0 * s, p.y), halo, 2.8 * s)
 		_occupy(p, 1.0 * s)
 		placed += 1
 
@@ -715,7 +881,7 @@ func _light_elf_village(h: Node3D, poi: Dictionary) -> void:
 	var r := float(poi.get("radius", 16.0))
 	var mc := _central(h, c, "crystals_blue_big", 2.1, 4.5)
 	if mc.is_finite():
-		_halo(h, w.ground(mc.x, mc.y, 3.0), Color(0.55, 0.85, 1.0, 0.6), 6.0, 200.0)
+		_halo(h, w.ground(mc.x, mc.y, 3.0), Color(0.55, 0.85, 1.0, 0.6), 6.0)
 		var sp := Vfx.ambient_sparkles(h, Color(0.7, 0.92, 1.0), 2.5, 10)
 		sp.position = w.ground(mc.x, mc.y, 2.5)
 		sp.visibility_range_end = PROP_RANGE
@@ -747,14 +913,14 @@ func _dark_elf_village(h: Node3D, poi: Dictionary) -> void:
 	_plan(h, c, plan, c, r + 4.0)
 	var mc := _central(h, c, "crystals_purple_big", 2.1, 4.5)
 	if mc.is_finite():
-		_halo(h, w.ground(mc.x, mc.y, 3.0), Color(0.75, 0.4, 1.0, 0.6), 6.0, 200.0)
+		_halo(h, w.ground(mc.x, mc.y, 3.0), Color(0.75, 0.4, 1.0, 0.6), 6.0)
 	# Острые шпили-обелиски
 	for a in [-130.0, -50.0, 60.0, 125.0]:
 		var sp := _spot(c, a, 13.5, 1.1, 0.0, 0.5)
 		if sp.is_finite():
 			var body := _body(h, Vector3(sp.x, _floor_y(sp, 0.8), sp.y), rng.randf() * TAU)
 			body.name = "Spire"
-			_mesh(body, PoiModels.get_mesh("dark_spire"), Vector3.ZERO)
+			_put(body, "dark_spire")
 			_cyl_shape(body, 0.9, 6.0, Vector3.ZERO)
 			_occupy(sp, 1.1, Vector2(0.6, 0.6))
 	_crystals(h, c, ["crystals_purple"], 10, 5.0, r + 5.0, Color(0.72, 0.38, 1.0, 0.45))
@@ -799,20 +965,14 @@ func _dark_fog(h: Node3D, c: Vector2, r: float) -> void:
 	fog.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	h.add_child(fog)
 	fog.emitting = true
-	var mat := PoiModels.soft_material(Color(0.58, 0.46, 0.74, 0.22), false, "dot")
+	# Слои дымки — поверхность «fog_dark» меша мелочей зоны
+	var k := PoiModels.Kit.new()
 	for i in 3:
 		var a := TAU * float(i) / 3.0 + 0.4
 		var p := c + Vector2(cos(a), sin(a)) * r * 0.45
-		var plane := MeshInstance3D.new()
-		var pm := PlaneMesh.new()
-		pm.size = Vector2(r * 1.3, r * 1.3)
-		plane.mesh = pm
-		plane.material_override = mat
-		plane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		plane.set_meta("no_outline", true)
-		plane.position = Vector3(p.x, w.height_at(p.x, p.y) + 0.35 + float(i) * 0.12, p.y)
-		plane.visibility_range_end = 160.0
-		h.add_child(plane)
+		k.plane_uv(Vector3(p.x, w.height_at(p.x, p.y) + 0.35 + float(i) * 0.12, p.y), Vector2(r * 1.3, r * 1.3),
+			Color.WHITE, "fog_dark")
+	_put_kit(h, k, Transform3D.IDENTITY, true)
 
 
 func _human_village(h: Node3D, poi: Dictionary) -> void:
@@ -856,7 +1016,7 @@ func _windmill(h: Node3D, poi: Dictionary) -> void:
 	var face := _nearest_village(c)
 	var body := _body(h, Vector3(c.x, _floor_y(c, 2.4), c.y), _yaw_to(c, face))
 	body.name = "Windmill"
-	_mesh(body, PoiModels.get_mesh("windmill"), Vector3.ZERO)
+	_put(body, "windmill")
 	_cyl_shape(body, 2.4, 9.0, Vector3.ZERO)
 	var sails := _mesh(body, PoiModels.get_mesh("windmill_sails"), Vector3(0, 7.4, 2.35))
 	sails.name = "Sails"
@@ -877,15 +1037,12 @@ func _wheat_field(h: Node3D, poi: Dictionary) -> void:
 	node.position = Vector3(c.x, base_y, c.y)
 	node.rotation.y = rot
 	h.add_child(node)
-	var under := MeshInstance3D.new()
-	var pm := PlaneMesh.new()
-	pm.size = size
-	under.mesh = pm
-	under.material_override = PoiModels.toon_material(Color(0.8, 0.62, 0.3))
-	under.set_meta("no_outline", true)
-	under.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	under.position.y = 0.06
-	node.add_child(under)
+	var uk := PoiModels.Kit.new()
+	var hx := size.x * 0.5
+	var hz := size.y * 0.5
+	uk.quad(Vector3(-hx, 0.06, -hz), Vector3(hx, 0.06, -hz), Vector3(hx, 0.06, hz), Vector3(-hx, 0.06, hz),
+		Color(0.8, 0.62, 0.3), "toon", Vector3.UP)
+	_put_kit(node, uk)
 	var b := Basis(Vector3.UP, rot)
 	var xfs: Array[Transform3D] = []
 	var stp := 0.75
@@ -916,7 +1073,7 @@ func _wheat_field(h: Node3D, poi: Dictionary) -> void:
 	mmi.visibility_range_end = DECOR_RANGE
 	node.add_child(mmi)
 	# Пугало посередине
-	_prop(h, "scarecrow", c + Vector2(size.x * 0.12, 0.0).rotated(-rot), rng.randf() * TAU, 0.3, 2.4, DECOR_RANGE)
+	_prop(h, "scarecrow", c + Vector2(size.x * 0.12, 0.0).rotated(-rot), rng.randf() * TAU, 0.3, 2.4)
 
 
 ## Загон: круглая ограда с калиткой к деревне, овцы пасутся, кормушка и сено.
@@ -930,25 +1087,38 @@ func _sheep_pen(h: Node3D, poi: Dictionary) -> void:
 	_prop(h, "trough", back, _yaw_to(back, c) + PI * 0.5, 0.0)
 	var hay := c + Vector2(cos(to_v + 1.6), sin(to_v + 1.6)) * (r - 1.4)
 	_prop(h, "hay", hay, rng.randf() * TAU)
+	var flock: Array[Transform3D] = []
 	for i in 4:
 		var a := to_v + PI * 0.5 + float(i) * 1.3 + rng.randf_range(-0.3, 0.3)
 		var p := c + Vector2(cos(a), sin(a)) * rng.randf_range(1.2, r - 1.8)
-		_sheep(h, p)
+		flock.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), w.ground(p.x, p.y, -0.02)))
+	_sheep(h, flock)
 
 
-func _sheep(parent: Node3D, p: Vector2) -> void:
-	var s := Node3D.new()
-	s.name = "Sheep"
-	s.position = w.ground(p.x, p.y, -0.02)
-	s.rotation.y = rng.randf() * TAU
-	parent.add_child(s)
-	_mesh(s, PoiModels.get_mesh("sheep_body"), Vector3.ZERO, 0.0, PROP_RANGE)
-	var head := Node3D.new()
-	head.name = "Head"
-	head.position = Vector3(0, 0.85, -0.55)
-	s.add_child(head)
-	_mesh(head, PoiModels.get_mesh("sheep_head"), Vector3.ZERO, 0.0, PROP_RANGE)
-	anim.graze(s, head)
+## Овцы загона: тела и головы — два MultiMesh (2 меша на всё стадо), пасутся (PoiAnimator).
+func _sheep(parent: Node3D, flock: Array[Transform3D]) -> void:
+	var node := Node3D.new()
+	node.name = "Sheep"
+	parent.add_child(node)
+	var head_xf := Transform3D(Basis.IDENTITY, Vector3(0, 0.85, -0.55))
+	var parts: Array[MultiMeshInstance3D] = []
+	for part in ["sheep_body", "sheep_head"]:
+		var body_part: bool = part == "sheep_body"
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = PoiModels.get_mesh(String(part))
+		mm.instance_count = flock.size()
+		for i in flock.size():
+			mm.set_instance_transform(i, flock[i] if body_part else flock[i] * head_xf)
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = "Bodies" if body_part else "Heads"
+		mmi.multimesh = mm
+		mmi.visibility_range_end = PROP_RANGE
+		mmi.visibility_range_end_margin = 5.0
+		node.add_child(mmi)
+		parts.append(mmi)
+	for i in flock.size():
+		anim.graze_mm(parts[0], parts[1], i, flock[i], head_xf)
 
 
 # ---------- Порт ----------
@@ -992,13 +1162,13 @@ func _lighthouse(h: Node3D, poi: Dictionary) -> void:
 	var face := v2(port["center"]) if not port.is_empty() else Vector2.ZERO
 	var body := _body(h, Vector3(c.x, _floor_y(c, 2.2), c.y), _yaw_to(c, face))
 	body.name = "Lighthouse"
-	_mesh(body, PoiModels.get_mesh("lighthouse"), Vector3.ZERO)
+	_put(body, "lighthouse")
 	_cyl_shape(body, 2.3, 14.5, Vector3.ZERO)
 	footprints.append({"c": c, "r": 2.8})
 	_mark_walk(c, Vector2(1.8, 1.8), 0.0, 0)
 	# Огонь и вращающийся луч
 	var top := 0.8 + 11.0 + 0.95
-	_halo(body, Vector3(0, top, 0), Color(1.0, 0.85, 0.5, 0.8), 5.0, 300.0)
+	_halo(body, Vector3(0, top, 0), Color(1.0, 0.85, 0.5, 0.8), 5.0)
 	var beam := Node3D.new()
 	beam.name = "Beam"
 	beam.position = Vector3(0, top, 0)
@@ -1011,18 +1181,18 @@ func _lighthouse(h: Node3D, poi: Dictionary) -> void:
 	cone.rings = 1
 	cone.cap_top = false
 	cone.cap_bottom = false
-	var bm := PoiModels.soft_material(Color(1.0, 0.9, 0.6, 0.16), true)
+	# Два конуса — один меш (узкий конец у фонаря: ось цилиндра (Y) кладём вдоль ±X)
+	var st := SurfaceTool.new()
 	for s in [-1.0, 1.0]:
 		var sd: float = s
-		var mi := MeshInstance3D.new()
-		mi.mesh = cone
-		mi.material_override = bm
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.set_meta("no_outline", true)
-		# Узкий конец у фонаря: ось цилиндра (Y) кладём вдоль ±X
-		mi.rotation.z = sd * PI * 0.5
-		mi.position = Vector3(sd * 9.0, 0, 0)
-		beam.add_child(mi)
+		st.append_from(cone, 0, Transform3D(Basis(Vector3.BACK, sd * PI * 0.5), Vector3(sd * 9.0, 0, 0)))
+	var mi := MeshInstance3D.new()
+	mi.name = "BeamMesh"
+	mi.mesh = st.commit()
+	mi.material_override = PoiModels.soft_material(Color(1.0, 0.9, 0.6, 0.16), true)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.set_meta("no_outline", true)
+	beam.add_child(mi)
 	anim.spin(beam, Vector3.UP, 0.8)
 
 
@@ -1100,7 +1270,7 @@ func _pier(h: Node3D, poi: Dictionary) -> void:
 	k.cyl(Vector3(head_w * 0.5 - 0.4, 3.35, length - 0.4), 0.3, 0.02, 0.25, PoiModels.ROOF_ORANGE, 4, Vector3(0, PI * 0.25, 0))
 	k.box(Vector3(-head_w * 0.5 + 0.8, 0.4, length - 1.0), Vector3(0.8, 0.8, 0.8), PoiModels.WOOD_LIGHT)
 	k.cyl(Vector3(-head_w * 0.5 + 1.8, 0.45, length - 0.8), 0.34, 0.34, 0.9, PoiModels.WOOD, 8)
-	_mesh(node, k.to_mesh(), Vector3.ZERO)
+	_put_kit(node, k)
 	_halo(node, Vector3(head_w * 0.5 - 0.4, 3.05, length - 0.4), Color(1.0, 0.85, 0.5, 0.5), 1.4)
 	# Коллизия настила и площадки
 	_box_shape(node, Vector3(width, 0.3, length), Vector3(0, -0.15, length * 0.5))
@@ -1206,12 +1376,10 @@ func _cave(h: Node3D, poi: Dictionary) -> void:
 		var x: float = float(s) * 1.75
 		kit.cyl(Vector3(x, 1.0, 0.45), 0.07, 0.06, 2.0, PoiModels.WOOD_DARK, 5)
 		kit.cyl(Vector3(x, 2.05, 0.45), 0.14, 0.1, 0.16, PoiModels.STONE_DARK, 6)
-	_mesh(body, kit.to_mesh(), Vector3.ZERO)
+	_put_kit(body, kit)
 	for s in [-1.0, 1.0]:
 		var x: float = float(s) * 1.75
-		var fl := _mesh(body, PoiModels.get_mesh("flame"), Vector3(x, 2.1, 0.45), 0.0, PROP_RANGE, false)
-		fl.scale = Vector3(0.6, 0.7, 0.6)
-		anim.flicker(fl)
+		_flame(body, _xf(Vector3(x, 2.1, 0.45), 0.0, Vector3(0.6, 0.7, 0.6)))
 		_halo(body, Vector3(x, 2.4, 0.45), Color(1.0, 0.6, 0.25, 0.6), 1.6)
 	# Коллизия: скала позади и закрытый проём (внутрь не пройти)
 	_box_shape(body, Vector3(9.0, 6.0, 4.5), Vector3(0, 3.0, -3.6))
@@ -1227,8 +1395,12 @@ func _cave(h: Node3D, poi: Dictionary) -> void:
 			continue
 		var kind := "rock" if rng.randf() < 0.6 else "rock_dark"
 		var s := rng.randf_range(0.35, 1.0)
-		var mi := _mesh(h, PoiModels.get_mesh(kind), w.ground(p.x, p.y, s * 0.1), rng.randf() * TAU, PROP_RANGE, s > 0.7)
-		mi.scale = Vector3(s * rng.randf_range(1.0, 1.5), s, s * rng.randf_range(0.9, 1.3))
+		var rpos := w.ground(p.x, p.y, s * 0.1)
+		var ryaw := rng.randf() * TAU
+		var sx := s * rng.randf_range(1.0, 1.5)
+		var sz := s * rng.randf_range(0.9, 1.3)
+		# Крупные — в меш построек (с тенью), мелкие — в меш мелочей
+		_put(h, kind, _xf(rpos, ryaw, Vector3(sx, s, sz)), s <= 0.7)
 
 
 ## Локальная точка (x — вправо, y — вперёд по f) в мировое смещение.
@@ -1245,9 +1417,8 @@ func _camp(h: Node3D, poi: Dictionary) -> void:
 	fire.name = "Campfire"
 	fire.position = w.ground(c.x, c.y, -0.03)
 	h.add_child(fire)
-	_mesh(fire, PoiModels.get_mesh("campfire"), Vector3.ZERO, 0.0, PROP_RANGE * 1.5, false)
-	var fl := _mesh(fire, PoiModels.get_mesh("flame"), Vector3(0, 0.1, 0), 0.0, PROP_RANGE * 1.5, false)
-	anim.flicker(fl)
+	_put(fire, "campfire", Transform3D.IDENTITY, true)
+	_flame(fire, _xf(Vector3(0, 0.1, 0)))
 	_halo(fire, Vector3(0, 0.7, 0), Color(1.0, 0.6, 0.25, 0.65), 2.6)
 	var sparks := CPUParticles3D.new()
 	sparks.name = "Sparks"
@@ -1302,6 +1473,8 @@ func _bridge_rails() -> void:
 		if length < 0.5:
 			continue
 		var mid := (a + e) * 0.5
+		# Перила — в меш построек ближайшей зоны (или своей)
+		_zone = _zone_at(Vector2(mid.x, mid.z), holder)
 		var yaw := atan2(flat.x, flat.y)
 		var k := PoiModels.Kit.new()
 		var n := maxi(2, int(ceilf(length / 1.6)))
@@ -1322,5 +1495,4 @@ func _bridge_rails() -> void:
 			var ymid := 0.05 + (a.y + e.y) * 0.5 - mid.y
 			k.box(Vector3(x, ymid + 0.95, 0), Vector3(0.12, 0.12, length), PoiModels.WOOD, Vector3(pitch, 0, 0))
 			k.box(Vector3(x, ymid + 0.5, 0), Vector3(0.08, 0.08, length), PoiModels.WOOD, Vector3(pitch, 0, 0))
-		var mi := _mesh(holder, k.to_mesh(), mid, yaw, DECOR_RANGE * 1.5, false)
-		mi.name = "Rails"
+		_put_kit(holder, k, _xf(mid, yaw))

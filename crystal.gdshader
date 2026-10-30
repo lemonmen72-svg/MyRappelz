@@ -2,6 +2,8 @@
 // огранка (грани разной яркости), градиент от тёмного основания к яркой верхушке и мягкая
 // пульсация по TIME (у каждого кристалла своя фаза по положению в мире).
 // Цвет задаётся параметрами: голубые/золотые у светлых эльфов, фиолетовые у тёмных.
+// Кристаллы склеены в общий меш зоны (PoiModels.Kit.append_kit), поэтому высота над основанием
+// своей модели берётся из UV.x, а фаза пульсации своего объекта — из UV.y.
 shader_type spatial;
 render_mode unshaded, cull_back, depth_draw_opaque, shadows_disabled;
 
@@ -21,8 +23,8 @@ varying vec3 v_wn;
 
 void vertex() {
 	vec3 o = MODEL_MATRIX[3].xyz;
-	v_phase = fract(sin(dot(o.xz, vec2(12.9898, 78.233))) * 43758.5453) * 6.2832;
-	v_h = VERTEX.y;
+	v_phase = fract(sin(dot(o.xz, vec2(12.9898, 78.233))) * 43758.5453) * 6.2832 + UV.y;
+	v_h = UV.x;
 	v_wn = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 
