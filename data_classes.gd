@@ -65,8 +65,8 @@ const CLASSES := {
 		"skills": ["holy_bolt", "heal"],
 	},
 	"assassin": {
-		"name": "Убийца", "race": "dark_elf", "weapon": "daggers",
-		"desc": "Быстрые удары кинжалами, частые криты.",
+		"name": "Бродяга", "race": "dark_elf", "weapon": "sword",
+		"desc": "Странствующая мечница: быстрые удары клинком, частые криты.",
 		"attack": "melee", "range": 2.4, "cd": 0.55,
 		"hp": 95, "hp_lvl": 17, "atk": 9, "atk_lvl": 2.5, "def": 2, "def_lvl": 0.7,
 		"speed": 7.2, "crit": 0.2, "color": Color(0.35, 0.2, 0.45), "accent": Color(0.82, 0.16, 0.26),

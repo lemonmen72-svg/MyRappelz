@@ -3,6 +3,7 @@ extends "res://tests/test_base.gd"
 ## у эльфов есть уши, у каждого класса — своё оружие, бюджет мешей и вызовов отрисовки
 ## (детали склеены в меш со скелетом), кости скелета повторяют узлы, анимации без ошибок.
 ## Модель игрока и торговца — CharacterModel; экран создания строит 3D-превью.
+## Главный герой — модель из файла (glTF): загружается, анимации шага, бега и ударов, меч в руке.
 
 ## Узлы оружия, которые должны быть у модели (по полю weapon класса).
 const WEAPON_PARTS := {
@@ -19,11 +20,14 @@ const MAX_SURFACES := 5
 
 var models: Array[CharacterModel] = []
 var create: CharacterCreate = null
+var hero: CharacterModel = null
 
 
 func run_step() -> void:
 	match step:
 		0:
+			# Модели из примитивов (запасной вариант, торговец) — для всех сочетаний
+			CharacterModel.use_assets = false
 			var x := -9.0
 			for cid in ClassData.CLASSES:
 				var c := ClassData.cls(String(cid))
@@ -53,6 +57,7 @@ func run_step() -> void:
 				check(m.find_child("Face", true, false) != null, "%s: есть лицо" % who)
 				m.set_move_speed(6.5)
 				m.play_attack()
+			CharacterModel.use_assets = true
 			wait = 20
 			step = 1
 		1:
@@ -82,8 +87,36 @@ func run_step() -> void:
 			wait = 10
 			step = 5
 		5:
+			_hero_start()
+			wait = 30
+			step = 50
+		50:
+			_hero_check_run()
+			hero.play_attack()
+			wait = 4
+			step = 51
+		51:
+			var slash := hero._anim.current_animation
+			check(slash == hero._clip("left_slash") or slash == hero._clip("attack"),
+				"герой: удар играет клип атаки (%s)" % slash)
+			hero.set_move_speed(0.0)
+			wait = 70
+			step = 52
+		52:
+			check(hero._act_end < 0.0 and hero._loco == "idle", "герой: после удара — стойка покоя")
+			hero.play_buff()
+			hero.play_hit()
+			wait = 10
+			step = 53
+		53:
+			check(hero._anim.current_animation == hero._clip("sword_judgment"), "герой: умение — прыжок с мечом")
+			hero.queue_free()
+			wait = 2
+			step = 54
+		54:
 			var player: Player = main.player
 			check(player._model is CharacterModel, "у игрока модель CharacterModel")
+			check(player._model._asset != null, "игрок — главный герой из файла")
 			check(player._guard_fx != null and player._guard_fx.get_parent() == player._model,
 				"сияние «Щита света» на модели игрока")
 			var mer: Merchant = main.economy.merchant
@@ -111,9 +144,62 @@ func run_step() -> void:
 			step = 7
 		7:
 			var pm: CharacterModel = create._preview_model
-			check(pm != null and pm.weapon_kind == "staff" and pm.has_ears(), "превью обновилось: чернокнижник")
+			check(pm != null and pm._asset != null and pm.has_ears(), "превью обновилось: главный герой из файла")
+			check(create._preview_caption.text.contains("Чернокнижник"), "превью: подпись класса обновилась")
 			create.queue_free()
 			ok_done()
+
+
+## Главный герой из файла: загрузка, материалы, метки, меч, клипы, бёдра без смещения по земле.
+func _hero_start() -> void:
+	var spec := CharacterModel.spec_for("human", "warrior")
+	check(spec.get("asset", "") == CharacterModel.MAIN_ASSET, "главный герой у всех рас и классов")
+	hero = CharacterModel.new()
+	hero.setup(spec)
+	main.add_child(hero)
+	hero.position = Vector3(12.0, 0.0, 30.0)
+	check(hero._asset != null, "герой: модель из файла загружена")
+	check(hero._anim != null, "герой: есть проигрыватель анимаций")
+	if hero._asset == null or hero._anim == null:
+		return
+	for c in ["walking", "running", "left_slash", "attack", "double_combo_attack", "sword_judgment"]:
+		check(hero._clip(String(c)) != "", "герой: клип %s" % String(c))
+	check(hero.weapon_kind == "sword" and hero.find_child("Sword", true, false) != null, "герой: меч в руке")
+	check(hero.has_ears(), "герой: эльфийские уши")
+	var head := hero.find_child("Head", true, false) as Node3D
+	check(head != null, "герой: метка головы")
+	if head != null:
+		var hy := head.global_position.y
+		check(hy > 1.3 and hy < 1.85, "герой: голова на высоте %.2f м" % hy)
+	check(hero.find_child("Face", true, false) != null, "герой: метка лица")
+	var n := hero.mesh_count()
+	check(n >= 2 and n <= MAX_MESHES, "герой: мешей %d (до %d)" % [n, MAX_MESHES])
+	for mi in hero.find_children("*", "MeshInstance3D", true, false):
+		var m := (mi as MeshInstance3D).material_override as StandardMaterial3D
+		check(m != null and m.diffuse_mode == BaseMaterial3D.DIFFUSE_TOON, "герой: toon-материал у %s" % mi.name)
+		if m != null and mi.name != "Sword":
+			check(m.albedo_texture != null, "герой: текстура у %s" % mi.name)
+	var a := hero._anim.get_animation(hero._clip("sword_judgment"))
+	var pinned := false
+	for t in a.get_track_count():
+		if a.track_get_type(t) == Animation.TYPE_POSITION_3D \
+				and String(a.track_get_path(t).get_concatenated_subnames()).ends_with("Hips"):
+			var k0: Vector3 = a.track_get_key_value(t, 0)
+			var k1: Vector3 = a.track_get_key_value(t, a.track_get_key_count(t) - 1)
+			pinned = absf(k0.z - k1.z) < 0.001 and absf(k0.x - k1.x) < 0.001
+	check(pinned, "герой: смещение бёдер по земле убрано (удары на месте)")
+	check(a.loop_mode == Animation.LOOP_NONE and
+		hero._anim.get_animation(hero._clip("running")).loop_mode == Animation.LOOP_LINEAR, "герой: бег зациклен")
+	hero.set_move_speed(6.5)
+
+
+func _hero_check_run() -> void:
+	if hero._anim == null:
+		check(false, "герой: нет анимаций")
+		return
+	check(hero._anim.current_animation == hero._clip("running"), "герой: на скорости 6.5 м/с — бег (%s)"
+		% hero._anim.current_animation)
+	check(hero._anim.speed_scale > 1.0, "герой: темп бега по скорости (%.2f)" % hero._anim.speed_scale)
 
 
 ## Склеенный меш привязан к скелету: связка на каждую кость, в вершинах есть кости и веса.

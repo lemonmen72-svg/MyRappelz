@@ -3,6 +3,8 @@ extends Node3D
 ## Аниме-гуманоид из примитивов (cel-shading, контур): крупная голова, большие глаза, причёска по расе,
 ## одежда и оружие по классу. Временная модель до замены на аватары из VRoid.
 ## Рост ~1.8 м, ноги на y = 0, лицом к -Z.
+## Если в параметрах есть "asset" (путь к glTF), вместо примитивов берётся готовая модель из файла
+## со своим скелетом и анимациями (Meshy/Mixamo), см. раздел «Готовая модель из файла».
 ##
 ## Использование:
 ##   var m := CharacterModel.new()
@@ -42,6 +44,49 @@ const GLOW := 1
 const HALO := 2
 ## Рамка для отсечения (кости двигаются: поднятый посох, взмах рук).
 const CULL_AABB := AABB(Vector3(-1.7, -0.3, -1.7), Vector3(3.4, 4.0, 3.4))
+
+## Главный герой — модель из файла (тёмная эльфийка-Бродяга). Пока она одна, её получают все расы
+## и классы; своя модель расы или класса задаётся полем "model" в ClassData (у класса или расы).
+const MAIN_ASSET := "res://assets/characters/dark_elf_wanderer.glb"
+## Клипы модели из файла: [клип, с какой секунды, до какой, скорость]. Корневое смещение бёдер
+## по земле убрано (_pin_root), удары идут на месте.
+const ASSET_ACTIONS := {
+	"slash": ["left_slash", 0.5, 1.4, 1.6],
+	"chop": ["attack", 0.2, 1.4, 2.0],
+	"combo": ["double_combo_attack", 0.0, 2.6, 1.8],
+	"leap": ["sword_judgment", 0.4, 3.0, 2.0],
+}
+## Покоя в наборе Meshy нет: стойка с мечом — начало «Sword_Judgment», кадры с IDLE_FROM по
+## IDLE_TO проигрываются туда-обратно (дыхание).
+const ASSET_IDLE := "sword_judgment"
+const IDLE_FROM := 0.0
+const IDLE_TO := 0.22
+## Скорость, с которой клипы шага и бега выглядят без проскальзывания, м/с.
+const WALK_NATIVE := 1.4
+const RUN_NATIVE := 4.2
+## Меч в правой руке модели из файла (кость RightHand, Mixamo): центр кулака и направление клинка
+## (от мизинца к указательному) в пространстве кости.
+const GRIP_POS := Vector3(-0.023, 0.07, 0.019)
+const GRIP_DIR := Vector3(0.79, 0.15, 0.6)
+
+## Контур модели из файла: оболочка по нормалям, один тёмный цвет.
+const ASSET_OUTLINE_SHADER := """shader_type spatial;
+render_mode unshaded, cull_front, depth_draw_opaque, shadows_disabled, fog_disabled;
+
+uniform vec4 color : source_color = vec4(0.1, 0.07, 0.12, 1.0);
+uniform float width = 0.012;
+
+void vertex() {
+	vec3 world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	float dist = length(world - CAMERA_POSITION_WORLD);
+	float scale = length(MODEL_MATRIX[0].xyz);
+	VERTEX += normalize(NORMAL) * width * clamp(dist / 10.0, 0.6, 3.0) / max(scale, 0.001);
+}
+
+void fragment() {
+	ALBEDO = color.rgb;
+}
+"""
 
 ## Контур по нормалям («вывернутая оболочка»): у капсул и сфер толщина ровная по всей длине.
 ## Толщина детали — альфа цвета вершины × width (0 — деталь без контура: вершины стягиваются в точку),
@@ -230,6 +275,15 @@ var _blink := 3.0
 var _blinking := false
 var _spinning := false
 
+# Готовая модель из файла: сцена glTF, её проигрыватель анимаций, клипы по имени в нижнем регистре
+var _asset: Node3D
+var _anim: AnimationPlayer
+var _clips: Dictionary = {}
+var _asset_speed := 0.0
+var _act_end := -1.0
+var _loco := ""
+var _alt := false
+
 ## Массивы примитивов (одинаковые детали у всех персонажей).
 static var _arr_cache: Dictionary = {}
 ## Готовая геометрия по параметрам внешности: body, glow (или null), glow_kinds, face_open, face_closed.
@@ -238,6 +292,13 @@ static var _outline_shader: Shader
 static var _outline_material: ShaderMaterial
 static var _glow_mats: Dictionary = {}
 static var _face_material: StandardMaterial3D
+## Модели из файлов вместо примитивов (false — всегда примитивы, для тестов).
+static var use_assets := true
+## Пути моделей, у которых анимации уже подготовлены (зацикливание, без смещения по земле).
+static var _prepared: Dictionary = {}
+static var _asset_outline: ShaderMaterial
+static var _sword: ArrayMesh
+static var _sword_material: StandardMaterial3D
 
 
 # ---------- Параметры внешности ----------
@@ -247,7 +308,7 @@ static func spec_for(race_id: String, class_id: String) -> Dictionary:
 	var r := ClassData.race(race_id)
 	var c := ClassData.cls(class_id)
 	var main_c: Color = c.get("color", Color(0.6, 0.3, 0.2))
-	return {
+	var s := {
 		"skin": r.get("skin", Color(0.95, 0.8, 0.65)),
 		"hair": r.get("hair", Color(0.4, 0.25, 0.12)),
 		"hair_style": String(r.get("hair_style", "short")),
@@ -259,6 +320,12 @@ static func spec_for(race_id: String, class_id: String) -> Dictionary:
 		"accent": c.get("accent", main_c.lightened(0.4)),
 		"weapon": String(c.get("weapon", "sword")),
 	}
+	var asset := String(c.get("model", r.get("model", MAIN_ASSET)))
+	if use_assets and asset != "" and ResourceLoader.exists(asset):
+		s["asset"] = asset
+		s["weapon"] = "sword"
+		s["ears"] = true
+	return s
 
 
 ## Добродушный странствующий торговец: широкая шляпа, усы, глаза-улыбки, большой рюкзак.
@@ -286,7 +353,16 @@ func setup(s: Dictionary) -> CharacterModel:
 	_cape = null
 	_hair_back = null
 	_face = null
+	_root = null
+	_skel = null
+	_asset = null
+	_anim = null
+	_clips.clear()
+	_act_end = -1.0
+	_loco = ""
 	weapon_kind = String(s.get("weapon", ""))
+	if s.has("asset") and _setup_asset(String(s["asset"])):
+		return self
 	_girth = float(s.get("girth", 1.0))
 	_can_blink = String(s.get("eye_style", "normal")) != "smile"
 	var outfit := String(s.get("outfit", "warrior"))
@@ -830,6 +906,9 @@ func _apply_rest() -> void:
 # ---------- Анимации ----------
 
 func _process(delta: float) -> void:
+	if _asset != null:
+		_asset_process(delta)
+		return
 	if _root == null:
 		return
 	_t += delta
@@ -899,6 +978,10 @@ func _process(delta: float) -> void:
 
 ## Обычная атака под оружие: удар, выстрел из лука или взмах посохом.
 func play_attack() -> void:
+	if _asset != null:
+		_alt = not _alt
+		_asset_act("slash" if _alt else "chop")
+		return
 	match weapon_kind:
 		"bow":
 			play_shoot()
@@ -941,6 +1024,9 @@ func _play_stabs() -> void:
 
 ## Выстрел из лука: лук вперёд, правая рука натягивает тетиву.
 func play_shoot() -> void:
+	if _asset != null:
+		_asset_act("slash")
+		return
 	var t := _new_action(0.42, 0.45)
 	if t == null:
 		return
@@ -954,6 +1040,9 @@ func play_shoot() -> void:
 
 ## Заклинание: посох вскинут вперёд-вверх, навершие вспыхивает; левая рука раскрыта.
 func play_cast() -> void:
+	if _asset != null:
+		_asset_act("chop")
+		return
 	var t := _new_action(0.45, 0.45)
 	if t == null:
 		return
@@ -972,6 +1061,9 @@ func play_cast() -> void:
 
 ## Усиление (клич, щит, рывок): обе руки вверх.
 func play_buff() -> void:
+	if _asset != null:
+		_asset_act("leap")
+		return
 	var t := _new_action(0.5, 0.5)
 	if t == null:
 		return
@@ -983,6 +1075,9 @@ func play_buff() -> void:
 
 ## Удар щитом: выпад левой рукой, щит остаётся лицом к врагу.
 func play_bash() -> void:
+	if _asset != null:
+		_asset_act("combo")
+		return
 	var t := _new_action(0.0, 0.32)
 	if t == null:
 		return
@@ -993,6 +1088,9 @@ func play_bash() -> void:
 
 ## Круговой удар: оборот всей модели с вытянутой в сторону рукой.
 func play_spin() -> void:
+	if _asset != null:
+		_asset_act("combo")
+		return
 	var t := _new_action(0.42, 0.0)
 	if t == null:
 		return
@@ -1005,6 +1103,9 @@ func play_spin() -> void:
 
 ## Взмах рукой (приветствие).
 func play_wave() -> void:
+	if _asset != null:
+		_asset_act("chop")
+		return
 	var t := _new_action(1.1, 0.0)
 	if t == null:
 		return
@@ -1019,6 +1120,9 @@ func play_wave() -> void:
 ## Получение урона: красноватая вспышка и отшатывание назад.
 func play_hit() -> void:
 	_flash = 1.0
+	if _asset != null:
+		_asset_recoil()
+		return
 	if _root == null or not is_inside_tree():
 		return
 	if _hit != null and _hit.is_valid():
@@ -1051,6 +1155,246 @@ func _reset_spin() -> void:
 	rotation.y = 0.0
 
 
+
+
+# ---------- Готовая модель из файла (Meshy/Mixamo) ----------
+
+## Загрузить модель из файла: свой материал (toon, контур, вспышка урона), меч в правой руке,
+## метки Head и Face на костях. false — файла нет, модель соберётся из примитивов.
+func _setup_asset(path: String) -> bool:
+	if not ResourceLoader.exists(path):
+		return false
+	var ps := load(path) as PackedScene
+	if ps == null:
+		return false
+	var inst := ps.instantiate() as Node3D
+	if inst == null:
+		return false
+	_asset = inst
+	_asset.name = "Asset"
+	# glTF смотрит в +Z, наши модели — в -Z
+	_asset.rotation.y = PI
+	add_child(_asset)
+	_has_ears = true
+	weapon_kind = "sword"
+
+	var tex_path := path.get_basename() + ".png"
+	var tex: Texture2D = null
+	if ResourceLoader.exists(tex_path):
+		tex = load(tex_path) as Texture2D
+	for n in _asset.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		mi.set_meta("no_toon", true)
+		mi.custom_aabb = CULL_AABB
+		var src := mi.get_active_material(0) as StandardMaterial3D
+		var m := StandardMaterial3D.new()
+		if src != null:
+			m = src.duplicate() as StandardMaterial3D
+		if tex != null:
+			m.albedo_texture = tex
+		m.albedo_color = Color.WHITE
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		Util.toon(m)
+		# Эмиссия включена заранее (чёрная), чтобы вспышка урона не перекомпилировала шейдер
+		m.emission_enabled = true
+		m.emission = Color.BLACK
+		if Quality.outlines():
+			m.next_pass = _asset_outline_mat()
+		m.set_meta("toon_done", true)
+		mi.material_override = m
+		_flash_mats.append(m)
+
+	var skels := _asset.find_children("*", "Skeleton3D", true, false)
+	var skel: Skeleton3D = null
+	if not skels.is_empty():
+		skel = skels[0] as Skeleton3D
+	if skel != null:
+		var head := _attach(skel, "Head", "Head")
+		if head != null:
+			_node(head, "Face", Vector3(0, 0.08, 0.1))
+		var hand := _attach(skel, "RightHand", "GripR")
+		if hand != null:
+			var up := GRIP_DIR.normalized()
+			var fx := (Vector3.UP - up * up.dot(Vector3.UP)).normalized()
+			var sword := MeshInstance3D.new()
+			sword.name = "Sword"
+			sword.mesh = _sword_mesh()
+			sword.material_override = _sword_mat()
+			sword.set_meta("no_toon", true)
+			sword.transform = Transform3D(Basis(fx, up, fx.cross(up)), GRIP_POS)
+			hand.add_child(sword)
+
+	var aps := _asset.find_children("*", "AnimationPlayer", true, false)
+	if not aps.is_empty():
+		_anim = aps[0] as AnimationPlayer
+		for an in _anim.get_animation_list():
+			var k := String(an).to_lower()
+			if k.contains("/"):
+				k = k.get_slice("/", 1)
+			_clips[k] = String(an)
+		if not _prepared.has(path):
+			_prepared[path] = true
+			for an in _anim.get_animation_list():
+				var a := _anim.get_animation(an)
+				var k := String(an).to_lower()
+				if k.ends_with("walking") or k.ends_with("running") or k.ends_with("walk"):
+					a.loop_mode = Animation.LOOP_LINEAR
+				_pin_root(a, skel)
+	return true
+
+
+## Метка на кости, имя которой оканчивается на bone_suffix (у Mixamo «mixamorig_Head» и т. п.).
+func _attach(skel: Skeleton3D, bone_suffix: String, node_name: String) -> BoneAttachment3D:
+	for i in skel.get_bone_count():
+		var bn := skel.get_bone_name(i)
+		if bn == bone_suffix or bn.ends_with("_" + bone_suffix) or bn.ends_with(":" + bone_suffix):
+			var att := BoneAttachment3D.new()
+			att.name = node_name
+			att.bone_name = bn
+			skel.add_child(att)
+			# Сразу в позу покоя, не дожидаясь обновления скелета
+			att.transform = skel.get_bone_global_pose(i)
+			return att
+	return null
+
+
+## Убрать смещение бёдер по земле (X, Z) — анимации на месте; высота (прыжок, присед) остаётся.
+static func _pin_root(a: Animation, skel: Skeleton3D) -> void:
+	for t in a.get_track_count():
+		if a.track_get_type(t) != Animation.TYPE_POSITION_3D:
+			continue
+		var bn := String(a.track_get_path(t).get_concatenated_subnames())
+		if not bn.ends_with("Hips"):
+			continue
+		var rest := Vector3.ZERO
+		if skel != null and skel.find_bone(bn) >= 0:
+			rest = skel.get_bone_rest(skel.find_bone(bn)).origin
+		for k in a.track_get_key_count(t):
+			var v: Vector3 = a.track_get_key_value(t, k)
+			a.track_set_key_value(t, k, Vector3(rest.x, v.y, rest.z))
+
+
+## Имя клипа по ключу в нижнем регистре (или "").
+func _clip(key: String) -> String:
+	if _clips.has(key):
+		return _clips[key]
+	for k in _clips:
+		if String(k).contains(key):
+			return _clips[k]
+	return ""
+
+
+## Покой, шаг или бег по скорости; действие (удар, умение) доигрывается до конца.
+func _asset_process(delta: float) -> void:
+	_t += delta
+	_asset_speed = lerpf(_asset_speed, _speed, 1.0 - exp(-10.0 * delta))
+	if _flash > 0.0:
+		_flash = maxf(0.0, _flash - delta * 5.0)
+		var fc := FLASH * (_flash * 0.9)
+		for m in _flash_mats:
+			m.emission = fc
+	if _anim == null:
+		return
+	if _act_end >= 0.0:
+		if _anim.is_playing() and _anim.current_animation_position < _act_end:
+			return
+		_act_end = -1.0
+		_loco = ""
+	var want := "idle"
+	if _asset_speed > 2.6:
+		want = "run"
+	elif _asset_speed > 0.3:
+		want = "walk"
+	if want == "idle":
+		var c := _clip(ASSET_IDLE)
+		if c == "":
+			return
+		if _loco != "idle":
+			_loco = "idle"
+			_anim.speed_scale = 1.0
+			_anim.play(c, 0.25, 0.0)
+		_anim.seek(IDLE_FROM + (0.5 - 0.5 * cos(_t * 1.6)) * (IDLE_TO - IDLE_FROM), true)
+		return
+	var c := _clip("walking" if want == "walk" else "running")
+	if c == "":
+		return
+	if _loco != want:
+		_loco = want
+		_anim.play(c, 0.2)
+	_anim.speed_scale = clampf(_asset_speed / (WALK_NATIVE if want == "walk" else RUN_NATIVE), 0.6, 1.7)
+
+
+## Действие модели из файла: отрезок клипа (см. ASSET_ACTIONS).
+func _asset_act(kind: String) -> void:
+	if _anim == null or not is_inside_tree():
+		return
+	var a: Array = ASSET_ACTIONS[kind]
+	var c := _clip(String(a[0]))
+	if c == "":
+		return
+	_anim.speed_scale = 1.0
+	_anim.play(c, 0.08, float(a[3]))
+	_anim.seek(float(a[1]), true)
+	_act_end = float(a[2])
+	_loco = ""
+
+
+## Отшатывание модели из файла при уроне.
+func _asset_recoil() -> void:
+	if not is_inside_tree():
+		return
+	if _hit != null and _hit.is_valid():
+		_hit.kill()
+	_hit = create_tween()
+	_hit.tween_property(_asset, "position:z", 0.08, 0.06)
+	_hit.tween_property(_asset, "position:z", 0.0, 0.2)
+
+
+static func _asset_outline_mat() -> ShaderMaterial:
+	if _asset_outline == null:
+		var sh := Shader.new()
+		sh.code = ASSET_OUTLINE_SHADER
+		_asset_outline = ShaderMaterial.new()
+		_asset_outline.shader = sh
+	return _asset_outline
+
+
+## Короткий меч: клинок с острием, гарда, рукоять, навершие. Ось клинка +Y, рукоять в нуле.
+static func _sword_mesh() -> ArrayMesh:
+	if _sword != null:
+		return _sword
+	var b := GeoBuf.new()
+	var steel := Color(0.85, 0.88, 0.96)
+	var brass := Color(0.78, 0.6, 0.3)
+	b.add(_box(Vector3(0.045, 0.6, 0.012)), Transform3D(Basis(), Vector3(0, 0.38, 0)), steel, 0)
+	b.add(_prism(Vector3(0.045, 0.08, 0.012)), Transform3D(Basis(), Vector3(0, 0.72, 0)), steel, 0)
+	b.add(_box(Vector3(0.15, 0.024, 0.036)), Transform3D(Basis(), Vector3(0, 0.07, 0)), brass, 0)
+	b.add(_cyl(0.015, 0.015, 0.14, 8), Transform3D(Basis(), Vector3(0, -0.01, 0)), Color(0.26, 0.17, 0.13), 0)
+	b.add(_sphere(0.022, 0.044, 8, 4), Transform3D(Basis(), Vector3(0, -0.09, 0)), brass, 0)
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = b.verts
+	arr[Mesh.ARRAY_NORMAL] = b.norms
+	arr[Mesh.ARRAY_COLOR] = b.cols
+	arr[Mesh.ARRAY_INDEX] = b.idx
+	_sword = ArrayMesh.new()
+	_sword.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return _sword
+
+
+static func _sword_mat() -> StandardMaterial3D:
+	if _sword_material != null:
+		return _sword_material
+	var m := StandardMaterial3D.new()
+	m.vertex_color_use_as_albedo = true
+	m.vertex_color_is_srgb = true
+	Util.toon(m)
+	m.metallic_specular = 0.7
+	if Quality.outlines():
+		m.next_pass = _outline_mat()
+	m.set_meta("toon_done", true)
+	_sword_material = m
+	return m
 
 
 # ---------- Узлы, кости и сборка геометрии ----------

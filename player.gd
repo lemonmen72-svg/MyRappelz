@@ -385,7 +385,7 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 			if t == null:
 				return _no_target()
 			_engage(t)
-			_anim_attack()
+			_anim_bash()
 			_deal(t, _roll(mult, true))
 			Vfx.slash_arc(fx_parent, t.global_position + Vector3(0, 0.75 * t.body_scale, 0),
 				t.global_position - global_position, Color(0.75, 0.4, 1.0), 1.2)
@@ -404,6 +404,7 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 			global_position = dest
 			velocity = Vector3.ZERO
 			_engage(t)
+			_anim_buff()
 			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.5, 0.2, 0.7), 1.2, 0.3)
 			_announce(sname, "")
 		"dark_burst":

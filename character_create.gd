@@ -15,8 +15,8 @@ const STAT_ROWS := [
 const GOLD := Color(0.95, 0.8, 0.4)
 const MUTED := Color(0.7, 0.72, 0.78)
 
-var _race := "human"
-var _class := "warrior"
+var _race := "dark_elf"
+var _class := "assassin"
 var _name_edit: LineEdit
 var _race_btns: Dictionary = {}
 var _class_box: HBoxContainer

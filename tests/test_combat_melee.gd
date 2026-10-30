@@ -65,7 +65,7 @@ func run_step() -> void:
 			game.race_id = "dark_elf"
 			game.class_id = "assassin"
 			player.apply_class()
-			check(player.attack_kind == "melee" and player._weapon_kind == "daggers", "убийца: два кинжала")
+			check(player.attack_kind == "melee" and player._weapon_kind == "sword", "бродяга: меч")
 			check(player.guard_time == 0.0, "усиления сброшены при смене класса")
 			check(player.skill_id("skill1") == "backstab" and player.skill_id("skill2") == "shadow_step",
 				"умения убийцы на кнопках")

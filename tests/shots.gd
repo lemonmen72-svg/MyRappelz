@@ -100,6 +100,32 @@ func run_step() -> void:
 		9:
 			shot("08_create")
 			_create.queue_free()
+			# Главный герой крупно спереди: стойка покоя, затем удар
+			_top = Camera3D.new()
+			main.add_child(_top)
+			var front := player._model.global_transform.basis * Vector3(0, 0, -1)
+			front.y = 0.0
+			_top.global_position = player.global_position + front.normalized() * 2.8 + Vector3(0, 1.3, 0)
+			_top.look_at(player.global_position + Vector3(0, 0.95, 0))
+			_top.current = true
+			main.hud.visible = false
+			wait = 30
+			step = 10
+		10:
+			shot("09_hero")
+			player._model.play_attack()
+			wait = 12
+			step = 11
+		11:
+			shot("10_hero_attack")
+			player._model.play_buff()
+			wait = 25
+			step = 12
+		12:
+			shot("11_hero_skill")
+			_top.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
 			ok_done()
 
 
