@@ -49,6 +49,13 @@
   Сейчас одна модель — главный герой (тёмная эльфийка-Бродяга `dark_elf_wanderer.glb`), она у всех рас и классов,
   пока Максим не сделает остальных; своя модель задаётся полем `"model"` у класса или расы в `ClassData`.
   Источники и лицензии — `assets/LICENSES.md`.
+  Дополнительные анимации героя (Idle, удары и комбо мечом, рывок, кувырок, урон, смерть, каст, подбор) —
+  из Quaternius Universal Animation Library 1 и 2 (CC0), перенесены на скелет Mixamo оффлайн скриптом
+  `tools/retarget_animations.py` и записаны прямо в GLB героя. Новая модель героя на том же скелете:
+  скачать «…[Standard].zip» с quaternius.itch.io/universal-animation-library и …-library-2, затем
+  `python3 -I tools/retarget_animations.py --ual1 <UAL1_Standard.glb> --ual2 <UAL2_Standard.glb> assets/characters/<герой>.glb`
+  (`--check` — без записи; повторный запуск заменяет свои клипы). Какой клип играет какое действие —
+  `ASSET_ACTIONS` / `ASSET_IDLE` в `character_model.gd`.
 - Питомцы и звери: `data_mobs.gd` (`MobData`), `data_pets.gd` (`PetData`: роли, стадии эволюции),
   `creature_models.gd` (модели зверей: слитый меш на скелете + `creature.gdshader`, `creature_outline.gdshader`), `mob.gd`, `pet.gd`, `pet_manager.gd` (призыв, команды, окно), `taming.gd`.
   Тесты `tests/test_pets*.gd`.

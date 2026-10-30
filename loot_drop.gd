@@ -163,6 +163,8 @@ func _process(delta: float) -> void:
 		return
 	var d := Vector2(p.global_position.x - global_position.x, p.global_position.z - global_position.z)
 	if d.length() < PICKUP_RANGE:
+		if p.has_method("play_pickup"):
+			p.call("play_pickup")
 		pick_up()
 
 
