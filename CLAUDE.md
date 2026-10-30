@@ -45,7 +45,7 @@
   (снаряды лука и магии), `character_create.gd` (с 3D-превью), `character_model.gd` (`CharacterModel`:
   аниме-модель персонажа и торговца, анимации). Тесты `tests/test_combat*.gd`, `tests/test_character_model.gd`.
 - Питомцы и звери: `data_mobs.gd` (`MobData`), `data_pets.gd` (`PetData`: роли, стадии эволюции),
-  `creature_models.gd` (модели зверей), `mob.gd`, `pet.gd`, `pet_manager.gd` (призыв, команды, окно), `taming.gd`.
+  `creature_models.gd` (модели зверей: слитый меш на скелете + `creature.gdshader`, `creature_outline.gdshader`), `mob.gd`, `pet.gd`, `pet_manager.gd` (призыв, команды, окно), `taming.gd`.
   Тесты `tests/test_pets*.gd`.
 - Графика: `util.gd` (toon-материалы, `toonify_mesh`, контуры), `outline.gdshader`, `vfx.gd` (`Vfx`: эффекты),
   `world_builder.gd` + шейдеры мира (`sky`, `terrain`, `grass`, `flower`, `flag`, `world_common.gdshaderinc`).
