@@ -14,6 +14,7 @@ var xp_before := 0
 var gold_before := 0
 var pet_fought := false
 var done := false
+var last_msg := ""
 
 
 func _initialize() -> void:
@@ -33,6 +34,7 @@ func _process(_delta: float) -> bool:
 		return false
 
 	var player: Player = main.player
+	_log_messages()
 	match step:
 		0:
 			_check(player != null and main.hud != null, "игрок и HUD созданы")
@@ -48,7 +50,7 @@ func _process(_delta: float) -> bool:
 			if not _mob_ok():
 				step = 1
 				return false
-			player.global_position = mob.global_position + Vector3(0, 0, 2.0)
+			_stand_near(player)
 			if mob.hp > mob.max_hp * 0.5:
 				player.try_attack()
 			else:
@@ -65,7 +67,7 @@ func _process(_delta: float) -> bool:
 			if not _mob_ok():
 				step = 1
 				return false
-			player.global_position = mob.global_position + Vector3(0, 0, 2.0)
+			_stand_near(player)
 			main._on_tame()
 		4:
 			mob = _find_mob("Кабан")
@@ -81,7 +83,7 @@ func _process(_delta: float) -> bool:
 				_check(pet_fought, "питомец участвовал в бою")
 				step = 6
 				return false
-			player.global_position = mob.global_position + Vector3(0, 0, 2.0)
+			_stand_near(player)
 			player.try_attack()
 		6:
 			player.take_damage(99999, null)
@@ -131,6 +133,19 @@ func _test_touch(hud: HUD) -> void:
 	a.pressed = false
 	hud._input(a)
 	_check(hud._joy_idx == -1 and hud._attack_idx == -1, "касания отпущены")
+
+
+## Ставит игрока вплотную к зверю (в радиусе его атаки, чтобы зверь не бегал) и держит HP полным.
+func _stand_near(player: Player) -> void:
+	player.global_position = mob.global_position + Vector3(0, 0, 1.5)
+	player.hp = player.max_hp
+
+
+func _log_messages() -> void:
+	var t: String = main.hud._msg_label.text
+	if t != last_msg:
+		last_msg = t
+		print("  HUD: " + t)
 
 
 func _find_mob(mob_name: String) -> Mob:
