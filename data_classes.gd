@@ -21,7 +21,7 @@ const RACES := {
 	},
 	"dark_elf": {
 		"name": "Тёмные эльфы",
-		"desc": "Быстрые и точные. Кинжалы и разрушительная магия тьмы.",
+		"desc": "Быстрые и точные. Клинок странника и разрушительная магия тьмы.",
 		"skin": Color(0.62, 0.56, 0.78), "hair": Color(0.9, 0.86, 0.98), "ears": true,
 		"eyes": Color(0.92, 0.3, 0.45), "hair_style": "ponytail",
 		"classes": ["assassin", "warlock"],
@@ -103,7 +103,7 @@ const SKILLS := {
 	"heal": {"name": "Исцеление", "cd": 10.0, "target": "self", "value": 0.35,
 		"desc": "Лечит вас и питомца на 35% здоровья."},
 	"backstab": {"name": "Удар в спину", "cd": 7.0, "target": "enemy", "mult": 1.3,
-		"desc": "Удар кинжалами с гарантированным критом."},
+		"desc": "Удар клинком с гарантированным критом."},
 	"shadow_step": {"name": "Шаг тени", "cd": 12.0, "target": "enemy", "radius": 12.0,
 		"desc": "Мгновенный рывок к цели до 12 м."},
 	"dark_burst": {"name": "Взрыв тьмы", "cd": 8.0, "target": "enemy", "mult": 1.5, "radius": 3.5,

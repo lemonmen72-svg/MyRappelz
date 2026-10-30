@@ -64,6 +64,8 @@ const IDLE_TO := 0.22
 ## Скорость, с которой клипы шага и бега выглядят без проскальзывания, м/с.
 const WALK_NATIVE := 1.4
 const RUN_NATIVE := 4.2
+## Доля собственного свечения текстуры модели из файла (подсветка теневой стороны).
+const ASSET_GLOW := 0.3
 ## Меч в правой руке модели из файла (кость RightHand, Mixamo): центр кулака и направление клинка
 ## (от мизинца к указательному) в пространстве кости.
 const GRIP_POS := Vector3(-0.023, 0.07, 0.019)
@@ -1192,6 +1194,9 @@ func _setup_asset(path: String) -> bool:
 			m = src.duplicate() as StandardMaterial3D
 		if tex != null:
 			m.albedo_texture = tex
+			# Тёмная кожа и одежда в тени почти чёрные: слабое собственное свечение текстуры
+			m.emission_texture = tex
+			m.emission_energy_multiplier = ASSET_GLOW
 		m.albedo_color = Color.WHITE
 		m.cull_mode = BaseMaterial3D.CULL_DISABLED
 		Util.toon(m)
@@ -1290,7 +1295,8 @@ func _asset_process(delta: float) -> void:
 	_asset_speed = lerpf(_asset_speed, _speed, 1.0 - exp(-10.0 * delta))
 	if _flash > 0.0:
 		_flash = maxf(0.0, _flash - delta * 5.0)
-		var fc := FLASH * (_flash * 0.9)
+		# Эмиссия умножается на ASSET_GLOW — вспышку усиливаем
+		var fc := FLASH * (_flash * 0.9 / ASSET_GLOW)
 		for m in _flash_mats:
 			m.emission = fc
 	if _anim == null:
