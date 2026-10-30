@@ -1,8 +1,9 @@
-extends SceneTree
+extends Node
 ## Основа автотестов (без экрана). Создаёт нового персонажа, запускает main.tscn и каждый кадр
 ## вызывает run_step(), пока не вызван ok_done() или fail(). Пропуск кадров: wait = N.
 ## Наследник: extends "res://tests/test_base.gd", переопределяет run_step() и при нужде
-## race_class() / before_start(). Запуск: godot --headless --fixed-fps 60 --path . -s tests/<файл>.gd
+## race_class() / before_start(). Запуск:
+## godot --headless --fixed-fps 60 --path . res://tests/runner.tscn -- res://tests/<файл>.gd
 
 const MAX_FRAMES := 60 * 300
 
@@ -30,30 +31,29 @@ func run_step() -> void:
 	ok_done()
 
 
-func _initialize() -> void:
-	game = root.get_node("Game")
+func _ready() -> void:
+	game = Game
 	game.save_path = "user://test_save.json"
 	game.delete_save()
 	var rc := race_class()
 	game.new_character("Тест", rc[0], rc[1])
 	before_start()
 	main = load("res://main.tscn").instantiate()
-	root.add_child(main)
+	get_tree().root.add_child.call_deferred(main)
 
 
-func _process(_delta: float) -> bool:
-	if done:
-		return true
+func _process(_delta: float) -> void:
+	if done or main == null or not main.is_inside_tree():
+		return
 	frame += 1
 	if frame > MAX_FRAMES:
 		fail("таймаут на шаге %d" % step)
-		return true
+		return
 	log_messages()
 	if wait > 0:
 		wait -= 1
-		return false
+		return
 	run_step()
-	return false
 
 
 func ok_done() -> void:
@@ -62,7 +62,7 @@ func ok_done() -> void:
 	print("TEST OK (кадров: %d)" % frame)
 	done = true
 	game.delete_save()
-	quit(0)
+	get_tree().quit(0)
 
 
 func check(ok: bool, what: String) -> void:
@@ -77,7 +77,7 @@ func fail(what: String) -> void:
 		return
 	printerr("[FAIL] " + what)
 	done = true
-	quit(1)
+	get_tree().quit(1)
 
 
 ## Печатает новые сообщения HUD в лог теста.
@@ -93,7 +93,7 @@ func log_messages() -> void:
 ## Ближайший к центру живой зверь вида type_id.
 func find_mob(type_id: String) -> Mob:
 	var best: Mob = null
-	for n in get_nodes_in_group("mobs"):
+	for n in get_tree().get_nodes_in_group("mobs"):
 		var m := n as Mob
 		if m != null and not m.is_dead and m.type_id == type_id:
 			if best == null or m.global_position.length() < best.global_position.length():
@@ -113,7 +113,7 @@ func stand_near(m: Mob, dist: float = 1.5) -> void:
 
 
 func count_mobs() -> int:
-	return get_nodes_in_group("mobs").size()
+	return get_tree().get_nodes_in_group("mobs").size()
 
 
 ## Касание экрана для HUD: pressed, индекс пальца, позиция.

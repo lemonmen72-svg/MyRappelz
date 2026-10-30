@@ -13,9 +13,9 @@ grep -vE "$NOISE" import.log | tail -n 40
 fail=0
 for t in tests/smoke_test.gd tests/test_*.gd; do
 	[ -f "$t" ] || continue
-	[ "$(basename "$t")" = "test_base.gd" ] && continue
+	case "$(basename "$t")" in test_base.gd|runner.gd) continue ;; esac
 	log="$(basename "$t" .gd).log"
-	timeout 600 godot --headless --fixed-fps 60 --path . -s "$t" > "$log" 2>&1
+	timeout 600 godot --headless --fixed-fps 60 --path . res://tests/runner.tscn -- "res://$t" > "$log" 2>&1
 	status=$?
 	echo "===== $t (код $status) ====="
 	grep -vE "$NOISE" "$log" | tail -n 150
