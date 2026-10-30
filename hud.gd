@@ -3,7 +3,7 @@ extends CanvasLayer
 ## Интерфейс: плавающий джойстик (левая нижняя часть экрана), круглые кнопки действий справа,
 ## панели игрока, питомца и цели, окна (питомцы, сумка, торговец).
 ## На ПК: WASD/стрелки, Пробел = атака, 1/2 = умения, T = приручить, Q = зелье,
-## P = питомцы, I = сумка, E = торговец, F = питомец атакует, G = питомец за мной.
+## P = питомцы, I = сумка, E = торговец, F = питомец атакует, G = питомец за мной, O = настройки.
 
 ## Нажатие кнопки действия (касание, клавиша или кнопка меню).
 signal action(id: String)
@@ -15,7 +15,7 @@ const JOY_TOP := 230.0
 const CAM_TOP := 90.0
 const KEYS := {
 	KEY_SPACE: "attack", KEY_1: "skill1", KEY_2: "skill2", KEY_T: "tame", KEY_Q: "potion",
-	KEY_P: "pets_window", KEY_I: "bag_window", KEY_E: "shop", KEY_F: "pet_attack", KEY_G: "pet_follow",
+	KEY_P: "pets_window", KEY_I: "bag_window", KEY_E: "shop", KEY_F: "pet_attack", KEY_G: "pet_follow", KEY_O: "settings_window",
 }
 
 var move_vec := Vector2.ZERO
@@ -87,6 +87,7 @@ func _ready() -> void:
 	add_child(_menu)
 	_menu.add_child(_menu_button("Питомцы", "pets_window"))
 	_menu.add_child(_menu_button("Сумка", "bag_window"))
+	_menu.add_child(_menu_button("Настройки", "settings_window"))
 
 	update_pet(null)
 	get_viewport().size_changed.connect(_layout)
@@ -296,7 +297,7 @@ func _layout() -> void:
 	_msg_label.position = Vector2(0, 190)
 	_msg_label.size = Vector2(_view.x, 40)
 	_target_box.position = Vector2((_view.x - 320.0) / 2.0, 14)
-	_menu.position = Vector2(_view.x - 330.0, 16)
+	_menu.position = Vector2(_view.x - _menu.get_combined_minimum_size().x - 20.0, 16)
 	if _window != null and is_instance_valid(_window):
 		_window.position = (_view - _window.size) / 2.0
 	if _joy_idx == -1:

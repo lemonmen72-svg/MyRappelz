@@ -15,6 +15,7 @@ func race_class() -> Array:
 
 func before_start() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SHOTS_DIR))
+	Quality.set_level(Quality.HIGH, false)
 	game.add_pet("wolf", "Серохвост", 5)
 	game.active_pet = 0
 
@@ -32,12 +33,14 @@ func run_step() -> void:
 			_top.position = Vector3(1.0, 250.0, -3.0)
 			main.add_child(_top)
 			_top.current = true
+			IslandVegetation.set_far_view(get_tree(), true)
 			main.hud.visible = false
 			_set_fog(false)
 			wait = 90
 			step = 100
 		100:
 			shot("00_island_top")
+			IslandVegetation.set_far_view(get_tree(), false)
 			main.hud.visible = true
 			_set_fog(true)
 			_top.current = false

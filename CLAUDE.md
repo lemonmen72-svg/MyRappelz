@@ -52,8 +52,11 @@
   Тест `tests/test_vfx.gd`, скриншоты `tests/shots.gd` (CI-задача visual → ветка `ci-screenshots`).
 - Мир (тренировочный остров): `world/training_island.json` (конфиг: река, дороги, точки интереса, зоны, спауны),
   `island_world.gd` (`IslandWorld`: рельеф, коллизия, проходимость, мосты, запросы), `island_water.gd`, `island_pois.gd`,
-  `island_vegetation.gd`, `tools/extract_island_masks.py`, референсы в `reference/`. Подробно — `world/README.md`.
-  Тест `tests/test_island.gd`.
+  `island_vegetation.gd` (+ `island_grass`/`island_flower`/`veg_outline` шейдеры), `island_shore.gd`,
+  `water.gdshader`, `island_terrain.gdshader`, `tools/extract_island_masks.py`, референсы в `reference/`.
+  Подробно — `world/README.md`. Тесты `tests/test_island.gd`, `tests/test_vegetation.gd`.
+- Качество и постобработка: `quality.gd` (`Quality`: Low/Medium/High в `user://settings.cfg`), `postfx.gd` + `postfx.gdshader`,
+  `settings_menu.gd` (окно «Настройки» в HUD).
 - Предметы и торговля: `data_items.gd` (`ItemData`), `economy.gd` (добыча, сумка, магазин, зелья),
   `merchant.gd` (торговец и круг безопасной зоны), `loot_drop.gd` (мешочек с добычей). Тест `tests/test_economy.gd`.
 

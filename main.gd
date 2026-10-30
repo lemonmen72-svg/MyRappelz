@@ -64,6 +64,8 @@ func _build_world() -> void:
 	world.name = "Island"
 	add_child(world)
 	world.build(_rng)
+	add_child(PostFx.new())
+	Quality.apply(get_tree())
 
 
 ## Каждый новый меш в игре получает аниме-стиль (toon-свет и контур). Отложенно, чтобы
@@ -143,6 +145,8 @@ func _on_action(id: String) -> void:
 			pass  # удержание обрабатывается в _process
 		"skill1", "skill2":
 			player.use_skill(id)
+		"settings_window":
+			SettingsMenu.open(hud)
 		_:
 			if pets.handle_action(id):
 				return
