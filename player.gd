@@ -1,8 +1,11 @@
 class_name Player
 extends CharacterBody3D
-## Персонаж игрока. Уровень, опыт и золото хранятся в Game, характеристики считаются из ClassData.
-## Атака по типу класса: ближний бой (melee), лук (ranged) и магия (magic) — снаряд Projectile.
-## Умения класса (кнопки "skill1"/"skill2"), временные усиления. Внешний вид — CharacterModel.
+## Персонаж игрока. Уровень, опыт и золото хранятся в Game, характеристики считаются из ClassData,
+## надетого оружия (Game.weapon, ItemData) и умений героя (Game.hero, HeroSkills: пассивные и переключаемые).
+## Атака по типу класса или оружия: ближний бой (melee), лук или арбалет (ranged) и магия (magic) — снаряд Projectile.
+## Умения на кнопках "skill1"…"skill4" (Game.hero.slots): умения классов (ClassData) и древа героя (HeroSkills:
+## требуют MP, подходящее оружие — клинки или арбалет — и перезарядку). MP и уклонение — у классов с полями mp и eva.
+## Временные усиления. Внешний вид — CharacterModel.
 
 signal stats_changed
 signal message(text: String)
@@ -12,9 +15,25 @@ signal target_changed(target: Node3D)
 const CRIT_MULT := 1.8
 ## Умения ближнего боя достают чуть дальше обычной атаки.
 const MELEE_SKILL_REACH := 0.6
+## Кнопки умений HUD.
+const SLOT_IDS := ["skill1", "skill2", "skill3", "skill4"]
+## Восстановление MP в секунду (доля запаса): в бою и вне боя (нет ударов и умений MP_COMBAT_TIME с).
+const MP_REGEN_COMBAT := 0.012
+const MP_REGEN_REST := 0.04
+const MP_COMBAT_TIME := 4.0
+## Анимация умений героя ближнего боя (по умолчанию — обычный удар).
+const SKILL_ANIM := {"backstab": "bash", "charge_stab": "dash", "dark_strike": "bash", "head_breaker": "spin",
+	"bloody_blade": "attack", "sleeping_dust": "cast"}
+## Пауза между ударами многоударных умений и вторым ударом обычной атаки, с.
+const HIT_GAP := 0.14
 
 var max_hp := 100
 var hp := 100
+## MP: у классов с запасом MP (ClassData mp); 0 — умения без MP.
+var max_mp := 0
+var mp := 0
+## Шанс уклониться от удара зверя (0..1, без «Танца теней»: cur_eva()).
+var eva := 0.0
 ## Базовая атака без усилений (текущая: cur_atk()).
 var atk := 10
 var defense := 0
@@ -25,6 +44,15 @@ var attack_time := 0.8
 var crit := 0.05
 ## "melee" | "ranged" | "magic"
 var attack_kind := "melee"
+## Вид надетого сменного оружия ("daggers" | "dual_swords" | "crossbow"; "" — оружие задано классом).
+var weapon_kind := ""
+## От умений героя: множитель скорости атаки, множитель урона обычной атаки, шанс второго удара (выстрела),
+## доля урона выстрела в MP, незаметность (звери замечают ближе, удары реже отвлекают зверя от питомца).
+var aspd := 1.0
+var basic_mult := 1.0
+var double_chance := 0.0
+var mp_drain := 0.0
+var stealth := 0.0
 var attack_cd := 0.0
 var regen_delay := 0.0
 var move_input := Vector2.ZERO
@@ -42,6 +70,11 @@ var speed_buff_time := 0.0
 var speed_buff := 0.0
 var guard_time := 0.0
 var guard := 0.0
+## «Танец теней»: оставшееся время и прибавки к уклонению, атаке (доля) и шансу крита.
+var shade_time := 0.0
+var shade_eva := 0.0
+var shade_atk := 0.0
+var shade_crit := 0.0
 ## Бонусы от переключаемых умений призванного питомца («Узы …»): доля атаки, защита, HP в секунду.
 ## Ставит и снимает питомец (set_pet_aura / clear_pet_aura).
 var aura_atk := 0.0
@@ -56,14 +89,19 @@ var _weapon_kind := ""
 var _guard_fx: MeshInstance3D
 var _regen_acc := 0.0
 var _last_crit := false
+var _mp_acc := 0.0
+var _mp_delay := 0.0
+var _upkeep_acc := 0.0
 
 
 func _ready() -> void:
 	add_to_group("player")
 	collision_layer = 2
 	collision_mask = 1
+	Game.ensure_hero()
 	recalc_stats()
 	hp = max_hp
+	mp = max_mp
 
 	var col := CollisionShape3D.new()
 	var shape := CapsuleShape3D.new()
@@ -76,32 +114,103 @@ func _ready() -> void:
 	_build_model()
 
 
-## Пересчитать характеристики из класса и уровня (Game.class_id, Game.level).
+## Пересчитать характеристики: класс и уровень (Game.class_id, Game.level), оружие (Game.weapon),
+## пассивные и включённые переключаемые умения героя (HeroSkills.bonuses — только подходящие оружию).
 func recalc_stats() -> void:
 	var s := ClassData.stats_for(Game.class_id, Game.level)
 	max_hp = s["max_hp"]
+	max_mp = s["max_mp"]
 	atk = s["atk"]
 	defense = s["def"]
 	speed = s["speed"]
 	attack_range = s["range"]
 	attack_time = s["cd"]
 	crit = s["crit"]
+	eva = s["eva"]
 	attack_kind = s["attack"]
+	weapon_kind = Game.weapon_kind()
+	if weapon_kind != "":
+		var w := ItemData.get_item(Game.weapon)
+		atk += int(w.get("atk", 0))
+		attack_time = float(w.get("cd", attack_time))
+		attack_range = float(w.get("range", attack_range))
+		crit += float(w.get("crit", 0.0))
+		attack_kind = "ranged" if weapon_kind == "crossbow" else "melee"
+	var b := HeroSkills.bonuses(Game.hero, Game.class_id, weapon_kind)
+	atk = roundi(float(atk) * (1.0 + _bv(b, "atk_pct"))) + roundi(_bv(b, "atk_flat"))
+	defense += roundi(_bv(b, "def_flat"))
+	eva = clampf(eva + _bv(b, "eva"), 0.0, 0.6)
+	crit += _bv(b, "crit")
+	speed *= 1.0 + _bv(b, "speed_pct")
+	aspd = 1.0 + _bv(b, "aspd")
+	attack_time /= aspd
+	basic_mult = 1.0 + _bv(b, "basic_pct")
+	double_chance = _bv(b, "double")
+	mp_drain = _bv(b, "mp_drain")
+	stealth = _bv(b, "stealth")
+	max_hp = roundi(float(max_hp) * (1.0 + _bv(b, "hp_pct") + _bv(b, "hp_from_eva") * eva))
+	max_mp = roundi(float(max_mp) * (1.0 + _bv(b, "mp_from_eva") * eva))
 	hp = mini(hp, max_hp)
+	mp = mini(mp, max_mp)
 
 
-## Применить сменившиеся Game.class_id / Game.race_id: характеристики, умения, внешний вид.
+static func _bv(b: Dictionary, key: String) -> float:
+	return float(b.get(key, 0.0))
+
+
+## Применить сменившиеся Game.class_id / Game.race_id: умения героя и оружие (Game.ensure_hero),
+## характеристики, внешний вид.
 func apply_class() -> void:
+	Game.ensure_hero()
 	recalc_stats()
 	hp = max_hp
+	mp = max_mp
 	skill_cd.clear()
 	clear_buffs()
 	_build_model()
 	stats_changed.emit()
 
 
+## После изучения умения или переключения (окно героя): пересчитать характеристики.
+func refresh_skills() -> void:
+	recalc_stats()
+	stats_changed.emit()
+
+
+## Надеть оружие id из сумки (Бродяга). "" — получилось, иначе причина. Модель меняет оружие в руках,
+## переключаемые умения, которым оружие не подходит, выключаются.
+func equip(id: String) -> String:
+	if id == Game.weapon:
+		return ""
+	var err := Game.equip_weapon(id)
+	if err != "":
+		return err
+	recalc_stats()
+	attack_cd = 0.0
+	_build_model()
+	var off: PackedStringArray = []
+	for t in Game.last_dropped_toggles:
+		off.append(String(HeroSkills.get_skill(String(t)).get("name", t)))
+	var text := "В руках: %s" % ItemData.item_name(id)
+	if not off.is_empty():
+		text += ". Выключено: %s" % ", ".join(off)
+	message.emit(text)
+	stats_changed.emit()
+	return ""
+
+
 func cur_atk() -> int:
-	return roundi(float(atk) * (1.0 + atk_buff + aura_atk))
+	return roundi(float(atk) * (1.0 + atk_buff + aura_atk + shade_atk))
+
+
+## Шанс крита с «Танцем теней».
+func cur_crit() -> float:
+	return crit + shade_crit
+
+
+## Шанс уклониться с «Танцем теней» (не больше 60%).
+func cur_eva() -> float:
+	return clampf(eva + shade_eva, 0.0, 0.6)
 
 
 func cur_speed() -> float:
@@ -111,7 +220,9 @@ func cur_speed() -> float:
 func _physics_process(delta: float) -> void:
 	attack_cd = maxf(0.0, attack_cd - delta)
 	regen_delay = maxf(0.0, regen_delay - delta)
+	_mp_delay = maxf(0.0, _mp_delay - delta)
 	_tick_skills(delta)
+	_tick_mp(delta)
 
 	if current_target != null and (not is_instance_valid(current_target) or current_target.is_dead):
 		_set_target(null)
@@ -175,6 +286,91 @@ func _tick_skills(delta: float) -> void:
 			guard = 0.0
 			_update_guard_fx()
 			stats_changed.emit()
+	if shade_time > 0.0:
+		shade_time -= delta
+		if shade_time <= 0.0:
+			shade_time = 0.0
+			shade_eva = 0.0
+			shade_atk = 0.0
+			shade_crit = 0.0
+			stats_changed.emit()
+
+
+## Восстановление MP и поддержка переключаемых умений (раз в HeroSkills.UPKEEP_PERIOD с).
+func _tick_mp(delta: float) -> void:
+	if max_mp <= 0:
+		return
+	if mp < max_mp:
+		var rate := MP_REGEN_COMBAT if _mp_delay > 0.0 or regen_delay > 0.0 else MP_REGEN_REST
+		_mp_acc += delta * float(max_mp) * rate
+		if _mp_acc >= 1.0:
+			var m := int(_mp_acc)
+			mp = mini(max_mp, mp + m)
+			_mp_acc -= m
+			stats_changed.emit()
+	if toggle_upkeep() <= 0:
+		_upkeep_acc = 0.0
+		return
+	_upkeep_acc += delta
+	if _upkeep_acc >= HeroSkills.UPKEEP_PERIOD:
+		_upkeep_acc -= HeroSkills.UPKEEP_PERIOD
+		pay_upkeep()
+
+
+## Сумма поддержки включённых переключаемых умений, MP за 10 с.
+func toggle_upkeep() -> int:
+	var cost := 0
+	var tg: Dictionary = Game.hero.get("toggles", {})
+	for id in tg:
+		cost += HeroSkills.upkeep(String(id), HeroSkills.skill_level(Game.hero, String(id)))
+	return cost
+
+
+## Списать поддержку переключаемых умений; не хватает MP — все выключаются.
+func pay_upkeep() -> void:
+	var cost := toggle_upkeep()
+	if cost <= 0:
+		return
+	if mp >= cost:
+		mp -= cost
+		stats_changed.emit()
+		return
+	var tg: Dictionary = Game.hero.get("toggles", {})
+	tg.clear()
+	message.emit("Не хватает MP — переключаемые умения выключены")
+	refresh_skills()
+	Game.changed.emit()
+
+
+## Включить или выключить переключаемое умение героя id. Включение тратит MP и требует подходящее оружие.
+## "" — получилось, иначе причина.
+func set_toggle(id: String, on: bool) -> String:
+	var n := HeroSkills.skill_level(Game.hero, id)
+	if HeroSkills.kind(id) != "toggle" or n <= 0:
+		return "Умение не изучено"
+	var tg: Dictionary = Game.hero["toggles"]
+	if on == bool(tg.get(id, false)):
+		return ""
+	var sk := HeroSkills.get_skill(id)
+	if on:
+		var wb := HeroSkills.weapon_block(id, weapon_kind)
+		if wb != "":
+			return wb
+		var cost := HeroSkills.mp_cost(id, n)
+		if mp < cost:
+			return "Не хватает MP (нужно %d)" % cost
+		mp -= cost
+		tg[id] = true
+		_mp_delay = MP_COMBAT_TIME
+		_announce(String(sk["name"]), "включено")
+		if is_inside_tree():
+			Projectile.burst(get_parent(), global_position + Vector3(0, 1.0, 0), sk["color"], 1.4, 0.3)
+	else:
+		tg.erase(id)
+		message.emit("«%s» выключено" % String(sk["name"]))
+	refresh_skills()
+	Game.changed.emit()
+	return ""
 
 
 ## Бонусы хозяину от включённых умений питомца src (атака — доля, защита, HP в секунду).
@@ -199,6 +395,10 @@ func clear_buffs() -> void:
 	speed_buff = 0.0
 	guard_time = 0.0
 	guard = 0.0
+	shade_time = 0.0
+	shade_eva = 0.0
+	shade_atk = 0.0
+	shade_crit = 0.0
 	_update_guard_fx()
 
 
@@ -213,15 +413,63 @@ func try_attack() -> bool:
 		return false
 	attack_cd = attack_time
 	_engage(target)
-	var dmg := _roll(1.0, false)
+	_mp_delay = MP_COMBAT_TIME
+	var dmg := _roll(basic_mult, false)
 	_anim_attack()
+	var twice := double_chance > 0.0 and randf() < double_chance
 	if attack_kind == "melee":
 		_deal(target, dmg)
 		Vfx.slash_arc(get_parent(), target.global_position + Vector3(0, 0.75 * target.body_scale, 0),
 			target.global_position - global_position, _class_color())
+		if twice:
+			get_tree().create_timer(HIT_GAP).timeout.connect(_late_hit.bind(target, basic_mult, 0.0, false, true))
 	else:
-		_shoot(target, dmg, 1.0, Callable())
+		var cb := Callable()
+		if mp_drain > 0.0:
+			cb = func(_hit: Mob, dealt: int) -> void:
+				_gain_mp(float(dealt) * mp_drain)
+		_shoot(target, dmg, 1.0, cb)
+		if twice:
+			get_tree().create_timer(HIT_GAP).timeout.connect(_late_shot.bind(target, basic_mult, 0.0, false, cb, true))
 	return true
+
+
+## Второй удар (многоударное умение, «Вихрь клинков»): по цели, если она ещё жива.
+func _late_hit(t: Variant, mult: float, flat: float, force_crit: bool, say_double: bool) -> void:
+	if not is_instance_valid(t) or not is_inside_tree():
+		return
+	var m := t as Mob
+	if m == null or m.is_dead:
+		return
+	_deal(m, _roll(mult, force_crit, flat))
+	Vfx.slash_arc(get_parent(), m.global_position + Vector3(0, 0.75 * m.body_scale, 0),
+		m.global_position - global_position, _class_color().lightened(0.25))
+	if say_double:
+		Util.float_text(get_parent(), global_position + Vector3(0, 2.6, 0), "Двойной удар!", Color(1, 0.75, 0.4))
+
+
+## Второй болт (многоударное умение, «Беглый огонь»).
+func _late_shot(t: Variant, mult: float, flat: float, force_crit: bool, on_hit: Callable, say_double: bool) -> void:
+	if not is_instance_valid(t) or not is_inside_tree():
+		return
+	var m := t as Mob
+	if m == null or m.is_dead:
+		return
+	_shoot(m, _roll(mult, force_crit, flat), 1.0, on_hit)
+	if say_double:
+		Util.float_text(get_parent(), global_position + Vector3(0, 2.6, 0), "Второй болт!", Color(1, 0.75, 0.4))
+
+
+## MP с урона («Иссушающие болты»): дробная часть копится.
+func _gain_mp(amount: float) -> void:
+	if max_mp <= 0 or amount <= 0.0:
+		return
+	_mp_acc += amount
+	if _mp_acc >= 1.0:
+		var m := int(_mp_acc)
+		mp = mini(max_mp, mp + m)
+		_mp_acc -= m
+		stats_changed.emit()
 
 
 ## Выбрать цель вручную (касание по зверю и т. п.).
@@ -253,10 +501,10 @@ func _forward() -> Vector3:
 	return -global_transform.basis.z
 
 
-## Урон с разбросом и критом. mult: множитель атаки. Результат крита — в _last_crit.
-func _roll(mult: float, force_crit: bool) -> int:
-	var base := float(cur_atk()) * mult + float(randi_range(-2, 3))
-	_last_crit = force_crit or randf() < crit
+## Урон с разбросом и критом. mult: множитель атаки, flat: прибавка. Результат крита — в _last_crit.
+func _roll(mult: float, force_crit: bool, flat: float = 0.0) -> int:
+	var base := float(cur_atk()) * mult + flat + float(randi_range(-2, 3))
+	_last_crit = force_crit or randf() < cur_crit()
 	if _last_crit:
 		base *= CRIT_MULT
 	return maxi(1, int(base))
@@ -270,16 +518,20 @@ func _deal(t: Mob, dmg: int) -> void:
 			"Крит!", Color(1, 0.85, 0.2), 1.4)
 
 
-## Выпустить снаряд (стрела у лучника, шар у мага). on_hit: func(target: Mob, damage: int).
+## Выпустить снаряд (стрела у лучника, болт у арбалета, шар у мага). on_hit: func(target: Mob, damage: int).
 func _shoot(t: Mob, dmg: int, size: float, on_hit: Callable) -> void:
 	var p := Projectile.new()
-	var k := "arrow" if attack_kind == "ranged" else "orb"
+	var k := "orb"
+	if weapon_kind == "crossbow":
+		k = "bolt"
+	elif attack_kind == "ranged":
+		k = "arrow"
 	p.setup(t, self, dmg, _last_crit, k, _class_color(), size)
 	p.on_hit = on_hit
 	get_parent().add_child(p)
 	p.global_position = global_position + Vector3(0, 1.25, 0) + _forward() * 0.6
 	var aim := t.global_position + Vector3(0, 0.75 * t.body_scale, 0)
-	if k == "arrow" and Vector2(aim.x - p.global_position.x, aim.z - p.global_position.z).length() > 0.05:
+	if p.is_shaft() and Vector2(aim.x - p.global_position.x, aim.z - p.global_position.z).length() > 0.05:
 		p.look_at(aim, Vector3.UP)
 
 
@@ -290,19 +542,48 @@ func _class_color() -> Color:
 
 # ---------- Умения ----------
 
-## id умения по кнопке "skill1"/"skill2" (или сам id умения).
+## id умения на кнопке "skill1"…"skill4" (Game.hero.slots; "" — пусто) или сам id умения.
 func skill_id(slot: String) -> String:
-	var skills: Array = ClassData.cls(Game.class_id)["skills"]
-	if slot == "skill1" and skills.size() > 0:
-		return String(skills[0])
-	if slot == "skill2" and skills.size() > 1:
-		return String(skills[1])
-	return slot
+	var i := SLOT_IDS.find(slot)
+	if i < 0:
+		return slot
+	var slots: Array = Game.hero.get("slots", [])
+	return String(slots[i]) if i < slots.size() else ""
 
 
-## Умение по кнопке "skill1"/"skill2" (или по id). true, если применено.
+## Назначить умение id на кнопку i (0..3); id = "" — очистить. Умение с другой кнопки переезжает.
+func assign_slot(id: String, i: int) -> bool:
+	if i < 0 or i >= HeroSkills.SLOTS:
+		return false
+	if id != "" and (HeroSkills.skill_level(Game.hero, id) <= 0 or HeroSkills.kind(id) == "passive"):
+		return false
+	var slots: Array = Game.hero["slots"]
+	for k in slots.size():
+		if String(slots[k]) == id:
+			slots[k] = ""
+	slots[i] = id
+	Game.changed.emit()
+	return true
+
+
+## Почему умение на кнопке slot сейчас нельзя применить из-за оружия ("" — можно; пусто — тоже "").
+func slot_block(slot: String) -> String:
+	var sid := skill_id(slot)
+	if sid == "" or not HeroSkills.SKILLS.has(sid):
+		return ""
+	if HeroSkills.kind(sid) == "toggle" and HeroSkills.toggle_on(Game.hero, sid):
+		return ""
+	return HeroSkills.weapon_block(sid, weapon_kind)
+
+
+## Умение по кнопке "skill1"…"skill4" (или по id). true, если применено (переключаемое — включено/выключено).
 func use_skill(slot: String) -> bool:
 	var sid := skill_id(slot)
+	if sid == "":
+		message.emit("Кнопка пуста: назначьте умение в окне героя (K)")
+		return false
+	if HeroSkills.SKILLS.has(sid):
+		return _use_hero_skill(sid)
 	var sk := ClassData.skill(sid)
 	if sk.is_empty():
 		return false
@@ -317,13 +598,59 @@ func use_skill(slot: String) -> bool:
 	return true
 
 
-## Доля оставшейся перезарядки умения "skill1"/"skill2": 0 = готово, 1 = только что использовано.
+## Умение древа героя: изучено, подходит оружию, перезарядка готова, хватает MP.
+func _use_hero_skill(sid: String) -> bool:
+	var sk := HeroSkills.get_skill(sid)
+	var sname := String(sk["name"])
+	var n := HeroSkills.skill_level(Game.hero, sid)
+	if n <= 0:
+		message.emit("«%s» ещё не изучено" % sname)
+		return false
+	var k := HeroSkills.kind(sid)
+	if k == "passive":
+		message.emit("«%s» — пассивное умение, действует само" % sname)
+		return false
+	if k == "toggle":
+		var on := not HeroSkills.toggle_on(Game.hero, sid)
+		var err := set_toggle(sid, on)
+		if err != "":
+			message.emit("«%s»: %s" % [sname, err])
+			return false
+		return true
+	var wb := HeroSkills.weapon_block(sid, weapon_kind)
+	if wb != "":
+		message.emit("«%s»: %s" % [sname, wb])
+		return false
+	var left: float = skill_cd.get(sid, 0.0)
+	if left > 0.0:
+		message.emit("«%s» перезаряжается: %.1f с" % [sname, left])
+		return false
+	var cost := HeroSkills.mp_cost(sid, n)
+	if mp < cost:
+		message.emit("«%s»: не хватает MP (нужно %d)" % [sname, cost])
+		return false
+	if not _cast_hero(sid, n, sk):
+		return false
+	mp -= cost
+	_mp_delay = MP_COMBAT_TIME
+	skill_cd[sid] = HeroSkills.cooldown(sid, n)
+	stats_changed.emit()
+	return true
+
+
+## Перезарядка умения sid в секундах (у умений героя — по изученному уровню).
+func skill_total_cd(sid: String) -> float:
+	if HeroSkills.SKILLS.has(sid):
+		return HeroSkills.cooldown(sid, maxi(1, HeroSkills.skill_level(Game.hero, sid)))
+	return float(ClassData.skill(sid).get("cd", 0.0))
+
+
+## Доля оставшейся перезарядки умения на кнопке "skill1"…"skill4": 0 = готово, 1 = только что использовано.
 func cooldown_frac(slot: String) -> float:
 	var sid := skill_id(slot)
-	var sk := ClassData.skill(sid)
-	if sk.is_empty():
+	if sid == "":
 		return 0.0
-	var total: float = sk["cd"]
+	var total := skill_total_cd(sid)
 	var left: float = skill_cd.get(sid, 0.0)
 	if total <= 0.0:
 		return 0.0
@@ -412,33 +739,6 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 			_anim_attack()
 			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.5, 1, 0.5), 1.6, 0.4)
 			_announce(sname, extra)
-		"backstab":
-			var t := _find_target(attack_range + MELEE_SKILL_REACH)
-			if t == null:
-				return _no_target()
-			_engage(t)
-			_anim_bash()
-			_deal(t, _roll(mult, true))
-			Vfx.slash_arc(fx_parent, t.global_position + Vector3(0, 0.75 * t.body_scale, 0),
-				t.global_position - global_position, Color(0.75, 0.4, 1.0), 1.2)
-			_announce(sname, "")
-		"shadow_step":
-			var t := _find_target(radius)
-			if t == null:
-				return _no_target()
-			var away := global_position - t.global_position
-			away.y = 0.0
-			if away.length() < 0.01:
-				away = Vector3(0, 0, 1)
-			var dest := t.global_position + away.normalized() * 1.5
-			dest.y = global_position.y
-			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.3, 0.1, 0.4), 1.2, 0.3)
-			global_position = dest
-			velocity = Vector3.ZERO
-			_engage(t)
-			_anim_dash()
-			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.5, 0.2, 0.7), 1.2, 0.3)
-			_announce(sname, "")
 		"dark_burst":
 			var t := _find_target(attack_range)
 			if t == null:
@@ -462,6 +762,122 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 		_:
 			return false
 	return true
+
+
+## Умение древа героя уровня n. false — не применилось (нет цели), MP и перезарядка не тратятся.
+func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
+	var sname := String(sk["name"])
+	var col: Color = sk["color"]
+	var fx_parent := get_parent()
+	match String(sk.get("target", "")):
+		"dash":
+			var t := _find_target(HeroSkills.field(sid, "dash", n))
+			if t == null:
+				return _no_target()
+			var away := global_position - t.global_position
+			away.y = 0.0
+			if away.length() < 0.01:
+				away = Vector3(0, 0, 1)
+			var dest := t.global_position + away.normalized() * 1.5
+			dest.y = global_position.y
+			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.3, 0.1, 0.4), 1.2, 0.3)
+			global_position = dest
+			velocity = Vector3.ZERO
+			_engage(t)
+			_anim_dash()
+			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.5, 0.2, 0.7), 1.2, 0.3)
+			_announce(sname, "")
+		"self":
+			shade_time = float(sk.get("buff_time", 10.0))
+			shade_eva = HeroSkills.field_buff(sid, "eva", n)
+			shade_atk = HeroSkills.field_buff(sid, "atk_pct", n)
+			shade_crit = HeroSkills.field_buff(sid, "crit", n)
+			_anim_buff()
+			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), col, 2.0, 0.4)
+			_announce(sname, "уклонение +%d%% на %d с" % [roundi(shade_eva * 100.0), roundi(shade_time)])
+		"near":
+			var t := _find_target(float(sk.get("radius", 6.0)))
+			if t == null:
+				return _no_target()
+			_engage(t)
+			_anim_cast()
+			var sec := HeroSkills.field(sid, "sleep", n)
+			t.sleep(sec)
+			Projectile.burst(fx_parent, t.global_position + Vector3(0, 0.8 * t.body_scale, 0), col, 1.3, 0.4)
+			Util.float_text(fx_parent, t.global_position + Vector3(0, 2.4 * t.body_scale + 0.8, 0), "Сон", col.lightened(0.4))
+			_announce(sname, "сон %.1f с" % sec)
+		"melee":
+			var t := _find_target(attack_range + MELEE_SKILL_REACH)
+			if t == null:
+				return _no_target()
+			_engage(t)
+			_anim_skill(sid)
+			var mult := HeroSkills.field(sid, "mult", n)
+			var flat := HeroSkills.field(sid, "flat", n)
+			var force := bool(sk.get("crit", false))
+			var dmg := _roll(mult, force, flat)
+			_deal(t, dmg)
+			Vfx.slash_arc(fx_parent, t.global_position + Vector3(0, 0.75 * t.body_scale, 0),
+				t.global_position - global_position, col, 1.2)
+			for i in range(1, int(sk.get("hits", 1))):
+				get_tree().create_timer(HIT_GAP * float(i)).timeout.connect(_late_hit.bind(t, mult, flat, force, false))
+			if sk.has("heal"):
+				heal(maxi(1, roundi(float(dmg) * float(sk["heal"]))))
+			if sk.has("fear") and not t.is_dead:
+				t.frighten(HeroSkills.field(sid, "fear", n), global_position)
+				Util.float_text(fx_parent, t.global_position + Vector3(0, 2.4 * t.body_scale + 0.8, 0), "Страх!",
+					col.lightened(0.4))
+			_announce(sname, "")
+		"ranged":
+			var t := _find_target(attack_range)
+			if t == null:
+				return _no_target()
+			_engage(t)
+			_anim_attack()
+			var mult := HeroSkills.field(sid, "mult", n)
+			var flat := HeroSkills.field(sid, "flat", n)
+			var force := bool(sk.get("crit", false))
+			var cb := func(hit: Mob, _dealt: int) -> void:
+				_bolt_effects(hit, sid, n)
+			_shoot(t, _roll(mult, force, flat), 1.3, cb)
+			for i in range(1, int(sk.get("hits", 1))):
+				get_tree().create_timer(HIT_GAP * float(i)).timeout.connect(
+					_late_shot.bind(t, mult, flat, force, Callable(), false))
+			_announce(sname, "")
+		_:
+			return false
+	return true
+
+
+## Что делает болт умения при попадании: отбрасывание и удержание, урон со временем.
+func _bolt_effects(hit: Mob, sid: String, n: int) -> void:
+	if hit == null or not is_instance_valid(hit) or hit.is_dead:
+		return
+	var sk := HeroSkills.get_skill(sid)
+	var fx_parent := get_parent()
+	if sk.has("knock"):
+		hit.knock_back(global_position, float(sk["knock"]))
+		hit.stun(float(sk.get("root", 0.0)))
+		Util.float_text(fx_parent, hit.global_position + Vector3(0, 2.4 * hit.body_scale + 0.8, 0), "Отброшен!",
+			Color(1, 0.85, 0.5))
+	if sk.has("dot"):
+		var dps := float(cur_atk()) * HeroSkills.field(sid, "dot", n) + HeroSkills.field(sid, "dot_flat", n)
+		hit.add_dot(sid, dps, float(sk.get("dot_time", 10.0)), self, bool(sk.get("no_regen", false)))
+
+
+## Анимация умения ближнего боя (SKILL_ANIM).
+func _anim_skill(sid: String) -> void:
+	match String(SKILL_ANIM.get(sid, "attack")):
+		"bash":
+			_anim_bash()
+		"dash":
+			_anim_dash()
+		"spin":
+			_anim_spin()
+		"cast":
+			_anim_cast()
+		_:
+			_anim_attack()
 
 
 ## Взрыв тьмы: урон всем зверям вокруг center_mob, кроме него самого (он уже получил урон снарядом).
@@ -526,7 +942,11 @@ func _set_target(t: Mob) -> void:
 	target_changed.emit(t)
 
 
-func take_damage(amount: int, _attacker: Node3D) -> void:
+func take_damage(amount: int, attacker: Node3D) -> void:
+	# Уклонение — только от ударов зверей
+	if attacker is Mob and cur_eva() > 0.0 and randf() < cur_eva():
+		Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "Уклонение", Color(0.7, 0.95, 1.0))
+		return
 	amount = maxi(1, amount - int((defense + aura_def) * 0.5))
 	if guard_time > 0.0:
 		amount = maxi(1, roundi(float(amount) * (1.0 - guard)))
@@ -538,6 +958,7 @@ func take_damage(amount: int, _attacker: Node3D) -> void:
 	Vfx.hit_spark(get_parent(), global_position + Vector3(0, 1.2, 0), Color(1, 0.4, 0.35), 0.8)
 	if hp <= 0:
 		hp = max_hp
+		mp = max_mp
 		Game.gold = int(Game.gold * 0.8)
 		global_position = respawn_point()
 		Vfx.heal_sparkles(get_parent(), global_position, 1.3)
@@ -563,12 +984,16 @@ func respawn_point() -> Vector3:
 
 
 func gain_xp(amount: int) -> void:
+	# Очки умений героя копятся вместе с опытом (JP_PER_LEVEL за уровень, по долям за каждое убийство)
+	if amount > 0:
+		HeroSkills.add_jp(Game.hero, float(HeroSkills.JP_PER_LEVEL) * float(amount) / float(Game.xp_to_next(Game.level)))
 	Game.xp += amount
 	while Game.xp >= Game.xp_to_next(Game.level):
 		Game.xp -= Game.xp_to_next(Game.level)
 		Game.level += 1
 		recalc_stats()
 		hp = max_hp
+		mp = max_mp
 		message.emit("Новый уровень: %d!" % Game.level)
 		Vfx.level_up(get_parent(), global_position)
 	Game.changed.emit()
@@ -581,10 +1006,10 @@ func _build_model() -> void:
 	if _model != null and is_instance_valid(_model):
 		_model.queue_free()
 	var c := ClassData.cls(Game.class_id)
-	_weapon_kind = String(c.get("weapon", "sword"))
+	_weapon_kind = weapon_kind if weapon_kind != "" else String(c.get("weapon", "sword"))
 	_model = CharacterModel.new()
 	_model.name = "Model"
-	_model.setup(CharacterModel.spec_for(Game.race_id, Game.class_id))
+	_model.setup(CharacterModel.spec_for(Game.race_id, Game.class_id, _weapon_kind))
 	add_child(_model)
 
 	# Сияние «Щита света»
@@ -631,6 +1056,12 @@ func _anim_buff() -> void:
 func _anim_dash() -> void:
 	if _has_model():
 		_model.play_dash()
+
+
+## Заклинание (сонная пыльца и т. п.).
+func _anim_cast() -> void:
+	if _has_model():
+		_model.play_cast()
 
 
 ## Подбор добычи: присесть и поднять (модель сама решает, уместно ли сейчас).

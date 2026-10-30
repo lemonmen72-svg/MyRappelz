@@ -118,6 +118,12 @@ CLIPS = {
 	"Death": ("ual1", ["Death01"], None),  # смерть (падает на спину)
 	"Cast": ("ual1", ["Spell_Simple_Enter", "Spell_Simple_Shoot", "Spell_Simple_Exit"], None),  # заклинание левой рукой
 	"Pickup": ("ual2", ["Farm_Harvest"], None),  # присесть и поднять с земли
+	# Парные клинки: удары справа и слева чередуются (Sword_Slash, Sword_Slash_B, Sword_Slash_C)
+	"Sword_Slash_B": ("ual2", ["Sword_Regular_B", "Sword_Regular_B_Rec"], None),  # обратный удар и возврат
+	"Sword_Slash_C": ("ual2", ["Sword_Regular_C"], None),  # колющий выпад
+	# Арбалет (двуручный хват пистолета из UAL): стойка с оружием на изготовку у лица и выстрел с отдачей
+	"Crossbow_Idle": ("ual1", ["Pistol_Idle_Loop"], None),  # стойка с арбалетом, цикл
+	"Crossbow_Shoot": ("ual1", ["Pistol_Shoot"], None),  # выстрел
 }
 
 

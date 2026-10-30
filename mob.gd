@@ -47,6 +47,13 @@ var miss_time := 0.0
 var miss_frac := 0.0
 var vuln_time := 0.0
 var vuln_frac := 0.0
+## Ослабления от умений героя: сон (как оглушение, но будит любой удар), страх (убегает от fear_from
+## и не бьёт), урон со временем (dots: id умения → {"dps", "left", "acc", "by"}), без лечения (no_regen_time).
+var sleep_time := 0.0
+var fear_time := 0.0
+var fear_from := Vector3.ZERO
+var dots: Dictionary = {}
+var no_regen_time := 0.0
 var returning := false
 var target: Node3D = null
 ## На звере метка приручения (ставит и снимает Taming).
@@ -183,10 +190,18 @@ func _physics_process(delta: float) -> void:
 	_tick_debuffs(delta)
 	if type_id == "golem":
 		_slam_cd = maxf(0.0, _slam_cd - delta)
-	if stun_time > 0.0:
-		stun_time -= delta
+	_tick_dots(delta)
+	if is_dead:
+		return
+	if stun_time > 0.0 or sleep_time > 0.0:
+		stun_time = maxf(0.0, stun_time - delta)
+		sleep_time = maxf(0.0, sleep_time - delta)
 		_slam_windup = 0.0
 		_hit_target = null
+		velocity = Vector3.ZERO
+		return
+	if fear_time > 0.0:
+		_flee(delta)
 		return
 	if _hit_target != null:
 		_hit_left -= delta
@@ -248,9 +263,10 @@ func _physics_process(delta: float) -> void:
 			elif not _missed(target):
 				target.call("take_damage", dmg, self)
 	else:
-		# Ищем игрока
+		# Ищем игрока («Тихая поступь» героя: замечаем его ближе)
 		var p := get_tree().get_first_node_in_group("player") as Node3D
-		if p != null and global_position.distance_to(p.global_position) < aggro_range and not _in_safe_zone(p):
+		var seen := aggro_range * (1.0 - clampf(_stealth_of(p), 0.0, 0.9))
+		if p != null and global_position.distance_to(p.global_position) < seen and not _in_safe_zone(p):
 			target = p
 		# Бродим около дома
 		var to_w := _wander_to - global_position
@@ -346,6 +362,98 @@ func weaken_aim(frac: float, sec: float) -> void:
 func expose(frac: float, sec: float) -> void:
 	vuln_frac = maxf(vuln_frac if vuln_time > 0.0 else 0.0, maxf(frac, 0.0))
 	vuln_time = maxf(vuln_time, sec)
+
+
+## Усыпить на sec секунд: не двигается и не бьёт, пока не получит урон.
+func sleep(sec: float) -> void:
+	sleep_time = maxf(sleep_time, sec)
+
+
+## Напугать на sec секунд: убегает от точки from и не атакует.
+func frighten(sec: float, from: Vector3) -> void:
+	fear_time = maxf(fear_time, sec)
+	fear_from = from
+	_slam_windup = 0.0
+	_hit_target = null
+
+
+## Отбросить на dist м от точки from (по земле, без захода в воду и на кручи).
+func knock_back(from: Vector3, dist: float) -> void:
+	var away := global_position - from
+	away.y = 0.0
+	if away.length() < 0.01:
+		away = Vector3(0, 0, 1)
+	var prev := global_position
+	var steps := 5
+	for i in steps:
+		var before := global_position
+		global_position += away.normalized() * (dist / float(steps))
+		IslandWorld.constrain(self, before)
+	if global_position.distance_to(prev) > 0.01:
+		Vfx.death_puff(get_parent(), prev + Vector3(0, 0.2, 0), 0.6)
+
+
+## Урон со временем от умения id: dps в секунду (дробный копится), sec секунд, by — кто наносит (может пропасть).
+## Повторное попадание тем же умением обновляет время. no_regen = true — пока идёт, зверь не лечится.
+func add_dot(id: String, dps: float, sec: float, by: Node3D, no_regen: bool = false) -> void:
+	if is_dead or dps <= 0.0 or sec <= 0.0:
+		return
+	var acc := 0.0
+	if dots.has(id):
+		acc = float(dots[id]["acc"])
+	dots[id] = {"dps": dps, "left": sec, "acc": acc, "by": by}
+	if no_regen:
+		no_regen_time = maxf(no_regen_time, sec)
+
+
+func _tick_dots(delta: float) -> void:
+	no_regen_time = maxf(0.0, no_regen_time - delta)
+	if dots.is_empty():
+		return
+	for id in dots.keys():
+		var d: Dictionary = dots[id]
+		var step := minf(delta, float(d["left"]))
+		d["left"] = float(d["left"]) - delta
+		d["acc"] = float(d["acc"]) + float(d["dps"]) * step
+		if float(d["acc"]) >= 1.0 or (float(d["left"]) <= 0.0 and float(d["acc"]) >= 0.5):
+			var dmg := maxi(1, roundi(float(d["acc"])))
+			d["acc"] = 0.0
+			var by: Node3D = d["by"] if is_instance_valid(d["by"]) else null
+			take_damage(dmg, by, false, true)
+			if is_dead:
+				return
+		if float(d["left"]) <= 0.0:
+			dots.erase(id)
+
+
+## Страх: бежит прочь от fear_from (медленнее обычного бега), не атакует.
+func _flee(delta: float) -> void:
+	fear_time = maxf(0.0, fear_time - delta)
+	var away := global_position - fear_from
+	away.y = 0.0
+	if away.length() < 0.01:
+		away = Vector3(1, 0, 0)
+	var dir := away.normalized()
+	var spd := speed * 0.9
+	if slow_time > 0.0:
+		spd *= 1.0 - slow_frac
+	velocity.x = dir.x * spd
+	velocity.z = dir.z * spd
+	velocity.y = -1.0 if is_on_floor() else velocity.y - 25.0 * delta
+	var prev := global_position
+	move_and_slide()
+	IslandWorld.constrain(self, prev)
+	rotation.y = lerp_angle(rotation.y, atan2(-dir.x, -dir.z), 8.0 * delta)
+
+
+## Незаметность героя («Тихая поступь»): 0, если у узла её нет.
+static func _stealth_of(n: Node) -> float:
+	if n == null:
+		return 0.0
+	var v: Variant = n.get("stealth")
+	if v is float:
+		return float(v)
+	return 0.0
 
 
 func _tick_debuffs(delta: float) -> void:
@@ -444,7 +552,7 @@ func _in_safe_zone(n: Node3D) -> bool:
 
 
 func _heal(delta: float, frac_per_sec: float) -> void:
-	if hp >= max_hp:
+	if hp >= max_hp or no_regen_time > 0.0:
 		return
 	_regen_acc += delta * max_hp * frac_per_sec
 	if _regen_acc >= 1.0:
@@ -455,23 +563,37 @@ func _heal(delta: float, frac_per_sec: float) -> void:
 
 
 ## crit: критический удар (крупные цифры и яркая вспышка), только для вида.
-func take_damage(amount: int, attacker: Node3D, crit: bool = false) -> void:
+## periodic: урон со временем (кровотечение и т. п.) — без вспышки и отшатывания.
+func take_damage(amount: int, attacker: Node3D, crit: bool = false, periodic: bool = false) -> void:
 	if is_dead:
 		return
 	if vuln_time > 0.0:
 		amount = roundi(float(amount) * (1.0 + vuln_frac))
 	hp -= amount
-	if not returning and attacker != null and taunt_time <= 0.0:
+	# Удар будит спящего
+	sleep_time = 0.0
+	if not returning and attacker != null and taunt_time <= 0.0 and not _keeps_target(attacker):
 		target = attacker
 	var parent := get_parent()
 	var num_c := Color(1.0, 0.85, 0.25) if crit else Color(1, 1, 1)
+	if periodic:
+		num_c = Color(0.9, 0.45, 0.85)
 	Util.float_text(parent, global_position + Vector3(0, _height + 0.6, 0), str(amount), num_c, 1.5 if crit else 1.0)
-	Vfx.hit_spark(parent, global_position + Vector3(0, _height * 0.55, 0),
-		Color(1.0, 0.75, 0.25) if crit else Color(1.0, 0.92, 0.6), (1.4 if crit else 0.9) * clampf(body_scale, 0.7, 1.6))
-	_flash()
+	if not periodic:
+		Vfx.hit_spark(parent, global_position + Vector3(0, _height * 0.55, 0),
+			Color(1.0, 0.75, 0.25) if crit else Color(1.0, 0.92, 0.6), (1.4 if crit else 0.9) * clampf(body_scale, 0.7, 1.6))
+		_flash()
 	_update_label()
 	if hp <= 0:
 		_die()
+
+
+## Удар героя с «Тихой поступью» может не отвлечь зверя от питомца, которого тот уже бьёт.
+func _keeps_target(attacker: Node3D) -> bool:
+	if target == null or not is_instance_valid(target) or target == attacker or not target.is_in_group("pets"):
+		return false
+	var st := _stealth_of(attacker)
+	return st > 0.0 and randf() < clampf(st * 2.0, 0.0, 0.9)
 
 
 func _die() -> void:

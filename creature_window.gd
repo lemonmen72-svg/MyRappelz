@@ -4,13 +4,18 @@ extends Node
 ## Открывается кнопкой «Подробнее» в окне «Питомцы» и кнопкой «Существо» у панели питомца в HUD (клавиша C).
 ## Вкладки (кнопки сверху, не прокручиваются):
 ## «Существо» — 3D-превью модели, вид, роль, редкость, стадия, уровень и опыт, HP/MP, JP, 7 характеристик
-## и боевые показатели (PetStats); «Умения» — по стадиям эволюции: значок, название, тип, уровень,
-## требования, эффект сейчас и на следующем уровне, кнопка «+» (изучить за JP), у переключаемых — «Вкл»/«Выкл».
+## и боевые показатели (PetStats); «Умения» — компактное древо (SkillTree: ярусы по уровню питомца,
+## линии пререквизитов) и карточка выбранного умения: тип, уровень, эффект сейчас и на следующем уровне,
+## требования, кнопка «+ N JP» (изучить), у переключаемых — «Вкл»/«Выкл».
+## Значки: res://assets/icons/pets/<вид>/<id умения>.png (нет файла — кружок с буквой).
 ## Живёт в PetManager (pets.creature). Данные — запись Game.pets[index]; призванный питомец пересчитывается сразу.
 
 const WINDOW_SIZE := Vector2(1180, 660)
-## Ширина текстовой части строки умения (кнопки — справа).
+## Ширина переносимого текста по умолчанию.
 const TEXT_W := 800.0
+## Древо умений и карточка рядом (помещаются в окно без прокрутки).
+const TREE_SIZE := Vector2(660, 420)
+const CARD_W := 430.0
 const PREVIEW_SIZE := Vector2i(300, 300)
 const GOLD := Color(1.0, 0.85, 0.45)
 const MUTED := Color(0.78, 0.8, 0.9)
@@ -22,8 +27,12 @@ var pets: PetManager
 ## Индекс питомца в Game.pets (-1 — окно не открыто) и вкладка: "stats" | "skills".
 var index := -1
 var tab := "stats"
-## Кнопки открытого окна: "tab_stats", "tab_skills", "back", "learn_<id>", "toggle_<id>".
+## Кнопки открытого окна: "tab_stats", "tab_skills", "back", "skill_<id>" (значки древа),
+## "learn_<id>", "toggle_<id>" (карточка выбранного умения).
 var buttons: Dictionary = {}
+## Выбранное в древе умение и само древо (на вкладке «Умения»).
+var selected := ""
+var tree: SkillTree = null
 
 var _body: VBoxContainer = null
 var _scroll: ScrollContainer = null
@@ -44,10 +53,13 @@ func setup(m: Node, pm: PetManager) -> void:
 func open(i: int, which: String = "") -> bool:
 	if i < 0 or i >= Game.pets.size():
 		return false
+	if i != index:
+		selected = ""
 	index = i
 	if which != "":
 		tab = which
 	buttons.clear()
+	tree = null
 	_pivot = null
 	_holder = null
 	var rec: Dictionary = Game.pets[i]
@@ -359,6 +371,7 @@ func _build_preview(rec: Dictionary) -> Control:
 
 # ---------- Вкладка «Умения» ----------
 
+## Древо умений (SkillTree) слева и карточка выбранного умения справа.
 func _build_skills(body: VBoxContainer, rec: Dictionary) -> void:
 	var sp := _species
 	var lvl := int(rec.get("level", 1))
@@ -366,100 +379,125 @@ func _build_skills(body: VBoxContainer, rec: Dictionary) -> void:
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 24)
 	body.add_child(head)
-	head.add_child(_label("Очки умений: %d JP" % int(rec.get("jp", 0)), 26, GOLD))
+	head.add_child(_label("Очки умений: %d JP" % int(rec.get("jp", 0)), 24, GOLD))
 	var st := PetData.stage_for(lvl)
-	head.add_child(_label("Ур. %d, стадия %d" % [lvl, st + 1], 22, Color.WHITE))
+	head.add_child(_label("Ур. %d, стадия %d" % [lvl, st + 1], 21, Color.WHITE))
 	if pet != null:
 		var up := pet.toggle_upkeep()
 		head.add_child(_label("MP %d / %d%s" % [pet.mp, pet.max_mp,
-			("  (поддержка −%d / 10 с)" % up) if up > 0 else ""], 22, Color(0.6, 0.75, 1.0)))
-	body.add_child(_label("Активные умения питомец применяет сам; переключаемые включаются здесь и тратят MP "
-		+ "каждые 10 с; пассивные действуют всегда.", 18, MUTED, true))
-	var names: Array = PetData.get_species(sp)["stages"]
-	for s in 3:
-		var ids: Array = []
-		for id in PetSkills.list_for(sp):
-			if PetSkills.first_stage(String(id)) == s:
-				ids.append(String(id))
-		if ids.is_empty():
-			continue
-		var title := "Стадия %d — %s (с ур. %d)" % [s + 1, String(names[s]), int(PetData.STAGE_LEVELS[s])]
-		var sec := _label(title, 25, GOLD if s <= st else MUTED)
-		body.add_child(sec)
-		for id in ids:
-			body.add_child(_skill_row(rec, String(id), pet))
+			("  (поддержка −%d / 10 с)" % up) if up > 0 else ""], 21, Color(0.6, 0.75, 1.0)))
+	var ids := PetSkills.list_for(sp)
+	if selected == "" or not ids.has(selected):
+		selected = _default_pick(rec, ids)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	body.add_child(row)
+	var items: Array = []
+	for id in ids:
+		items.append(_tree_item(rec, String(id), pet))
+	tree = SkillTree.new()
+	tree.setup(items, TREE_SIZE, selected)
+	tree.picked.connect(_on_pick)
+	row.add_child(tree)
+	for id in tree.icons:
+		buttons["skill_" + String(id)] = tree.icons[id]
+	row.add_child(_card(rec, selected, pet))
 
 
-func _skill_row(rec: Dictionary, id: String, pet: Pet) -> Control:
+## Первое умение, которое можно изучить, иначе первое в списке.
+func _default_pick(rec: Dictionary, ids: Array) -> String:
+	for id in ids:
+		if PetSkills.learn_block(rec, String(id)) == "":
+			return String(id)
+	return String(ids[0]) if not ids.is_empty() else ""
+
+
+## Значок древа: ярус — уровень питомца для 1-го уровня умения, линия — от пререквизита.
+func _tree_item(rec: Dictionary, id: String, pet: Pet) -> Dictionary:
 	var sk := PetSkills.get_skill(id)
+	var cur := PetSkills.skill_level(rec, id)
+	var pre := ""
+	if sk.has("pre"):
+		pre = String((sk["pre"] as Array)[0])
+	return {
+		"id": id, "name": String(sk["name"]), "glyph": String(sk.get("glyph", "?")), "color": sk["color"],
+		"kind": String(sk["kind"]), "level": cur, "max": PetSkills.max_level(id),
+		"row": PetSkills.level_needed(id, 1), "pre": pre, "learned": cur > 0,
+		"can": PetSkills.learn_block(rec, id) == "", "unfit": false,
+		"on": PetSkills.toggle_on(rec, id) if pet == null else bool(pet.toggles.get(id, false)),
+		"icon": icon_path(_species, id),
+	}
+
+
+## Значок умения питомца: res://assets/icons/pets/<вид>/<id умения>.png (у каждого вида свои картинки).
+static func icon_path(species: String, id: String) -> String:
+	return "res://assets/icons/pets/%s/%s.png" % [species, id]
+
+
+## Карточка умения: название, тип, уровень, эффект сейчас и на следующем, требования, «+ JP», «Вкл/Выкл».
+func _card(rec: Dictionary, id: String, pet: Pet) -> Control:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(CARD_W, TREE_SIZE.y)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.13, 0.15, 0.28, 0.95)
+	sb.border_color = Color(1.0, 0.85, 0.5, 0.6)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(14)
+	sb.set_content_margin_all(12)
+	panel.add_theme_stylebox_override("panel", sb)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	panel.add_child(box)
+	var sk := PetSkills.get_skill(id)
+	if sk.is_empty():
+		box.add_child(_label("Выберите умение в древе", 20, MUTED, CARD_W - 30.0))
+		return panel
 	var lvl := int(rec.get("level", 1))
 	var cur := PetSkills.skill_level(rec, id)
 	var mx := PetSkills.max_level(id)
 	var cap := PetSkills.cap_for(id, lvl)
 	var block := PetSkills.learn_block(rec, id)
 	var kind := String(sk["kind"])
-
-	var col: Color = sk["color"]
-	var panel := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.16, 0.18, 0.32, 0.95) if cur > 0 else Color(0.12, 0.13, 0.22, 0.9)
-	sb.border_color = Color(col, 0.8) if cur > 0 else Color(0.4, 0.42, 0.55, 0.6)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(12)
-	sb.set_content_margin_all(10)
-	panel.add_theme_stylebox_override("panel", sb)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 14)
-	panel.add_child(row)
-	row.add_child(_icon(sk))
-
-	var text := VBoxContainer.new()
-	text.custom_minimum_size = Vector2(TEXT_W, 0)
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_theme_constant_override("separation", 2)
-	row.add_child(text)
-	var title := HBoxContainer.new()
-	title.add_theme_constant_override("separation", 14)
-	text.add_child(title)
-	title.add_child(_label(String(sk["name"]), 24, Color.WHITE))
+	box.add_child(_label(String(sk["name"]), 26, GOLD, CARD_W - 30.0))
 	var lvl_text := "ур. %d/%d" % [cur, mx]
 	if cap < mx:
 		lvl_text += " (сейчас до %d)" % cap
-	var meta := "%s · %s · %d JP за ур." % [PetSkills.kind_name(id), lvl_text, int(sk["jp"])]
-	if kind == "toggle" and PetSkills.toggle_on(rec, id):
+	var meta := "%s · %s · стадия %d+" % [PetSkills.kind_name(id), lvl_text, PetSkills.first_stage(id) + 1]
+	var on := kind == "toggle" and PetSkills.toggle_on(rec, id)
+	if on:
 		meta += " · ВКЛЮЧЕНО"
-	title.add_child(_label(meta, 19, GOOD if kind == "toggle" and PetSkills.toggle_on(rec, id) else MUTED))
-	text.add_child(_label(String(sk["desc"]), 19, MUTED, true))
+	box.add_child(_label(meta, 18, GOOD if on else MUTED, CARD_W - 30.0))
+	box.add_child(_label(String(sk["desc"]), 18, MUTED, CARD_W - 30.0))
 	if cur > 0:
-		text.add_child(_label("Сейчас: " + PetSkills.effect_text(id, cur), 19, Color.WHITE, true))
+		box.add_child(_label("Сейчас: " + PetSkills.effect_text(id, cur), 18, Color.WHITE, CARD_W - 30.0))
 	if cur < mx:
-		text.add_child(_label("Ур. %d: %s" % [cur + 1, PetSkills.effect_text(id, cur + 1)], 19,
-			Color(0.85, 0.88, 1.0), true))
+		box.add_child(_label("Ур. %d: %s" % [cur + 1, PetSkills.effect_text(id, cur + 1)], 18,
+			Color(0.85, 0.88, 1.0), CARD_W - 30.0))
 		var req := "Нужно: " + PetSkills.requirement_text(id, cur + 1)
 		if block == "":
-			text.add_child(_label(req + "  — можно изучить", 19, GOOD, true))
+			box.add_child(_label(req + " — можно изучить", 18, GOOD, CARD_W - 30.0))
 		else:
-			text.add_child(_label(req + "  — " + block, 19, BAD, true))
+			box.add_child(_label(req + " — " + block, 18, BAD, CARD_W - 30.0))
 	if kind == "active" and pet != null and cur > 0:
 		var left := float(pet.skill_cds.get(id, 0.0))
 		if left > 0.0:
-			text.add_child(_label("Перезарядка: %.0f с" % ceilf(left), 19, MUTED))
-
-	var btns := VBoxContainer.new()
-	btns.add_theme_constant_override("separation", 8)
-	btns.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(btns)
+			box.add_child(_label("Перезарядка: %.0f с" % ceilf(left), 18, MUTED))
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(spacer)
+	var btns := HBoxContainer.new()
+	btns.add_theme_constant_override("separation", 10)
+	box.add_child(btns)
 	if cur < mx:
 		var plus := Button.new()
 		plus.text = "+ %d JP" % int(sk["jp"])
 		plus.focus_mode = Control.FOCUS_NONE
-		plus.custom_minimum_size = Vector2(130, 56)
+		plus.custom_minimum_size = Vector2(150, 56)
 		plus.disabled = block != ""
 		plus.pressed.connect(_on_learn.bind(id))
 		btns.add_child(plus)
 		buttons["learn_" + id] = plus
 	if kind == "toggle" and cur > 0:
-		var on := PetSkills.toggle_on(rec, id)
 		var tb := Button.new()
 		tb.text = "Выкл" if on else "Вкл"
 		tb.focus_mode = Control.FOCUS_NONE
@@ -467,49 +505,12 @@ func _skill_row(rec: Dictionary, id: String, pet: Pet) -> Control:
 		tb.pressed.connect(_on_toggle.bind(id))
 		btns.add_child(tb)
 		buttons["toggle_" + id] = tb
-	if cur == 0 and block != "":
-		panel.modulate = Color(1, 1, 1, 0.62)
 	return panel
 
 
-## Значок умения: цветной кружок с буквой.
-func _icon(sk: Dictionary) -> Control:
-	var p := Panel.new()
-	p.custom_minimum_size = Vector2(64, 64)
-	p.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	var sb := StyleBoxFlat.new()
-	var c: Color = sk["color"]
-	sb.bg_color = c
-	sb.set_corner_radius_all(32)
-	sb.border_color = c.lightened(0.5)
-	sb.set_border_width_all(3)
-	sb.anti_aliasing = true
-	p.add_theme_stylebox_override("panel", sb)
-	var l := Label.new()
-	l.text = String(sk.get("glyph", "?"))
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	l.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	l.add_theme_font_size_override("font_size", 30)
-	l.add_theme_color_override("font_color", Color.WHITE)
-	l.add_theme_color_override("font_outline_color", c.darkened(0.6))
-	l.add_theme_constant_override("outline_size", 6)
-	p.add_child(l)
-	# Тип: у пассивных — кольцо, у переключаемых — точка снизу
-	var kind := String(sk.get("kind", ""))
-	if kind == "passive":
-		sb.draw_center = true
-		sb.bg_color = c.darkened(0.35)
-	elif kind == "toggle":
-		var dot := Panel.new()
-		var ds := StyleBoxFlat.new()
-		ds.bg_color = Color(1, 1, 1, 0.9)
-		ds.set_corner_radius_all(6)
-		dot.add_theme_stylebox_override("panel", ds)
-		dot.size = Vector2(12, 12)
-		dot.position = Vector2(26, 50)
-		p.add_child(dot)
-	return p
+func _on_pick(id: String) -> void:
+	selected = id
+	refresh()
 
 
 func _on_learn(id: String) -> void:
@@ -558,14 +559,15 @@ func _on_toggle(id: String) -> void:
 	refresh()
 
 
-func _label(text: String, font_size: int, col: Color, wrap: bool = false) -> Label:
+## Подпись; wrap_w > 0 — перенос строк по этой ширине.
+func _label(text: String, font_size: int, col: Color, wrap_w: float = 0.0) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", font_size)
 	l.add_theme_color_override("font_color", col)
-	if wrap:
+	if wrap_w > 0.0:
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.custom_minimum_size = Vector2(TEXT_W, 0)
+		l.custom_minimum_size = Vector2(wrap_w, 0)
 	return l
 
 

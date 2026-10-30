@@ -13,6 +13,8 @@ const WEAPON_PARTS := {
 	"sword": ["Sword"],
 	"staff": ["Staff", "Orb"],
 	"daggers": ["DaggerR", "DaggerL"],
+	"dual_swords": ["Sword", "SwordL"],
+	"crossbow": ["Crossbow"],
 }
 ## Body (освещаемое), Glow (свечение, если есть), Face — и запас.
 const MAX_MESHES := 4
@@ -183,7 +185,8 @@ func _hero_start() -> void:
 	check(not hero._pick(CharacterModel.ASSET_IDLE).is_empty(), "герой: есть поза покоя")
 	# Клипы, перенесённые из Quaternius UAL скриптом tools/retarget_animations.py
 	for c in ["idle", "sword_slash", "sword_attack", "sword_combo", "sword_heavy_combo", "sword_dash",
-			"sword_block", "dodge", "hit", "death", "cast", "pickup"]:
+			"sword_block", "dodge", "hit", "death", "cast", "pickup", "sword_slash_b", "sword_slash_c", "crossbow_idle",
+			"crossbow_shoot"]:
 		check(hero._clips.has(c), "герой: есть клип «%s» (Quaternius UAL)" % c)
 	if hero._clips.has("idle"):
 		check(hero._anim.get_animation(hero._clip("idle")).loop_mode == Animation.LOOP_LINEAR, "герой: покой зациклен")

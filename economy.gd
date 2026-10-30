@@ -1,7 +1,8 @@
 class_name Economy
 extends Node
 ## Предметы и деньги: добыча со зверей (мешочки на земле), торговец в безопасной зоне,
-## окна сумки и магазина, зелья здоровья с перезарядкой.
+## окна сумки и магазина, зелья здоровья с перезарядкой. Оружие Бродяги: продаётся у торговца,
+## в сумке — кнопка «Надеть» (надетое оружие продать нельзя, пока оно одно).
 
 ## Где стоит торговец (внутри безопасной зоны MobData.SAFE_RADIUS).
 const MERCHANT_POS := Vector3(0, 0, -4)
@@ -165,7 +166,10 @@ func open_shop() -> void:
 		var price: int = int(it.get("buy", 0))
 		if price <= 0:
 			continue
-		var desc := String(it.get("desc", ""))
+		# Оружие — только то, что подходит классу героя
+		if ItemData.is_weapon(id) and not ItemData.weapon_fits(id, Game.class_id):
+			continue
+		var desc := _item_desc(id)
 		var have: int = Game.inventory.count(id)
 		if have > 0:
 			desc += "  В сумке: %d" % have
@@ -181,12 +185,12 @@ func open_shop() -> void:
 	for key in ids:
 		var id: String = key
 		var price: int = int(ItemData.get_item(id).get("sell", 0))
-		if price <= 0:
+		if price <= 0 or _sellable(id) <= 0:
 			continue
 		any = true
 		var cnt: int = Game.inventory.count(id)
 		var title := "%s  ×%d" % [ItemData.item_name(id), cnt]
-		var row := _item_row(id, title, String(ItemData.get_item(id).get("desc", "")), "%d зол./шт." % price)
+		var row := _item_row(id, title, _item_desc(id), "%d зол./шт." % price)
 		row.add_child(_button("Продать 1", "sell1_" + id, _sell.bind(id, 1)))
 		row.add_child(_button("Продать все", "sellall_" + id, _sell.bind(id, -1)))
 		body.add_child(row)
@@ -208,9 +212,26 @@ func _buy(id: String, n: int) -> void:
 	_rebuild_window()
 
 
+## Сколько штук предмета можно продать: надетое оружие остаётся в сумке.
+func _sellable(id: String) -> int:
+	var have: int = Game.inventory.count(id)
+	if id == Game.weapon:
+		have -= 1
+	return maxi(0, have)
+
+
+## Описание предмета; у оружия — ещё характеристики.
+func _item_desc(id: String) -> String:
+	var desc := String(ItemData.get_item(id).get("desc", ""))
+	if ItemData.is_weapon(id):
+		var st := ItemData.weapon_stats_text(id)
+		desc += " " + st.substr(0, 1).to_upper() + st.substr(1) + "."
+	return desc
+
+
 ## n < 0: продать все.
 func _sell(id: String, n: int) -> void:
-	var have: int = Game.inventory.count(id)
+	var have: int = _sellable(id)
 	var cnt: int = have if n < 0 else mini(n, have)
 	var price: int = int(ItemData.get_item(id).get("sell", 0))
 	if cnt <= 0 or price <= 0:
@@ -239,15 +260,35 @@ func open_bag() -> void:
 	for key in ids:
 		var id: String = key
 		var title := "%s  ×%d" % [ItemData.item_name(id), Game.inventory.count(id)]
-		var row := _item_row(id, title, String(ItemData.get_item(id).get("desc", "")), "")
+		var row := _item_row(id, title, _item_desc(id), "")
 		if id == "hp_potion":
 			row.add_child(_button("Использовать", "use_" + id, _use_from_bag.bind(id)))
+		elif ItemData.is_weapon(id):
+			if id == Game.weapon:
+				var worn := _button("В руках", "equip_" + id, Callable())
+				worn.disabled = true
+				row.add_child(worn)
+			elif ItemData.weapon_fits(id, Game.class_id):
+				row.add_child(_button("Надеть", "equip_" + id, _equip_from_bag.bind(id)))
+			else:
+				var no := _button("Не для класса", "equip_" + id, Callable())
+				no.disabled = true
+				row.add_child(no)
 		body.add_child(row)
 
 
 func _use_from_bag(id: String) -> void:
 	if id == "hp_potion":
 		use_potion()
+	_rebuild_window()
+
+
+## Надеть оружие из сумки (касание «Надеть»).
+func _equip_from_bag(id: String) -> void:
+	var p: Player = main.player
+	var err := p.equip(id)
+	if err != "":
+		_msg(err)
 	_rebuild_window()
 
 
@@ -330,7 +371,8 @@ func _button(text: String, node_name: String, cb: Callable) -> Button:
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(0, 56)
 	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	b.pressed.connect(cb)
+	if cb.is_valid():
+		b.pressed.connect(cb)
 	return b
 
 

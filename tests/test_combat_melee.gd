@@ -1,6 +1,6 @@
 extends "res://tests/test_base.gd"
 ## Ближний бой: Страж (меч и щит, «Удар щитом» с оглушением, «Щит света»),
-## затем смена класса на Убийцу («Удар в спину» с критом, «Шаг тени»).
+## затем смена класса на Бродягу (парные мечи, «Удар в спину» с критом, «Шаг тени»).
 
 var mob: Mob = null
 var t0 := 0
@@ -65,7 +65,9 @@ func run_step() -> void:
 			game.race_id = "dark_elf"
 			game.class_id = "assassin"
 			player.apply_class()
-			check(player.attack_kind == "melee" and player._weapon_kind == "sword", "бродяга: меч")
+			check(player.attack_kind == "melee" and player._weapon_kind == "dual_swords", "бродяга: парные мечи")
+			check(game.weapon == "dual_swords_starter" and game.inventory.has("crossbow_starter"),
+				"при смене класса на Бродягу выдан стартовый набор оружия")
 			check(player.guard_time == 0.0, "усиления сброшены при смене класса")
 			check(player.skill_id("skill1") == "backstab" and player.skill_id("skill2") == "shadow_step",
 				"умения убийцы на кнопках")

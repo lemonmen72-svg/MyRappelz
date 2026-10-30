@@ -1,6 +1,6 @@
 class_name Projectile
 extends Node3D
-## Снаряд игрока: стрела ("arrow") или светящийся шар ("orb"). Летит к цели с наведением
+## Снаряд игрока: стрела ("arrow"), болт арбалета ("bolt") или светящийся шар ("orb"). Летит к цели с наведением
 ## и наносит урон при попадании. Если цель погибла или пропала по пути, снаряд исчезает.
 
 const SPEED := 20.0
@@ -34,6 +34,8 @@ func _ready() -> void:
 	add_to_group("projectiles")
 	if kind == "arrow":
 		_build_arrow()
+	elif kind == "bolt":
+		_build_bolt()
 	else:
 		_build_orb()
 
@@ -51,7 +53,7 @@ func _physics_process(delta: float) -> void:
 		_hit()
 		return
 	global_position += to.normalized() * step
-	if kind == "arrow" and Vector2(to.x, to.z).length() > 0.05:
+	if is_shaft() and Vector2(to.x, to.z).length() > 0.05:
 		look_at(aim, Vector3.UP)
 	if _spin != null:
 		_spin.rotation.z += delta * 14.0
@@ -71,11 +73,32 @@ func _hit() -> void:
 			"Крит!", Color(1, 0.85, 0.2), 1.4)
 	if on_hit.is_valid():
 		on_hit.call(t, damage)
-	if kind == "arrow":
+	if is_shaft():
 		Vfx.hit_spark(get_parent(), hit_pos, color.lightened(0.3), 0.9 * size)
 	else:
 		_spark(hit_pos)
 	queue_free()
+
+
+## Стрела или болт (летит наконечником вперёд, поворачивается к цели).
+func is_shaft() -> bool:
+	return kind == "arrow" or kind == "bolt"
+
+
+## Болт арбалета: короткое толстое древко, тяжёлый стальной наконечник, два коротких пера и шлейф.
+func _build_bolt() -> void:
+	var shaft := _part(_cyl_mesh(0.032, 0.032, 0.46), Util.mat(Color(0.32, 0.22, 0.16)), Vector3.ZERO, false)
+	shaft.rotation.x = PI / 2.0
+	var tip := _part(_cyl_mesh(0.0, 0.07, 0.14), Util.mat(Color(0.72, 0.75, 0.82)), Vector3(0, 0, -0.3), false)
+	tip.rotation.x = -PI / 2.0
+	var fm := Util.mat(color.lightened(0.2))
+	for i in 2:
+		var fb := BoxMesh.new()
+		fb.size = Vector3(0.14, 0.012, 0.1) if i == 0 else Vector3(0.012, 0.14, 0.1)
+		_part(fb, fm, Vector3(0, 0, 0.18), false)
+	var trail := _part(_cyl_mesh(0.0, 0.06, 0.8), Vfx.fx_mat(Color(color.lightened(0.3), 0.4)), Vector3(0, 0, 0.62), true)
+	trail.rotation.x = PI / 2.0
+	_trail_particles(Color(color.lightened(0.4), 0.9), 0.08)
 
 
 ## Стрела: древко, наконечник-конус, оперение цвета класса и светящийся шлейф.

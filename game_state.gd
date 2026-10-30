@@ -1,5 +1,5 @@
 extends Node
-## Автозагрузка Game: персонаж, сумка, питомцы, сохранение в user://.
+## Автозагрузка Game: персонаж, сумка, оружие и умения героя, питомцы, сохранение в user://.
 
 signal changed
 
@@ -17,6 +17,14 @@ var level := 1
 var xp := 0
 var gold := 0
 var inventory := Inventory.new()
+## Надетое оружие (id предмета ItemData из сумки; "" — нет). Сменное оружие только у классов
+## со стартовым набором (Бродяга), у остальных оружие задано классом.
+var weapon := ""
+## Умения героя (HeroSkills): {"jp": int, "jp_part": float, "skills": {id: ур.}, "toggles": {id: true},
+## "slots": [id умения на кнопке skill1…skill4 или ""]}.
+var hero: Dictionary = {}
+## Переключаемые умения, выключенные последней сменой оружия (для сообщения игроку).
+var last_dropped_toggles: Array = []
 ## Питомцы: {"species": String, "name": String, "level": int, "xp": int, "hp": int, "dead": bool,
 ## "mp": int, "jp": int (очки умений), "jp_part": float (накопленная доля JP), "skills": {id умения: уровень},
 ## "toggles": {id включённого переключаемого умения: true}} (умения — PetSkills). hp, mp = -1: полный запас.
@@ -49,6 +57,8 @@ func reset() -> void:
 	xp = 0
 	gold = 0
 	inventory.from_dict({})
+	weapon = ""
+	hero = {}
 	pets.clear()
 	active_pet = -1
 
@@ -63,7 +73,57 @@ func new_character(n: String, race: String, cls: String) -> void:
 	inventory.add("crystal_common", 3)
 	inventory.add("hp_potion", 3)
 	inventory.add("revive_scroll", 1)
+	hero = HeroSkills.new_record(cls, 1)
+	ensure_hero()
 	changed.emit()
+
+
+## Приводит умения и оружие героя к текущему классу: запись умений (HeroSkills.ensure_record),
+## стартовый набор оружия в сумке у Бродяги (если оружия нет совсем) и надетое оружие (по умолчанию — первое
+## из набора, у старых сохранений — парные мечи). Вызывается при создании, загрузке и смене класса.
+func ensure_hero() -> void:
+	if hero.is_empty():
+		hero = HeroSkills.new_record(class_id, level)
+	HeroSkills.ensure_record(hero, class_id)
+	if not ItemData.class_uses_weapons(class_id):
+		weapon = ""
+		return
+	var has_any := false
+	for id in inventory.ids():
+		if ItemData.weapon_fits(String(id), class_id):
+			has_any = true
+	if not has_any:
+		for id in ItemData.STARTER_WEAPONS[class_id]:
+			inventory.add(String(id))
+	if not (ItemData.weapon_fits(weapon, class_id) and inventory.has(weapon)):
+		weapon = ItemData.default_weapon(class_id)
+		if not inventory.has(weapon):
+			for id in inventory.ids():
+				if ItemData.weapon_fits(String(id), class_id):
+					weapon = String(id)
+					break
+	HeroSkills.drop_unfit_toggles(hero, weapon_kind())
+
+
+## Вид надетого оружия ("daggers" | "dual_swords" | "crossbow"); у классов без сменного оружия — "".
+func weapon_kind() -> String:
+	return ItemData.weapon_kind(weapon)
+
+
+## Надеть оружие id из сумки. "" — получилось, иначе причина. Переключаемые умения, которым новое оружие
+## не подходит, выключаются (их id — в last_dropped_toggles).
+func equip_weapon(id: String) -> String:
+	last_dropped_toggles = []
+	if not ItemData.is_weapon(id):
+		return "Это не оружие"
+	if not ItemData.weapon_fits(id, class_id):
+		return "Это оружие не для класса «%s»" % String(ClassData.cls(class_id)["name"])
+	if not inventory.has(id):
+		return "Этого оружия нет в сумке"
+	weapon = id
+	last_dropped_toggles = HeroSkills.drop_unfit_toggles(hero, weapon_kind())
+	changed.emit()
+	return ""
 
 
 ## Добавляет питомца в коллекцию. Возвращает индекс или -1, если места нет.
@@ -95,6 +155,8 @@ func to_dict() -> Dictionary:
 		"name": char_name, "race": race_id, "class": class_id,
 		"level": level, "xp": xp, "gold": gold,
 		"inventory": inventory.to_dict(),
+		"weapon": weapon,
+		"hero": hero.duplicate(true),
 		"pets": pets.duplicate(true),
 		"active_pet": active_pet,
 	}
@@ -134,6 +196,17 @@ func from_dict(d: Dictionary) -> void:
 	active_pet = int(d.get("active_pet", -1))
 	if active_pet >= pets.size():
 		active_pet = -1
+	# Оружие (старые сохранения Бродяги — парные мечи и стартовый набор в сумку, см. ensure_hero)
+	weapon = String(d.get("weapon", ""))
+	# Умения героя: старые сохранения — JP, как будто копились с 1 уровня, стартовые умения
+	var h: Variant = d.get("hero", null)
+	if h is Dictionary:
+		hero = (h as Dictionary).duplicate(true)
+		hero["jp"] = int(hero.get("jp", HeroSkills.default_jp(level)))
+		hero["jp_part"] = float(hero.get("jp_part", 0.0))
+	else:
+		hero = HeroSkills.new_record(class_id, level)
+	ensure_hero()
 	changed.emit()
 
 
