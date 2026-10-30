@@ -10,6 +10,7 @@ const WEAPON_PARTS := {
 	"axe": ["Axe"],
 	"bow": ["Bow", "Quiver"],
 	"sword_shield": ["Sword", "Shield"],
+	"sword": ["Sword"],
 	"staff": ["Staff", "Orb"],
 	"daggers": ["DaggerR", "DaggerL"],
 }
