@@ -101,8 +101,9 @@ func find_mob(type_id: String) -> Mob:
 	return best
 
 
-func mob_ok(m: Mob) -> bool:
-	return is_instance_valid(m) and not m.is_dead
+## Без типа у параметра: удалённый зверь (умер и освобождён) с типом Mob дал бы ошибку вызова.
+func mob_ok(m: Variant) -> bool:
+	return is_instance_valid(m) and not (m as Mob).is_dead
 
 
 ## Ставит игрока рядом со зверем (в радиусе атаки зверя, чтобы тот не бегал) и держит HP полным.
