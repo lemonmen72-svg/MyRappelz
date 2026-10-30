@@ -2,7 +2,9 @@ class_name CharacterCreate
 extends CanvasLayer
 ## Экран создания персонажа: слева имя, раса, класс; в центре — 3D-превью персонажа
 ## (SubViewport, медленно вращается, можно крутить пальцем, касание — показать атаку);
-## справа — карточка класса: описание, характеристики 1-го уровня и два умения.
+## справа — карточка класса: описание, характеристики 1-го уровня (у Бродяги ещё 7 статов) и два умения.
+## Пока доступна одна профессия — тёмная эльфийка-Бродяга (ClassData.is_playable): остальные расы и классы
+## видны, но затемнены с подписью «скоро» и не выбираются.
 ## Рассчитан на 1280×720 и касания пальцем.
 
 signal created(char_name: String, race_id: String, class_id: String)
@@ -25,6 +27,7 @@ var _class_stripe: ColorRect
 var _class_title: Label
 var _class_sub: Label
 var _class_desc: Label
+var _class_stats7: Label
 var _stat_bars: Dictionary = {}
 var _stat_vals: Dictionary = {}
 var _stat_max: Dictionary = {}
@@ -97,6 +100,8 @@ func _build_left() -> PanelContainer:
 	v.add_child(race_box)
 	for rid in ClassData.RACES:
 		var b := _choice_button(String(ClassData.race(rid)["name"]), 50)
+		if not ClassData.race_playable(String(rid)):
+			_soon(b)
 		b.pressed.connect(_select_race.bind(String(rid)))
 		race_box.add_child(b)
 		_race_btns[rid] = b
@@ -109,6 +114,9 @@ func _build_left() -> PanelContainer:
 	_class_box = HBoxContainer.new()
 	_class_box.add_theme_constant_override("separation", 8)
 	v.add_child(_class_box)
+	var only := _label("Пока доступна одна профессия — Бродяга. Остальные появятся позже.", 16, MUTED)
+	only.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(only)
 
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -300,6 +308,10 @@ func _build_right() -> PanelContainer:
 		grid.add_child(val)
 		_stat_vals[key] = val
 
+	_class_stats7 = _label("", 17, Color(0.85, 0.86, 0.9))
+	_class_stats7.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(_class_stats7)
+
 	v.add_child(HSeparator.new())
 	v.add_child(_label("Умения", 20, GOLD))
 	_skills_box = VBoxContainer.new()
@@ -314,6 +326,14 @@ func _label(text: String, font_size: int, col: Color) -> Label:
 	l.add_theme_font_size_override("font_size", font_size)
 	l.add_theme_color_override("font_color", col)
 	return l
+
+
+## Недоступный вариант: затемнён, с подписью «скоро», не нажимается.
+func _soon(b: Button) -> void:
+	b.text += " — скоро"
+	b.disabled = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override("font_size", 17)
 
 
 func _choice_button(text: String, height: float = 54.0) -> Button:
@@ -338,6 +358,8 @@ func _calc_stat_max() -> void:
 
 
 func _select_race(rid: String) -> void:
+	if not ClassData.race_playable(rid):
+		return
 	_race = rid
 	var r := ClassData.race(rid)
 	for k in _race_btns:
@@ -345,20 +367,30 @@ func _select_race(rid: String) -> void:
 		b.set_pressed_no_signal(k == rid)
 	_race_desc.text = String(r["desc"])
 	var classes: Array = r["classes"]
-	if not classes.has(_class):
-		_class = String(classes[0])
+	if not classes.has(_class) or not ClassData.is_playable(_class):
+		for cid in classes:
+			if ClassData.is_playable(String(cid)):
+				_class = String(cid)
+				break
 
 	for c in _class_box.get_children():
 		c.queue_free()
 	for cid in classes:
 		var b := _choice_button(String(ClassData.cls(cid)["name"]))
 		b.set_pressed_no_signal(cid == _class)
+		if not ClassData.is_playable(String(cid)):
+			b.text = String(ClassData.cls(cid)["name"]) + "\nскоро"
+			b.disabled = true
+			b.focus_mode = Control.FOCUS_NONE
+			b.add_theme_font_size_override("font_size", 17)
 		b.pressed.connect(_select_class.bind(String(cid)))
 		_class_box.add_child(b)
 	_select_class(_class)
 
 
 func _select_class(cid: String) -> void:
+	if not ClassData.is_playable(cid):
+		return
 	_class = cid
 	for b in _class_box.get_children():
 		var btn := b as Button
@@ -394,6 +426,14 @@ func _select_class(cid: String) -> void:
 			_:
 				lbl.text = _num(v)
 
+	_class_stats7.visible = HeroStats.has_stats(cid)
+	if _class_stats7.visible:
+		var st := HeroStats.base_stats(cid, 1)
+		var parts: PackedStringArray = []
+		for k in Stats.STATS:
+			parts.append("%s %d" % [String(Stats.STAT_NAMES[k]), int(st[k])])
+		_class_stats7.text = " · ".join(parts)
+
 	for ch in _skills_box.get_children():
 		ch.queue_free()
 	for sid in c["skills"]:
@@ -420,6 +460,8 @@ func _num(v: float) -> String:
 
 
 func _on_start() -> void:
+	if not ClassData.is_playable(_class):
+		return
 	var n := _name_edit.text.strip_edges()
 	if n == "":
 		n = "Герой"
