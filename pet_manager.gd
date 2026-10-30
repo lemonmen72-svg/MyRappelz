@@ -4,7 +4,9 @@ extends Node
 ## ЗАГЛУШКА каркаса: реализует модуль «Питомцы».
 
 var main: Node
-## Призванный питомец (узел в мире) или null.
+## Призванный питомец (узел в мире) или null. Контракт узла питомца (используют HUD и другие модули):
+## поля pet_name: String, level: int, hp: int, max_hp: int, is_down: bool (погиб/скрыт),
+## метод heal(amount: int), сигнал stats_changed.
 var active_pet: Node3D = null
 
 

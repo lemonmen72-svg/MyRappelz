@@ -142,6 +142,11 @@ func use_skill(_id: String) -> void:
 	message.emit("Умения: в разработке")
 
 
+## Доля оставшейся перезарядки умения "skill1"/"skill2": 0 = готово, 1 = только что использовано.
+func cooldown_frac(_id: String) -> float:
+	return 0.0
+
+
 func heal(amount: int) -> void:
 	hp = mini(max_hp, hp + amount)
 	Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "+%d" % amount, Color(0.4, 1, 0.4))

@@ -21,6 +21,10 @@ var aggro_range := 7.0
 var leash := 22.0
 var attack_cd := 0.0
 var is_dead := false
+## Оглушение: зверь не двигается и не атакует, пока > 0.
+var stun_time := 0.0
+## Провокация: пока > 0, зверь не меняет цель (танк-питомец, умения).
+var taunt_time := 0.0
 var returning := false
 var target: Node3D = null
 
@@ -78,6 +82,10 @@ func _physics_process(delta: float) -> void:
 	if is_dead:
 		return
 	attack_cd = maxf(0.0, attack_cd - delta)
+	taunt_time = maxf(0.0, taunt_time - delta)
+	if stun_time > 0.0:
+		stun_time -= delta
+		return
 
 	if target != null and _target_gone():
 		target = null
@@ -141,6 +149,19 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, atan2(-face.x, -face.z), 8.0 * delta)
 
 
+## Оглушить на sec секунд.
+func stun(sec: float) -> void:
+	stun_time = maxf(stun_time, sec)
+
+
+## Заставить атаковать by в течение sec секунд.
+func taunt(by: Node3D, sec: float) -> void:
+	if is_dead or returning:
+		return
+	target = by
+	taunt_time = sec
+
+
 func _in_safe_zone(n: Node3D) -> bool:
 	return Vector2(n.global_position.x, n.global_position.z).length() < MobData.SAFE_RADIUS
 
@@ -160,7 +181,7 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 	if is_dead:
 		return
 	hp -= amount
-	if not returning:
+	if not returning and attacker != null and taunt_time <= 0.0:
 		target = attacker
 	Util.float_text(get_parent(), global_position + Vector3(0, 2.2 * body_scale, 0), str(amount), Color(1, 1, 1))
 	_flash()

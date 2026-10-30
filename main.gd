@@ -209,6 +209,8 @@ func _process(delta: float) -> void:
 	player.move_input = mv
 	if hud.is_held("attack"):
 		player.try_attack()
+	hud.set_cooldown("skill1", player.cooldown_frac("skill1"))
+	hud.set_cooldown("skill2", player.cooldown_frac("skill2"))
 
 	var want := player.global_position + Vector3(0, 12, 9.5)
 	cam.global_position = cam.global_position.lerp(want, 1.0 - exp(-8.0 * delta))
