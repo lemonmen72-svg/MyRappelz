@@ -3,7 +3,7 @@ extends CanvasLayer
 ## Интерфейс: плавающий джойстик (левая нижняя часть экрана), круглые кнопки действий справа,
 ## панели игрока (HP, MP, опыт), питомца и цели, окна (герой, питомцы, сумка, торговец).
 ## На ПК: WASD/стрелки, Пробел = атака, 1–4 = умения, T = приручить, Q = зелье, K = окно героя,
-## P = питомцы, C = окно существа, I = сумка, E = торговец, F = питомец атакует, G = питомец за мной, O = настройки.
+## P = питомцы, C = окно существа, I или B = сумка, E = торговец, F = питомец атакует, G = питомец за мной, O = настройки.
 
 ## Нажатие кнопки действия (касание, клавиша или кнопка меню).
 signal action(id: String)
@@ -17,7 +17,7 @@ const KEYS := {
 	KEY_SPACE: "attack", KEY_1: "skill1", KEY_2: "skill2", KEY_3: "skill3", KEY_4: "skill4", KEY_T: "tame",
 	KEY_Q: "potion", KEY_K: "hero_window",
 	KEY_P: "pets_window", KEY_I: "bag_window", KEY_E: "shop", KEY_F: "pet_attack", KEY_G: "pet_follow", KEY_O: "settings_window",
-	KEY_C: "creature_window",
+	KEY_C: "creature_window", KEY_B: "bag_window",
 }
 
 var move_vec := Vector2.ZERO

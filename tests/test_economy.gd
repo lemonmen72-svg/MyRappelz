@@ -1,6 +1,7 @@
 extends "res://tests/test_base.gd"
 ## Предметы и торговля: добыча мешочком и подбор, торговец и безопасная зона, покупка и продажа,
-## окна магазина и сумки, зелье с перезарядкой и счётчиком на кнопке.
+## окна торговца и сумки (InventoryWindow: сетка, карточка, кнопки действий), зелье с перезарядкой и счётчиком
+## на кнопке. Подробно сумка — tests/test_inventory.gd.
 
 ## Сколько кабанов можно убить в поисках добычи (шанс клыка 0.6, пустой мешок ~35%).
 const MAX_KILLS := 12
@@ -101,22 +102,25 @@ func run_step() -> void:
 			check(_shop_visible(), "кнопка «Торговец» снова видна")
 			main._on_action("shop")
 			check(hud.is_window_open() and eco.is_shop_open(), "окно магазина открыто")
-			check(_find_button("buy_boar_tusk") == null, "трофеи не продаются торговцем")
-			# Покупка кристалла
+			check(_find_button("good_boar_tusk") == null, "трофеи не продаются торговцем")
+			# Покупка кристалла: касание товара → «Купить»
 			game.gold = 100
 			var crystals: int = game.inventory.count("crystal_common")
-			_press("buy_crystal_common")
+			_press("good_crystal_common")
+			_press("act_buy")
 			check(game.gold == 75 and game.inventory.count("crystal_common") == crystals + 1,
 				"куплен кристалл: золото %d, кристаллов %d" % [game.gold, game.inventory.count("crystal_common")])
 			# Покупка ×5
 			game.gold = 100
 			var potions: int = game.inventory.count("hp_potion")
-			_press("buy5_hp_potion")
+			_press("good_hp_potion")
+			_press("act_buy5")
 			check(game.gold == 50 and game.inventory.count("hp_potion") == potions + 5, "куплено 5 зелий")
 			# Не хватает золота
 			game.gold = 10
 			crystals = game.inventory.count("crystal_common")
-			_press("buy_crystal_common")
+			_press("good_crystal_common")
+			_press("act_buy")
 			check(game.gold == 10 and game.inventory.count("crystal_common") == crystals, "без золота покупка не проходит")
 			check(hud.is_window_open() and eco.is_shop_open(), "окно магазина открыто после покупок")
 			# Трофеи для продажи: окно перестроится само в следующем кадре
@@ -127,11 +131,14 @@ func run_step() -> void:
 			var tusks: int = game.inventory.count("boar_tusk")
 			var gold: int = game.gold
 			var price: int = ItemData.get_item("boar_tusk")["sell"]
-			_press("sell1_boar_tusk")
+			# Продажа — из ячейки сумки в окне торговца
+			_press("cell_%d" % game.inventory.find_cell("boar_tusk"))
+			_press("act_sell")
 			check(game.gold == gold + price and game.inventory.count("boar_tusk") == tusks - 1, "продан 1 клык")
-			_press("sellall_boar_tusk")
+			_press("act_sell_all")
 			check(game.gold == gold + price * tusks and game.inventory.count("boar_tusk") == 0, "проданы все клыки")
-			check(_find_button("sell1_boar_tusk") == null, "проданный трофей пропал из списка")
+			check(game.inventory.find_cell("boar_tusk") == -1 and _find_button("act_sell") == null,
+				"проданный трофей пропал из сумки")
 			player.global_position = Vector3(0, 0.1, 7.0)
 			wait = 3
 			step = 10
@@ -144,7 +151,8 @@ func run_step() -> void:
 			check(eco.potion_cooldown_frac() == 0.0, "зелье готово")
 			player.hp = 10
 			var potions: int = game.inventory.count("hp_potion")
-			_press("use_hp_potion")
+			_press("cell_%d" % game.inventory.find_cell("hp_potion"))
+			_press("act_use")
 			check(player.hp > 10 and game.inventory.count("hp_potion") == potions - 1, "зелье из сумки лечит")
 			check(hud.is_window_open() and eco.is_bag_open(), "сумка открыта после использования")
 			check(_button_label("potion") == "Зелье\n%d" % (potions - 1), "счётчик зелий на кнопке")
@@ -167,7 +175,10 @@ func run_step() -> void:
 			var saved: Dictionary = game.inventory.to_dict()
 			game.inventory.from_dict({})
 			main._on_action("bag_window")
-			check(hud.is_window_open() and hud._window.find_child("empty_label", true, false) != null, "пустая сумка: надпись")
+			var used := hud._window.find_child("used_label", true, false) as Label
+			check(hud.is_window_open() and used != null and used.text == "Занято: 0/%d" % Inventory.CAPACITY,
+				"пустая сумка: %s" % (used.text if used else "?"))
+			check(_find_button("cell_0") != null, "пустые ячейки видны")
 			check(_button_label("potion") == "Зелье\n0", "на кнопке 0 зелий")
 			main._on_action("bag_window")
 			check(not hud.is_window_open(), "сумка закрывается повторным действием")
@@ -203,12 +214,13 @@ func _button_label(id: String) -> String:
 	return l.text
 
 
-## Кнопка окна по имени узла (buy_<id>, buy5_<id>, sell1_<id>, sellall_<id>, use_<id>).
+## Кнопка открытого окна сумки или торговца (InventoryWindow.buttons: good_<id>, cell_<i>, act_buy, act_sell…).
 func _find_button(node_name: String) -> Button:
 	var hud: HUD = main.hud
-	if not hud.is_window_open():
+	var win: InventoryWindow = main.economy.window
+	if not hud.is_window_open() or not win.is_open():
 		return null
-	return hud._window.find_child(node_name, true, false) as Button
+	return win.buttons.get(node_name) as Button
 
 
 func _press(node_name: String) -> void:

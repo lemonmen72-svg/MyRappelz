@@ -306,6 +306,25 @@ func _on_revive(i: int) -> void:
 	_refresh_window()
 
 
+## Свиток воскрешения из сумки («Использовать»): воскрешает призванного погибшего питомца, иначе первого
+## погибшего в коллекции. true — воскрешён.
+func revive_any() -> bool:
+	var idx := -1
+	if Game.active_pet >= 0 and Game.active_pet < Game.pets.size() \
+			and bool(Game.pets[Game.active_pet].get("dead", false)):
+		idx = Game.active_pet
+	else:
+		for i in Game.pets.size():
+			if bool(Game.pets[i].get("dead", false)):
+				idx = i
+				break
+	if idx < 0:
+		_msg("Нет погибших питомцев")
+		return false
+	_on_revive(idx)
+	return not bool(Game.pets[idx].get("dead", false))
+
+
 func _on_release(i: int) -> void:
 	if i < 0 or i >= Game.pets.size():
 		return

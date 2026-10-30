@@ -22,8 +22,12 @@ var xp := 0
 var gold := 0
 var inventory := Inventory.new()
 ## Надетое оружие (id предмета ItemData из сумки; "" — нет). Сменное оружие только у классов
-## со стартовым набором (Бродяга), у остальных оружие задано классом.
-var weapon := ""
+## со стартовым набором (Бродяга), у остальных оружие задано классом. Надетое оружие не занимает ячейку сумки
+## (inventory.equipped), в окне сумки оно в слоте «Оружие».
+var weapon := "":
+	set(v):
+		weapon = v
+		inventory.equipped = v
 ## Умения героя (HeroSkills): {"jp": int, "jp_part": float, "skills": {id: ур.}, "toggles": {id: true},
 ## "slots": [id умения на кнопке skill1…skill4 или ""]}.
 var hero: Dictionary = {}
@@ -162,6 +166,8 @@ func to_dict() -> Dictionary:
 		"name": char_name, "race": race_id, "class": class_id,
 		"level": level, "xp": xp, "gold": gold,
 		"inventory": inventory.to_dict(),
+		# Раскладка сумки по ячейкам (у старых сохранений нет — предметы ложатся по порядку сортировки)
+		"bag": inventory.layout_to_array(),
 		"weapon": weapon,
 		"hero": hero.duplicate(true),
 		"pets": pets.duplicate(true),
@@ -186,6 +192,7 @@ func from_dict(d: Dictionary) -> void:
 	xp = int(d.get("xp", 0))
 	gold = int(d.get("gold", 0))
 	inventory.from_dict(migrate_items(d.get("inventory", {})))
+	inventory.load_layout(d.get("bag", []))
 	for p in d.get("pets", []):
 		var r: Dictionary = p
 		var sp := String(r.get("species", "boar"))

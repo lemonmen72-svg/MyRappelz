@@ -20,6 +20,12 @@ var _frames := 0
 ## Умения Бродяги для кадров окна героя [id, уровень].
 const HERO_SKILLS := [["blade_mastery", 2], ["charge_stab", 2], ["dark_strike", 1], ["evasion_expert", 2],
 	["concentration", 1], ["crossbow_mastery", 1], ["dual_shot", 1]]
+## Предметы для кадров сумки и торговца (27, 28): [id, количество].
+const BAG_ITEMS := [
+	["daggers_steel", 1], ["crossbow_heavy", 1], ["crystal_rare", 1], ["crystal_unique", 1], ["boar_tusk", 7],
+	["wolf_pelt", 3], ["panther_fang", 2], ["pheasant_feather", 4], ["shell_plate", 2], ["golem_shard", 1],
+	["hp_potion", 12],
+]
 
 
 func race_class() -> Array:
@@ -96,7 +102,8 @@ func run_step() -> void:
 			step = 5
 		5:
 			shot("05_pheasant")
-			player.global_position = Vector3(0, 0.1, 1.0)
+			# Рядом с торговцем (дальше SHOP_RANGE окно торговца закрывается само)
+			player.global_position = Vector3(0, 0.1, -1.5)
 			wait = 60
 			step = 6
 		6:
@@ -261,6 +268,28 @@ func run_step() -> void:
 			_top.queue_free()
 			main.cam.current = true
 			main.hud.visible = true
+			# Сумка с добычей и покупками, у торговца
+			for e in BAG_ITEMS:
+				game.inventory.add(String(e[0]), int(e[1]))
+			player.global_position = Vector3(0, 0.1, -1.5)
+			wait = 10
+			step = 29
+		29:
+			# Окно сумки: карточка стальных кинжалов (сравнение с надетыми)
+			main.economy.open_bag()
+			main.economy.window.select_cell(game.inventory.find_cell("daggers_steel"))
+			wait = 8
+			step = 30
+		30:
+			shot("27_inventory")
+			# Окно торговца: товары, сумка, карточка тяжёлого арбалета
+			main.economy.open_shop()
+			main.economy.window._on_cell("good", InventoryWindow.goods(game.class_id).find("crossbow_heavy"))
+			wait = 8
+			step = 31
+		31:
+			shot("28_shop")
+			main.hud.close_window()
 			ok_done()
 
 

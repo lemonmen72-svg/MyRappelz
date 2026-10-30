@@ -1,22 +1,28 @@
 class_name LootDrop
 extends Node3D
 ## Мешочек с добычей на земле: подпрыгивает и вращается, игрок подбирает его, подойдя ближе
-## PICKUP_RANGE. Через LIFETIME секунд исчезает (последние секунды мигает).
+## PICKUP_RANGE. Через LIFETIME секунд исчезает (последние секунды мигает). В сумку кладётся то, что помещается
+## (Inventory.try_add); если сумка полна, остаток лежит дальше (bag_full), повторная попытка — через RETRY_TIME.
 
-## Мешочек подобран: items = {id предмета: количество}.
+## Подобрано (может быть и часть содержимого): items = {id предмета: количество}.
 signal picked_up(items: Dictionary)
+## Сумка полна: left — что осталось лежать в мешочке.
+signal bag_full(left: Dictionary)
 
 const PICKUP_RANGE := 2.5
 ## Небольшая пауза, чтобы мешочек было видно, даже если игрок стоит рядом.
 const PICKUP_DELAY := 0.4
 const LIFETIME := 60.0
 const BLINK_TIME := 5.0
+## Пауза перед новой попыткой подобрать, если сумка была полна, с.
+const RETRY_TIME := 3.0
 
 ## id предмета -> количество.
 var items: Dictionary = {}
 var age := 0.0
 
 var _taken := false
+var _retry := 0.0
 var _model: Node3D
 var _sparkle: MeshInstance3D
 
@@ -158,26 +164,43 @@ func _process(delta: float) -> void:
 		_model.visible = int(age * 6.0) % 2 == 0
 	if age < PICKUP_DELAY:
 		return
+	if _retry > 0.0:
+		_retry -= delta
+		return
 	var p := get_tree().get_first_node_in_group("player") as Node3D
 	if p == null:
 		return
 	var d := Vector2(p.global_position.x - global_position.x, p.global_position.z - global_position.z)
 	if d.length() < PICKUP_RANGE:
-		if p.has_method("play_pickup"):
+		if pick_up() and p.has_method("play_pickup"):
 			p.call("play_pickup")
-		pick_up()
 
 
-## Кладёт содержимое в сумку и убирает мешочек.
-func pick_up() -> void:
+## Кладёт в сумку, что помещается. Всё взято — мешочек исчезает, иначе остаток лежит (bag_full).
+## true — что-то подобрано.
+func pick_up() -> bool:
 	if _taken:
-		return
-	_taken = true
+		return false
+	var got: Dictionary = {}
+	var left: Dictionary = {}
 	for key in items:
 		var id: String = key
 		var n: int = int(items[key])
-		Game.inventory.add(id, n)
-	Util.float_text(get_parent(), global_position + Vector3(0, 1.6, 0), describe(items), Color(1, 0.9, 0.5))
-	Vfx.pickup(get_parent(), global_position + Vector3(0, 0.5, 0))
-	picked_up.emit(items)
-	queue_free()
+		var k: int = Game.inventory.try_add(id, n)
+		if k > 0:
+			got[id] = k
+		if n - k > 0:
+			left[id] = n - k
+	if not got.is_empty():
+		Util.float_text(get_parent(), global_position + Vector3(0, 1.6, 0), describe(got), Color(1, 0.9, 0.5))
+		Vfx.pickup(get_parent(), global_position + Vector3(0, 0.5, 0))
+		picked_up.emit(got)
+	if left.is_empty():
+		_taken = true
+		queue_free()
+		return true
+	items = left
+	_retry = RETRY_TIME
+	Util.float_text(get_parent(), global_position + Vector3(0, 1.2, 0), "Сумка полна", Color(1, 0.5, 0.4))
+	bag_full.emit(left)
+	return not got.is_empty()
