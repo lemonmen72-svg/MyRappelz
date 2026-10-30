@@ -13,6 +13,7 @@
 | Вода, берег | `island_water.gd` (`IslandWater`) |
 | Постройки и точки интереса | `island_pois.gd` (`IslandPois`) |
 | Растительность, качество, постобработка | `island_vegetation.gd`, `quality.gd`, `postfx.gd` |
+| Рисованные текстуры земли и построек | `world_textures.gd`, `assets/textures/` (делает `tools/gen_textures.py`) |
 
 ## Координаты
 Метры. `x` — восток, `z` — юг (север сверху, как на картинке). Город новичков — в `(0, 0)` на высоте 0,

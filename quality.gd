@@ -12,35 +12,36 @@ const HIGH := 2
 const PATH := "user://settings.cfg"
 const NAMES := ["Низкое", "Среднее", "Высокое"]
 const DESCRIPTIONS := [
-	"Без теней и постобработки, трава редкая и только рядом, у кустов и камней нет контуров. Для слабых телефонов.",
-	"Тени рядом с игроком, лёгкая цветокоррекция и виньетка, трава средней густоты. Рекомендуется.",
+	"Без теней, текстур и постобработки, трава редкая и только рядом, у кустов и камней нет контуров. Для слабых телефонов.",
+	"Тени рядом с игроком, рисованные текстуры земли и построек, трава средней густоты. Рекомендуется.",
 	"Тени дальше и чётче, мягкое свечение светлых мест, густая трава вдаль, тени от кустов и камней.",
 ]
 ## grass_density — доля от полной густоты травы; *_distance — дальность видимости, м;
 ## shadow_atlas — размер карты теней солнца; postfx — цветокоррекция и виньетка; bloom — свечение;
 ## outlines — контуры (персонажи, звери, постройки, растительность); small_shadows — тени от кустов и камней;
-## render_scale — меньше 1: кадр рисуется высотой 720 px и растягивается (см. apply_resolution).
+## render_scale — меньше 1: кадр рисуется высотой 720 px и растягивается (см. apply_resolution);
+## textures — рисованные текстуры земли и построек (WorldTextures; на «Низком» без выборок текстур).
 const PRESETS := [
 	{
 		"grass_density": 0.35, "grass_distance": 24.0, "grass_blades": 4, "flower_density": 0.45,
 		"detail_distance": 45.0, "tree_distance": 90.0,
 		"shadows": false, "shadow_distance": 0.0, "shadow_splits": false, "shadow_atlas": 1024,
 		"small_shadows": false, "postfx": false, "bloom": false, "outlines": false,
-		"render_scale": 0.6, "rich_shaders": false,
+		"render_scale": 0.6, "rich_shaders": false, "textures": false,
 	},
 	{
 		"grass_density": 0.65, "grass_distance": 38.0, "grass_blades": 5, "flower_density": 0.75,
 		"detail_distance": 65.0, "tree_distance": 125.0,
 		"shadows": true, "shadow_distance": 28.0, "shadow_splits": false, "shadow_atlas": 1024,
 		"small_shadows": false, "postfx": false, "bloom": false, "outlines": true,
-		"render_scale": 0.75, "rich_shaders": false,
+		"render_scale": 0.75, "rich_shaders": false, "textures": true,
 	},
 	{
 		"grass_density": 1.0, "grass_distance": 58.0, "grass_blades": 6, "flower_density": 1.0,
 		"detail_distance": 95.0, "tree_distance": 175.0,
 		"shadows": true, "shadow_distance": 60.0, "shadow_splits": true, "shadow_atlas": 4096,
 		"small_shadows": true, "postfx": true, "bloom": true, "outlines": true,
-		"render_scale": 1.0, "rich_shaders": true,
+		"render_scale": 1.0, "rich_shaders": true, "textures": true,
 	},
 ]
 
@@ -177,6 +178,12 @@ static func rich_shaders() -> bool:
 	return bool(_p("rich_shaders"))
 
 
+## Рисованные текстуры земли и построек (WorldTextures). Полный режим (две выборки против повтора,
+## triplanar) — вместе с rich_shaders().
+static func textures() -> bool:
+	return bool(_p("textures"))
+
+
 static func outlines() -> bool:
 	return bool(_p("outlines"))
 
@@ -197,6 +204,7 @@ static func apply(tree: SceneTree) -> void:
 			n.call("apply_quality")
 	IslandVegetation.apply_quality(tree)
 	PoiModels.apply_quality()
+	WorldTextures.apply_quality()
 
 
 ## Разрешение рендера: на «Низком» и «Среднем» кадр рисуется высотой 720 пикселей (ширина — по
