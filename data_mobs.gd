@@ -35,12 +35,12 @@ const TYPES := {
 			["crystal_rare", 0.03, 1, 1]],
 	},
 	"pheasant": {
-		"name": "Фазан", "level": 4, "hp": 45, "atk": 7, "speed": 3.8, "xp": 35, "gold": [6, 12],
+		"name": "Фазан", "level": 4, "hp": 45, "atk": 7, "speed": 3.6, "xp": 35, "gold": [6, 12],
 		"color": Color(0.74, 0.4, 0.2), "scale": 1.0, "rarity": "common",
 		"loot": [["pheasant_feather", 0.6, 1, 2], ["hp_potion", 0.15, 1, 1], ["crystal_common", 0.06, 1, 1]],
 	},
 	"turtle": {
-		"name": "Черепаха", "level": 7, "hp": 150, "atk": 14, "speed": 2.4, "xp": 80, "gold": [12, 24],
+		"name": "Черепаха", "level": 7, "hp": 150, "atk": 14, "speed": 1.6, "xp": 80, "gold": [12, 24],
 		"color": Color(0.36, 0.55, 0.32), "scale": 1.0, "rarity": "common",
 		"loot": [["shell_plate", 0.5, 1, 1], ["revive_scroll", 0.08, 1, 1], ["crystal_rare", 0.05, 1, 1]],
 	},

@@ -56,6 +56,14 @@
   `python3 -I tools/retarget_animations.py --ual1 <UAL1_Standard.glb> --ual2 <UAL2_Standard.glb> assets/characters/<герой>.glb`
   (`--check` — без записи; повторный запуск заменяет свои клипы). Какой клип играет какое действие —
   `ASSET_ACTIONS` / `ASSET_IDLE` в `character_model.gd`.
+- Звери из файлов: `assets/creatures/<id>.glb` + `<id>.png` (пантера `panther`, черепаха `turtle`, фазан `pheasant`;
+  Meshy AI, сделаны Максимом). Скрипт `tools/prepare_creatures.py` (numpy, Pillow, meshoptimizer) из GLB Meshy со скелетом
+  без анимаций делает: меш ~7 тыс. треугольников, реальный размер (высота в `CREATURES`), морда в +Z, ноги на y = 0,
+  понятные имена костей (Root, Hips, Chest, Neck*, Head, Tail*, LegFL1…/LegL1…, Wing*), процедурные клипы
+  Idle/Walk/Run/Attack/Hit/Death/Cast (корень по X/Z на месте), `assets/creatures/creatures.json` — размеры, скорости шага
+  и бега без проскальзывания, длины клипов, момент удара (`attack_hit_time`) и умения (`cast_time`), роли костей.
+  Новый зверь или стадия эволюции: запись в `CREATURES` в скрипте (высота, стиль «cat»/«turtle»/«bird», шаг), затем
+  `python3 -I tools/prepare_creatures.py <id>=<файл.glb>` (`--check` — только проверка готовых, `--preview <папка>` — картинки).
 - Питомцы и звери: `data_mobs.gd` (`MobData`: звери, редкость, перевод старых id), `data_pets.gd` (`PetData`: роли,
   стадии эволюции), `creature_models.gd` (модели зверей из примитивов: слитый меш на скелете + `creature.gdshader`,
   `creature_outline.gdshader`; запасные модели пантеры, черепахи и фазана), `creature_asset.gd` (`CreatureAsset`: зверь

@@ -54,13 +54,13 @@ const SPECIES := {
 	"pheasant": {
 		"role": "healer", "stages": ["Пёстрышко", "Рассветный фазан", "Златохвост"],
 		"hp": 45, "hp_lvl": 8.0, "atk": 4, "atk_lvl": 1.0, "def": 1, "def_lvl": 0.4,
-		"speed": 6.8, "range": 8.0, "cd": 1.4, "scale": 0.85, "evo_color": Color(1.0, 0.78, 0.35),
+		"speed": 6.0, "range": 8.0, "cd": 1.4, "scale": 0.85, "evo_color": Color(1.0, 0.78, 0.35),
 		"fx_color": Color(1.0, 0.85, 0.45),
 	},
 	"turtle": {
 		"role": "tank", "stages": ["Галечник", "Мшистый панцирь", "Древний бастион"],
 		"hp": 115, "hp_lvl": 21.0, "atk": 5, "atk_lvl": 1.2, "def": 6, "def_lvl": 1.3,
-		"speed": 6.2, "range": 2.0, "cd": 1.3, "scale": 0.85, "evo_color": Color(0.3, 0.7, 0.65),
+		"speed": 5.5, "range": 2.0, "cd": 1.3, "scale": 0.85, "evo_color": Color(0.3, 0.7, 0.65),
 	},
 	"golem": {
 		"role": "tank", "stages": ["Камушек", "Валунный страж", "Древний колосс"],

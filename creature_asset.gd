@@ -326,7 +326,7 @@ func update(delta: float, spd: float) -> void:
 		anim.speed_scale = 1.0
 	else:
 		var native := walk_v if want == "walk" else run_v
-		anim.speed_scale = clampf(spd / maxf(native, 0.05), 0.5, 2.2)
+		anim.speed_scale = clampf(spd / maxf(native, 0.05), 0.5, 3.0)
 
 
 func _set_loco(want: String, blend: float) -> void:
