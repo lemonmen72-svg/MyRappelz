@@ -571,6 +571,8 @@ func _fence_ring(parent: Node3D, c: Vector2, r: float, gaps: Array, gap_half: fl
 	var body := _body(node, Vector3.ZERO, 0.0)
 	body.name = "FenceBody"
 	var k := PoiModels.Kit.new()
+	# Столбики темнее палитры (darkened) — текстура досок задаётся явно
+	k.tex = WorldTextures.WOOD
 	var n := maxi(8, int(ceilf(TAU * r / step)))
 	var pts: Array[Vector3] = []
 	var ok: Array[bool] = []

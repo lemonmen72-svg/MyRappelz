@@ -123,6 +123,29 @@ func run_step() -> void:
 			step = 12
 		12:
 			shot("11_hero_skill")
+			# Город с рисованными текстурами (площадь, улицы, дома) на трёх уровнях качества
+			_top.global_position = Vector3(7.0, 4.5, -2.0)
+			_top.look_at(Vector3(-1.0, 2.2, -14.0))
+			Quality.set_level(Quality.HIGH, false)
+			Quality.apply(get_tree())
+			wait = 20
+			step = 13
+		13:
+			shot("12_town_high")
+			Quality.set_level(Quality.MEDIUM, false)
+			Quality.apply(get_tree())
+			wait = 20
+			step = 14
+		14:
+			shot("13_town_medium")
+			Quality.set_level(Quality.LOW, false)
+			Quality.apply(get_tree())
+			wait = 20
+			step = 15
+		15:
+			shot("14_town_low")
+			Quality.set_level(Quality.HIGH, false)
+			Quality.apply(get_tree())
 			_top.queue_free()
 			main.cam.current = true
 			main.hud.visible = true

@@ -394,6 +394,15 @@ func _build_terrain_mesh() -> void:
 	mat.shader = load("res://island_terrain.gdshader")
 	mat.set_shader_parameter("road_half", float(cfg.get("roads", {}).get("width", 3.2)) * 0.45)
 	mat.set_shader_parameter("rich", Quality.rich_shaders())
+	# Город: мощёная площадь вокруг свободного центра и мощёные улицы внутри ограды (с текстурами)
+	var towns := pois_of_type("town")
+	if not towns.is_empty():
+		var town: Dictionary = towns[0]
+		mat.set_shader_parameter("town_center", v2(town["center"]))
+		mat.set_shader_parameter("plaza_radius", IslandPois.TOWN_FREE + 2.0)
+		mat.set_shader_parameter("paved_radius", float(town.get("radius", 22.0)))
+	# Рисованные текстуры (WorldTextures): включаются по качеству
+	WorldTextures.register_terrain(mat)
 	terrain_material = mat
 	var holder := Node3D.new()
 	holder.name = "Terrain"
@@ -491,6 +500,12 @@ func _build_collision() -> void:
 
 
 func _build_bridges() -> void:
+	# Настил — toon.gdshader с текстурой досок (WorldTextures.WOOD) по качеству, контур — как у построек
+	var deck_color := Color(0.62, 0.44, 0.28)
+	var deck_mat := PoiModels.toon_material(deck_color, false, 2, 0.2)
+	deck_mat.set_shader_parameter("tex_layer", WorldTextures.WOOD)
+	if Quality.outlines():
+		deck_mat.next_pass = Util.outline_mat(deck_color)
 	for b in bridges:
 		var a: Vector3 = b["a"]
 		var e: Vector3 = b["b"]
@@ -514,7 +529,7 @@ func _build_bridges() -> void:
 		bm.size = Vector3(width, 0.3, length)
 		deck.mesh = bm
 		deck.position.y = -0.15
-		deck.material_override = Util.mat(Color(0.62, 0.44, 0.28))
+		deck.material_override = deck_mat
 		body.add_child(deck)
 		add_child(body)
 

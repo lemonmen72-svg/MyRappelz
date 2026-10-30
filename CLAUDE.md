@@ -55,6 +55,8 @@
 - Графика: `util.gd` (toon-материалы, `toonify_mesh`, контуры), `outline.gdshader`, `vfx.gd` (`Vfx`: эффекты),
   `world_builder.gd` + шейдеры мира (`sky`, `terrain`, `grass`, `flower`, `flag`, `world_common.gdshaderinc`).
   Тест `tests/test_vfx.gd`, скриншоты `tests/shots.gd` (CI-задача visual → ветка `ci-screenshots`).
+- Рисованные текстуры окружения: `world_textures.gd` (`WorldTextures`: загрузка, номера текстур, флаги по качеству),
+  PNG в `assets/textures/` (их делает `tools/gen_textures.py`). Тест `tests/test_textures.gd`.
 - Мир (тренировочный остров): `world/training_island.json` (конфиг: река, дороги, точки интереса, зоны, спауны),
   `island_world.gd` (`IslandWorld`: рельеф, коллизия, проходимость, мосты, запросы), `island_water.gd`, `island_pois.gd`,
   `island_pois.gd` + `poi_models.gd` (`PoiModels`: модели-заглушки построек, одна функция на тип) + `poi_anim.gd`,
@@ -95,6 +97,13 @@
   бесплатные ассеты itch.io с лицензией, разрешающей коммерческое использование (проверять каждый),
   модели из AI-генераторов (Tripo, Meshy, Hunyuan3D, hi3d, assetfurnace) по своим оригинальным эскизам — с проверкой их условий.
 - Для каждого внешнего ассета записывать источник и лицензию в `assets/LICENSES.md`.
+- Текстуры окружения (`assets/textures/`: трава, земля, песок, скала, брусчатка, доски, черепица, солома, штукатурка)
+  свои: их генерирует `tools/gen_textures.py` (numpy + Pillow, фиксированное зерно, бесшовные 512×512).
+  Это почти серые «детальные маски» со средним 0.5: шейдеры умножают цвет зоны/вершины на tex × 2, палитра сохраняется.
+  Земля — `island_terrain.gdshader` (по мировым XZ, скалы triplanar), постройки — `toon.gdshader` (проекция по мировым
+  координатам, номер текстуры детали — в альфе цвета вершины `PoiModels.Kit`, по палитре или `Kit.tex`).
+  Включены на «Среднем» и «Высоком» (ключ `textures` в `Quality.PRESETS`), на «Низком» выборок нет.
+  Поменять вид — правка скрипта и перезапуск `python3 tools/gen_textures.py`, PNG коммитить.
 
 ## Проверка и сборка
 - Автотест локально: `godot --headless --path . --import`, затем

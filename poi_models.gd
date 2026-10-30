@@ -14,6 +14,9 @@ extends RefCounted
 ## - "toon_ol": UV.xy и UV2.x — центр детали (контур раздувается от него);
 ## - "halo": UV — угол квадрата, UV2.x — размер ореола;
 ## - toon-поверхности: UV2.y = 1 — светящаяся вершина.
+##
+## Альфа цвета вершины — номер рисованной текстуры детали (WorldTextures: доски, камень, штукатурка,
+## черепица, солома, скала; см. toon.gdshader): по цвету из палитры (texture_of) или явно — Kit.tex.
 
 const TOON_SHADER := "res://toon.gdshader"
 const CRYSTAL_SHADER := "res://crystal.gdshader"
@@ -88,6 +91,21 @@ const ROCK_DARK := Color(0.44, 0.44, 0.48)
 const WOOL := Color(0.97, 0.96, 0.92)
 const FIRE := Color(1.0, 0.55, 0.15)
 const FIRE_CORE := Color(1.0, 0.9, 0.45)
+const WHITEWASH := Color(0.95, 0.92, 0.84)
+const HULL := Color(0.45, 0.29, 0.18)
+
+## Рисованная текстура по цвету палитры (детали с другими цветами — без текстуры или Kit.tex).
+const TEXTURE_OF := {
+	WOOD: WorldTextures.WOOD, WOOD_DARK: WorldTextures.WOOD, WOOD_LIGHT: WorldTextures.WOOD,
+	HULL: WorldTextures.WOOD,
+	STONE: WorldTextures.STONE, STONE_DARK: WorldTextures.STONE, ELF_STONE: WorldTextures.STONE,
+	DARK_STONE: WorldTextures.STONE, DARK_STONE2: WorldTextures.STONE,
+	PLASTER: WorldTextures.PLASTER, ELF_WHITE: WorldTextures.PLASTER, WHITEWASH: WorldTextures.PLASTER,
+	ROOF_ORANGE: WorldTextures.TILES, ROOF_RED: WorldTextures.TILES, ELF_ROOF: WorldTextures.TILES,
+	DARK_ROOF: WorldTextures.TILES,
+	THATCH: WorldTextures.THATCH, THATCH_DARK: WorldTextures.THATCH,
+	ROCK: WorldTextures.ROCK, ROCK_DARK: WorldTextures.ROCK,
+}
 
 static var _mats := {}
 static var _meshes := {}
@@ -112,10 +130,22 @@ class Surf:
 ## Ключ "glow" (свечение) пишется в поверхность "toon" с флагом UV2.y = 1.
 ## base — текущее преобразование, применяется ко всему добавляемому.
 ## mats — свои материалы по ключу (иначе PoiModels.material(key)).
+## tex — номер текстуры (WorldTextures.WOOD...) для добавляемых деталей; −1 — по цвету (texture_of).
 class Kit:
 	var surfs := {}
 	var base := Transform3D.IDENTITY
 	var mats := {}
+	var tex := -1
+
+	## Цвет вершины (линейный) с номером текстуры детали в альфе. Свечение, ткань, колосья
+	## и кристаллы — без текстуры.
+	func _vcolor(c: Color, key: String) -> Color:
+		var lc := c.srgb_to_linear()
+		var layer := WorldTextures.NONE
+		if key != "glow" and key != "cloth" and key != "wheat" and not key.begins_with("crystal"):
+			layer = tex if tex >= 0 else PoiModels.texture_of(c)
+		lc.a = WorldTextures.layer_alpha(layer)
+		return lc
 
 	func surf(key: String) -> Surf:
 		if not surfs.has(key):
@@ -143,7 +173,7 @@ class Kit:
 		var nb := full.basis.inverse().transposed()
 		var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
 		var n: PackedVector3Array = arr[Mesh.ARRAY_NORMAL]
-		var lc := c.srgb_to_linear()
+		var lc := _vcolor(c, key)
 		var uv2 := Vector2(0.0, 1.0 if key == "glow" else 0.0)
 		var start := s.verts.size()
 		for i in v.size():
@@ -195,7 +225,7 @@ class Kit:
 			pb = pc
 			pc = tmp
 			n = -n
-		var lc := c.srgb_to_linear()
+		var lc := _vcolor(c, key)
 		var uv2 := Vector2(0.0, 1.0 if key == "glow" else 0.0)
 		var start := s.verts.size()
 		for p in [pa, pb, pc]:
@@ -310,6 +340,11 @@ static func xf(pos: Vector3, size: Vector3, rot: Vector3 = Vector3.ZERO) -> Tran
 	return Transform3D(Basis.from_euler(rot) * Basis.from_scale(size), pos)
 
 
+## Номер рисованной текстуры для цвета палитры (WorldTextures.NONE — без текстуры).
+static func texture_of(c: Color) -> int:
+	return int(TEXTURE_OF.get(c, WorldTextures.NONE))
+
+
 ## Массивы единичного примитива (кэш): "box", "cyl|<верх/низ>|<сегменты>", "ball|<сегм>|<кольца>", "prism".
 static func prim(key: String) -> Array:
 	if _prims.has(key):
@@ -357,6 +392,8 @@ static func toon_material(c: Color, vertex_color: bool = false, tones: int = 2, 
 	m.set_shader_parameter("use_vertex_color", vertex_color)
 	m.set_shader_parameter("tones", tones)
 	m.set_shader_parameter("rim_strength", rim)
+	# Рисованные текстуры по качеству (номер текстуры — в альфе цвета вершин или tex_layer)
+	WorldTextures.register_toon(m)
 	return m
 
 
@@ -589,11 +626,16 @@ static func gable_roof(k: Kit, top: float, w: float, l: float, h: float, ov: flo
 		roof: Color, gable: Color, key: String = "toon") -> void:
 	var a := atan2(h, w * 0.5)
 	var sl := sqrt(h * h + w * w * 0.25) + ov
+	# Скаты — черепица (или солома, если цвет соломенный), даже если цвет не из палитры
+	var prev_tex := k.tex
+	if prev_tex < 0:
+		k.tex = WorldTextures.THATCH if texture_of(roof) == WorldTextures.THATCH else WorldTextures.TILES
 	for s in [-1.0, 1.0]:
 		var sd: float = s
 		var u := Vector3(0.0, -sin(a), sd * cos(a))
 		var ridge := Vector3(0.0, top + h + th * 0.5, 0.0)
 		k.box(ridge + u * sl * 0.5, Vector3(l + ov * 2.0, th, sl), roof, Vector3(sd * a, 0.0, 0.0), key)
+	k.tex = prev_tex
 	# Фронтоны: призма цвета стен под скатами
 	k.prism(Vector3(0.0, top + h * 0.5, 0.0), Vector3(w, h, l), gable, Vector3(0.0, PI * 0.5, 0.0), key)
 
@@ -991,7 +1033,7 @@ static func human_house(k: Kit, thatch: bool) -> void:
 ## Ступица крыльев — на (0, 7.4, 2.0); крылья — отдельный меш "windmill_sails".
 static func windmill_tower(k: Kit) -> void:
 	k.cyl(Vector3(0, 0.3, 0), 2.7, 2.8, 0.6, STONE_DARK, 8)
-	k.cyl(Vector3(0, 3.9, 0), 2.3, 1.65, 6.6, Color(0.95, 0.92, 0.84), 8)
+	k.cyl(Vector3(0, 3.9, 0), 2.3, 1.65, 6.6, WHITEWASH, 8)
 	for y in [2.4, 5.0]:
 		var yy: float = y
 		var r := lerpf(2.3, 1.65, (yy - 0.6) / 6.6) + 0.05
@@ -1088,7 +1130,9 @@ static func lighthouse(k: Kit) -> void:
 		var r0 := lerpf(2.1, 1.35, float(i) / float(bands))
 		var r1 := lerpf(2.1, 1.35, float(i + 1) / float(bands))
 		var c := Color(0.97, 0.96, 0.93) if i % 2 == 0 else ROOF_RED
+		k.tex = WorldTextures.PLASTER
 		k.cyl(Vector3(0, (y0 + y1) * 0.5, 0), r0, r1, y1 - y0, c, 10)
+		k.tex = -1
 	k.box(Vector3(0, 1.8, 2.05), Vector3(1.0, 2.0, 0.2), WOOD_DARK)
 	for y in [4.5, 8.0]:
 		var yy: float = y
@@ -1113,7 +1157,7 @@ static func lighthouse(k: Kit) -> void:
 ## Корабль: корпус с носом-клином, палуба, кормовая надстройка, мачта с двумя парусами.
 ## Ватерлиния — y = 0, нос смотрит на -Z.
 static func ship(k: Kit) -> void:
-	var hull := Color(0.45, 0.29, 0.18)
+	var hull := HULL
 	k.box(Vector3(0, -0.2, 0.2), Vector3(2.8, 1.6, 6.6), hull)
 	k.box(Vector3(0, -0.85, 0.2), Vector3(2.2, 0.5, 6.2), WOOD_DARK)
 	k.prism(Vector3(0, -0.2, -4.0), Vector3(2.8, 2.2, 1.6), hull, Vector3(-PI * 0.5, 0, 0))
@@ -1148,9 +1192,11 @@ static func crate(k: Kit) -> void:
 
 static func barrel(k: Kit) -> void:
 	k.cyl(Vector3(0, 0.45, 0), 0.34, 0.34, 0.9, WOOD, 8, Vector3.ZERO, "toon_ol")
+	k.tex = WorldTextures.NONE
 	for y in [0.15, 0.75]:
 		var yy: float = y
 		k.cyl(Vector3(0, yy, 0), 0.36, 0.36, 0.08, STONE_DARK, 8, Vector3.ZERO, "toon_ol")
+	k.tex = -1
 
 
 # ---------- Лагеря ----------
