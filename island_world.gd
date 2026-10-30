@@ -387,13 +387,10 @@ func _compute_walkable() -> void:
 # ---------- Меш и коллизия ----------
 
 func _build_terrain_mesh() -> void:
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.albedo_color = Color.WHITE
-	Util.toon(mat)
-	mat.rim_enabled = false
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.set_meta("toon_done", true)
+	# Свой шейдер земли (island_terrain.gdshader): рисованная трава, дороги, скалы, песок, toon-свет
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://island_terrain.gdshader")
+	mat.set_shader_parameter("road_half", float(cfg.get("roads", {}).get("width", 3.2)) * 0.45)
 	var holder := Node3D.new()
 	holder.name = "Terrain"
 	add_child(holder)
@@ -410,10 +407,13 @@ func _build_terrain_mesh() -> void:
 		cj += CHUNK
 
 
+## Участок рельефа. Вершины: цвет — оттенок травы и вес площадки (_ground_color),
+## UV — (расстояние до дороги, уровень ближайшей воды); остальное считает шейдер по пикселям.
 func _chunk_mesh(i0: int, j0: int, i1: int, j1: int) -> ArrayMesh:
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
+	var uvs := PackedVector2Array()
 	var idx := PackedInt32Array()
 	var w := i1 - i0 + 1
 	for j in range(j0, j1 + 1):
@@ -423,6 +423,11 @@ func _chunk_mesh(i0: int, j0: int, i1: int, j1: int) -> ArrayMesh:
 			verts.append(Vector3(p.x, heights[k], p.y))
 			normals.append(_normal(i, j))
 			colors.append(_ground_color(i, j))
+			var wl := maxf(water_level[k], sea_level)
+			# Река у устья опускается к уровню моря (как и вода в IslandWater)
+			if water_d[k] < FAR and absf(wl - river_level) < 0.001:
+				wl = lerpf(sea_level, river_level, smoothstep(1.5, 12.0, coast_distance(p.x, p.y)))
+			uvs.append(Vector2(road_d[k], wl))
 	for j in range(j1 - j0):
 		for i in range(i1 - i0):
 			var a := j * w + i
@@ -433,6 +438,7 @@ func _chunk_mesh(i0: int, j0: int, i1: int, j1: int) -> ArrayMesh:
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_INDEX] = idx
 	var m := ArrayMesh.new()
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
@@ -447,29 +453,20 @@ func _normal(i: int, j: int) -> Vector3:
 	return Vector3(hl - hr, 2.0 * step, hd - hu).normalized()
 
 
-## Цвет земли в узле: трава с оттенком зоны, дороги, скалы, песок у воды, площадки.
+## Цвет земли в узле (sRGB, шейдер переводит в линейный): оттенок травы зоны с крупными
+## мягкими переливами; альфа — вес площадки постройки. Дороги, песок, скалы и мелкие пятна
+## рисует island_terrain.gdshader по пикселям.
 func _ground_color(i: int, j: int) -> Color:
 	var k := _idx(i, j)
 	var p := _pos(i, j)
-	var h := heights[k]
 	var c := zone_tint_at(p.x, p.y)
-	# Мягкие пятна травы
-	var n := _noise.get_noise_2d(p.x * 2.3 + 11.0, p.y * 2.3)
-	c = c.lightened(maxf(0.0, n) * 0.12).darkened(maxf(0.0, -n) * 0.1)
-	# Площадки построек — утоптанная земля
-	c = c.lerp(Color(0.66, 0.56, 0.42), clampf((_flat_w[k] - 0.85) * 6.0, 0.0, 1.0) * 0.55)
-	# Дороги
-	var road_w := float(cfg.get("roads", {}).get("width", 3.2))
-	var rt := 1.0 - smoothstep(road_w * 0.35, road_w * 0.55, road_d[k])
-	c = c.lerp(Color(0.72, 0.57, 0.4), rt)
-	# Песок у воды и под водой
-	var wl := maxf(water_level[k], sea_level)
-	var sand := 1.0 - smoothstep(wl + 0.2, wl + 0.9, h)
-	c = c.lerp(Color(0.84, 0.76, 0.56), sand * 0.85)
-	# Скалы на крутых склонах
-	var nrm := _normal(i, j)
-	var rock := smoothstep(0.82, 0.62, nrm.y)
-	c = c.lerp(Color(0.56, 0.54, 0.52), rock)
+	# Крупные переливы оттенка (чуть желтее / чуть синее), чтобы луг не был однотонным
+	var n := _noise.get_noise_2d(p.x * 0.6 + 11.0, p.y * 0.6)
+	if n > 0.0:
+		c = c.lerp(Color(0.62, 0.74, 0.30), n * 0.35)
+	else:
+		c = c.lerp(Color(0.26, 0.54, 0.36), -n * 0.3)
+	c.a = clampf(_flat_w[k], 0.0, 1.0)
 	return c
 
 
