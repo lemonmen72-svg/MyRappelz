@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="48" fill="#2f6b3a"/>
+  <circle cx="128" cy="128" r="104" fill="#3f8a4b"/>
+  <!-- Лапа питомца -->
+  <ellipse cx="128" cy="160" rx="46" ry="38" fill="#f3e6c8"/>
+  <ellipse cx="78" cy="112" rx="18" ry="24" fill="#f3e6c8"/>
+  <ellipse cx="108" cy="86" rx="18" ry="24" fill="#f3e6c8"/>
+  <ellipse cx="148" cy="86" rx="18" ry="24" fill="#f3e6c8"/>
+  <ellipse cx="178" cy="112" rx="18" ry="24" fill="#f3e6c8"/>
+</svg>

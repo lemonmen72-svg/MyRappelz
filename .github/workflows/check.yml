@@ -1,0 +1,25 @@
+# Проверка кода: импорт проекта и автотест. APK здесь НЕ собирается.
+name: Проверка кода
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    env:
+      GODOT_VERSION: "4.3"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/godot-dl
+          key: godot-${{ env.GODOT_VERSION }}-bin
+
+      - name: Установка Godot
+        run: .github/scripts/setup_godot.sh
+
+      - name: Автотест
+        run: .github/scripts/smoke_test.sh
