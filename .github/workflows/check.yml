@@ -23,3 +23,46 @@ jobs:
 
       - name: Автотест
         run: .github/scripts/smoke_test.sh
+
+  # Настоящий рендер: ошибки шейдеров + скриншоты в ветку ci-screenshots (APK не собирается)
+  visual:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GODOT_VERSION: "4.3"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/godot-dl
+          key: godot-${{ env.GODOT_VERSION }}-bin
+
+      - name: Установка Godot
+        run: .github/scripts/setup_godot.sh
+
+      - name: Скриншоты
+        run: .github/scripts/screenshots.sh
+
+      - name: Публикация скриншотов
+        if: always() && github.event_name == 'push'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SRC="$HOME/.local/share/godot/app_userdata/MyRappelz/shots"
+          [ -d "$SRC" ] || exit 0
+          OUT="$RUNNER_TEMP/shots-branch"
+          mkdir -p "$OUT" && cp "$SRC"/*.png "$OUT"/ && cp shots.log "$OUT"/ || true
+          cd "$OUT"
+          {
+            echo "# Скриншоты CI"
+            echo
+            echo "Коммит: \`${GITHUB_SHA}\`, ветка \`${GITHUB_REF_NAME}\`."
+            echo
+            for f in *.png; do echo "## $f"; echo; echo "![$f]($f)"; echo; done
+          } > README.md
+          git init -q -b ci-screenshots
+          git add -A
+          git -c user.name="CI" -c user.email="ci@users.noreply.github.com" commit -qm "Скриншоты ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-screenshots

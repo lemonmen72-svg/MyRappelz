@@ -35,11 +35,72 @@ static func ui_theme() -> Theme:
 	return _theme
 
 
+## Материал в аниме-стиле (cel-shading): ступенчатый свет и блик, подсветка краёв (rim).
+## Контур добавляется автоматически (см. toonify), если меш не помечен meta "no_outline".
 static func mat(c: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = c
-	m.roughness = 0.9
+	toon(m)
 	return m
+
+
+## Настраивает StandardMaterial3D под cel-shading. Не трогает неосвещаемые и прозрачные.
+static func toon(m: StandardMaterial3D) -> void:
+	if m.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED:
+		return
+	m.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+	m.specular_mode = BaseMaterial3D.SPECULAR_TOON
+	m.roughness = 0.55
+	m.metallic_specular = 0.25
+	m.rim_enabled = true
+	m.rim = 0.3
+	m.rim_tint = 0.7
+
+
+static var _outline_shader: Shader
+static var _outlines := {}
+
+
+## Материал контура для базового цвета: тёмный оттенок того же цвета (как в аниме), с кэшем.
+static func outline_mat(base: Color, width: float = 0.02) -> ShaderMaterial:
+	var key := "%s|%.3f" % [base.to_html(false), width]
+	if _outlines.has(key):
+		return _outlines[key]
+	if _outline_shader == null:
+		_outline_shader = load("res://outline.gdshader")
+	var om := ShaderMaterial.new()
+	om.shader = _outline_shader
+	var c := Color.from_hsv(base.h, minf(1.0, base.s * 1.2 + 0.1), base.v * 0.28)
+	om.set_shader_parameter("color", c)
+	om.set_shader_parameter("width", width)
+	_outlines[key] = om
+	return om
+
+
+## Стилизует меш: toon-освещение и контур. Повторный вызов безопасен.
+## meta "no_toon" — не трогать; meta "no_outline" — без контура (земля, трава, эффекты).
+static func toonify_mesh(mi: MeshInstance3D) -> void:
+	if not is_instance_valid(mi) or mi.has_meta("no_toon"):
+		return
+	var m := mi.material_override as StandardMaterial3D
+	if m == null and mi.mesh != null and mi.mesh.get_surface_count() > 0:
+		m = mi.get_active_material(0) as StandardMaterial3D
+	if m == null or m.has_meta("toon_done"):
+		return
+	m.set_meta("toon_done", true)
+	toon(m)
+	var solid := m.shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED \
+		and m.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED
+	if solid and not mi.has_meta("no_outline") and m.next_pass == null:
+		m.next_pass = outline_mat(m.albedo_color)
+
+
+## Стилизует все меши в поддереве.
+static func toonify(root: Node) -> void:
+	if root is MeshInstance3D:
+		toonify_mesh(root)
+	for n in root.find_children("*", "MeshInstance3D", true, false):
+		toonify_mesh(n)
 
 
 ## Ближайший живой узел из группы в пределах max_dist.

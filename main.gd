@@ -20,6 +20,7 @@ var _autosave := 0.0
 
 func _ready() -> void:
 	_rng.seed = 1234
+	get_tree().node_added.connect(_on_node_added)
 	if Game.has_character or Game.load_game():
 		_start_world()
 		return
@@ -46,74 +47,14 @@ func _start_world() -> void:
 
 
 func _build_world() -> void:
-	var env := Environment.new()
-	var sky := Sky.new()
-	sky.sky_material = ProceduralSkyMaterial.new()
-	env.background_mode = Environment.BG_SKY
-	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	var we := WorldEnvironment.new()
-	we.environment = env
-	add_child(we)
-
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-55, -30, 0)
-	sun.shadow_enabled = true
-	add_child(sun)
-
-	var ground := StaticBody3D.new()
-	var gcol := CollisionShape3D.new()
-	var gshape := BoxShape3D.new()
-	gshape.size = Vector3(200, 1, 200)
-	gcol.shape = gshape
-	gcol.position.y = -0.5
-	ground.add_child(gcol)
-	var gm := MeshInstance3D.new()
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(200, 200)
-	gm.mesh = plane
-	gm.material_override = Util.mat(Color(0.28, 0.5, 0.25))
-	ground.add_child(gm)
-	add_child(ground)
-
-	for i in 90:
-		var pos := Vector3(_rng.randf_range(-75, 75), 0.0, _rng.randf_range(-75, 75))
-		if Vector2(pos.x, pos.z).length() < MobData.SAFE_RADIUS + 2.0:
-			continue
-		_add_tree(pos)
+	WorldBuilder.build(self, _rng)
 
 
-func _add_tree(pos: Vector3) -> void:
-	var tree := StaticBody3D.new()
-	tree.position = pos
-	var col := CollisionShape3D.new()
-	var cs := CylinderShape3D.new()
-	cs.radius = 0.35
-	cs.height = 2.4
-	col.shape = cs
-	col.position.y = 1.2
-	tree.add_child(col)
-
-	var trunk := MeshInstance3D.new()
-	var tm := CylinderMesh.new()
-	tm.top_radius = 0.2
-	tm.bottom_radius = 0.3
-	tm.height = 2.4
-	trunk.mesh = tm
-	trunk.position.y = 1.2
-	trunk.material_override = Util.mat(Color(0.4, 0.27, 0.15))
-	tree.add_child(trunk)
-
-	var r := _rng.randf_range(1.1, 1.7)
-	var crown := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = r
-	sm.height = r * 2.0
-	crown.mesh = sm
-	crown.position.y = 2.6 + r * 0.4
-	crown.material_override = Util.mat(Color(0.12, _rng.randf_range(0.35, 0.5), 0.15))
-	tree.add_child(crown)
-	add_child(tree)
+## Каждый новый меш в игре получает аниме-стиль (toon-свет и контур). Отложенно, чтобы
+## код, создавший меш, успел назначить материал.
+func _on_node_added(n: Node) -> void:
+	if n is MeshInstance3D:
+		Util.toonify_mesh.call_deferred(n)
 
 
 func _build_hud() -> void:
