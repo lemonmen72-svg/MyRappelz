@@ -7,7 +7,12 @@ const RESPAWN_TIME := 20.0
 const AUTOSAVE_TIME := 30.0
 ## Камера от третьего лица: вращается вокруг игрока (перетаскивание по правой части экрана).
 const CAM_DIST := 12.4
+## Приближение камеры (щипок двумя пальцами, колесо мыши): от CAM_DIST_MIN до CAM_DIST_MAX, м.
+const CAM_DIST_MIN := 3.0
+const CAM_DIST_MAX := 22.0
 const CAM_LOOK_Y := 1.2
+## Вблизи камера смотрит на уровень груди и головы, а не пояса.
+const CAM_LOOK_Y_NEAR := 1.45
 const CAM_PITCH_MIN := deg_to_rad(18.0)
 const CAM_PITCH_MAX := deg_to_rad(75.0)
 ## Чувствительность вращения камеры, радиан на пиксель.
@@ -23,6 +28,7 @@ var world: IslandWorld
 ## Поворот камеры вокруг игрока (0 — смотрим на север) и наклон над горизонтом.
 var cam_yaw := 0.0
 var cam_pitch := atan2(9.0, 8.5)
+var cam_dist := CAM_DIST
 
 var _slots: Array = []
 var _rng := RandomNumberGenerator.new()
@@ -165,6 +171,7 @@ func _process(delta: float) -> void:
 	var drag := hud.take_camera_drag()
 	cam_yaw -= drag.x * CAM_SENS
 	cam_pitch = clampf(cam_pitch + drag.y * CAM_SENS, CAM_PITCH_MIN, CAM_PITCH_MAX)
+	cam_dist = clampf(cam_dist * hud.take_camera_zoom(), CAM_DIST_MIN, CAM_DIST_MAX)
 
 	# Движение относительно камеры: «вверх» на джойстике — от камеры вперёд
 	var mv := hud.move_vec
@@ -183,7 +190,7 @@ func _process(delta: float) -> void:
 	if want.y < ground:
 		want.y = ground
 	cam.global_position = cam.global_position.lerp(want, 1.0 - exp(-8.0 * delta))
-	cam.look_at(player.global_position + Vector3(0, CAM_LOOK_Y, 0), Vector3.UP)
+	cam.look_at(player.global_position + Vector3(0, _cam_look_y(), 0), Vector3.UP)
 
 	_check_transitions(delta)
 
@@ -194,7 +201,13 @@ func _process(delta: float) -> void:
 
 
 func _cam_offset() -> Vector3:
-	return Vector3(0.0, sin(cam_pitch), cos(cam_pitch)).rotated(Vector3.UP, cam_yaw) * CAM_DIST
+	return Vector3(0.0, sin(cam_pitch), cos(cam_pitch)).rotated(Vector3.UP, cam_yaw) * cam_dist
+
+
+## Высота точки, куда смотрит камера: вблизи — на уровне груди и головы.
+func _cam_look_y() -> float:
+	var near := clampf((CAM_DIST - cam_dist) / (CAM_DIST - CAM_DIST_MIN), 0.0, 1.0)
+	return lerpf(CAM_LOOK_Y, CAM_LOOK_Y_NEAR, near)
 
 
 ## Переходы из конфига (порт → материк): пока заглушка с сообщением.

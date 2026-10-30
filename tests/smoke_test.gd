@@ -1,6 +1,8 @@
 extends "res://tests/test_base.gd"
 ## Общий автотест: мир, сенсорный HUD, бой, опыт и золото, зелье, смерть, сохранение, респавн.
 
+const MainScript := preload("res://main.gd")
+
 var mob: Mob = null
 var gold_before := 0
 var potions_before := 0
@@ -78,3 +80,36 @@ func _test_touch() -> void:
 	touch(true, 0, Vector2(view.x * 0.2, 100.0))
 	check(hud._joy_idx == -1, "джойстик не начинается в зоне панелей")
 	touch(false, 0, Vector2(view.x * 0.2, 100.0))
+	_test_camera_zoom(hud, view)
+
+
+## Щипок двумя пальцами в правой половине: развели — камера ближе, свели — дальше.
+func _test_camera_zoom(hud: HUD, view: Vector2) -> void:
+	var a := Vector2(view.x * 0.62, view.y * 0.45)
+	var b := Vector2(view.x * 0.72, view.y * 0.45)
+	touch(true, 0, a)
+	touch(true, 1, b)
+	var d := InputEventScreenDrag.new()
+	d.index = 1
+	d.position = b + Vector2(120, 0)
+	hud._input(d)
+	var z := hud.take_camera_zoom()
+	check(z < 0.6, "щипок «развести» приближает камеру: ×%.2f" % z)
+	check(hud.take_camera_drag() == Vector2.ZERO, "щипок не вращает камеру")
+	d = InputEventScreenDrag.new()
+	d.index = 1
+	d.position = b
+	hud._input(d)
+	z = hud.take_camera_zoom()
+	check(z > 1.5, "щипок «свести» отдаляет камеру: ×%.2f" % z)
+	touch(false, 1, b)
+	touch(false, 0, a)
+	check(hud._cam_touches.is_empty(), "касания камеры отпущены")
+	var before: float = main.cam_dist
+	hud._cam_zoom = 0.01
+	main._process(0.016)
+	check(is_equal_approx(main.cam_dist, MainScript.CAM_DIST_MIN), "камера не ближе %.1f м" % MainScript.CAM_DIST_MIN)
+	hud._cam_zoom = 1000.0
+	main._process(0.016)
+	check(is_equal_approx(main.cam_dist, MainScript.CAM_DIST_MAX), "камера не дальше %.1f м" % MainScript.CAM_DIST_MAX)
+	main.cam_dist = before

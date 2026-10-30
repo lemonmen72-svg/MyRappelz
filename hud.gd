@@ -23,10 +23,11 @@ var move_vec := Vector2.ZERO
 ## id -> {"panel": Panel, "label": Label, "offset": Vector2, "r": float, "hold": bool, "touch": int}
 var _buttons := {}
 var _joy_idx := -1
-## Касание, которым вращают камеру (правая половина экрана вне кнопок), и накопленный сдвиг.
-var _cam_idx := -1
-var _cam_last := Vector2.ZERO
+## Касания камеры (индекс → последняя позиция): один палец в правой половине экрана вне кнопок
+## вращает камеру, два пальца щипком приближают и отдаляют. Накопленные сдвиг и множитель дальности.
+var _cam_touches := {}
 var _cam_drag := Vector2.ZERO
+var _cam_zoom := 1.0
 var _joy_center := Vector2.ZERO
 var _view := Vector2(1280, 720)
 var _window: Control = null
@@ -146,6 +147,13 @@ func take_camera_drag() -> Vector2:
 	var d := _cam_drag
 	_cam_drag = Vector2.ZERO
 	return d
+
+
+## Множитель дальности камеры с прошлого вызова (щипок, колесо мыши): < 1 — ближе; сбрасывается в 1.
+func take_camera_zoom() -> float:
+	var z := _cam_zoom
+	_cam_zoom = 1.0
+	return z
 
 
 # ---------- Окна ----------
@@ -314,7 +322,7 @@ func _reset_joy() -> void:
 
 func _release_all() -> void:
 	_reset_joy()
-	_cam_idx = -1
+	_cam_touches.clear()
 	for id in _buttons:
 		_buttons[id]["touch"] = -1
 
@@ -342,6 +350,13 @@ func _input(event: InputEvent) -> void:
 	if is_window_open():
 		return
 
+	var mb := event as InputEventMouseButton
+	if mb != null and mb.pressed:
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_cam_zoom *= 0.9
+		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_cam_zoom /= 0.9
+
 	var te := event as InputEventScreenTouch
 	if te != null:
 		if te.pressed:
@@ -356,23 +371,33 @@ func _input(event: InputEvent) -> void:
 				_joy_center = p
 				_joy_base.position = p - _joy_base.size / 2.0
 				_joy_knob.position = p - _joy_knob.size / 2.0
-			elif _cam_idx == -1 and p.x >= _view.x * 0.5 and p.y > CAM_TOP:
-				_cam_idx = te.index
-				_cam_last = p
+			elif p.y > CAM_TOP and _cam_touches.size() < 2 and (p.x >= _view.x * 0.5 or _cam_touches.size() == 1):
+				# Второй палец (для щипка) может быть и в левой половине
+				_cam_touches[te.index] = p
 		else:
 			if te.index == _joy_idx:
 				_reset_joy()
-			if te.index == _cam_idx:
-				_cam_idx = -1
+			_cam_touches.erase(te.index)
 			for id in _buttons:
 				if _buttons[id]["touch"] == te.index:
 					_buttons[id]["touch"] = -1
 		return
 
 	var de := event as InputEventScreenDrag
-	if de != null and de.index == _cam_idx:
-		_cam_drag += de.position - _cam_last
-		_cam_last = de.position
+	if de != null and _cam_touches.has(de.index):
+		var prev: Vector2 = _cam_touches[de.index]
+		if _cam_touches.size() == 1:
+			_cam_drag += de.position - prev
+		else:
+			var other := prev
+			for k in _cam_touches:
+				if k != de.index:
+					other = _cam_touches[k]
+			var before := other.distance_to(prev)
+			var after := other.distance_to(de.position)
+			if before > 10.0 and after > 10.0:
+				_cam_zoom *= before / after
+		_cam_touches[de.index] = de.position
 		return
 	if de != null and de.index == _joy_idx:
 		var d := de.position - _joy_center
