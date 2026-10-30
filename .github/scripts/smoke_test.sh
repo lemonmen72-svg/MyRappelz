@@ -27,6 +27,11 @@ for t in tests/smoke_test.gd tests/test_*.gd; do
 		fail=1
 	fi
 done
+# Нагрузка скриптов без отрисовки (в headless TIME_PROCESS — только скрипты и движок, без рендера)
+timeout 600 godot --headless --path . res://tests/runner.tscn -- res://tests/perf.gd > perf_cpu.log 2>&1
+echo "===== нагрузка процессора (без рендера) ====="
+grep -E "PERF|FAIL" perf_cpu.log || tail -n 20 perf_cpu.log
+
 if grep -nE "SCRIPT ERROR|Parse Error|Compile Error" import.log; then
 	echo "::error::ошибки GDScript при импорте"
 	fail=1

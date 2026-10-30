@@ -82,7 +82,7 @@ func run_step() -> void:
 			check(Quality.level() == Quality.HIGH, "качество прочитано из settings.cfg")
 			Quality.set_level(Quality.MEDIUM, false)
 			Quality.apply(get_tree())
-			check(sun.shadow_enabled and _fx.visible, "«Среднее»: тени и лёгкая постобработка")
+			check(sun.shadow_enabled and not _fx.visible, "«Среднее»: тени без постобработки (экономия на телефоне)")
 			IslandVegetation.set_far_view(get_tree(), true)
 			var g := get_tree().get_nodes_in_group("veg_grass")[0] as GeometryInstance3D
 			check(g.visibility_range_end == 0.0, "вид издалека: дальность травы не ограничена")

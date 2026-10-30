@@ -34,7 +34,7 @@ func run_step() -> void:
 			_n += 1
 			if _n >= FRAMES:
 				var k := float(_n)
-				print("PERF %-8s %-14s вызовов %5d  объектов %5d  треуг. %7d  скрипты %.1f мс  физика %.1f мс" % [
+				print("PERF %-8s %-14s вызовов %5d  объектов %5d  треуг. %7d  кадр(process) %.1f мс  физика %.1f мс" % [
 					Quality.level_name(_q), SPOTS[_spot][0], int(_acc["draw"] / k), int(_acc["obj"] / k),
 					int(_acc["prim"] / k), _acc["proc"] / k, _acc["phys"] / k])
 				_spot += 1
