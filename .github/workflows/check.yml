@@ -53,7 +53,7 @@ jobs:
           SRC="$HOME/.local/share/godot/app_userdata/MyRappelz/shots"
           [ -d "$SRC" ] || exit 0
           OUT="$RUNNER_TEMP/shots-branch"
-          mkdir -p "$OUT" && cp "$SRC"/*.png "$OUT"/ && cp shots.log "$OUT"/ || true
+          mkdir -p "$OUT" && cp "$SRC"/*.png "$OUT"/ && cp shots.log "$OUT"/ && cp perf.txt "$OUT"/ || true
           cd "$OUT"
           {
             echo "# Скриншоты CI"
