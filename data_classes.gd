@@ -2,36 +2,42 @@ class_name ClassData
 extends RefCounted
 ## Расы, классы и умения персонажа. Берём только архетипы жанра, названия и описания свои.
 
+## Внешний вид (CharacterModel): skin — кожа, hair — волосы, eyes — радужка, hair_style — причёска
+## ("short" | "long" | "ponytail"), ears — заострённые уши.
 const RACES := {
 	"human": {
 		"name": "Люди",
 		"desc": "Сильные и выносливые. Топоры, луки и магия природы.",
 		"skin": Color(0.95, 0.8, 0.65), "hair": Color(0.4, 0.25, 0.12), "ears": false,
+		"eyes": Color(0.3, 0.52, 0.86), "hair_style": "short",
 		"classes": ["warrior", "ranger"],
 	},
 	"light_elf": {
 		"name": "Светлые эльфы",
 		"desc": "Целители и защитники. Щит, меч и магия света.",
-		"skin": Color(1.0, 0.93, 0.86), "hair": Color(0.95, 0.85, 0.5), "ears": true,
+		"skin": Color(1.0, 0.93, 0.86), "hair": Color(0.96, 0.9, 0.7), "ears": true,
+		"eyes": Color(0.2, 0.72, 0.58), "hair_style": "long",
 		"classes": ["guardian", "cleric"],
 	},
 	"dark_elf": {
 		"name": "Тёмные эльфы",
 		"desc": "Быстрые и точные. Кинжалы и разрушительная магия тьмы.",
-		"skin": Color(0.62, 0.56, 0.78), "hair": Color(0.88, 0.88, 0.95), "ears": true,
+		"skin": Color(0.62, 0.56, 0.78), "hair": Color(0.9, 0.86, 0.98), "ears": true,
+		"eyes": Color(0.92, 0.3, 0.45), "hair_style": "ponytail",
 		"classes": ["assassin", "warlock"],
 	},
 }
 
 ## attack: "melee" | "ranged" | "magic". range: дальность атаки, м. cd: перезарядка атаки, с.
 ## hp/atk/def: на 1 уровне, *_lvl: прибавка за уровень. crit: шанс крита 0..1.
+## Внешний вид: color — основной цвет одежды, accent — акцент (плащ, пояс, щит, свечение), weapon — оружие.
 const CLASSES := {
 	"warrior": {
 		"name": "Воин", "race": "human", "weapon": "axe",
 		"desc": "Ближний бой, много здоровья, удары по площади.",
 		"attack": "melee", "range": 2.8, "cd": 0.8,
 		"hp": 120, "hp_lvl": 24, "atk": 13, "atk_lvl": 3.0, "def": 4, "def_lvl": 1.0,
-		"speed": 6.5, "crit": 0.05, "color": Color(0.7, 0.3, 0.2),
+		"speed": 6.5, "crit": 0.05, "color": Color(0.7, 0.3, 0.2), "accent": Color(0.92, 0.72, 0.3),
 		"skills": ["cleave", "war_cry"],
 	},
 	"ranger": {
@@ -39,7 +45,7 @@ const CLASSES := {
 		"desc": "Стрельба из лука издалека.",
 		"attack": "ranged", "range": 12.0, "cd": 0.9,
 		"hp": 90, "hp_lvl": 16, "atk": 11, "atk_lvl": 3.0, "def": 2, "def_lvl": 0.6,
-		"speed": 6.8, "crit": 0.1, "color": Color(0.3, 0.55, 0.25),
+		"speed": 6.8, "crit": 0.1, "color": Color(0.3, 0.55, 0.25), "accent": Color(0.85, 0.7, 0.42),
 		"skills": ["power_shot", "quick_step"],
 	},
 	"guardian": {
@@ -47,7 +53,7 @@ const CLASSES := {
 		"desc": "Щит и меч: высокая защита, оглушение.",
 		"attack": "melee", "range": 2.8, "cd": 0.9,
 		"hp": 140, "hp_lvl": 28, "atk": 10, "atk_lvl": 2.0, "def": 7, "def_lvl": 1.5,
-		"speed": 6.2, "crit": 0.03, "color": Color(0.85, 0.85, 0.95),
+		"speed": 6.2, "crit": 0.03, "color": Color(0.85, 0.85, 0.95), "accent": Color(0.3, 0.45, 0.82),
 		"skills": ["shield_bash", "holy_guard"],
 	},
 	"cleric": {
@@ -55,7 +61,7 @@ const CLASSES := {
 		"desc": "Магия света: лечит себя и питомца.",
 		"attack": "magic", "range": 10.0, "cd": 1.0,
 		"hp": 85, "hp_lvl": 15, "atk": 10, "atk_lvl": 3.0, "def": 2, "def_lvl": 0.6,
-		"speed": 6.3, "crit": 0.05, "color": Color(1.0, 0.9, 0.5),
+		"speed": 6.3, "crit": 0.05, "color": Color(1.0, 0.9, 0.5), "accent": Color(0.95, 0.78, 0.35),
 		"skills": ["holy_bolt", "heal"],
 	},
 	"assassin": {
@@ -63,7 +69,7 @@ const CLASSES := {
 		"desc": "Быстрые удары кинжалами, частые криты.",
 		"attack": "melee", "range": 2.4, "cd": 0.55,
 		"hp": 95, "hp_lvl": 17, "atk": 9, "atk_lvl": 2.5, "def": 2, "def_lvl": 0.7,
-		"speed": 7.2, "crit": 0.2, "color": Color(0.35, 0.2, 0.45),
+		"speed": 7.2, "crit": 0.2, "color": Color(0.35, 0.2, 0.45), "accent": Color(0.82, 0.16, 0.26),
 		"skills": ["backstab", "shadow_step"],
 	},
 	"warlock": {
@@ -71,7 +77,7 @@ const CLASSES := {
 		"desc": "Магия тьмы: большой урон издалека.",
 		"attack": "magic", "range": 11.0, "cd": 1.1,
 		"hp": 80, "hp_lvl": 14, "atk": 15, "atk_lvl": 4.0, "def": 1, "def_lvl": 0.5,
-		"speed": 6.3, "crit": 0.07, "color": Color(0.5, 0.15, 0.6),
+		"speed": 6.3, "crit": 0.07, "color": Color(0.5, 0.15, 0.6), "accent": Color(0.78, 0.45, 1.0),
 		"skills": ["dark_burst", "drain"],
 	},
 }

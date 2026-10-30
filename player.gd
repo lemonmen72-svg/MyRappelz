@@ -2,7 +2,7 @@ class_name Player
 extends CharacterBody3D
 ## Персонаж игрока. Уровень, опыт и золото хранятся в Game, характеристики считаются из ClassData.
 ## Атака по типу класса: ближний бой (melee), лук (ranged) и магия (magic) — снаряд Projectile.
-## Умения класса (кнопки "skill1"/"skill2"), временные усиления, простая модель из мешей.
+## Умения класса (кнопки "skill1"/"skill2"), временные усиления. Внешний вид — CharacterModel.
 
 signal stats_changed
 signal message(text: String)
@@ -43,12 +43,9 @@ var speed_buff := 0.0
 var guard_time := 0.0
 var guard := 0.0
 
-var _model: Node3D
-var _hand_r: Node3D
-var _hand_l: Node3D
+var _model: CharacterModel
 var _weapon_kind := ""
 var _guard_fx: MeshInstance3D
-var _anim: Tween
 var _regen_acc := 0.0
 var _last_crit := false
 
@@ -135,6 +132,8 @@ func _physics_process(delta: float) -> void:
 
 	if dir.length() > 0.1:
 		rotation.y = lerp_angle(rotation.y, atan2(-dir.x, -dir.z), 12.0 * delta)
+	if _has_model():
+		_model.set_move_speed(Vector2(velocity.x, velocity.z).length())
 
 
 func _tick_skills(delta: float) -> void:
@@ -321,6 +320,7 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 		"war_cry":
 			atk_buff = value
 			atk_buff_time = time
+			_anim_buff()
 			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(1, 0.3, 0.2), 2.5, 0.4)
 			_announce(sname, "атака +%d%% на %d с" % [roundi(value * 100.0), roundi(time)])
 		"power_shot":
@@ -334,6 +334,7 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 		"quick_step":
 			speed_buff = value
 			speed_buff_time = time
+			_anim_buff()
 			Projectile.burst(fx_parent, global_position + Vector3(0, 0.3, 0), Color(0.5, 1, 0.6), 1.8, 0.3)
 			_announce(sname, "скорость +%d%% на %d с" % [roundi(value * 100.0), roundi(time)])
 		"shield_bash":
@@ -352,6 +353,7 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 			guard = value
 			guard_time = time
 			_update_guard_fx()
+			_anim_buff()
 			_announce(sname, "урон −%d%% на %d с" % [roundi(value * 100.0), roundi(time)])
 		"holy_bolt":
 			var t := _find_target(attack_range)
@@ -489,6 +491,8 @@ func take_damage(amount: int, _attacker: Node3D) -> void:
 		amount = maxi(1, roundi(float(amount) * (1.0 - guard)))
 	hp -= amount
 	regen_delay = 6.0
+	if _has_model():
+		_model.play_hit()
 	Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), str(amount), Color(1, 0.3, 0.3))
 	if hp <= 0:
 		hp = max_hp
@@ -520,75 +524,17 @@ func gain_xp(amount: int) -> void:
 	stats_changed.emit()
 
 
-# ---------- Внешний вид (простые меши, позже заменим моделью) ----------
+# ---------- Внешний вид: аниме-модель (CharacterModel) ----------
 
 func _build_model() -> void:
-	_stop_anim()
 	if _model != null and is_instance_valid(_model):
 		_model.queue_free()
-	_model = Node3D.new()
-	add_child(_model)
-
 	var c := ClassData.cls(Game.class_id)
-	var r := ClassData.race(Game.race_id)
-	var body: Color = c["color"]
-	var skin: Color = r["skin"]
-	var hair: Color = r.get("hair", Color(0.3, 0.2, 0.1))
-	var elf: bool = r.get("ears", false)
-
-	# Ноги, туловище, пояс, руки
-	_box(_model, Vector3(0.5, 0.75, 0.34), Vector3(0, 0.375, 0), body.darkened(0.45))
-	var torso := MeshInstance3D.new()
-	var tm := CapsuleMesh.new()
-	tm.radius = 0.33
-	tm.height = 1.0
-	torso.mesh = tm
-	torso.position.y = 1.15
-	torso.material_override = Util.mat(body)
-	_model.add_child(torso)
-	_box(_model, Vector3(0.68, 0.1, 0.5), Vector3(0, 0.82, 0), body.darkened(0.6))
-	for x in [-0.43, 0.43]:
-		_box(_model, Vector3(0.16, 0.58, 0.18), Vector3(x, 1.22, -0.02), body.darkened(0.15))
-		_sphere(_model, 0.09, Vector3(x, 0.92, -0.06), skin)
-
-	# Голова: лицо цветом кожи расы, глаза, волосы
-	_sphere(_model, 0.25, Vector3(0, 1.85, 0), skin)
-	var eye_col := Color(0.9, 0.3, 0.3) if Game.race_id == "dark_elf" else Color(0.12, 0.14, 0.22)
-	for x in [-0.09, 0.09]:
-		_box(_model, Vector3(0.07, 0.07, 0.03), Vector3(x, 1.87, -0.235), eye_col)
-	var hair_mi := _sphere(_model, 0.27, Vector3(0, 1.95, 0.06), hair)
-	hair_mi.scale = Vector3(1.0, 0.75, 1.0)
-	if elf:
-		# Заострённые уши: вытянутые боксы, наклонены вверх-наружу
-		for side in [-1.0, 1.0]:
-			var ear := _box(_model, Vector3(0.05, 0.28, 0.09), Vector3(0.27 * side, 1.9, 0.02), skin)
-			ear.rotation = Vector3(0.35, 0.0, -0.6 * side)
-
-	# Руки с оружием по классу
-	_hand_r = Node3D.new()
-	_hand_r.position = Vector3(0.45, 0.95, -0.1)
-	_model.add_child(_hand_r)
-	_hand_l = Node3D.new()
-	_hand_l.position = Vector3(-0.45, 0.95, -0.1)
-	_model.add_child(_hand_l)
 	_weapon_kind = String(c.get("weapon", "sword"))
-	match _weapon_kind:
-		"axe":
-			_build_axe(_hand_r)
-		"bow":
-			_build_bow(_hand_l)
-			_build_quiver()
-		"sword_shield":
-			_build_blade(_hand_r, 1.0)
-			_build_shield(_hand_l)
-		"staff":
-			_build_staff(_hand_r, body)
-		"daggers":
-			_build_blade(_hand_r, 0.45)
-			_build_blade(_hand_l, 0.45)
-		_:
-			_build_blade(_hand_r, 1.0)
-	_rest_pose()
+	_model = CharacterModel.new()
+	_model.name = "Model"
+	_model.setup(CharacterModel.spec_for(Game.race_id, Game.class_id))
+	add_child(_model)
 
 	# Сияние «Щита света»
 	_guard_fx = MeshInstance3D.new()
@@ -602,164 +548,32 @@ func _build_model() -> void:
 	_update_guard_fx()
 
 
-func _box(parent: Node3D, sz: Vector3, pos: Vector3, col: Color) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = sz
-	mi.mesh = bm
-	mi.position = pos
-	mi.material_override = Util.mat(col)
-	parent.add_child(mi)
-	return mi
+func _has_model() -> bool:
+	return _model != null and is_instance_valid(_model)
 
 
-func _sphere(parent: Node3D, radius: float, pos: Vector3, col: Color) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = radius
-	sm.height = radius * 2.0
-	mi.mesh = sm
-	mi.position = pos
-	mi.material_override = Util.mat(col)
-	parent.add_child(mi)
-	return mi
-
-
-## Оружие строится вдоль оси -Z от кисти; в покое кисть повёрнута вверх (rotation.x > 0).
-func _build_axe(hand: Node3D) -> void:
-	_box(hand, Vector3(0.07, 0.07, 1.0), Vector3(0, 0, -0.4), Color(0.45, 0.3, 0.17))
-	_box(hand, Vector3(0.05, 0.38, 0.3), Vector3(0, -0.13, -0.78), Color(0.75, 0.75, 0.8))
-	_box(hand, Vector3(0.05, 0.1, 0.12), Vector3(0, 0.08, -0.8), Color(0.6, 0.6, 0.65))
-
-
-func _build_blade(hand: Node3D, length: float) -> void:
-	_box(hand, Vector3(0.05, 0.05, 0.22), Vector3(0, 0, 0.02), Color(0.3, 0.2, 0.12))
-	_box(hand, Vector3(0.24 * maxf(length, 0.6), 0.05, 0.05), Vector3(0, 0, -0.1), Color(0.8, 0.65, 0.3))
-	_box(hand, Vector3(0.06, 0.12, 0.9 * length), Vector3(0, 0, -0.12 - 0.45 * length), Color(0.85, 0.87, 0.92))
-
-
-func _build_shield(hand: Node3D) -> void:
-	_box(hand, Vector3(0.52, 0.64, 0.07), Vector3(-0.06, 0.05, -0.18), Color(0.3, 0.42, 0.75))
-	_box(hand, Vector3(0.1, 0.42, 0.02), Vector3(-0.06, 0.05, -0.225), Color(0.95, 0.8, 0.35))
-	_box(hand, Vector3(0.32, 0.1, 0.02), Vector3(-0.06, 0.12, -0.225), Color(0.95, 0.8, 0.35))
-
-
-func _build_bow(hand: Node3D) -> void:
-	var wood := Color(0.5, 0.33, 0.16)
-	_box(hand, Vector3(0.07, 0.26, 0.07), Vector3(0, 0.1, -0.2), wood)
-	var up := _box(hand, Vector3(0.05, 0.52, 0.05), Vector3(0, 0.46, -0.13), wood)
-	up.rotation.x = 0.3
-	var down := _box(hand, Vector3(0.05, 0.52, 0.05), Vector3(0, -0.26, -0.13), wood)
-	down.rotation.x = -0.3
-	_box(hand, Vector3(0.015, 1.18, 0.015), Vector3(0, 0.1, -0.05), Color(0.92, 0.92, 0.85))
-
-
-func _build_quiver() -> void:
-	var q := _box(_model, Vector3(0.18, 0.62, 0.18), Vector3(0.15, 1.3, 0.34), Color(0.4, 0.26, 0.14))
-	q.rotation.z = 0.3
-	for i in 3:
-		var a := _box(q, Vector3(0.04, 0.16, 0.04), Vector3(-0.05 + 0.05 * i, 0.38, 0), Color(0.3, 0.6, 0.3))
-		a.rotation.x = 0.1 * (i - 1)
-
-
-func _build_staff(hand: Node3D, col: Color) -> void:
-	var wood := Color(0.3, 0.2, 0.25) if Game.class_id == "warlock" else Color(0.75, 0.62, 0.4)
-	_box(hand, Vector3(0.06, 0.06, 1.7), Vector3(0, 0, -0.45), wood)
-	var orb := MeshInstance3D.new()
-	var om := SphereMesh.new()
-	om.radius = 0.13
-	om.height = 0.26
-	orb.mesh = om
-	orb.position = Vector3(0, 0, -1.33)
-	orb.material_override = Projectile.glow_mat(col.lightened(0.3), 1.0)
-	hand.add_child(orb)
-	var halo := MeshInstance3D.new()
-	var hm := SphereMesh.new()
-	hm.radius = 0.22
-	hm.height = 0.44
-	halo.mesh = hm
-	halo.position = orb.position
-	halo.material_override = Projectile.glow_mat(col, 0.35)
-	hand.add_child(halo)
-
-
-## Положение рук в покое.
-func _rest_pose() -> void:
-	if _hand_r == null or not is_instance_valid(_hand_r):
-		return
-	_hand_r.position = Vector3(0.45, 0.95, -0.1)
-	_hand_l.position = Vector3(-0.45, 0.95, -0.1)
-	_hand_r.rotation = Vector3.ZERO
-	_hand_l.rotation = Vector3.ZERO
-	_model.rotation = Vector3.ZERO
-	match _weapon_kind:
-		"staff":
-			_hand_r.rotation.x = 1.35
-		"daggers":
-			_hand_r.rotation.x = 1.0
-			_hand_l.rotation.x = 1.0
-		"bow":
-			pass
-		_:
-			_hand_r.rotation.x = 1.0
-
-
-func _stop_anim() -> void:
-	if _anim != null and _anim.is_valid():
-		_anim.kill()
-	_anim = null
-	_rest_pose()
-
-
-func _new_anim() -> Tween:
-	_stop_anim()
-	_anim = create_tween()
-	return _anim
-
-
-## Удар / выстрел / заклинание обычной атаки.
+## Удар / выстрел / заклинание обычной атаки (вид — по оружию модели).
 func _anim_attack() -> void:
-	if _hand_r == null or not is_instance_valid(_hand_r):
-		return
-	var t := _new_anim()
-	match _weapon_kind:
-		"bow":
-			# Лук выносится вперёд, рука-«тетива» оттягивается назад
-			t.set_parallel(true)
-			t.tween_property(_hand_l, "position:z", -0.35, 0.07)
-			t.tween_property(_hand_r, "position", Vector3(0.1, 1.15, 0.15), 0.07)
-			t.chain().tween_property(_hand_l, "position:z", -0.1, 0.2)
-			t.tween_property(_hand_r, "position", Vector3(0.45, 0.95, -0.1), 0.2)
-		"staff":
-			t.tween_property(_hand_r, "rotation:x", 0.25, 0.1)
-			t.tween_property(_hand_r, "rotation:x", 1.35, 0.25)
-		"daggers":
-			t.tween_property(_hand_r, "rotation:x", -0.6, 0.06)
-			t.tween_property(_hand_r, "rotation:x", 1.0, 0.1)
-			t.tween_property(_hand_l, "rotation:x", -0.6, 0.06)
-			t.tween_property(_hand_l, "rotation:x", 1.0, 0.1)
-		_:
-			t.tween_property(_hand_r, "rotation:x", -0.7, 0.08)
-			t.tween_property(_hand_r, "rotation:x", 1.0, 0.18)
+	if _has_model():
+		_model.play_attack()
 
 
-## Круговой удар (Рассечение): оборот всей модели с опущенным оружием.
+## Круговой удар (Рассечение): оборот всей модели.
 func _anim_spin() -> void:
-	if _model == null or not is_instance_valid(_model):
-		return
-	var t := _new_anim()
-	_hand_r.rotation.x = -0.2
-	t.tween_property(_model, "rotation:y", TAU, 0.35).from(0.0)
-	t.tween_callback(_rest_pose)
+	if _has_model():
+		_model.play_spin()
 
 
 ## Удар щитом: выпад левой рукой.
 func _anim_bash() -> void:
-	if _hand_l == null or not is_instance_valid(_hand_l):
-		return
-	var t := _new_anim()
-	t.tween_property(_hand_l, "position:z", -0.6, 0.08)
-	t.tween_property(_hand_l, "position:z", -0.1, 0.2)
+	if _has_model():
+		_model.play_bash()
+
+
+## Усиление на себя: руки вверх.
+func _anim_buff() -> void:
+	if _has_model():
+		_model.play_buff()
 
 
 func _update_guard_fx() -> void:

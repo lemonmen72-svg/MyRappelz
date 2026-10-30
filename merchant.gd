@@ -1,10 +1,16 @@
 class_name Merchant
 extends StaticBody3D
-## Торговец в безопасной зоне: простая фигура из примитивов и подпись. Поворачивается к игроку.
+## Торговец в безопасной зоне: добродушный странствующий торговец (аниме-модель CharacterModel) —
+## широкая шляпа с пером, усы, глаза-улыбки, фартук и большой рюкзак со скаткой и фонариком.
+## Рядом ящик с товаром. Поворачивается к игроку и машет рукой, когда тот подходит.
 
 const TURN_RANGE := 10.0
+const WAVE_RANGE := 6.0
+const WAVE_COOLDOWN := 8.0
 
-var _model: Node3D
+var _model: CharacterModel
+var _near := false
+var _wave_cd := 0.0
 
 
 func _ready() -> void:
@@ -20,81 +26,12 @@ func _ready() -> void:
 	col.position.y = 0.95
 	add_child(col)
 
-	_model = Node3D.new()
+	_model = CharacterModel.new()
+	_model.name = "Model"
+	_model.setup(CharacterModel.merchant_spec())
 	add_child(_model)
 
-	# Мантия
-	var robe := MeshInstance3D.new()
-	var rm := CylinderMesh.new()
-	rm.top_radius = 0.26
-	rm.bottom_radius = 0.5
-	rm.height = 1.3
-	robe.mesh = rm
-	robe.position.y = 0.65
-	robe.material_override = Util.mat(Color(0.18, 0.42, 0.48))
-	_model.add_child(robe)
-
-	# Пояс
-	var belt := MeshInstance3D.new()
-	var bm := CylinderMesh.new()
-	bm.top_radius = 0.37
-	bm.bottom_radius = 0.37
-	bm.height = 0.08
-	belt.mesh = bm
-	belt.position.y = 0.75
-	belt.material_override = Util.mat(Color(0.85, 0.65, 0.2))
-	_model.add_child(belt)
-
-	# Голова
-	var head := MeshInstance3D.new()
-	var hm := SphereMesh.new()
-	hm.radius = 0.24
-	hm.height = 0.48
-	head.mesh = hm
-	head.position.y = 1.52
-	head.material_override = Util.mat(Color(0.95, 0.8, 0.65))
-	_model.add_child(head)
-
-	# Нос: видно, куда смотрит торговец (вперёд = -Z)
-	var nose := MeshInstance3D.new()
-	var nm := BoxMesh.new()
-	nm.size = Vector3(0.08, 0.08, 0.1)
-	nose.mesh = nm
-	nose.position = Vector3(0, 1.5, -0.25)
-	nose.material_override = Util.mat(Color(0.9, 0.7, 0.55))
-	_model.add_child(nose)
-
-	# Шляпа: поля и конус
-	var hat_mat := Util.mat(Color(0.72, 0.5, 0.2))
-	var brim := MeshInstance3D.new()
-	var brm := CylinderMesh.new()
-	brm.top_radius = 0.45
-	brm.bottom_radius = 0.45
-	brm.height = 0.04
-	brim.mesh = brm
-	brim.position.y = 1.7
-	brim.material_override = hat_mat
-	_model.add_child(brim)
-	var hat := MeshInstance3D.new()
-	var htm := CylinderMesh.new()
-	htm.top_radius = 0.0
-	htm.bottom_radius = 0.28
-	htm.height = 0.45
-	hat.mesh = htm
-	hat.position.y = 1.94
-	hat.material_override = hat_mat
-	_model.add_child(hat)
-
-	# Заплечный мешок с товаром
-	var pack := MeshInstance3D.new()
-	var pm := BoxMesh.new()
-	pm.size = Vector3(0.55, 0.65, 0.3)
-	pack.mesh = pm
-	pack.position = Vector3(0, 1.05, 0.38)
-	pack.material_override = Util.mat(Color(0.5, 0.35, 0.2))
-	_model.add_child(pack)
-
-	# Ящик с товаром рядом (без коллизии)
+	# Ящик с товаром рядом (без коллизии): на крышке пара зелий
 	var crate := MeshInstance3D.new()
 	var crm := BoxMesh.new()
 	crm.size = Vector3(0.6, 0.5, 0.6)
@@ -102,6 +39,28 @@ func _ready() -> void:
 	crate.position = Vector3(0.95, 0.25, 0.1)
 	crate.material_override = Util.mat(Color(0.6, 0.45, 0.25))
 	add_child(crate)
+	var potions := [[Vector3(0.85, 0.58, 0.0), Color(0.9, 0.2, 0.3)], [Vector3(1.07, 0.58, 0.18), Color(0.25, 0.5, 0.95)]]
+	for p in potions:
+		var bottle := MeshInstance3D.new()
+		var bm := SphereMesh.new()
+		bm.radius = 0.08
+		bm.height = 0.16
+		bm.radial_segments = 10
+		bm.rings = 5
+		bottle.mesh = bm
+		bottle.position = p[0]
+		bottle.material_override = Util.mat(p[1])
+		add_child(bottle)
+		var cork := MeshInstance3D.new()
+		var km := CylinderMesh.new()
+		km.top_radius = 0.025
+		km.bottom_radius = 0.03
+		km.height = 0.06
+		km.radial_segments = 6
+		cork.mesh = km
+		cork.position = p[0] + Vector3(0, 0.09, 0)
+		cork.material_override = Util.mat(Color(0.55, 0.4, 0.25))
+		add_child(cork)
 
 	var label := Label3D.new()
 	label.text = "Торговец"
@@ -115,6 +74,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_wave_cd = maxf(0.0, _wave_cd - delta)
 	var p := get_tree().get_first_node_in_group("player") as Node3D
 	if p == null:
 		return
@@ -123,3 +83,9 @@ func _process(delta: float) -> void:
 	var d := to.length()
 	if d > 0.1 and d < TURN_RANGE:
 		_model.rotation.y = lerp_angle(_model.rotation.y, atan2(-to.x, -to.z), 4.0 * delta)
+	# Приветствие, когда игрок подходит
+	var near := d < WAVE_RANGE
+	if near and not _near and _wave_cd <= 0.0:
+		_model.play_wave()
+		_wave_cd = WAVE_COOLDOWN
+	_near = near
