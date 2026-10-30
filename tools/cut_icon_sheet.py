@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Нарезка листа значков: тайлы на белом фоне -> PNG 128x128 с прозрачными скруглёнными углами.
-# python3 -I tools/cut_icon_sheet.py (нужны numpy, Pillow, scipy) <лист.png> <папка> id1,id2,...   (порядок: слева направо, сверху вниз)
+# python3 -I tools/cut_icon_sheet.py (нужны numpy, Pillow, scipy) <лист.png> <папка> id1,id2,...   (порядок: слева направо, сверху вниз;
+# «_» — пропустить тайл: ChatGPT иногда рисует дубли или лишние)
 import sys, numpy as np
 from PIL import Image, ImageDraw
 from scipy import ndimage
@@ -26,6 +27,8 @@ print('найдено тайлов', len(order), 'нужно', len(ids), 'раз
 assert len(order) == len(ids), 'число тайлов не совпало'
 import os; os.makedirs(out, exist_ok=True)
 for (y0, x0, y1, x1), i in zip(order, ids):
+    if i == '_':
+        continue
     s = max(y1 - y0, x1 - x0); cy, cx = (y0 + y1) // 2, (x0 + x1) // 2
     tile = im.crop((cx - s // 2, cy - s // 2, cx - s // 2 + s, cy - s // 2 + s)).resize((128, 128), Image.LANCZOS).convert('RGBA')
     m = Image.new('L', (128 * 4, 128 * 4), 0); ImageDraw.Draw(m).rounded_rectangle((2, 2, 128 * 4 - 3, 128 * 4 - 3), radius=56, fill=255)
