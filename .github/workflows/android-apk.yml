@@ -1,5 +1,5 @@
 # Сборка APK и публикация релиза. Запускается ТОЛЬКО вручную (по команде Максима):
-# Actions → «Сборка APK» → Run workflow.
+# Actions → «Сборка APK» → Run workflow, либо пуш тега вида v0.1.0.
 name: Сборка APK
 
 on:
@@ -9,6 +9,9 @@ on:
         description: "Версия (например 0.1.0)"
         required: true
         default: "0.1.0"
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -18,9 +21,12 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       GODOT_VERSION: "4.3"
-      VERSION: ${{ inputs.version }}
+      RAW_VERSION: ${{ inputs.version || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Версия
+        run: echo "VERSION=${RAW_VERSION#v}" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
         with:
@@ -93,15 +99,15 @@ jobs:
       - name: Публикация релиза
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ inputs.version }}
-          name: MyRappelz ${{ inputs.version }}
+          tag_name: v${{ env.VERSION }}
+          name: MyRappelz ${{ env.VERSION }}
           target_commitish: ${{ github.sha }}
           prerelease: true
-          files: build/MyRappelz-${{ inputs.version }}.apk
+          files: build/MyRappelz-${{ env.VERSION }}.apk
           body: |
-            Прототип MyRappelz ${{ inputs.version }} для Android (сборка №${{ github.run_number }}, коммит ${{ github.sha }}).
+            Прототип MyRappelz ${{ env.VERSION }} для Android (сборка №${{ github.run_number }}, коммит ${{ github.sha }}).
 
-            **Установка:** скачайте `MyRappelz-${{ inputs.version }}.apk` на телефон, откройте его и разрешите установку из неизвестных источников.
+            **Установка:** скачайте `MyRappelz-${{ env.VERSION }}.apk` на телефон, откройте его и разрешите установку из неизвестных источников.
 
             **Управление:** левая половина экрана: джойстик; справа кнопки «Атака» и «Приручить».
             Приручение: ослабьте зверя ниже 50% HP, подойдите и нажмите «Приручить» (шанс 65%).

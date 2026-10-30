@@ -18,7 +18,8 @@ Godot 4.3+, рендерер GL Compatibility. Вся графика: прост
 - Питомец: идёт за вами, помогает в бою, получает опыт и уровни, при потере HP отдыхает 10 с
 
 ## Сборка под Android
-APK собирается в GitHub Actions **только вручную**: Actions → «Сборка APK» → Run workflow.
+APK собирается в GitHub Actions **только вручную**: Actions → «Сборка APK» → Run workflow
+(или пуш тега вида `v0.1.0`).
 Готовый файл публикуется в Releases. На каждый пуш запускается только автотест («Проверка кода»).
 
 Локально: Godot 4.3 → Editor → Manage Export Templates → Download, указать Android SDK и JDK 17
