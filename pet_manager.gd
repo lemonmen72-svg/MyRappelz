@@ -6,6 +6,9 @@ extends Node
 ## Призванный питомец всегда соответствует Game.active_pet: сверка идёт каждый кадр,
 ## поэтому после загрузки сохранения или отпускания другого питомца узел пересоздаётся сам.
 
+## Питомец вида species призван (слушают задания — Quests).
+signal summoned(species: String)
+
 const WINDOW_SIZE := Vector2(1040, 600)
 ## Радиус поиска цели для команды «Атакуй», если у игрока нет цели.
 const ATTACK_RANGE := 12.0
@@ -87,6 +90,7 @@ func summon(i: int) -> bool:
 	if _has_pet():
 		_msg("Питомец «%s» призван" % active_pet.pet_name)
 	Game.changed.emit()
+	summoned.emit(String(rec.get("species", "")))
 	return true
 
 
@@ -215,8 +219,8 @@ func open_window() -> void:
 	_add_forming(body)
 	if Game.pets.is_empty():
 		var hint := Label.new()
-		hint.text = "Питомцев пока нет. Возьмите карту существа нужного вида (базовые продаёт торговец, другие выпадают " \
-			+ "из зверей), нажмите «Приручить» рядом со зверем и победите его. Из карты с душой сформируйте существо."
+		hint.text = "Питомцев пока нет. Возьмите карту существа нужного вида (базовые продаёт Учитель Кирк в центре города, другие " \
+			+ "выпадают из зверей), нажмите «Приручить» рядом со зверем и победите его. Из карты с душой сформируйте существо."
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		hint.custom_minimum_size = Vector2(WINDOW_SIZE.x - 60.0, 0)
 		body.add_child(hint)

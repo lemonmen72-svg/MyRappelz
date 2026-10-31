@@ -8,7 +8,7 @@ extends Node3D
 ##
 ## Использование:
 ##   var m := CharacterModel.new()
-##   m.setup(CharacterModel.spec_for(race_id, class_id))   # или merchant_spec()
+##   m.setup(CharacterModel.spec_for(race_id, class_id))   # или npc_spec("merchant"), kirk_spec()
 ##   add_child(m)
 ## Оружие (spec "weapon"): у модели из файла — меч в правой руке ("sword"), парные мечи или кинжалы в обеих
 ## руках ("dual_swords", "daggers", левый клинок — зеркально) или арбалет в руках ("crossbow": стойка
@@ -383,6 +383,26 @@ static func merchant_spec() -> Dictionary:
 	}
 
 
+## Учитель Кирк, наставник укротителей: седые короткие волосы, длинная седая борода и усы, зелёные глаза,
+## тёмно-зелёная мантия до пят, дорожный плащ с откинутым капюшоном, сумка с картами существ на боку,
+## светлый посох со светящимся зелёным камнем.
+static func kirk_spec() -> Dictionary:
+	return {
+		"skin": Color(0.93, 0.78, 0.66), "hair": Color(0.86, 0.86, 0.84), "hair_style": "short",
+		"eyes": Color(0.38, 0.62, 0.4), "eye_style": "normal", "ears": false,
+		"outfit": "mentor", "main": Color(0.22, 0.42, 0.32), "accent": Color(0.86, 0.68, 0.32),
+		"weapon": "staff", "girth": 1.06, "beard": true, "long_beard": true,
+	}
+
+
+## Внешность NPC по id (NpcData): торговец, Учитель Кирк; неизвестный — как торговец.
+static func npc_spec(npc_id: String) -> Dictionary:
+	match npc_id:
+		"kirk":
+			return kirk_spec()
+	return merchant_spec()
+
+
 ## Собрать модель по параметрам (можно вызывать до добавления в дерево). Возвращает себя.
 func setup(s: Dictionary) -> CharacterModel:
 	spec = s
@@ -523,6 +543,13 @@ func _palette(outfit: String) -> Dictionary:
 			p["skirt_len"] = "mid"
 			p["belt"] = acc
 			p["pants"] = Color(0.45, 0.35, 0.25)
+		"mentor":
+			p["sleeve"] = main_c.darkened(0.12)
+			p["skirt"] = main_c.darkened(0.2)
+			p["skirt_len"] = "long"
+			p["belt"] = Color(0.42, 0.28, 0.16)
+			p["pants"] = Color(0.3, 0.26, 0.22)
+			p["boots"] = Color(0.36, 0.24, 0.15)
 	return p
 
 
@@ -598,6 +625,13 @@ func _build_head() -> void:
 			_add(_head, _sphere(0.035, 0.07, 8, 4),
 				_dir(0.12 * side, -0.42) * (HEAD_R + 0.008) + Vector3(0.012 * side, 0, 0), hair, OL_THIN,
 				Vector3(0, 0, -0.35 * side), Vector3(1.3, 0.6, 0.5))
+	if bool(spec.get("long_beard", false)):
+		# Длинная борода клином от подбородка и две пряди по бокам
+		var beard: Color = spec.get("hair", Color(0.85, 0.85, 0.83))
+		_spike(_head, Vector3(0, -0.13, -0.15), Vector3(0, -0.4, -0.15), 0.085, beard)
+		for sd in [-1.0, 1.0]:
+			var side: float = sd
+			_spike(_head, Vector3(0.08 * side, -0.11, -0.15), Vector3(0.06 * side, -0.3, -0.16), 0.05, beard)
 
 
 ## Направление от центра головы: u — поворот (0 = вперёд, + = вправо), v — наклон (+ = вверх).
@@ -830,6 +864,26 @@ func _build_outfit(outfit: String) -> void:
 				var side: float = sd
 				_add(_torso, _box(Vector3(0.04, 0.3, 0.02)), Vector3(0.1 * side, 0.36, -0.165),
 					Color(0.42, 0.28, 0.16), OL_THIN)
+		"mentor":
+			# Дорожный плащ с откинутым капюшоном, кайма мантии, ремень через грудь и сумка с картами на левом боку
+			var cloak := Color(0.5, 0.36, 0.23)
+			var leather := Color(0.42, 0.28, 0.16)
+			_add(_torso, _cyl(0.1, 0.27, 0.26, 12), Vector3(0, 0.44, 0), cloak, OL, Vector3.ZERO,
+				Vector3(1.0, 1.0, 0.9))
+			_add(_torso, _sphere(0.14, 0.18), Vector3(0, 0.55, 0.16), cloak, OL, Vector3.ZERO, Vector3(1.1, 1.0, 0.75))
+			_cape = _bone(_torso, "Cape", Vector3(0, 0.5, 0.12))
+			_cape_rest = -0.12
+			_add(_cape, _box(Vector3(0.4, 1.0, 0.025)), Vector3(0, -0.5, 0.03), cloak.darkened(0.08))
+			_add(_torso, _torus(0.315, 0.35), Vector3(0, -0.69, 0), acc, OL_THIN, Vector3.ZERO, Vector3(1.0, 1.0, 0.85))
+			_add(_torso, _box(Vector3(0.045, 0.6, 0.02)), Vector3(-0.02, 0.27, -0.155), leather, OL_THIN,
+				Vector3(0, 0, -0.62))
+			_add(_torso, _box(Vector3(0.2, 0.17, 0.08)), Vector3(-0.23, -0.02, -0.05), leather)
+			_add(_torso, _box(Vector3(0.21, 0.04, 0.09)), Vector3(-0.23, 0.07, -0.05), leather.darkened(0.15), OL_THIN)
+			# Уголки карт существ из сумки: фиолетовая, зелёная, рыжая
+			var cards := [Color(0.62, 0.52, 0.78), Color(0.5, 0.72, 0.45), Color(0.9, 0.58, 0.3)]
+			for i in cards.size():
+				_add(_torso, _box(Vector3(0.05, 0.08, 0.008)), Vector3(-0.27 + 0.04 * float(i), 0.11, -0.05), cards[i],
+					OL_THIN, Vector3(0, 0, 0.18 * (float(i) - 1.0)))
 
 
 ## Наплечники на обоих плечах (двигаются вместе с рукой).

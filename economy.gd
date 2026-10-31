@@ -1,9 +1,15 @@
 class_name Economy
 extends Node
 ## Предметы и деньги: добыча со зверей (мешочки на земле; сумка полна — мешочек остаётся лежать), торговец
-## в безопасной зоне, покупка и продажа, зелья здоровья с перезарядкой. Окна сумки и торговца — InventoryWindow
+## в безопасной зоне, покупка и продажа, зелья здоровья с перезарядкой. Окна сумки и торговли — InventoryWindow
 ## (window): сетка ячеек, экипировка, карточка предмета. Надетое оружие лежит не в ячейке, а в слоте «Оружие»,
 ## поэтому его нельзя продать или выбросить.
+## Торгуют несколько NPC (группа "trader", поле npc_id; ассортимент — NpcData.shop): торговец (кнопка «Торговец»)
+## и Учитель Кирк (карты существ; «Торговля» в его диалоге — Npcs). Окно торговли открыто у одного продавца
+## (window.seller) и закрывается, если игрок от него отошёл; продавать из сумки можно рядом с любым из них.
+
+## Куплено n штук предмета id у NPC seller (слушают задания — Quests).
+signal bought(id: String, n: int, seller: String)
 
 ## Где стоит торговец (внутри безопасной зоны MobData.SAFE_RADIUS).
 const MERCHANT_POS := Vector3(0, 0, -4)
@@ -155,9 +161,38 @@ func is_bag_open() -> bool:
 	return window != null and window.mode == "bag" and window.is_open()
 
 
-## Окно торговца: товары, сумка и карточка (InventoryWindow).
-func open_shop() -> void:
-	window.open("shop")
+## Окно торговли у NPC seller (по умолчанию — торговец): товары, сумка и карточка (InventoryWindow).
+func open_shop(seller: String = "merchant") -> void:
+	window.open("shop", seller)
+
+
+## Узел торгующего NPC с id npc_id (группа "trader") или null.
+func trader_node(npc_id: String) -> Node3D:
+	if main == null or not main.is_inside_tree():
+		return null
+	for n in main.get_tree().get_nodes_in_group("trader"):
+		var t := n as Node3D
+		if t != null and is_instance_valid(t) and String(t.get("npc_id")) == npc_id:
+			return t
+	return null
+
+
+## Игрок рядом (ближе SHOP_RANGE) с торгующим NPC npc_id; "" — с любым.
+func is_near_trader(npc_id: String = "") -> bool:
+	if main == null or main.player == null or not main.is_inside_tree():
+		return false
+	var p: Player = main.player
+	for n in main.get_tree().get_nodes_in_group("trader"):
+		var t := n as Node3D
+		if t == null or not is_instance_valid(t):
+			continue
+		if npc_id != "" and String(t.get("npc_id")) != npc_id:
+			continue
+		var d := p.global_position - t.global_position
+		d.y = 0.0
+		if d.length() < SHOP_RANGE:
+			return true
+	return false
 
 
 ## Окно сумки: экипировка, сетка ячеек и карточка (InventoryWindow).
@@ -165,11 +200,12 @@ func open_bag() -> void:
 	window.open("bag")
 
 
-## Купить n штук предмета id у торговца. true — куплено.
-func buy(id: String, n: int = 1) -> bool:
+## Купить n штук предмета id у NPC seller ("" — у того, чьё окно торговли открыто). true — куплено.
+func buy(id: String, n: int = 1, seller: String = "") -> bool:
+	var who := seller if seller != "" else window.seller
 	var price: int = int(ItemData.get_item(id).get("buy", 0)) * n
-	if price <= 0 or n <= 0:
-		_msg("Торговец это не продаёт")
+	if price <= 0 or n <= 0 or not InventoryWindow.goods(Game.class_id, who).has(id):
+		_msg("%s это не продаёт" % NpcData.npc_name(who))
 		return false
 	if Game.gold < price:
 		_msg("Не хватает золота: нужно %d, есть %d" % [price, Game.gold])
@@ -181,10 +217,11 @@ func buy(id: String, n: int = 1) -> bool:
 	Game.gold -= price
 	Game.inventory.add(id, n)
 	_msg("Куплено: %s ×%d за %d зол." % [ItemData.item_name(id), n, price])
+	bought.emit(id, n, who)
 	return true
 
 
-## Продать торговцу n штук из ячейки сумки i (n < 0 — всю стопку). Возвращает, сколько продано.
+## Продать n штук из ячейки сумки i (n < 0 — всю стопку) торгующему NPC рядом. Возвращает, сколько продано.
 ## Надетое оружие в ячейках не лежит — его продать нельзя.
 func sell_cell(i: int, n: int = 1) -> int:
 	var c: Dictionary = Game.inventory.cell(i)
@@ -195,7 +232,7 @@ func sell_cell(i: int, n: int = 1) -> int:
 	if price <= 0:
 		_msg("Торговец это не купит")
 		return 0
-	if not is_near_merchant():
+	if not is_near_trader():
 		_msg("Продать можно только торговцу")
 		return 0
 	var have := int(c["n"])
@@ -278,8 +315,8 @@ func _process(delta: float) -> void:
 		_shop_near = near
 		main.hud.set_button_visible("shop", near)
 
-	if is_shop_open() and not near:
+	if is_shop_open() and not is_near_trader(window.seller):
 		_close_window()
-		_msg("Вы отошли от торговца")
+		_msg("Вы отошли от %s" % NpcData.name_gen(window.seller))
 	elif window.is_open() and (window.dirty or Game.gold != window.seen_gold):
 		window.refresh()

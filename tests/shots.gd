@@ -323,7 +323,60 @@ func run_step() -> void:
 			step = 35
 		35:
 			shot("32_target_no_tame")
+			player._set_target(null)
+			# Учитель Кирк в центре города со значком «!» (задание можно взять), кнопка «Говорить»
+			_kirk_view()
+			wait = 45
+			step = 36
+		36:
+			shot("33_kirk_town")
+			main.npcs.talk_to("kirk")
+			wait = 8
+			step = 37
+		37:
+			shot("34_kirk_dialog")
+			main.npcs.open_dialog("kirk", "quest", "kirk_first_card")
+			wait = 8
+			step = 38
+		38:
+			shot("35_kirk_quest_offer")
+			# Лавка Кирка: карты существ и зеркальная карта, карточка карты фазана
+			main.economy.open_shop("kirk")
+			main.economy.window._on_cell("good", InventoryWindow.goods(game.class_id, "kirk").find("card_pheasant"))
+			wait = 8
+			step = 39
+		39:
+			shot("36_kirk_shop")
+			main.hud.close_window()
+			# Журнал: три задания цепочки сданы, «Испытание связи» — 2/5
+			for id in ["kirk_first_card", "kirk_soul", "kirk_new_friend"]:
+				game.quests_done[id] = 1
+			main.quests.accept("kirk_bond_trial")
+			game.quests_active["kirk_bond_trial"]["progress"] = [2]
+			main.quests.refresh_tracker()
+			main.quests.window.open("kirk_bond_trial")
+			wait = 8
+			step = 40
+		40:
+			shot("37_quest_journal")
+			main.hud.close_window()
+			wait = 20
+			step = 41
+		41:
+			# Трекер справа вверху под меню; над Кирком серый «?»
+			shot("38_quest_tracker")
 			ok_done()
+
+
+## Игрок в 3 м от Учителя Кирка (со стороны площади), камера за игроком чуть сбоку — Кирк в кадре.
+func _kirk_view() -> void:
+	var player: Player = main.player
+	var kp: Vector3 = main.npcs.kirk.global_position
+	var to_c := Vector3(-kp.x, 0, -kp.z).normalized()
+	player.global_position = kp + to_c * 3.0 + Vector3(0, 0.1, 0)
+	main.cam_yaw = atan2(to_c.x, to_c.z) + 0.35
+	main.cam_pitch = 0.33
+	main.cam_dist = 6.5
 
 
 ## Камера спереди на героя (как кадры 09–11), HUD скрыт.

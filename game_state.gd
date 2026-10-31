@@ -41,6 +41,11 @@ var load_note := ""
 var pets: Array[Dictionary] = []
 ## Индекс призванного питомца в pets, -1: никого.
 var active_pet := -1
+## Задания (QuestData, логика — Quests): взятые {id: {"progress": [число по каждой цели]}} в порядке взятия,
+## сданные {id: сколько раз сдано}, отслеживаемое на экране ("" — никакое).
+var quests_active: Dictionary = {}
+var quests_done: Dictionary = {}
+var quest_tracked := ""
 
 
 func _ready() -> void:
@@ -72,6 +77,9 @@ func reset() -> void:
 	load_note = ""
 	pets.clear()
 	active_pet = -1
+	quests_active = {}
+	quests_done = {}
+	quest_tracked = ""
 
 
 func new_character(n: String, race: String, cls: String) -> void:
@@ -171,6 +179,7 @@ func to_dict() -> Dictionary:
 		"hero": hero.duplicate(true),
 		"pets": pets.duplicate(true),
 		"active_pet": active_pet,
+		"quests": {"active": quests_active.duplicate(true), "done": quests_done.duplicate(), "tracked": quest_tracked},
 	}
 
 
@@ -223,6 +232,8 @@ func from_dict(d: Dictionary) -> void:
 	active_pet = int(d.get("active_pet", -1))
 	if active_pet >= pets.size():
 		active_pet = -1
+	# Задания (старые сохранения — без заданий)
+	_load_quests(d.get("quests", {}))
 	# Оружие (старые сохранения Наёмника и переведённые герои — парные мечи и стартовый набор в сумку,
 	# см. ensure_hero)
 	weapon = "" if converted else String(d.get("weapon", ""))
@@ -243,6 +254,42 @@ func from_dict(d: Dictionary) -> void:
 		hero = HeroSkills.new_record(class_id, level)
 	ensure_hero()
 	changed.emit()
+
+
+## Задания из сохранения: только известные (QuestData), прогресс — целые числа по числу целей (JSON хранит
+## числа как float), отслеживаемое — только из взятых.
+func _load_quests(src: Variant) -> void:
+	quests_active = {}
+	quests_done = {}
+	quest_tracked = ""
+	if not (src is Dictionary):
+		return
+	var d: Dictionary = src
+	var act: Variant = d.get("active", {})
+	if act is Dictionary:
+		for k in act:
+			var id := String(k)
+			if not QuestData.has_quest(id):
+				continue
+			var rec: Variant = (act as Dictionary)[k]
+			var old: Array = []
+			if rec is Dictionary and (rec as Dictionary).get("progress", []) is Array:
+				old = (rec as Dictionary)["progress"]
+			var prog: Array = []
+			var goals := QuestData.goals(id)
+			for gi in goals.size():
+				var v := int(old[gi]) if gi < old.size() else 0
+				prog.append(clampi(v, 0, QuestData.goal_need(goals[gi])))
+			quests_active[id] = {"progress": prog}
+	var dn: Variant = d.get("done", {})
+	if dn is Dictionary:
+		for k in dn:
+			var n := int((dn as Dictionary)[k])
+			if n > 0 and QuestData.has_quest(String(k)):
+				quests_done[String(k)] = n
+	var tr := String(d.get("tracked", ""))
+	if quests_active.has(tr):
+		quest_tracked = tr
 
 
 ## Изученные умения из сохранения: только известные виду, уровни — целые (JSON хранит числа как float).

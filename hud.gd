@@ -5,8 +5,11 @@ extends CanvasLayer
 ## У зверя-цели слева от полоски HP — значок приручения (Taming.badge_state): зелёный кружок — можно приручить
 ## и нужная карта существа в сумке, жёлто-серый — можно, но карты нет, фиолетовый — нельзя приручить;
 ## левее — квадратик цвета тира карты (коричневый, синий, фиолетовый, жёлтый).
+## Меню справа вверху: «Герой / Питомцы / Сумка / Задания / Настройки» (кнопки помельче — помещаются на 1280
+## рядом с панелью цели). Под меню — трекер заданий (Quests; касание по нему не вращает камеру — add_blocker).
 ## На ПК: WASD/стрелки, Пробел = атака, 1–4 = умения, T = приручить, Q = зелье, K = окно героя,
-## P = питомцы, C = окно существа, I или B = сумка, E = торговец, F = питомец атакует, G = питомец за мной, O = настройки.
+## P = питомцы, C = окно существа, I или B = сумка, E = торговец, R = говорить, J = задания,
+## F = питомец атакует, G = питомец за мной, O = настройки.
 
 ## Нажатие кнопки действия (касание, клавиша или кнопка меню).
 signal action(id: String)
@@ -20,8 +23,14 @@ const KEYS := {
 	KEY_SPACE: "attack", KEY_1: "skill1", KEY_2: "skill2", KEY_3: "skill3", KEY_4: "skill4", KEY_T: "tame",
 	KEY_Q: "potion", KEY_K: "hero_window",
 	KEY_P: "pets_window", KEY_I: "bag_window", KEY_E: "shop", KEY_F: "pet_attack", KEY_G: "pet_follow", KEY_O: "settings_window",
-	KEY_C: "creature_window", KEY_B: "bag_window",
+	KEY_C: "creature_window", KEY_B: "bag_window", KEY_R: "talk", KEY_J: "quest_window",
 }
+## Кнопки меню: размер шрифта и поля по бокам (меньше, чем в окнах: пять кнопок и панель цели на 1280).
+const MENU_FONT := 20
+const MENU_PAD := 8
+## Панель цели: ширина полоски и наименьший отступ слева (правее панели игрока).
+const TARGET_W := 320.0
+const TARGET_MIN_X := 400.0
 
 var move_vec := Vector2.ZERO
 
@@ -62,6 +71,8 @@ var target_card_tier := ""
 var _msg_label: Label
 var _msg_time := 0.0
 var _menu: HBoxContainer
+## Элементы интерфейса поверх мира (трекер заданий): касание по ним не начинает джойстик и вращение камеры.
+var _blockers: Array[Control] = []
 
 
 func _ready() -> void:
@@ -105,12 +116,14 @@ func _ready() -> void:
 	_msg_label.add_theme_color_override("font_color", Color(1, 0.95, 0.5))
 
 	_menu = HBoxContainer.new()
-	_menu.add_theme_constant_override("separation", 10)
+	_menu.name = "Menu"
+	_menu.add_theme_constant_override("separation", 6)
 	add_child(_menu)
-	_menu.add_child(_menu_button("Герой", "hero_window"))
-	_menu.add_child(_menu_button("Питомцы", "pets_window"))
-	_menu.add_child(_menu_button("Сумка", "bag_window"))
-	_menu.add_child(_menu_button("Настройки", "settings_window"))
+	for e in [["Герой", "hero_window"], ["Питомцы", "pets_window"], ["Сумка", "bag_window"],
+			["Задания", "quest_window"], ["Настройки", "settings_window"]]:
+		var mb := _menu_button(String(e[0]), String(e[1]))
+		_compact(mb)
+		_menu.add_child(mb)
 
 	update_pet(null)
 	get_viewport().size_changed.connect(_layout)
@@ -221,6 +234,40 @@ func take_camera_zoom() -> float:
 
 
 # ---------- Окна ----------
+
+## Элемент поверх мира (трекер и т. п.): касание по нему не начинает джойстик и вращение камеры.
+func add_blocker(c: Control) -> void:
+	if not _blockers.has(c):
+		_blockers.append(c)
+
+
+## Точка p на видимом элементе-блокере.
+func over_blocker(p: Vector2) -> bool:
+	for c in _blockers:
+		if is_instance_valid(c) and c.is_visible_in_tree() and c.get_global_rect().has_point(p):
+			return true
+	return false
+
+
+## Кнопки меню (Герой, Питомцы, …): id действия → кнопка.
+func menu_buttons() -> Dictionary:
+	var res := {}
+	for c in _menu.get_children():
+		var b := c as Button
+		if b != null:
+			res[String(b.get_meta("action", ""))] = b
+	return res
+
+
+## Прямоугольник меню на экране.
+func menu_rect() -> Rect2:
+	return Rect2(_menu.position, _menu.get_combined_minimum_size())
+
+
+## Прямоугольник полоски HP цели (и подписи над ней) на экране.
+func target_rect() -> Rect2:
+	return Rect2(_target_box.position, Vector2(TARGET_W, 48))
+
 
 ## Создаёт окно по центру экрана и возвращает контейнер для содержимого.
 ## Пока окно открыто, джойстик и круглые кнопки не работают. Открыто только одно окно.
@@ -406,8 +453,25 @@ func _menu_button(text: String, id: String) -> Button:
 	b.text = text
 	b.theme = Util.ui_theme()
 	b.focus_mode = Control.FOCUS_NONE
+	b.set_meta("action", id)
 	b.pressed.connect(func(): action.emit(id))
 	return b
+
+
+## Кнопка меню помельче: шрифт MENU_FONT, поля по бокам MENU_PAD.
+func _compact(b: Button) -> void:
+	b.add_theme_font_size_override("font_size", MENU_FONT)
+	var th := Util.ui_theme()
+	for st in ["normal", "hover", "pressed", "disabled"]:
+		var src := th.get_stylebox(st, "Button") as StyleBoxFlat
+		if src == null:
+			continue
+		var sb := src.duplicate() as StyleBoxFlat
+		sb.content_margin_left = MENU_PAD
+		sb.content_margin_right = MENU_PAD
+		sb.content_margin_top = 10
+		sb.content_margin_bottom = 10
+		b.add_theme_stylebox_override(st, sb)
 
 
 func _layout() -> void:
@@ -418,9 +482,10 @@ func _layout() -> void:
 		p.position = _view - b["offset"] - p.size / 2.0
 	_msg_label.position = Vector2(0, 190)
 	_msg_label.size = Vector2(_view.x, 40)
-	# Чуть левее центра: справа вверху кнопки меню
-	_target_box.position = Vector2((_view.x - 320.0) / 2.0 - 50.0, 14)
 	_menu.position = Vector2(_view.x - _menu.get_combined_minimum_size().x - 20.0, 16)
+	# Чуть левее центра, но не под кнопками меню справа вверху и не на панели игрока слева
+	var tx := minf((_view.x - TARGET_W) / 2.0 - 50.0, _menu.position.x - TARGET_W - 24.0)
+	_target_box.position = Vector2(maxf(TARGET_MIN_X, tx), 14)
 	if _window != null and is_instance_valid(_window):
 		_window.position = (_view - _window.size) / 2.0
 	if _joy_idx == -1:
@@ -477,6 +542,8 @@ func _input(event: InputEvent) -> void:
 		if te.pressed:
 			var p := te.position
 			var id := _button_at(p)
+			if id == "" and over_blocker(p):
+				return
 			if id != "":
 				if _buttons[id]["hold"]:
 					_buttons[id]["touch"] = te.index

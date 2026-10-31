@@ -38,7 +38,7 @@ func run_step() -> void:
 				check(String(MobData.get_type(id)["rarity"]) == "common", "%s — базовой редкости" % id)
 				check(MobData.rarity_name(id) == "Базовый", "редкость %s видна как «Базовый»" % id)
 				check(ItemData.card_tier("card_" + id) == "basic", "%s ловится базовой (коричневой) картой" % id)
-				check(int(ItemData.get_item("card_" + id)["buy"]) > 0, "карта %s продаётся у торговца" % id)
+				check(int(ItemData.get_item("card_" + id)["buy"]) > 0, "карта %s продаётся (у Учителя Кирка)" % id)
 				var names: Array = PetData.get_species(id)["stages"]
 				check(names.size() == 3, "у вида %s три стадии: %s" % [id, str(names)])
 				for e in MobData.get_type(id)["loot"]:

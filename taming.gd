@@ -9,6 +9,12 @@ extends Node
 ## Метка одна, держится 30 с или пока зверь жив и не ушёл домой. Перезарядка умения 3 с.
 ## Не всех зверей можно приручить (MobData.tameable: кабан и каменный страж — нельзя, карт у них нет).
 ## Описание карты для карточки предмета (где водится вид, уровни, тир, где взять) — card_lines.
+## Сигналы soul_caught и formed слушают задания (Quests).
+
+## Душа зверя вида species поймана в карту.
+signal soul_caught(species: String)
+## Из карты с душой сформировано существо вида species.
+signal formed(species: String)
 
 ## Дальность умения, м.
 const RANGE := 8.0
@@ -100,6 +106,7 @@ func on_mob_killed(mob: Mob) -> void:
 		Vfx.tame_success(main, pos, clampf(mob.body_scale, 0.8, 1.6))
 		_msg("Душа %s поймана в карту. Сформируйте существо (окно «Питомцы» или карта в сумке)"
 			% MobData.name_gen(mob.type_id))
+		soul_caught.emit(mob.type_id)
 	elif Game.inventory.has(ItemData.MIRROR_CARD):
 		Game.inventory.remove(ItemData.MIRROR_CARD)
 		Util.float_text(main, pos + Vector3(0, 3.0, 0), "Зеркальная карта сломалась", Color(0.8, 0.88, 1.0))
@@ -129,6 +136,8 @@ func form(card_id: String) -> bool:
 	if idx >= 0 and Game.active_pet == -1 and main != null and main.get("pets") != null:
 		main.pets.summon(idx)
 	_msg("Сформировано существо: «%s» (%s)!" % [pet_name, PetData.role_name(sp)])
+	# После своего сообщения: задания сообщают о прогрессе поверх него
+	formed.emit(sp)
 	return true
 
 
@@ -146,10 +155,15 @@ static func badge_state(type_id: String) -> String:
 	return BADGE_READY if Game.inventory.has(card) else BADGE_NEED_CARD
 
 
-## Где взять карту: «продаётся у торговца» или «выпадает из волка» (по добыче MobData).
+## Где взять карту: «продаётся у Учителя Кирка в центре города» (кто торгует ею — NpcData) или «выпадает
+## из волка» (по добыче MobData).
 static func where_to_get(card_id: String) -> String:
 	if int(ItemData.get_item(card_id).get("buy", 0)) > 0:
-		return "продаётся у торговца"
+		var sellers := NpcData.sellers_of(card_id)
+		if sellers.is_empty():
+			return "продаётся у торговца"
+		var s := String(sellers[0])
+		return "продаётся у %s %s" % [NpcData.name_gen(s), String(NpcData.npc(s).get("where", ""))]
 	var from: Array = []
 	for k in MobData.TYPES:
 		for e in MobData.get_type(String(k)).get("loot", []):

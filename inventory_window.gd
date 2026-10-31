@@ -12,8 +12,9 @@ extends Node
 ## Пальцем: касание ячейки — карточка; «Переместить», затем касание другой ячейки — стопки одного предмета
 ## складываются, разные предметы меняются местами; то же — перетаскиванием значка (касания эмулируют мышь),
 ## оружие можно перетащить в слот «Оружие». Надетое оружие меняется местами с выбранным (старое — в ту же ячейку).
-## Торговец: слева — товары (касание — карточка с «Купить» / «Купить ×5»), в центре — сумка (касание — карточка
-## с «Продать» / «Продать все»), справа — карточка.
+## Торговля (у торговца или другого NPC — seller, ассортимент NpcData.shop): слева — товары (касание — карточка
+## с «Купить» / «Купить ×5»), в центре — сумка (касание — карточка с «Продать» / «Продать все»), справа — карточка.
+## Продать из сумки можно рядом с любым торгующим NPC.
 ## Кнопки открытого окна для тестов (buttons): "cell_<i>", "equip_<слот>", "good_<id>", "sort", "act_equip",
 ## "act_use", "act_form", "act_sell", "act_sell_all", "act_move", "act_move_cancel", "act_drop", "act_drop_yes", "act_drop_no",
 ## "act_drop_minus", "act_drop_plus", "act_drop_all", "act_buy", "act_buy5".
@@ -52,6 +53,8 @@ var main: Node
 var economy: Node
 ## Открытое окно: "" (закрыто), "bag" или "shop".
 var mode := ""
+## У кого открыта торговля (id NPC, NpcData).
+var seller := "merchant"
 ## Выбранное: sel_kind "cell" (ячейка сумки sel_index с предметом sel_id), "equip" (слот EQUIP_SLOTS[sel_index]),
 ## "good" (товар sel_id), "" — ничего.
 var sel_kind := ""
@@ -75,9 +78,11 @@ func setup(m: Node, eco: Node) -> void:
 	economy = eco
 
 
-## Открыть окно kind ("bag" или "shop") заново, без выделения.
-func open(kind: String) -> void:
+## Открыть окно kind ("bag" или "shop") заново, без выделения. who — продавец для "shop" ("" — прежний).
+func open(kind: String, who: String = "") -> void:
 	mode = kind
+	if kind == "shop" and who != "":
+		seller = who
 	clear_selection()
 	_build()
 
@@ -120,10 +125,10 @@ func select_cell(i: int) -> void:
 	_on_cell("bag", i)
 
 
-## Товары торговца: продаётся (buy > 0), оружие — только подходящее классу героя class_id.
-static func goods(class_id: String) -> Array:
+## Товары NPC who (NpcData.shop): продаётся (buy > 0), оружие — только подходящее классу героя class_id.
+static func goods(class_id: String, who: String = "merchant") -> Array:
 	var res: Array = []
-	for key in ItemData.ITEMS:
+	for key in NpcData.shop(who):
 		var id := String(key)
 		if int(ItemData.get_item(id).get("buy", 0)) <= 0:
 			continue
@@ -140,7 +145,7 @@ func _build() -> void:
 	seen_gold = Game.gold
 	buttons.clear()
 	_validate_selection()
-	_body = main.hud.create_window("Сумка" if mode == "bag" else "Торговец", WINDOW_SIZE)
+	_body = main.hud.create_window("Сумка" if mode == "bag" else NpcData.shop_title(seller), WINDOW_SIZE)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	_body.add_child(row)
@@ -202,7 +207,7 @@ func _build_goods(parent: VBoxContainer) -> void:
 	grid.add_theme_constant_override("h_separation", GAP)
 	grid.add_theme_constant_override("v_separation", GAP)
 	parent.add_child(grid)
-	var list := goods(Game.class_id)
+	var list := goods(Game.class_id, seller)
 	for i in list.size():
 		var id := String(list[i])
 		var price := int(ItemData.get_item(id).get("buy", 0))
@@ -374,7 +379,7 @@ func _card_item(card: VBoxContainer) -> void:
 		acts.append(["Использовать", "act_use", _on_use])
 	elif ItemData.is_soul_card(id):
 		acts.append(["Сформировать", "act_form", _on_form])
-	if sell > 0 and economy.is_near_merchant():
+	if sell > 0 and economy.is_near_trader():
 		acts.append(["Продать", "act_sell", _on_sell.bind(false)])
 		if n > 1:
 			acts.append(["Продать все", "act_sell_all", _on_sell.bind(true)])
@@ -543,7 +548,7 @@ func _on_cell(kind: String, index: int) -> void:
 			sel_index = index
 			sel_id = String(EQUIP_SLOTS[index][0])
 		"good":
-			var list := goods(Game.class_id)
+			var list := goods(Game.class_id, seller)
 			if index >= 0 and index < list.size():
 				sel_kind = "good"
 				sel_index = index

@@ -152,6 +152,26 @@ func room_for(id: String) -> int:
 	return room
 
 
+## Поместятся ли все предметы {id: количество} сразу (награда за задание): сначала в неполные стопки,
+## остальное — в свободные ячейки.
+func room_for_all(add_items: Dictionary) -> bool:
+	_sync()
+	var free := maxi(0, CAPACITY - used_cells())
+	for k in add_items:
+		var id := String(k)
+		var n := int(add_items[k])
+		if n <= 0:
+			continue
+		var st := ItemData.stack_size(id)
+		for c in _cells:
+			var d: Dictionary = c
+			if not d.is_empty() and String(d["id"]) == id:
+				n -= maxi(0, st - int(d["n"]))
+		if n > 0:
+			free -= ceili(float(n) / float(st))
+	return free >= 0
+
+
 ## Индекс первой ячейки с предметом id (или -1). last = true — последней.
 func find_cell(id: String, last: bool = false) -> int:
 	_sync()
