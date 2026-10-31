@@ -3,12 +3,13 @@ extends "res://tests/test_base.gd"
 ## покупка карты у Учителя Кирка (у торговца карт нет), «Приручить» без карты — отказ с подсказкой, где взять; с картой — метка, победа,
 ## успех (карта с душой), «Сформировать» из карточки в сумке и из окна «Питомцы»; неудача без зеркальной карты —
 ## карта ломается, с зеркальной — ломается зеркальная; значок приручения на панели цели; карта с душой при полной
-## сумке; кабана и каменного стража приручить нельзя (карт нет, фиолетовый значок, «Приручить» отказывает);
-## перевод кристаллов души и убранных карт кабана и стража из старого сохранения.
+## сумке; анатем, кабана и каменного стража приручить нельзя (карт нет, фиолетовый значок, «Приручить» отказывает);
+## перевод кристаллов души и убранных карт кабана и стража из старого сохранения, питомцы-кабаны и стражи → волки и
+## черепахи.
 
 const SPECIES := ["panther", "turtle", "pheasant", "wolf"]
-## Звери, которых нельзя приручить (решение Максима).
-const NO_TAME := ["boar", "golem"]
+## Звери острова, которых нельзя приручить (анатемы; кабан и страж — тоже, но на острове их больше нет).
+const NO_TAME := ["anathema", "anathema_chief"]
 
 var mob: Mob = null
 
@@ -162,7 +163,7 @@ func run_step() -> void:
 			player.global_position = Vector3(0, 0.1, 2)
 			step = 6
 		6:
-			# Кабана и стража приручить нельзя: фиолетовый значок, «Приручить» отказывает
+			# Анатем приручить нельзя: фиолетовый значок, «Приручить» отказывает
 			check(Taming.badge_state("no_such_beast") == Taming.BADGE_NO, "неизвестного зверя приручить нельзя")
 			for sp in NO_TAME:
 				mob = find_mob(String(sp))
@@ -200,8 +201,11 @@ func run_step() -> void:
 			check(String(inv.cell(0).get("id", "")) == "mirror_card" and String(inv.cell(3).get("id", "")) == "mirror_card",
 				"раскладка сумки сохранена с новыми id")
 			check(game.load_note.contains("Кристаллы души заменены картами"), "сообщение игроку: " + game.load_note)
-			check(game.pets.size() == 2 and String(game.pets[0]["name"]) == "Хрюня" and String(game.pets[0]["species"]) == "boar"
-				and String(game.pets[1]["species"]) == "golem", "прирученные кабан и страж не тронуты")
+			# Кабан и страж ушли с острова: питомцы стали волком и черепахой, уровень и имя (своё) сохранены
+			check(game.pets.size() == 2 and String(game.pets[0]["name"]) == "Хрюня" and String(game.pets[0]["species"]) == "wolf"
+				and int(game.pets[0]["level"]) == 4 and String(game.pets[1]["species"]) == "turtle"
+				and int(game.pets[1]["level"]) == 12, "питомцы-кабан и страж стали волком и черепахой: %s" % [game.pets])
+			check(game.load_note.contains("питомцы-кабаны стали волками"), "сообщение о питомцах: " + game.load_note)
 			# Карты кабана и стража из сохранения прошлой версии → зеркальные карты
 			game.from_dict({
 				"name": "Старый", "race": "dark_elf", "class": "assassin", "level": 3, "gold": 10,
@@ -243,8 +247,8 @@ func _unit_items() -> void:
 		"тиры карт по редкостям")
 	check(ItemData.card_tier_label("rare") == "синяя (обычная)" and ItemData.card_tier_label("special") == "фиолетовая (редкая)",
 		"названия тиров — как у редкостей: %s, %s" % [ItemData.card_tier_label("rare"), ItemData.card_tier_label("special")])
-	# Кабан и страж не приручаются: их карт нет ни в предметах, ни в добыче, ни у торговца, ни значков
-	for sp in NO_TAME:
+	# Анатемы, кабан и страж не приручаются: их карт нет ни в предметах, ни в добыче, ни у торговца, ни значков
+	for sp in NO_TAME + ["boar", "golem"]:
 		var c := "card_" + String(sp)
 		check(not MobData.tameable(String(sp)), "%s — нельзя приручить" % sp)
 		check(Taming.badge_state(String(sp)) == Taming.BADGE_NO, "значок %s — «нельзя приручить»" % sp)

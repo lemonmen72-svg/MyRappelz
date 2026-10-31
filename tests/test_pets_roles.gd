@@ -1,8 +1,8 @@
 extends "res://tests/test_base.gd"
 ## Роли питомцев: танк провоцирует, лекарь лечит, маг бьёт снарядами и по площади, боец делает рывок.
 ## Новые виды: черепаха — танк, фазан — лекарь, пантера — маг (модели из файлов или запасные).
-## Удар по площади каменного стража, карта существа своего вида (у кабана и стража карт нет — нельзя приручить,
-## но уже прирученные кабан и страж призываются), приручение при полной коллекции (карта с душой ждёт в сумке,
+## Удар по площади каменного стража (в мире его нет — ставится тестом), карта существа своего вида (у кабана и
+## стража карт нет — нельзя приручить, но питомцы этих видов, добавленные в коллекцию, призываются), приручение при полной коллекции (карта с душой ждёт в сумке,
 ## формирование — отказ), снятие метки со зверя, ушедшего домой.
 
 const SPECIES := ["turtle", "pheasant", "panther", "wolf", "golem"]
@@ -30,8 +30,8 @@ func run_step() -> void:
 			check(pm.active_pet.role == "tank", "черепаха — танк")
 			var has_file := CreatureAsset.has_asset("turtle")
 			check((pm.active_pet._asset != null) == has_file, "черепаха: модель %s" % ("из файла" if has_file else "запасная"))
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан")
 			timer = 0
 			step = 1
 		1:
@@ -44,7 +44,7 @@ func run_step() -> void:
 				mob.target = player
 				return
 			if mob.is_dead:
-				fail("кабан погиб раньше провокации")
+				fail("фазан погиб раньше провокации")
 				return
 			stand_near(mob, 1.5)
 			if pet.skill_uses > 0 and mob.target == pet:
@@ -78,7 +78,7 @@ func run_step() -> void:
 			if timer > 60 * 3:
 				fail("лекарь не лечит хозяина")
 		5:
-			mob = find_mob("boar")
+			mob = find_mob("wolf")
 			if mob == null:
 				return
 			check(pm.summon(2), "пантера призвана")
@@ -90,7 +90,7 @@ func run_step() -> void:
 			if _fight("mage"):
 				step = 7
 		7:
-			mob = find_mob("boar")
+			mob = find_mob("wolf")
 			if mob == null:
 				return
 			check(pm.summon(3), "волк призван")
@@ -103,8 +103,12 @@ func run_step() -> void:
 				step = 9
 		9:
 			check(pm.summon(4), "каменный страж-питомец призван")
-			mob = find_mob("golem")
-			check(mob != null, "найден дикий каменный страж")
+			# Каменного стража на острове больше нет (там только существа Максима); его удар по площади остался
+			# в коде — для проверки страж ставится на лугу вручную
+			mob = Mob.new()
+			mob.setup("golem", -1, IslandWorld.current.ground(30.0, 34.0), 10)
+			main.add_child(mob)
+			check(find_mob("golem") == mob, "дикий каменный страж поставлен")
 			timer = 0
 			step = 10
 		10:
@@ -179,7 +183,7 @@ func run_step() -> void:
 			ok_done()
 
 
-## Бой призванного питомца роли role с кабаном mob (питомец начинает в 6 м). true, когда кабан убит.
+## Бой призванного питомца роли role со зверем mob (питомец начинает в 6 м). true, когда зверь убит.
 func _fight(role: String) -> bool:
 	var player: Player = main.player
 	var pet: Pet = main.pets.active_pet
@@ -199,5 +203,5 @@ func _fight(role: String) -> bool:
 	stand_near(mob, 2.0)
 	player.last_target = mob
 	if timer > 60 * 40:
-		fail("%s не убил кабана" % role)
+		fail("%s не убил фазана" % role)
 	return false

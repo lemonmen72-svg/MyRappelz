@@ -2,7 +2,7 @@ class_name CreatureModels
 extends RefCounted
 ## Модели зверей и питомцев в аниме-стиле (чиби): округлые формы из сфер и капсул, большие глаза
 ## с бликами, румянец, характерные детали вида. Всё своё, из примитивов.
-## Пантера, черепаха, фазан и летающие рыбы — модели из файлов (CreatureAsset, assets/creatures/<id>.glb): build() берёт
+## Пантера, черепаха, фазан, волк, летающие рыбы и анатемы — модели из файлов (CreatureAsset, assets/creatures/<id>.glb): build() берёт
 ## файл, если он есть, иначе строит их запасную модель из примитивов (размеры — CreatureAsset.info_for).
 ## Для модели из файла: asset_of(корень) — узел CreatureAsset (анимации вызывают Mob и Pet).
 ## build() строит только меши в отдельном узле, коллизию добавляет add_collision().
@@ -194,6 +194,8 @@ static func build(root: Node3D, species: String, color: Color, s: float, tint: C
 			_golem(root, rig, color, s)
 		"flyfish", "flyfish_sail", "flyfish_drake":
 			_fish(root, rig, species, color, s)
+		"anathema", "anathema_blade", "anathema_chief":
+			_lizard(root, rig, species, color, s)
 		_:
 			_beast(root, rig, species, color, s)
 	var a: Dictionary = root.get_meta("anim", {})
@@ -866,6 +868,60 @@ static func _fish(root: Node3D, rig: Rig, species: String, color: Color, s: floa
 		f.rotation.z = -0.35 * side
 		fins.append(fj)
 	anim["fins"] = fins
+	root.set_meta("anim", anim)
+
+
+## Анатема (запасная модель, если нет assets/creatures/<вид>.glb): ящер на двух ногах — тёмно-зелёное тело,
+## светлое брюхо, вытянутая морда, костяные клинки-серпы вдоль предплечий, гребень из шипов (у старших — больше).
+## Размеры — CreatureAsset.info_for; анимация как у стража (ноги и руки на шарнирах).
+static func _lizard(root: Node3D, rig: Rig, species: String, color: Color, s: float) -> void:
+	var h := float(CreatureAsset.info_for(species)["height"]) * s
+	var m := _lit(color)
+	var belly := _lit(Color(0.85, 0.62, 0.38))
+	var bone := _lit(Color(0.92, 0.88, 0.78))
+	var spikes := 3 if species == "anathema" else (5 if species == "anathema_blade" else 7)
+	var anim := {"kind": "golem", "s": s}
+
+	var legs: Array = []
+	for i in 2:
+		var side := float(i * 2 - 1)
+		var hip := _joint(rig, root, "Leg", Vector3(0.1 * side * h, 0.47 * h, 0.0))
+		_capsule(rig, hip, 0.05 * h, 0.3 * h, Vector3(0, -0.14 * h, -0.02 * h), m)
+		_capsule(rig, hip, 0.04 * h, 0.22 * h, Vector3(0, -0.36 * h, 0.03 * h), m)
+		_ball(rig, hip, 0.05 * h, Vector3(0, -0.46 * h, -0.04 * h), m, Vector3(0.9, 0.5, 1.6))
+		legs.append(hip)
+	anim["legs"] = legs
+
+	var body := _joint(rig, root, "Body", Vector3.ZERO)
+	anim["body"] = body
+	_capsule(rig, body, 0.12 * h, 0.36 * h, Vector3(0, 0.63 * h, 0), m)
+	_ball(rig, body, 0.09 * h, Vector3(0, 0.62 * h, -0.07 * h), belly, Vector3(0.9, 1.6, 0.5))
+	for i in spikes:
+		var sp := _cyl(rig, body, 0.0, 0.025 * h, 0.09 * h, Vector3(0, (0.76 - 0.05 * float(i)) * h, 0.1 * h), bone)
+		sp.rotation.x = 0.9
+
+	var head := _joint(rig, body, "Head", Vector3(0, 0.86 * h, -0.02 * h))
+	anim["head"] = head
+	_ball(rig, head, 0.07 * h, Vector3.ZERO, m, Vector3(0.9, 0.9, 1.1))
+	_ball(rig, head, 0.045 * h, Vector3(0, -0.02 * h, -0.08 * h), m, Vector3(0.8, 0.6, 1.4))
+	for i in 2:
+		var side := float(i * 2 - 1)
+		var eye := _ball(rig, head, 0.014 * h, Vector3(0.04 * side * h, 0.02 * h, -0.05 * h), _flat(Color(1.0, 0.75, 0.2)),
+			Vector3.ONE, true)
+		_face(eye, Vector3(0.5 * side, 0.2, -1.0).normalized())
+		var horn := _cyl(rig, head, 0.0, 0.02 * h, 0.1 * h, Vector3(0.03 * side * h, 0.06 * h, 0.05 * h), bone)
+		horn.rotation = Vector3(1.0, 0.0, -0.3 * side)
+
+	var arms: Array = []
+	for i in 2:
+		var side := float(i * 2 - 1)
+		var sh := _joint(rig, body, "Arm", Vector3(0.15 * side * h, 0.78 * h, 0.0))
+		sh.rotation.z = 0.12 * side
+		_capsule(rig, sh, 0.035 * h, 0.34 * h, Vector3(0, -0.15 * h, 0), m)
+		var blade := _cyl(rig, sh, 0.0, 0.03 * h, 0.3 * h, Vector3(0.02 * side * h, -0.3 * h, 0.05 * h), bone)
+		blade.rotation.x = -0.25
+		arms.append(sh)
+	anim["arms"] = arms
 	root.set_meta("anim", anim)
 
 

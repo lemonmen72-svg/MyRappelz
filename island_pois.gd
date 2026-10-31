@@ -16,7 +16,7 @@ extends RefCounted
 ## «Static» (постройки, ограды, отбрасывают тень, видны всегда) и «Props» (мелочи, кристаллы, ореолы,
 ## туман; без теней, до NEAR_RANGE) — по одной поверхности на материал. Тела StaticBody3D остаются
 ## (коллизия, группа poi_buildings), но мешей в них нет. Отдельно — только анимированное: крылья
-## мельницы, луч маяка, корабль, овцы и огни (MultiMesh), полотнища флажков; частицы и подписи.
+## мельницы, луч маяка, корабль и огни (MultiMesh), полотнища флажков; частицы и подписи.
 
 ## Свободный круг в центре города, м.
 const TOWN_FREE := 9.5
@@ -1071,7 +1071,8 @@ func _wheat_field(h: Node3D, poi: Dictionary) -> void:
 	_prop(h, "scarecrow", c + Vector2(size.x * 0.12, 0.0).rotated(-rot), rng.randf() * TAU, 0.3, 2.4)
 
 
-## Загон: круглая ограда с калиткой к деревне, овцы пасутся, кормушка и сено.
+## Загон: круглая ограда с калиткой к деревне, кормушка и сено. Овец (модели из примитивов) на острове больше нет —
+## на острове только существа Максима; модель овцы (PoiModels sheep_body/sheep_head, PoiAnimator.graze_mm) — в запасе.
 func _sheep_pen(h: Node3D, poi: Dictionary) -> void:
 	var c := _center(poi)
 	var r := float(poi.get("radius", 5.0))
@@ -1082,38 +1083,6 @@ func _sheep_pen(h: Node3D, poi: Dictionary) -> void:
 	_prop(h, "trough", back, _yaw_to(back, c) + PI * 0.5, 0.0)
 	var hay := c + Vector2(cos(to_v + 1.6), sin(to_v + 1.6)) * (r - 1.4)
 	_prop(h, "hay", hay, rng.randf() * TAU)
-	var flock: Array[Transform3D] = []
-	for i in 4:
-		var a := to_v + PI * 0.5 + float(i) * 1.3 + rng.randf_range(-0.3, 0.3)
-		var p := c + Vector2(cos(a), sin(a)) * rng.randf_range(1.2, r - 1.8)
-		flock.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), w.ground(p.x, p.y, -0.02)))
-	_sheep(h, flock)
-
-
-## Овцы загона: тела и головы — два MultiMesh (2 меша на всё стадо), пасутся (PoiAnimator).
-func _sheep(parent: Node3D, flock: Array[Transform3D]) -> void:
-	var node := Node3D.new()
-	node.name = "Sheep"
-	parent.add_child(node)
-	var head_xf := Transform3D(Basis.IDENTITY, Vector3(0, 0.85, -0.55))
-	var parts: Array[MultiMeshInstance3D] = []
-	for part in ["sheep_body", "sheep_head"]:
-		var body_part: bool = part == "sheep_body"
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = PoiModels.get_mesh(String(part))
-		mm.instance_count = flock.size()
-		for i in flock.size():
-			mm.set_instance_transform(i, flock[i] if body_part else flock[i] * head_xf)
-		var mmi := MultiMeshInstance3D.new()
-		mmi.name = "Bodies" if body_part else "Heads"
-		mmi.multimesh = mm
-		mmi.visibility_range_end = PROP_RANGE
-		mmi.visibility_range_end_margin = 5.0
-		node.add_child(mmi)
-		parts.append(mmi)
-	for i in flock.size():
-		anim.graze_mm(parts[0], parts[1], i, flock[i], head_xf)
 
 
 # ---------- Порт ----------

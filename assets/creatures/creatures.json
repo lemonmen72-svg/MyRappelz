@@ -2249,5 +2249,386 @@
 		"source": "Meshy_AI_Character_output (5).glb",
 		"hover": 1.55,
 		"body_height": 1.038
+	},
+	"anathema": {
+		"kind": "biped",
+		"height": 1.9,
+		"length": 0.549,
+		"width": 0.886,
+		"bounds": [
+			[
+				-0.442,
+				0.0,
+				-0.274
+			],
+			[
+				0.443,
+				1.9,
+				0.275
+			]
+		],
+		"walk_speed": 0.92,
+		"run_speed": 5.724,
+		"attack_hit_time": 0.233,
+		"cast_time": 0.7,
+		"clips": {
+			"Idle": {
+				"length": 1.667,
+				"loop": true,
+				"source": "ual1:Sword_Idle"
+			},
+			"Walk": {
+				"length": 1.333,
+				"loop": true,
+				"source": "ual1:Walk_Loop",
+				"speed": 0.92
+			},
+			"Run": {
+				"length": 0.933,
+				"loop": true,
+				"source": "ual1:Jog_Fwd_Loop",
+				"speed": 5.724
+			},
+			"Attack": {
+				"length": 1.067,
+				"loop": false,
+				"source": "ual2:Melee_Hook+Melee_Hook_Rec"
+			},
+			"Hit": {
+				"length": 0.333,
+				"loop": false,
+				"source": "ual1:Hit_Chest"
+			},
+			"Death": {
+				"length": 2.4,
+				"loop": false,
+				"source": "ual1:Death01"
+			},
+			"Cast": {
+				"length": 1.467,
+				"loop": false,
+				"source": "ual1:Spell_Simple_Enter+Spell_Simple_Shoot+Spell_Simple_Exit"
+			}
+		},
+		"head_rest": [
+			0.011,
+			1.72,
+			0.041
+		],
+		"tris": 7999,
+		"verts": 8622,
+		"bones": {
+			"root": "Root",
+			"hips": "Hips",
+			"chest": "Chest",
+			"head": "Head",
+			"spine": [
+				"Spine1",
+				"Spine2",
+				"Chest"
+			],
+			"neck": [
+				"Neck"
+			],
+			"legs": {
+				"L": [
+					"LegL1",
+					"LegL2",
+					"LegL3",
+					"LegL4",
+					"LegL5"
+				],
+				"R": [
+					"LegR1",
+					"LegR2",
+					"LegR3",
+					"LegR4",
+					"LegR5"
+				]
+			},
+			"feet": {
+				"L": "LegL4",
+				"R": "LegR4"
+			},
+			"arms": {
+				"L": [
+					"ShoulderL",
+					"ArmL1",
+					"ArmL2",
+					"HandL",
+					"HandL_1"
+				],
+				"R": [
+					"ShoulderR",
+					"ArmR1",
+					"ArmR2",
+					"HandR",
+					"HandR_1"
+				]
+			},
+			"hands": {
+				"L": "HandL",
+				"R": "HandR"
+			},
+			"other": [
+				"HeadEnd"
+			]
+		},
+		"source": "a18.glb"
+	},
+	"anathema_blade": {
+		"kind": "biped",
+		"height": 2.0,
+		"length": 0.635,
+		"width": 0.975,
+		"bounds": [
+			[
+				-0.488,
+				0.0,
+				-0.318
+			],
+			[
+				0.488,
+				2.0,
+				0.317
+			]
+		],
+		"walk_speed": 1.004,
+		"run_speed": 5.706,
+		"attack_hit_time": 0.233,
+		"cast_time": 0.7,
+		"clips": {
+			"Idle": {
+				"length": 1.667,
+				"loop": true,
+				"source": "ual1:Sword_Idle"
+			},
+			"Walk": {
+				"length": 1.333,
+				"loop": true,
+				"source": "ual1:Walk_Loop",
+				"speed": 1.004
+			},
+			"Run": {
+				"length": 0.933,
+				"loop": true,
+				"source": "ual1:Jog_Fwd_Loop",
+				"speed": 5.706
+			},
+			"Attack": {
+				"length": 1.4,
+				"loop": false,
+				"source": "ual2:Sword_Regular_A+Sword_Regular_A_Rec"
+			},
+			"Hit": {
+				"length": 0.333,
+				"loop": false,
+				"source": "ual1:Hit_Chest"
+			},
+			"Death": {
+				"length": 2.4,
+				"loop": false,
+				"source": "ual1:Death01"
+			},
+			"Cast": {
+				"length": 1.467,
+				"loop": false,
+				"source": "ual1:Spell_Simple_Enter+Spell_Simple_Shoot+Spell_Simple_Exit"
+			}
+		},
+		"head_rest": [
+			-0.02,
+			1.746,
+			0.051
+		],
+		"tris": 7997,
+		"verts": 9328,
+		"bones": {
+			"root": "Root",
+			"hips": "Hips",
+			"chest": "Chest",
+			"head": "Head",
+			"spine": [
+				"Spine1",
+				"Spine2",
+				"Chest"
+			],
+			"neck": [
+				"Neck"
+			],
+			"legs": {
+				"L": [
+					"LegL1",
+					"LegL2",
+					"LegL3",
+					"LegL4",
+					"LegL5",
+					"LegL6"
+				],
+				"R": [
+					"LegR1",
+					"LegR2",
+					"LegR3",
+					"LegR4",
+					"LegR5",
+					"LegR6"
+				]
+			},
+			"feet": {
+				"L": "LegL4",
+				"R": "LegR4"
+			},
+			"arms": {
+				"L": [
+					"ShoulderL",
+					"ArmL1",
+					"ArmL2",
+					"HandL",
+					"HandL_1"
+				],
+				"R": [
+					"ShoulderR",
+					"ArmR1",
+					"ArmR2",
+					"HandR",
+					"HandR_1"
+				]
+			},
+			"hands": {
+				"L": "HandL",
+				"R": "HandR"
+			},
+			"other": [
+				"HeadEnd"
+			]
+		},
+		"source": "a19.glb"
+	},
+	"anathema_chief": {
+		"kind": "biped",
+		"height": 2.2,
+		"length": 0.72,
+		"width": 1.308,
+		"bounds": [
+			[
+				-0.655,
+				0.0,
+				-0.36
+			],
+			[
+				0.653,
+				2.2,
+				0.36
+			]
+		],
+		"walk_speed": 1.155,
+		"run_speed": 6.941,
+		"attack_hit_time": 0.267,
+		"cast_time": 0.7,
+		"clips": {
+			"Idle": {
+				"length": 1.667,
+				"loop": true,
+				"source": "ual1:Sword_Idle"
+			},
+			"Walk": {
+				"length": 1.333,
+				"loop": true,
+				"source": "ual1:Walk_Loop",
+				"speed": 1.155
+			},
+			"Run": {
+				"length": 0.933,
+				"loop": true,
+				"source": "ual1:Jog_Fwd_Loop",
+				"speed": 6.941
+			},
+			"Attack": {
+				"length": 1.567,
+				"loop": false,
+				"source": "ual2:Sword_Regular_B+Sword_Regular_B_Rec"
+			},
+			"Hit": {
+				"length": 0.333,
+				"loop": false,
+				"source": "ual1:Hit_Chest"
+			},
+			"Death": {
+				"length": 2.4,
+				"loop": false,
+				"source": "ual1:Death01"
+			},
+			"Cast": {
+				"length": 1.467,
+				"loop": false,
+				"source": "ual1:Spell_Simple_Enter+Spell_Simple_Shoot+Spell_Simple_Exit"
+			}
+		},
+		"head_rest": [
+			-0.013,
+			1.809,
+			-0.021
+		],
+		"tris": 8089,
+		"verts": 10803,
+		"bones": {
+			"root": "Root",
+			"hips": "Hips",
+			"chest": "Chest",
+			"head": "Head",
+			"spine": [
+				"Spine1",
+				"Spine2",
+				"Spine3",
+				"Chest"
+			],
+			"neck": [
+				"Neck"
+			],
+			"legs": {
+				"L": [
+					"LegL1",
+					"LegL2",
+					"LegL3",
+					"LegL4",
+					"LegL5"
+				],
+				"R": [
+					"LegR1",
+					"LegR2",
+					"LegR3",
+					"LegR4",
+					"LegR5"
+				]
+			},
+			"feet": {
+				"L": "LegL4",
+				"R": "LegR4"
+			},
+			"arms": {
+				"L": [
+					"ShoulderL",
+					"ArmL1",
+					"ArmL2",
+					"HandL",
+					"HandL_1"
+				],
+				"R": [
+					"ShoulderR",
+					"ArmR1",
+					"ArmR2",
+					"HandR",
+					"HandR_1"
+				]
+			},
+			"hands": {
+				"L": "HandL",
+				"R": "HandR"
+			},
+			"other": [
+				"HeadEnd"
+			]
+		},
+		"source": "a20.glb"
 	}
 }

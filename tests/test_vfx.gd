@@ -47,7 +47,7 @@ func run_step() -> void:
 			check(_effects_left() == 0, "все эффекты удалились сами (осталось %d)" % _effects_left())
 			check(box.get_child_count() == models.size(), "в контейнере остались только модели: %d/%d"
 				% [box.get_child_count(), models.size()])
-			var m := find_mob("boar")
+			var m := find_mob("pheasant")
 			if m != null:
 				m.set_tame_mark(false)
 			box.queue_free()
@@ -191,8 +191,8 @@ func _spawn_effects() -> void:
 
 
 func _test_mob() -> void:
-	var m := find_mob("boar")
-	check(m != null, "найден кабан")
+	var m := find_mob("pheasant")
+	check(m != null, "найден фазан")
 	m.set_tame_mark(true)
 	check(m.get("_mark") != null and m.tame_marked, "метка приручения построена")
 	var hp0 := m.hp

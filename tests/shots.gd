@@ -21,14 +21,16 @@ var _frames := 0
 var _fish: Variant = null
 ## Летающие рыбы в ряд рядом с героем — кадр 52.
 const FISH_ROW := ["flyfish", "flyfish_sail", "flyfish_drake"]
+## Анатемы в ряд рядом с героем — кадр 56.
+const ANATHEMA_ROW := ["anathema", "anathema_blade", "anathema_chief"]
 ## Умения Наёмника для кадров окна героя [id, уровень].
 const HERO_SKILLS := [["blade_mastery", 2], ["charge_stab", 2], ["dark_strike", 1], ["evasion_expert", 2],
 	["concentration", 1], ["crossbow_mastery", 1], ["dual_shot", 1]]
 ## Предметы для кадров сумки и торговца (27–30): [id, количество]. Карты существ: пустые, с душой, зеркальная.
 const BAG_ITEMS := [
 	["daggers_steel", 1], ["crossbow_heavy", 1], ["card_panther", 4], ["card_wolf", 1], ["card_turtle", 1],
-	["card_panther_soul", 1], ["card_wolf_soul", 1], ["mirror_card", 2], ["boar_tusk", 7],
-	["wolf_pelt", 3], ["panther_fang", 2], ["pheasant_feather", 4], ["shell_plate", 2], ["golem_shard", 1],
+	["card_panther_soul", 1], ["card_wolf_soul", 1], ["mirror_card", 2], ["lizard_scale", 7],
+	["wolf_pelt", 3], ["panther_fang", 2], ["pheasant_feather", 4], ["shell_plate", 2], ["chief_spike", 1],
 	["hp_potion", 12],
 ]
 
@@ -80,7 +82,7 @@ func run_step() -> void:
 			step = 1
 		1:
 			shot("01_start")
-			var m := find_mob("boar")
+			var m := find_mob("pheasant")
 			if m != null:
 				stand_near(m, 4.0)
 			wait = 45
@@ -93,13 +95,14 @@ func run_step() -> void:
 			step = 3
 		3:
 			shot("03_combat")
-			var g := find_mob("golem")
+			# Главный враг пещеры — вожак анатем (каменного стража на острове больше нет)
+			var g := find_mob("anathema_chief")
 			if g != null:
 				stand_near(g, 7.0)
 			wait = 60
 			step = 4
 		4:
-			shot("04_golem")
+			shot("04_anathema_chief")
 			var f := find_mob("pheasant")
 			if f != null:
 				stand_near(f, 4.0)
@@ -318,8 +321,8 @@ func run_step() -> void:
 			step = 34
 		34:
 			shot("31_target_tame")
-			# Кабана приручить нельзя — фиолетовый значок
-			var m := find_mob("boar")
+			# Анатему приручить нельзя — фиолетовый значок
+			var m := find_mob("anathema")
 			if m != null:
 				stand_near(m, 4.0)
 				player._set_target(m)
@@ -497,6 +500,23 @@ func run_step() -> void:
 			step = 524
 		524:
 			shot("54_flyfish_dead")
+			step = 560
+		560:
+			# Анатемы (ящеры с костяными клинками) рядом с героем
+			_anathema_row()
+			wait = 40
+			step = 561
+		561:
+			shot("56_anathema_row")
+			_row.queue_free()
+			_top.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
+			_fish_view("anathema_blade", 5.0)
+			wait = 60
+			step = 562
+		562:
+			shot("57_anathema_world")
 			ok_done()
 
 
@@ -611,6 +631,35 @@ func _fish_row() -> void:
 	_top = Camera3D.new()
 	main.add_child(_top)
 	_top.global_position = base + Vector3(3.0, 1.9, 7.0)
+	_top.look_at(base + Vector3(3.0, 1.2, 0))
+	_top.current = true
+	main.hud.visible = false
+
+
+## Герой слева, три анатемы в ряд справа (клип Idle — боевая стойка), камера сбоку чуть сверху, HUD скрыт.
+func _anathema_row() -> void:
+	var player: Player = main.player
+	main.pets.recall()
+	player.visible = true
+	var base := player.global_position
+	_row = Node3D.new()
+	_row.name = "AnathemaRow"
+	main.add_child(_row)
+	for i in ANATHEMA_ROW.size():
+		var id := String(ANATHEMA_ROW[i])
+		var holder := Node3D.new()
+		holder.set_meta("species", id)
+		_row.add_child(holder)
+		var d := MobData.get_type(id)
+		CreatureModels.build(holder, id, d["color"], float(d["scale"]))
+		var gp := base + Vector3(1.6 + 2.0 * float(i), 0, 0)
+		if IslandWorld.current != null:
+			gp.y = IslandWorld.current.height_at(gp.x, gp.z)
+		holder.global_position = gp
+		holder.rotation.y = PI + 0.7
+	_top = Camera3D.new()
+	main.add_child(_top)
+	_top.global_position = base + Vector3(3.0, 2.0, 7.5)
 	_top.look_at(base + Vector3(3.0, 1.2, 0))
 	_top.current = true
 	main.hud.visible = false

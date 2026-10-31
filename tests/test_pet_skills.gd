@@ -100,8 +100,8 @@ func run_step() -> void:
 		3:
 			# Эффекты умений напрямую: урон, оглушение и угроза, замедление, морок
 			var pet: Pet = pm.active_pet
-			var g := find_mob("golem")
-			check(g != null, "найден каменный страж")
+			var g := find_mob("anathema_chief")
+			check(g != null, "найден вожак анатем")
 			var hp_g := g.hp
 			pet._apply_skill("shadow_fang", g)
 			check(g.hp < hp_g, "«Клык полуночи» ранил: %d → %d" % [hp_g, g.hp])

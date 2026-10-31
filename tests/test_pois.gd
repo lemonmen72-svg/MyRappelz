@@ -1,7 +1,7 @@
 extends "res://tests/test_base.gd"
 ## Постройки острова (IslandPois): здания поставлены с коллизией, центр города свободен (торговец,
 ## точка старта), точки старта рас проходимы и не заняты, по настилу причала можно ходить,
-## над деревнями есть подписи, анимации (мельница, корабль, овцы) работают.
+## над деревнями есть подписи, анимации (мельница, корабль) работают, овец (модели из примитивов) на острове нет.
 ## Отрисовка: неподвижное склеено в меши зон — MeshInstance3D в узле построек немного,
 ## в телах построек мешей нет (кроме анимированных: мельница, маяк).
 
@@ -82,8 +82,9 @@ func run_step() -> void:
 			var ship := pois.find_child("Ship", true, false) as Node3D
 			check(ship != null and ship.global_position.y < 0.0, "корабль на воде")
 			ship_y = ship.global_position.y
-			var flock := pois.find_child("Bodies", true, false) as MultiMeshInstance3D
-			check(flock != null and flock.multimesh.instance_count == 4, "овцы в загоне")
+			# На острове только существа Максима: овец из примитивов в загоне нет
+			check(pois.find_child("Sheep", true, false) == null and pois.find_child("Bodies", true, false) == null,
+				"овец в загоне нет")
 			check(pois.find_child("Flames", true, false) is MultiMeshInstance3D, "огни пещеры и лагерей")
 			check(PoiModels.get_mesh("light_elf_house").get_surface_count() >= 2, "модель дома: несколько поверхностей")
 			# Анимации идут только рядом с камерой: переносим игрока в деревню людей у мельницы
@@ -96,15 +97,9 @@ func run_step() -> void:
 			check(not sails.transform.basis.is_equal_approx(sails_basis), "крылья мельницы вращаются")
 			var ship := pois.find_child("Ship", true, false) as Node3D
 			check(absf(ship.global_position.y - ship_y) < 0.5, "корабль качается рядом с уровнем моря")
-			var flock := pois.find_child("Bodies", true, false) as MultiMeshInstance3D
-			# Поза из аниматора: headless-рендер не хранит трансформы экземпляров MultiMesh
 			var grazing := 0
 			for e in (pois.get_node("PoiAnimator") as PoiAnimator)._items:
-				if int(e["kind"]) != PoiAnimator.GRAZE_MM or not e.has("last"):
-					continue
-				var last: Transform3D = e["last"]
-				var rest: Transform3D = e["xf"]
-				if not last.is_equal_approx(rest):
+				if int(e["kind"]) == PoiAnimator.GRAZE_MM or int(e["kind"]) == PoiAnimator.GRAZE:
 					grazing += 1
-			check(flock != null and grazing == flock.multimesh.instance_count, "овцы пасутся: %d" % grazing)
+			check(grazing == 0, "пасущихся овец нет")
 			ok_done()

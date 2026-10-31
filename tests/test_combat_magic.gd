@@ -22,19 +22,19 @@ func run_step() -> void:
 			check(player._weapon_kind == "staff", "у чернокнижника посох")
 			check(player.skill_id("skill1") == "dark_burst" and player.skill_id("skill2") == "drain",
 				"умения чернокнижника на кнопках")
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан")
 			player.select_target(mob)
 			t0 = frame
 			step = 1
 		1:
 			if not mob_ok(mob):
-				check(shots > 0, "чернокнижник убил кабана магией (выстрелов: %d)" % shots)
+				check(shots > 0, "чернокнижник убил фазана магией (выстрелов: %d)" % shots)
 				check(min_dist > 5.0, "атака с расстояния больше 5 м (мин. %.1f м)" % min_dist)
 				step = 2
 				return
 			if frame - t0 > 60 * 30:
-				fail("чернокнижник не убил кабана за 30 с")
+				fail("чернокнижник не убил фазана за 30 с")
 				return
 			player.hp = player.max_hp
 			var d := player.global_position.distance_to(mob.global_position)
@@ -48,8 +48,8 @@ func run_step() -> void:
 					var pr := first_projectile()
 					check(pr != null and pr.kind == "orb", "магический шар летит к цели")
 		2:
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан для «Взрыва тьмы»")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан для «Взрыва тьмы»")
 			place_far(mob, 8.0)
 			player.select_target(mob)
 			hp_before = mob.hp
@@ -65,8 +65,8 @@ func run_step() -> void:
 			elif frame - t0 > 120:
 				fail("«Взрыв тьмы» не попал")
 		4:
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан для «Похищения жизни»")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан для «Похищения жизни»")
 			place_far(mob, 8.0)
 			player.select_target(mob)
 			calm_mobs()
@@ -93,8 +93,8 @@ func run_step() -> void:
 			check(player.attack_kind == "magic" and player._weapon_kind == "staff", "жрец: магия, посох")
 			check(player.skill_id("skill1") == "holy_bolt" and player.skill_id("skill2") == "heal",
 				"умения жреца на кнопках")
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан для «Луча света»")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан для «Луча света»")
 			place_far(mob, 8.0)
 			player.select_target(mob)
 			hp_before = mob.hp

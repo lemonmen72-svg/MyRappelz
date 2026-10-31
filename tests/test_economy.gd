@@ -3,7 +3,7 @@ extends "res://tests/test_base.gd"
 ## окна торговца и сумки (InventoryWindow: сетка, карточка, кнопки действий), зелье с перезарядкой и счётчиком
 ## на кнопке. Подробно сумка — tests/test_inventory.gd.
 
-## Сколько кабанов можно убить в поисках добычи (шанс клыка 0.6, пустой мешок ~35%).
+## Сколько фазанов можно убить в поисках добычи (шанс пера 0.6, пустой мешок ~35%).
 const MAX_KILLS := 12
 
 var mob: Mob = null
@@ -28,8 +28,8 @@ func run_step() -> void:
 			check(not _shop_visible(), "кнопка «Торговец» скрыта на старте (игрок далеко)")
 			step = 1
 		1:
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан")
 			step = 2
 		2:
 			if mob_ok(mob):
@@ -40,13 +40,13 @@ func run_step() -> void:
 			kills += 1
 			var found := _fresh_drop()
 			if found == null:
-				print("  убит кабан %d: без добычи" % kills)
-				check(kills < MAX_KILLS, "добыча выпала хотя бы за %d кабанов" % MAX_KILLS)
+				print("  убит фазан %d: без добычи" % kills)
+				check(kills < MAX_KILLS, "добыча выпала хотя бы за %d фазанов" % MAX_KILLS)
 				step = 1
 				return
 			drop = found
 			drop_items = drop.items.duplicate()
-			check(not drop_items.is_empty(), "мешочек с добычей: %s (кабан %d)" % [LootDrop.describe(drop_items), kills])
+			check(not drop_items.is_empty(), "мешочек с добычей: %s (фазан %d)" % [LootDrop.describe(drop_items), kills])
 			counts_before = {}
 			for key in drop_items:
 				var id: String = key

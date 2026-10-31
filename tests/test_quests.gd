@@ -189,8 +189,8 @@ func run_step() -> void:
 			check(game.quest_tracked == "kirk_bond_trial" and _tracker_has("0/5"), "трекер: 0/5 %s" % [q.tracker_lines()])
 			# Без питомца победа не считается
 			main.pets.recall()
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан")
 			stand_near(mob, 3.0)
 			mob.take_damage(mob.hp + 5, player)
 			check(q.goal_progress("kirk_bond_trial", 0) == 0, "без питомца победа не в счёт")
@@ -199,8 +199,8 @@ func run_step() -> void:
 			step = 3
 		3:
 			# Пять побед с призванным питомцем
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан для испытания")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан для испытания")
 			stand_near(mob, 3.0)
 			mob.take_damage(mob.hp + 5, player)
 			kills += 1
@@ -435,7 +435,7 @@ func _unit_other_goals() -> void:
 		"name": "Проверка целей", "giver": "merchant", "turn_in": "kirk", "level": 1, "prev": "", "repeatable": true,
 		"desc": "Проверка всех видов целей.", "offer": "Вот дело.", "progress": "Ну как?", "done": "Готово!",
 		"goals": [
-			{"type": "kill", "target": "boar", "n": 2},
+			{"type": "kill", "target": "pheasant", "n": 2},
 			{"type": "collect", "items": ["boar_tusk"], "n": 3, "take": true},
 			{"type": "level", "n": game.level + 1},
 			{"type": "talk", "npc": "kirk", "n": 1},
@@ -458,8 +458,8 @@ func _unit_other_goals() -> void:
 	main.hud.close_window()
 	check(q.accept("test_all"), "задание-проверка взято снова")
 	for i in 2:
-		mob = find_mob("boar")
-		check(mob != null, "кабан для цели kill")
+		mob = find_mob("pheasant")
+		check(mob != null, "фазан для цели kill")
 		stand_near(mob, 3.0)
 		mob.take_damage(mob.hp + 5, player)
 	check(q.goal_progress("test_all", 0) == 2, "kill: 2/2")
