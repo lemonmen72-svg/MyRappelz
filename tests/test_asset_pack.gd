@@ -205,7 +205,7 @@ func _check_files() -> void:
 	check(Assets.is_packed(CharacterModel.MAIN_ASSET), "прежняя героиня — в пакете")
 	var heroes := 0
 	for f in _list("res://assets/characters/", ".glb"):
-		var p := "res://assets/characters/" + f
+		var p: String = "res://assets/characters/" + String(f)
 		var fallback := CharacterModel.FALLBACK_HEROES.values().has(p)
 		check(Assets.is_packed(p) != fallback, "%s — %s" % [f, "в APK" if fallback else "в пакете"])
 		check(Assets.is_packed(p.get_basename() + ".png") == Assets.is_packed(p), "%s: текстура там же" % f)
@@ -214,8 +214,8 @@ func _check_files() -> void:
 			heroes += 1
 	check(heroes >= 23, "в пакете моделей героев: %d" % heroes)
 	for f in _list("res://assets/creatures/", ".glb"):
-		var p := "res://assets/creatures/" + f
-		var stage := f.ends_with("_2.glb") or f.ends_with("_3.glb")
+		var p: String = "res://assets/creatures/" + String(f)
+		var stage: bool = String(f).ends_with("_2.glb") or String(f).ends_with("_3.glb")
 		check(Assets.is_packed(p) == stage and Assets.is_packed(p.get_basename() + ".png") == stage,
 			"%s — %s" % [f, "в пакете" if stage else "в APK"])
 	check(not Assets.is_packed("res://assets/creatures/creatures.json"), "creatures.json — в APK")
