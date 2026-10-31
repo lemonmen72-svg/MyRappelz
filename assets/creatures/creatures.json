@@ -455,6 +455,134 @@
 		},
 		"source": "27501d8c-Meshy_AI_Character_output_2.glb"
 	},
+	"sheep": {
+		"height": 0.95,
+		"length": 1.137,
+		"width": 0.818,
+		"bounds": [
+			[
+				-0.415,
+				0.0,
+				-0.569
+			],
+			[
+				0.403,
+				0.95,
+				0.569
+			]
+		],
+		"walk_speed": 0.246,
+		"run_speed": 0.8,
+		"attack_hit_time": 0.36,
+		"cast_time": 0.42,
+		"clips": {
+			"Idle": {
+				"length": 3.0,
+				"loop": true
+			},
+			"Walk": {
+				"length": 1.0,
+				"loop": true,
+				"speed": 0.246,
+				"stride": 0.16,
+				"duty": 0.65
+			},
+			"Run": {
+				"length": 0.6,
+				"loop": true,
+				"speed": 0.8,
+				"stride": 0.24,
+				"duty": 0.5
+			},
+			"Attack": {
+				"length": 0.75,
+				"loop": false
+			},
+			"Hit": {
+				"length": 0.35,
+				"loop": false
+			},
+			"Death": {
+				"length": 1.1,
+				"loop": false
+			},
+			"Cast": {
+				"length": 0.8,
+				"loop": false
+			}
+		},
+		"head_rest": [
+			0.069,
+			0.563,
+			0.493
+		],
+		"tris": 2997,
+		"verts": 2807,
+		"bones": {
+			"root": "Root",
+			"hips": "Hips",
+			"chest": "Chest",
+			"head": "Head",
+			"spine": [
+				"Hips",
+				"Spine1",
+				"Chest"
+			],
+			"back": [],
+			"neck": [
+				"Neck"
+			],
+			"tail": [
+				"Tail1",
+				"Tail2",
+				"Tail3",
+				"Tail4"
+			],
+			"legs": {
+				"BL": [
+					"LegBL1",
+					"LegBL2",
+					"LegBL3"
+				],
+				"BR": [
+					"LegBR1",
+					"LegBR2",
+					"LegBR3"
+				],
+				"FL": [
+					"LegFL1",
+					"LegFL2",
+					"LegFL3"
+				],
+				"FR": [
+					"LegFR1",
+					"LegFR2",
+					"LegFR3"
+				]
+			},
+			"feet": {
+				"BL": "LegBL3",
+				"BR": "LegBR3",
+				"FL": "LegFL3",
+				"FR": "LegFR3"
+			},
+			"toes": {},
+			"ears": {},
+			"wings": {},
+			"other": [
+				"HeadEnd",
+				"Extra1_1",
+				"Extra1_2",
+				"Extra2_1",
+				"Extra2_2",
+				"Extra2_3",
+				"Extra2_4",
+				"Extra2_5",
+				"Extra2_6"
+			]
+		},
+		"source": "Meshy_AI_Character_output.glb"
+	},
 	"wolf": {
 		"height": 0.95,
 		"length": 1.386,

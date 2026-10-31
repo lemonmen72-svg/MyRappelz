@@ -1,7 +1,8 @@
 extends "res://tests/test_base.gd"
 ## Постройки острова (IslandPois): здания поставлены с коллизией, центр города свободен (торговец,
 ## точка старта), точки старта рас проходимы и не заняты, по настилу причала можно ходить,
-## над деревнями есть подписи, анимации (мельница, корабль) работают, овец (модели из примитивов) на острове нет.
+## над деревнями есть подписи, анимации (мельница, корабль) работают, овец из примитивов на острове нет
+## (в загоне — овцы-модели из файла, PenSheep).
 ## Отрисовка: неподвижное склеено в меши зон — MeshInstance3D в узле построек немного,
 ## в телах построек мешей нет (кроме анимированных: мельница, маяк).
 
@@ -82,9 +83,14 @@ func run_step() -> void:
 			var ship := pois.find_child("Ship", true, false) as Node3D
 			check(ship != null and ship.global_position.y < 0.0, "корабль на воде")
 			ship_y = ship.global_position.y
-			# На острове только существа Максима: овец из примитивов в загоне нет
-			check(pois.find_child("Sheep", true, false) == null and pois.find_child("Bodies", true, false) == null,
-				"овец в загоне нет")
+			# На острове только существа Максима: овец из примитивов в загоне нет; овцы — модель Максима из файла
+			check(pois.find_child("Bodies", true, false) == null, "овец из примитивов в загоне нет")
+			if CreatureAsset.has_asset("sheep"):
+				var sheep := pois.find_child("Sheep", true, false) as PenSheep
+				check(sheep != null and sheep.asset != null, "овцы в загоне — модель из файла")
+				var pen := IslandWorld.v2(w.poi("sheep_pen")["center"])
+				check(Vector2(sheep.position.x, sheep.position.z).distance_to(pen) < float(w.poi("sheep_pen").get("radius", 5.0)),
+					"овца внутри загона")
 			check(pois.find_child("Flames", true, false) is MultiMeshInstance3D, "огни пещеры и лагерей")
 			check(PoiModels.get_mesh("light_elf_house").get_surface_count() >= 2, "модель дома: несколько поверхностей")
 			# Анимации идут только рядом с камерой: переносим игрока в деревню людей у мельницы

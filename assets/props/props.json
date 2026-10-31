@@ -1,0 +1,1707 @@
+{
+	"pages": {
+		"town": {
+			"file": "props_town.png",
+			"size": [
+				2048,
+				2048
+			]
+		},
+		"village": {
+			"file": "props_village.png",
+			"size": [
+				2048,
+				2048
+			]
+		},
+		"elves": {
+			"file": "props_elves.png",
+			"size": [
+				2048,
+				2048
+			]
+		},
+		"port": {
+			"file": "props_port.png",
+			"size": [
+				2048,
+				2048
+			]
+		},
+		"small": {
+			"file": "props_small.png",
+			"size": [
+				2048,
+				2048
+			]
+		},
+		"nature": {
+			"file": "props_nature.png",
+			"size": [
+				2048,
+				1024
+			]
+		}
+	},
+	"props": {
+		"town_house": {
+			"page": "town",
+			"slot": [
+				0,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Hearthwood_Cottage_1031081103_texture.glb",
+			"size": [
+				4.553,
+				6.023,
+				5.0
+			],
+			"min": [
+				-2.277,
+				0.0,
+				-2.5
+			],
+			"max": [
+				2.277,
+				6.023,
+				2.5
+			],
+			"tris": 3488,
+			"verts": 6536,
+			"src_tris": 12458,
+			"open_edges": 820,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.245,
+					4.397,
+					2.384
+				]
+			}
+		},
+		"town_house_b": {
+			"page": "town",
+			"slot": [
+				1024,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Amber_Hearth_Cottage_1031081053_texture.glb",
+			"size": [
+				6.6,
+				5.731,
+				4.748
+			],
+			"min": [
+				-3.3,
+				0.0,
+				-2.374
+			],
+			"max": [
+				3.3,
+				5.731,
+				2.374
+			],
+			"tris": 3494,
+			"verts": 6887,
+			"src_tris": 12330,
+			"open_edges": 617,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					0.239,
+					1.85,
+					2.268
+				]
+			}
+		},
+		"town_hall": {
+			"page": "town",
+			"slot": [
+				0,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Ivybell_Cottage_1031080953_texture.glb",
+			"size": [
+				7.345,
+				9.075,
+				7.195
+			],
+			"min": [
+				-3.672,
+				0.0,
+				-3.598
+			],
+			"max": [
+				3.672,
+				9.075,
+				3.598
+			],
+			"tris": 4490,
+			"verts": 8569,
+			"src_tris": 13534,
+			"open_edges": 531,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.317,
+					0.322,
+					3.435
+				]
+			}
+		},
+		"well": {
+			"page": "town",
+			"slot": [
+				1024,
+				1024,
+				512
+			],
+			"src": "Meshy_AI_Mossy_Village_Well_1031080931_texture.glb",
+			"size": [
+				2.365,
+				2.844,
+				2.032
+			],
+			"min": [
+				-1.182,
+				0.0,
+				-1.016
+			],
+			"max": [
+				1.182,
+				2.844,
+				1.016
+			],
+			"tris": 1471,
+			"verts": 2645,
+			"src_tris": 13730,
+			"open_edges": 154,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					0.007,
+					0.373,
+					0.963
+				]
+			}
+		},
+		"notice_board": {
+			"page": "town",
+			"slot": [
+				1536,
+				1024,
+				512
+			],
+			"src": "Meshy_AI_Village_Notice_Board_1031081021_texture.glb",
+			"size": [
+				2.267,
+				2.109,
+				1.0
+			],
+			"min": [
+				-1.133,
+				0.0,
+				-0.5
+			],
+			"max": [
+				1.133,
+				2.109,
+				0.5
+			],
+			"tris": 988,
+			"verts": 1900,
+			"src_tris": 14630,
+			"open_edges": 105,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.008,
+					1.65,
+					0.482
+				]
+			}
+		},
+		"town_gate": {
+			"page": "town",
+			"slot": [
+				1024,
+				1536,
+				512
+			],
+			"src": "Meshy_AI_Rustic_Garden_Gatehou_1031081004_texture.glb",
+			"size": [
+				5.677,
+				5.997,
+				2.221
+			],
+			"min": [
+				-2.839,
+				0.0,
+				-1.111
+			],
+			"max": [
+				2.839,
+				5.997,
+				1.111
+			],
+			"tris": 1495,
+			"verts": 2770,
+			"src_tris": 14468,
+			"open_edges": 121,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.006,
+					4.72,
+					1.054
+				]
+			}
+		},
+		"merchant_stall": {
+			"page": "town",
+			"slot": [
+				1536,
+				1536,
+				512
+			],
+			"src": "Meshy_AI_Harvest_Market_Stall_1031081031_texture.glb",
+			"size": [
+				2.983,
+				2.525,
+				2.566
+			],
+			"min": [
+				-1.492,
+				0.0,
+				-1.283
+			],
+			"max": [
+				1.492,
+				2.525,
+				1.283
+			],
+			"tris": 1492,
+			"verts": 3069,
+			"src_tris": 14799,
+			"open_edges": 36,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.006,
+					0.074,
+					1.261
+				]
+			}
+		},
+		"human_house_thatch": {
+			"page": "village",
+			"slot": [
+				0,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Thatchwood_Cottage_1031081821_texture.glb",
+			"size": [
+				5.6,
+				5.623,
+				5.197
+			],
+			"min": [
+				-2.8,
+				0.0,
+				-2.599
+			],
+			"max": [
+				2.8,
+				5.623,
+				2.599
+			],
+			"tris": 3496,
+			"verts": 6296,
+			"src_tris": 13182,
+			"open_edges": 1038,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.101,
+					4.311,
+					2.585
+				]
+			}
+		},
+		"human_house_red": {
+			"page": "village",
+			"slot": [
+				1024,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Ivy_Hearth_Cottage_1031081810_texture.glb",
+			"size": [
+				5.386,
+				5.668,
+				5.197
+			],
+			"min": [
+				-2.693,
+				0.0,
+				-2.599
+			],
+			"max": [
+				2.693,
+				5.668,
+				2.599
+			],
+			"tris": 3480,
+			"verts": 7424,
+			"src_tris": 13575,
+			"open_edges": 204,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.375,
+					1.387,
+					2.455
+				]
+			}
+		},
+		"windmill_tower": {
+			"page": "village",
+			"slot": [
+				0,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Whisperwind_Watchtowe_1031081901_texture.glb",
+			"size": [
+				4.791,
+				10.417,
+				5.973
+			],
+			"min": [
+				-2.396,
+				0.0,
+				-2.987
+			],
+			"max": [
+				2.396,
+				10.417,
+				2.987
+			],
+			"tris": 3495,
+			"verts": 6542,
+			"src_tris": 12733,
+			"open_edges": 497,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.009,
+					7.396,
+					2.987
+				]
+			}
+		},
+		"windmill_sails": {
+			"page": "village",
+			"slot": [
+				1024,
+				1024,
+				512
+			],
+			"src": "Meshy_AI_Tattered_Windmill_Sai_1031081909_texture.glb",
+			"size": [
+				9.58,
+				9.492,
+				0.851
+			],
+			"min": [
+				-4.79,
+				-4.746,
+				-0.426
+			],
+			"max": [
+				4.79,
+				4.746,
+				0.426
+			],
+			"tris": 1476,
+			"verts": 2981,
+			"src_tris": 15615,
+			"open_edges": 101,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					0.012,
+					-0.038,
+					0.42
+				]
+			}
+		},
+		"scarecrow": {
+			"page": "village",
+			"slot": [
+				1536,
+				1024,
+				512
+			],
+			"src": "Meshy_AI_Patchwork_Scarecrow_1031081833_texture.glb",
+			"size": [
+				2.196,
+				2.475,
+				0.76
+			],
+			"min": [
+				-1.098,
+				0.0,
+				-0.38
+			],
+			"max": [
+				1.098,
+				2.475,
+				0.38
+			],
+			"tris": 767,
+			"verts": 1455,
+			"src_tris": 14897,
+			"open_edges": 88,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					0.035,
+					2.101,
+					0.368
+				]
+			}
+		},
+		"hay_bale": {
+			"page": "village",
+			"slot": [
+				1024,
+				1536,
+				512
+			],
+			"src": "Meshy_AI_Golden_Hay_Bale_1031081843_texture.glb",
+			"size": [
+				1.033,
+				1.024,
+				1.109
+			],
+			"min": [
+				-0.516,
+				0.0,
+				-0.554
+			],
+			"max": [
+				0.516,
+				1.024,
+				0.554
+			],
+			"tris": 475,
+			"verts": 758,
+			"src_tris": 13168,
+			"open_edges": 133,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					0.021,
+					0.445,
+					0.526
+				]
+			}
+		},
+		"trough": {
+			"page": "village",
+			"slot": [
+				1536,
+				1536,
+				512
+			],
+			"src": "Meshy_AI_Mosswood_Trough_1031081715_texture.glb",
+			"size": [
+				1.693,
+				0.518,
+				0.579
+			],
+			"min": [
+				-0.847,
+				0.0,
+				-0.29
+			],
+			"max": [
+				0.847,
+				0.518,
+				0.29
+			],
+			"tris": 499,
+			"verts": 887,
+			"src_tris": 15147,
+			"open_edges": 3,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.073,
+					0.424,
+					0.279
+				]
+			}
+		},
+		"light_elf_house": {
+			"page": "elves",
+			"slot": [
+				0,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Crystalspire_Manor_1031083030_texture.glb",
+			"size": [
+				6.392,
+				5.617,
+				5.148
+			],
+			"min": [
+				-3.196,
+				0.0,
+				-2.574
+			],
+			"max": [
+				3.196,
+				5.617,
+				2.574
+			],
+			"tris": 4496,
+			"verts": 7212,
+			"src_tris": 2947094,
+			"open_edges": 0,
+			"glow_verts": 202,
+			"markers": {
+				"glow": [
+					-0.06,
+					0.822,
+					0.133
+				],
+				"front": [
+					0.023,
+					0.12,
+					2.462
+				]
+			}
+		},
+		"light_elf_tower": {
+			"page": "elves",
+			"slot": [
+				1024,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Crystal_Spire_Tower_1031082925_texture.glb",
+			"size": [
+				3.968,
+				11.0,
+				4.385
+			],
+			"min": [
+				-1.984,
+				0.0,
+				-2.193
+			],
+			"max": [
+				1.984,
+				11.0,
+				2.193
+			],
+			"tris": 3470,
+			"verts": 6105,
+			"src_tris": 13737,
+			"open_edges": 724,
+			"glow_verts": 13,
+			"markers": {
+				"glow": [
+					0.035,
+					10.472,
+					-0.062
+				],
+				"front": [
+					-0.03,
+					0.062,
+					2.043
+				]
+			}
+		},
+		"dark_elf_house": {
+			"page": "elves",
+			"slot": [
+				0,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Violet_Gloom_Manor_1031082549_texture.glb",
+			"size": [
+				5.319,
+				5.882,
+				5.4
+			],
+			"min": [
+				-2.659,
+				0.0,
+				-2.7
+			],
+			"max": [
+				2.659,
+				5.882,
+				2.7
+			],
+			"tris": 4460,
+			"verts": 8450,
+			"src_tris": 25363,
+			"open_edges": 1794,
+			"glow_verts": 187,
+			"markers": {
+				"glow": [
+					-0.269,
+					3.001,
+					-0.169
+				],
+				"front": [
+					0.047,
+					0.159,
+					2.551
+				]
+			}
+		},
+		"dark_elf_tower": {
+			"page": "elves",
+			"slot": [
+				1024,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Amethyst_Spire_1031082521_texture.glb",
+			"size": [
+				6.328,
+				15.811,
+				7.0
+			],
+			"min": [
+				-3.164,
+				0.0,
+				-3.5
+			],
+			"max": [
+				3.164,
+				15.811,
+				3.5
+			],
+			"tris": 3477,
+			"verts": 6681,
+			"src_tris": 13521,
+			"open_edges": 807,
+			"glow_verts": 156,
+			"markers": {
+				"glow": [
+					-0.072,
+					7.193,
+					0.265
+				],
+				"front": [
+					0.035,
+					0.302,
+					3.286
+				]
+			}
+		},
+		"lighthouse": {
+			"page": "port",
+			"slot": [
+				0,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Crimson_Beacon_1031083527_texture.glb",
+			"size": [
+				5.041,
+				13.979,
+				5.579
+			],
+			"min": [
+				-2.521,
+				0.0,
+				-2.789
+			],
+			"max": [
+				2.521,
+				13.979,
+				2.789
+			],
+			"tris": 3443,
+			"verts": 6467,
+			"src_tris": 13583,
+			"open_edges": 614,
+			"glow_verts": 249,
+			"markers": {
+				"glow": [
+					0.024,
+					11.033,
+					0.03
+				],
+				"front": [
+					-0.042,
+					0.172,
+					2.643
+				],
+				"lamp": [
+					0.0,
+					10.903,
+					0.0
+				]
+			}
+		},
+		"ship": {
+			"page": "port",
+			"slot": [
+				1024,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Sunlit_Voyager_1031083358_texture.glb",
+			"size": [
+				6.49,
+				9.988,
+				9.537
+			],
+			"min": [
+				-3.245,
+				-0.9,
+				-4.769
+			],
+			"max": [
+				3.245,
+				9.088,
+				4.769
+			],
+			"tris": 4470,
+			"verts": 8467,
+			"src_tris": 29274,
+			"open_edges": 632,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					0.012,
+					2.798,
+					4.482
+				]
+			}
+		},
+		"cave_entrance": {
+			"page": "port",
+			"slot": [
+				0,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Overgrown_Mine_Entran_1031083228_texture.glb",
+			"size": [
+				9.137,
+				6.185,
+				7.995
+			],
+			"min": [
+				-4.568,
+				0.0,
+				-3.998
+			],
+			"max": [
+				4.568,
+				6.185,
+				3.998
+			],
+			"tris": 3452,
+			"verts": 5616,
+			"src_tris": 13204,
+			"open_edges": 1051,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-2.254,
+					0.124,
+					3.838
+				]
+			}
+		},
+		"tent_bell": {
+			"page": "port",
+			"slot": [
+				1024,
+				1024,
+				512
+			],
+			"src": "Meshy_AI_Desert_Pavilion_1031083250_texture.glb",
+			"size": [
+				4.4,
+				3.274,
+				3.682
+			],
+			"min": [
+				-2.2,
+				0.0,
+				-1.841
+			],
+			"max": [
+				2.2,
+				3.274,
+				1.841
+			],
+			"tris": 1495,
+			"verts": 2481,
+			"src_tris": 15201,
+			"open_edges": 37,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					0.171,
+					0.097,
+					1.751
+				]
+			}
+		},
+		"tent_ridge": {
+			"page": "port",
+			"slot": [
+				1536,
+				1024,
+				512
+			],
+			"src": "Meshy_AI_Wayfarer_s_Green_Pavi_1031083238_texture.glb",
+			"size": [
+				3.198,
+				2.319,
+				3.415
+			],
+			"min": [
+				-1.599,
+				0.0,
+				-1.707
+			],
+			"max": [
+				1.599,
+				2.319,
+				1.707
+			],
+			"tris": 1484,
+			"verts": 2544,
+			"src_tris": 15123,
+			"open_edges": 189,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.098,
+					0.066,
+					1.668
+				]
+			}
+		},
+		"campfire": {
+			"page": "port",
+			"slot": [
+				1024,
+				1536,
+				512
+			],
+			"src": "Meshy_AI_Stone_Circle_Campfire_1031083258_texture.glb",
+			"size": [
+				1.686,
+				0.669,
+				1.681
+			],
+			"min": [
+				-0.843,
+				0.0,
+				-0.84
+			],
+			"max": [
+				0.843,
+				0.669,
+				0.84
+			],
+			"tris": 780,
+			"verts": 1495,
+			"src_tris": 14426,
+			"open_edges": 35,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.002,
+					0.094,
+					0.795
+				]
+			}
+		},
+		"dock_crates": {
+			"page": "port",
+			"slot": [
+				1536,
+				1536,
+				512
+			],
+			"src": "Meshy_AI_Dockside_Stash_1031083455_texture.glb",
+			"size": [
+				1.745,
+				1.52,
+				1.105
+			],
+			"min": [
+				-0.873,
+				0.0,
+				-0.552
+			],
+			"max": [
+				0.873,
+				1.52,
+				0.552
+			],
+			"tris": 997,
+			"verts": 2169,
+			"src_tris": 15404,
+			"open_edges": 296,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.593,
+					0.499,
+					0.526
+				]
+			}
+		},
+		"lantern_town": {
+			"page": "small",
+			"slot": [
+				0,
+				0,
+				512
+			],
+			"src": "Meshy_AI_Rustic_Lantern_Post_1031080844_texture.glb",
+			"size": [
+				1.054,
+				3.398,
+				0.47
+			],
+			"min": [
+				-0.527,
+				0.0,
+				-0.235
+			],
+			"max": [
+				0.527,
+				3.398,
+				0.235
+			],
+			"tris": 593,
+			"verts": 1173,
+			"src_tris": 14050,
+			"open_edges": 154,
+			"glow_verts": 21,
+			"markers": {
+				"glow": [
+					-0.481,
+					2.632,
+					0.002
+				],
+				"front": [
+					0.026,
+					1.446,
+					0.224
+				],
+				"lamp": [
+					-0.411,
+					2.532,
+					0.0
+				]
+			}
+		},
+		"lantern_elf": {
+			"page": "small",
+			"slot": [
+				512,
+				0,
+				512
+			],
+			"src": "Meshy_AI_Moonlit_Arcana_Lanter_1031083006_texture.glb",
+			"size": [
+				1.678,
+				3.388,
+				0.833
+			],
+			"min": [
+				-0.839,
+				0.0,
+				-0.416
+			],
+			"max": [
+				0.839,
+				3.388,
+				0.416
+			],
+			"tris": 757,
+			"verts": 1476,
+			"src_tris": 15937,
+			"open_edges": 5,
+			"glow_verts": 95,
+			"markers": {
+				"glow": [
+					-0.503,
+					2.156,
+					0.028
+				],
+				"front": [
+					-0.098,
+					0.264,
+					0.394
+				],
+				"lamp": [
+					-0.554,
+					2.1,
+					0.0
+				]
+			}
+		},
+		"weapon_rack": {
+			"page": "small",
+			"slot": [
+				1024,
+				0,
+				512
+			],
+			"src": "Meshy_AI_Wooden_Weapon_Rack_1031081043_texture.glb",
+			"size": [
+				1.756,
+				1.696,
+				0.825
+			],
+			"min": [
+				-0.878,
+				0.0,
+				-0.412
+			],
+			"max": [
+				0.878,
+				1.696,
+				0.412
+			],
+			"tris": 798,
+			"verts": 1430,
+			"src_tris": 13718,
+			"open_edges": 203,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					0.05,
+					0.034,
+					0.401
+				]
+			}
+		},
+		"training_dummy": {
+			"page": "small",
+			"slot": [
+				1536,
+				0,
+				512
+			],
+			"src": "Meshy_AI_Target_Scarecrow_1031080915_texture.glb",
+			"size": [
+				1.575,
+				2.2,
+				0.585
+			],
+			"min": [
+				-0.788,
+				0.0,
+				-0.293
+			],
+			"max": [
+				0.788,
+				2.2,
+				0.293
+			],
+			"tris": 770,
+			"verts": 1651,
+			"src_tris": 14394,
+			"open_edges": 188,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					0.02,
+					1.212,
+					0.274
+				]
+			}
+		},
+		"bollard": {
+			"page": "small",
+			"slot": [
+				0,
+				512,
+				512
+			],
+			"src": "Meshy_AI_Weathered_Mooring_Pos_1031083444_texture.glb",
+			"size": [
+				0.779,
+				0.724,
+				0.752
+			],
+			"min": [
+				-0.389,
+				0.0,
+				-0.376
+			],
+			"max": [
+				0.389,
+				0.724,
+				0.376
+			],
+			"tris": 857,
+			"verts": 1986,
+			"src_tris": 15281,
+			"open_edges": 54,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.035,
+					0.035,
+					0.36
+				]
+			}
+		},
+		"crate": {
+			"page": "small",
+			"slot": [
+				512,
+				512,
+				512
+			],
+			"src": "Meshy_AI_Ironbound_Adventurer__1031080941_texture.glb",
+			"size": [
+				0.813,
+				0.803,
+				0.807
+			],
+			"min": [
+				-0.406,
+				0.0,
+				-0.403
+			],
+			"max": [
+				0.406,
+				0.803,
+				0.403
+			],
+			"tris": 396,
+			"verts": 784,
+			"src_tris": 14333,
+			"open_edges": 52,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.003,
+					0.476,
+					0.392
+				]
+			}
+		},
+		"barrel": {
+			"page": "small",
+			"slot": [
+				1024,
+				512,
+				512
+			],
+			"src": "Meshy_AI_Weathered_Barrel_1031081011_texture.glb",
+			"size": [
+				0.834,
+				0.855,
+				0.846
+			],
+			"min": [
+				-0.417,
+				0.0,
+				-0.423
+			],
+			"max": [
+				0.417,
+				0.855,
+				0.423
+			],
+			"tris": 499,
+			"verts": 737,
+			"src_tris": 15369,
+			"open_edges": 3,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					0.038,
+					0.431,
+					0.397
+				]
+			}
+		},
+		"brazier_dark": {
+			"page": "small",
+			"slot": [
+				1536,
+				512,
+				512
+			],
+			"src": "Meshy_AI_Violet_Witchflame_Cau_1031082455_texture.glb",
+			"size": [
+				1.319,
+				1.135,
+				1.327
+			],
+			"min": [
+				-0.659,
+				0.0,
+				-0.664
+			],
+			"max": [
+				0.659,
+				1.135,
+				0.664
+			],
+			"tris": 987,
+			"verts": 1852,
+			"src_tris": 14798,
+			"open_edges": 86,
+			"glow_verts": 160,
+			"markers": {
+				"glow": [
+					0.01,
+					0.775,
+					0.078
+				],
+				"front": [
+					-0.009,
+					0.219,
+					0.633
+				]
+			}
+		},
+		"dark_spire": {
+			"page": "small",
+			"slot": [
+				0,
+				1024,
+				512
+			],
+			"src": "Meshy_AI_Voidspire_1031082506_texture.glb",
+			"size": [
+				2.591,
+				5.535,
+				2.117
+			],
+			"min": [
+				-1.296,
+				0.0,
+				-1.059
+			],
+			"max": [
+				1.296,
+				5.535,
+				1.059
+			],
+			"tris": 991,
+			"verts": 1819,
+			"src_tris": 15301,
+			"open_edges": 7,
+			"glow_verts": 185,
+			"markers": {
+				"glow": [
+					0.095,
+					2.922,
+					0.046
+				],
+				"front": [
+					0.611,
+					0.068,
+					0.995
+				]
+			}
+		},
+		"crystal_blue": {
+			"page": "small",
+			"slot": [
+				512,
+				1024,
+				512
+			],
+			"src": "Meshy_AI_Crystal_Moss_Haven_1031082934_texture.glb",
+			"size": [
+				1.897,
+				1.734,
+				1.711
+			],
+			"min": [
+				-0.949,
+				0.0,
+				-0.855
+			],
+			"max": [
+				0.949,
+				1.734,
+				0.855
+			],
+			"tris": 896,
+			"verts": 1624,
+			"src_tris": 14471,
+			"open_edges": 203,
+			"glow_verts": 678,
+			"markers": {
+				"glow": [
+					-0.002,
+					0.917,
+					0.008
+				],
+				"front": [
+					-0.008,
+					0.157,
+					0.799
+				]
+			}
+		},
+		"crystal_gold": {
+			"page": "small",
+			"slot": [
+				1024,
+				1024,
+				512
+			],
+			"src": "Meshy_AI_Golden_Crystal_Grove_1031082908_texture.glb",
+			"size": [
+				1.7,
+				1.681,
+				1.319
+			],
+			"min": [
+				-0.85,
+				0.0,
+				-0.659
+			],
+			"max": [
+				0.85,
+				1.681,
+				0.659
+			],
+			"tris": 899,
+			"verts": 1680,
+			"src_tris": 15546,
+			"open_edges": 23,
+			"glow_verts": 569,
+			"markers": {
+				"glow": [
+					0.005,
+					0.899,
+					0.022
+				],
+				"front": [
+					-0.041,
+					0.147,
+					0.618
+				]
+			}
+		},
+		"crystal_purple": {
+			"page": "small",
+			"slot": [
+				1536,
+				1024,
+				512
+			],
+			"src": "Meshy_AI_Amethyst_Grove_1031082530_texture.glb",
+			"size": [
+				1.999,
+				1.964,
+				1.871
+			],
+			"min": [
+				-0.999,
+				0.0,
+				-0.935
+			],
+			"max": [
+				0.999,
+				1.964,
+				0.935
+			],
+			"tris": 894,
+			"verts": 1696,
+			"src_tris": 13008,
+			"open_edges": 209,
+			"glow_verts": 876,
+			"markers": {
+				"glow": [
+					0.001,
+					1.048,
+					0.032
+				],
+				"front": [
+					-0.055,
+					0.16,
+					0.892
+				]
+			}
+		},
+		"tree_oak": {
+			"page": "nature",
+			"slot": [
+				0,
+				0,
+				512
+			],
+			"src": "Meshy_AI_Whispering_Grove_1031083746_texture.glb",
+			"size": [
+				5.997,
+				5.871,
+				3.889
+			],
+			"min": [
+				-2.998,
+				0.0,
+				-1.945
+			],
+			"max": [
+				2.998,
+				5.871,
+				1.945
+			],
+			"tris": 1083,
+			"verts": 2287,
+			"src_tris": 9919,
+			"open_edges": 0,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					0.73,
+					3.87,
+					1.913
+				]
+			}
+		},
+		"tree_pine": {
+			"page": "nature",
+			"slot": [
+				512,
+				0,
+				512
+			],
+			"src": "Meshy_AI_Whispering_Evergreen_1031083735_texture.glb",
+			"size": [
+				4.73,
+				6.975,
+				4.112
+			],
+			"min": [
+				-2.365,
+				0.0,
+				-2.056
+			],
+			"max": [
+				2.365,
+				6.975,
+				2.056
+			],
+			"tris": 790,
+			"verts": 1608,
+			"src_tris": 10339,
+			"open_edges": 74,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.412,
+					3.121,
+					1.938
+				]
+			}
+		},
+		"tree_elf": {
+			"page": "nature",
+			"slot": [
+				1024,
+				0,
+				512
+			],
+			"src": "Meshy_AI_Blushbloom_Tree_1031083836_texture.glb",
+			"size": [
+				5.413,
+				5.849,
+				3.309
+			],
+			"min": [
+				-2.706,
+				0.0,
+				-1.655
+			],
+			"max": [
+				2.706,
+				5.849,
+				1.655
+			],
+			"tris": 1085,
+			"verts": 2219,
+			"src_tris": 9500,
+			"open_edges": 111,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.12,
+					3.839,
+					1.566
+				]
+			}
+		},
+		"tree_dead": {
+			"page": "nature",
+			"slot": [
+				1536,
+				0,
+				512
+			],
+			"src": "Meshy_AI_Twisted_Elder_1031083755_texture.glb",
+			"size": [
+				4.745,
+				5.043,
+				3.899
+			],
+			"min": [
+				-2.372,
+				0.0,
+				-1.949
+			],
+			"max": [
+				2.372,
+				5.043,
+				1.949
+			],
+			"tris": 1074,
+			"verts": 2334,
+			"src_tris": 10166,
+			"open_edges": 60,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.106,
+					0.147,
+					1.852
+				]
+			}
+		},
+		"bush": {
+			"page": "nature",
+			"slot": [
+				0,
+				512,
+				512
+			],
+			"src": "Meshy_AI_Verdant_Whimsy_1031083806_texture.glb",
+			"size": [
+				1.607,
+				1.478,
+				1.398
+			],
+			"min": [
+				-0.804,
+				0.0,
+				-0.699
+			],
+			"max": [
+				0.804,
+				1.478,
+				0.699
+			],
+			"tris": 448,
+			"verts": 935,
+			"src_tris": 9719,
+			"open_edges": 0,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					0.117,
+					0.651,
+					0.686
+				]
+			}
+		},
+		"rock": {
+			"page": "nature",
+			"slot": [
+				512,
+				512,
+				512
+			],
+			"src": "Meshy_AI_Mossy_Boulder_1031083829_texture.glb",
+			"size": [
+				1.887,
+				1.346,
+				1.548
+			],
+			"min": [
+				-0.943,
+				0.0,
+				-0.774
+			],
+			"max": [
+				0.943,
+				1.346,
+				0.774
+			],
+			"tris": 397,
+			"verts": 686,
+			"src_tris": 8494,
+			"open_edges": 54,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.161,
+					0.106,
+					0.724
+				]
+			}
+		},
+		"rock_dark": {
+			"page": "nature",
+			"slot": [
+				1024,
+				512,
+				512
+			],
+			"src": "Meshy_AI_Shadowcrag_Bloom_1031083820_texture.glb",
+			"size": [
+				1.656,
+				1.66,
+				1.7
+			],
+			"min": [
+				-0.828,
+				0.0,
+				-0.85
+			],
+			"max": [
+				0.828,
+				1.66,
+				0.85
+			],
+			"tris": 447,
+			"verts": 848,
+			"src_tris": 9733,
+			"open_edges": 1,
+			"glow_verts": 0,
+			"markers": {
+				"front": [
+					-0.14,
+					0.017,
+					0.818
+				]
+			}
+		}
+	}
+}

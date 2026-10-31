@@ -539,6 +539,87 @@ func run_step() -> void:
 			step = 562
 		562:
 			shot("57_anathema_world")
+			# Объекты локации из файлов (модели Meshy, PropAsset) — кадры 59–67, «Высокое», HUD скрыт
+			main.hud.visible = false
+			_top = Camera3D.new()
+			main.add_child(_top)
+			_top.current = true
+			# Город крупно: ратуша (север площади), дома, фонари, колодец
+			_look_from(Vector2(0.0, 6.0), 3.0, Vector2(0.0, -16.0), 4.0)
+			wait = 40
+			step = 600
+		600:
+			shot("59_town_close")
+			_look_from(Vector2(16.0, 18.0), 11.0, Vector2(0.0, 0.0), 1.0)
+			wait = 30
+			step = 601
+		601:
+			shot("60_town_wide")
+			# Деревня людей и мельница
+			var vc := _poi_c("human_village")
+			var wm := _poi_c("windmill")
+			var mid := vc.lerp(wm, 0.5)
+			var side := Vector2(-(wm - vc).y, (wm - vc).x).normalized()
+			_look_from(mid + side * 22.0, 9.0, mid, 3.0)
+			wait = 40
+			step = 602
+		602:
+			shot("61_human_village_mill")
+			_look_from(_poi_c("light_elf_village") + Vector2(4.0, 19.0), 7.0, _poi_c("light_elf_village"), 3.0)
+			wait = 40
+			step = 603
+		603:
+			shot("62_light_elf_village")
+			_look_from(_poi_c("dark_elf_village") + Vector2(-4.0, 21.0), 8.0, _poi_c("dark_elf_village"), 4.0)
+			wait = 40
+			step = 604
+		604:
+			shot("63_dark_elf_village")
+			# Порт: маяк, причал, склад, груз
+			var lc := _poi_c("lighthouse")
+			var pc := _poi_c("pier")
+			_look_from(lc.lerp(pc, 0.5) + Vector2(-6.0, -16.0), 8.0, lc.lerp(pc, 0.5), 4.0)
+			wait = 40
+			step = 605
+		605:
+			shot("64_port_lighthouse")
+			# Корабль на воде (качается)
+			var ship := IslandWorld.current.get_node("Pois").find_child("Ship", true, false) as Node3D
+			if ship != null:
+				var sp := ship.global_position
+				_top.global_position = sp + Vector3(9.0, 5.0, 10.0)
+				_top.look_at(sp + Vector3(0, 3.0, 0))
+			wait = 40
+			step = 606
+		606:
+			shot("65_ship")
+			# Пещера: вход в скале (смотрит вниз по склону)
+			var cave := IslandWorld.current.get_node("Pois").find_child("Cave", true, false) as Node3D
+			if cave != null:
+				var fwd := cave.global_transform.basis.z
+				_top.global_position = cave.global_position + fwd * 13.0 + Vector3(3.0, 5.0, 0)
+				_top.look_at(cave.global_position + Vector3(0, 2.5, 0))
+			wait = 40
+			step = 607
+		607:
+			shot("66_cave")
+			# Лагерь: шатры и костёр
+			var tc := _poi_c("tent_w1")
+			_look_from(tc + Vector2(7.0, 7.0), 4.5, tc, 0.8)
+			wait = 40
+			step = 608
+		608:
+			shot("67_camp")
+			# Лес: деревья, кусты и камни из файлов (центр острова и роща светлых эльфов)
+			var fp := _forest_spot(Vector2(-30.0, -30.0), 30.0)
+			_look_from(fp + Vector2(10.0, 12.0), 4.0, fp, 2.0)
+			wait = 40
+			step = 609
+		609:
+			shot("68_forest")
+			_top.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
 			ok_done()
 
 
@@ -551,6 +632,14 @@ func _kirk_view() -> void:
 	main.cam_yaw = atan2(to_c.x, to_c.z) + 0.35
 	main.cam_pitch = 0.33
 	main.cam_dist = 6.5
+
+
+## Центр POI из конфига острова (x, z).
+func _poi_c(id: String) -> Vector2:
+	var w := IslandWorld.current
+	if w == null or w.poi(id).is_empty():
+		return Vector2.ZERO
+	return IslandWorld.v2(w.poi(id)["center"])
 
 
 ## Камера _top из точки from (x, z) на высоте h над землёй смотрит на точку to на высоте th над землёй.

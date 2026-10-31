@@ -43,6 +43,9 @@ const DEFAULTS := {
 		"attack_hit_time": 0.35},
 	"wolf": {"height": 0.95, "length": 1.4, "width": 0.35, "walk_speed": 0.65, "run_speed": 4.2,
 		"attack_hit_time": 0.36},
+	# Овца в загоне деревни людей (PenSheep, не зверь для боя): шаг медленный
+	"sheep": {"height": 0.95, "length": 1.14, "width": 0.82, "walk_speed": 0.25, "run_speed": 0.8,
+		"attack_hit_time": 0.25},
 	# Кентавр (стиль «centaur»): высота — до наконечника копья
 	"centaur": {"height": 2.25, "length": 1.66, "width": 0.8, "walk_speed": 0.85, "run_speed": 3.92,
 		"attack_hit_time": 0.42},

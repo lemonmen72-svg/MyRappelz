@@ -134,10 +134,25 @@
   Тест `tests/test_textures.gd`, кадры 12–14 и 39–43 в `tests/shots.gd`.
 - Мир (тренировочный остров): `world/training_island.json` (конфиг: река, дороги, точки интереса, зоны, спауны),
   `island_world.gd` (`IslandWorld`: рельеф, коллизия, проходимость, мосты, запросы), `island_water.gd`, `island_pois.gd`,
-  `island_pois.gd` + `poi_models.gd` (`PoiModels`: модели-заглушки построек, одна функция на тип) + `poi_anim.gd`,
+  `island_pois.gd` + `poi_models.gd` (`PoiModels`: запасные модели построек из примитивов, одна функция на тип) + `poi_anim.gd`,
   `toon.gdshader`, `crystal.gdshader`, `island_vegetation.gd` (+ `island_grass`/`island_flower`/`veg_outline` шейдеры), `island_shore.gd`,
   `water.gdshader`, `island_terrain.gdshader`, `tools/extract_island_masks.py`, референсы в `reference/`.
   Подробно — `world/README.md`. Тесты `tests/test_island.gd`, `tests/test_vegetation.gd`, `tests/test_pois.gd`.
+- Объекты локации из файлов (модели Meshy от Максима по промтам `tools/Промты_объекты_локации.docx`): `assets/props/<id>.glb`
+  (упрощённый меш, своя развёртка, UV сразу в атласе), атласы `props_<страница>.png` (2048×2048, клетки 1024 — дома и башни,
+  512 — мелочи и природа; страницы town / village / elves / port / small / nature), `props.json` (размеры, страница, точки:
+  `lamp` — фонарь, `glow` — центр свечения, `front` — ступица мельницы). `prop_asset.gd` (`PropAsset`: `KINDS` — какую
+  процедурную модель PoiModels заменяет id, меш на все экземпляры один, материал страницы `prop.gdshader` — атлас + cel,
+  свечение из альфы цвета вершин, один сэмплер, детальные маски WorldTextures не кладутся). `IslandPois._put` ставит модель
+  из файла, если она есть (иначе процедурную); экземпляры склеиваются в меши зон одной поверхностью на страницу; коллизия
+  построек — по габаритам модели (`_model_box`). Деревья, кусты, камни (`IslandVegetation`, группы `G_PTREE`/`G_PSMALL`) —
+  так же по участкам; колючие кусты тёмных земель, камешки у дорог, кристаллы, ограды, мост, причал, пламя, флажки,
+  колосья — процедурные. Овцы в загоне — `pen_sheep.gd` (`PenSheep`, модель `assets/creatures/sheep.glb`, бродят и пасутся).
+  Скрипт `tools/prepare_props.py` (numpy, Pillow, scipy, meshoptimizer, xatlas): упрощение по форме, развёртка xatlas,
+  запекание цвета с исходной модели, масштаб под рамку `fit`, основание y = 0, фасад +Z (`rot`).
+  Новый объект: GLB в папку исходников, строка в `PROPS` скрипта (src — часть имени файла, fit, tris, tex, rot, page),
+  `python3 -I tools/prepare_props.py --src <папка Meshy>` (пересобирает всё; `--check`, `--preview <папка>`), затем запись
+  в `PropAsset.KINDS` и место в `IslandPois`. Тест `tests/test_props.gd`, кадры 59–68 в `tests/shots.gd`.
 - Качество и постобработка: `quality.gd` (`Quality`: Low/Medium/High в `user://settings.cfg`), `postfx.gd` + `postfx.gdshader`,
   `settings_menu.gd` (окно «Настройки» в HUD: размер интерфейса, качество, предел кадров).
 - Предметы и торговля: `data_items.gd` (`ItemData`: в т. ч. оружие Наёмника; редкость, тип, стопки, значки), `economy.gd`
