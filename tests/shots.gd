@@ -939,8 +939,8 @@ func run_step() -> void:
 				bp.bond_hp_changed()
 			main.player.use_skill("skill1")
 			wait = 14
-			step = 820
-		820:
+			step = 830
+		830:
 			shot("100_skills_pet_jobs")
 			# Колдун (кадр 101): «Слияние душ» — питомец внутри героя, сияние цвета питомца; «Гнев стаи»
 			game.admin_set_look("human", "m")
@@ -951,8 +951,8 @@ func run_step() -> void:
 			main.player.set_toggle("soul_merge", true)
 			main.player.use_skill("skill1")
 			wait = 14
-			step = 821
-		821:
+			step = 831
+		831:
 			shot("101_skills_pet_merge")
 			main.player.set_toggle("soul_merge", false)
 			# Умения Неофита (кадр 96): «Пылающая земля» и «Грозовой круг» на земле у зверя, «Сгусток пламени» летит,
@@ -962,14 +962,14 @@ func run_step() -> void:
 			main.player.use_skill("skill1")
 			main.player.use_skill("skill2")
 			wait = 50
-			step = 822
-		822:
+			step = 832
+		832:
 			main.player.skill_cd.clear()
 			main.player.attack_cd = 0.0
 			main.player.use_skill("skill3")
 			wait = 8
-			step = 823
-		823:
+			step = 833
+		833:
 			shot("96_skills_casters")
 			for z in get_tree().get_nodes_in_group("skill_zones"):
 				z.queue_free()
@@ -980,8 +980,8 @@ func run_step() -> void:
 			main.player.use_skill("skill1")
 			main.player.use_skill("skill3")
 			wait = 8
-			step = 824
-		824:
+			step = 834
+		834:
 			shot("97_skills_guard")
 			ok_done()
 
