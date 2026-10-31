@@ -109,7 +109,7 @@ func run_step() -> void:
 			check(main.hud._pet_box.visible, "панель питомца видна")
 			main._on_action("pets_window")
 			check(main.hud.is_window_open(), "окно питомцев открыто")
-			check(_window_text(pm).contains("Базовый"), "в окне питомцев видна редкость «Базовый»")
+			check(_window_text(pm).contains("Обычный"), "в окне питомцев видна редкость волка «Обычный»")
 			press(pm, "recall_0")
 			check(pm.active_pet == null and game.active_pet == -1, "питомец отозван")
 			check(not main.hud._pet_box.visible, "панель питомца скрыта после отзыва")
