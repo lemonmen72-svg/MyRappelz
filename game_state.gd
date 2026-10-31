@@ -72,6 +72,9 @@ var active_pet := -1
 var quests_active: Dictionary = {}
 var quests_done: Dictionary = {}
 var quest_tracked := ""
+## Склад у Кладовщика Тобина (Economy.deposit / withdraw, окно — InventoryWindow "storage"): те же ячейки и стопки,
+## что в сумке, Inventory.CAPACITY ячеек. В сохранении — ключ "storage" {"items", "cells"}; у старых сохранений пуст.
+var storage := Inventory.new()
 ## Множитель опыта за зверей (админ-панель, вкладка «Опыт»: 1, 2, 5, 10, 20, 50): герою и питомцу
 ## (main._on_mob_gone, PetManager.on_mob_killed). Хранится в сохранении; без админ-панели — всегда 1.
 var xp_mult := 1
@@ -113,6 +116,7 @@ func reset() -> void:
 	quests_active = {}
 	quests_done = {}
 	quest_tracked = ""
+	storage.from_dict({})
 	xp_mult = 1
 
 
@@ -371,7 +375,9 @@ func to_dict() -> Dictionary:
 		"hero": hero.duplicate(true),
 		"pets": pets.duplicate(true),
 		"active_pet": active_pet,
-		"quests": {"active": quests_active.duplicate(true), "done": quests_done.duplicate(), "tracked": quest_tracked},
+		"quests": {"active": quests_active.duplicate(true), "done": quests_done.duplicate(), "tracked": quest_tracked,
+			"chain": QuestData.CHAIN_VERSION},
+		"storage": {"items": storage.to_dict(), "cells": storage.layout_to_array()},
 		"xp_mult": xp_mult,
 	}
 
@@ -457,8 +463,19 @@ func from_dict(d: Dictionary) -> void:
 	active_pet = int(d.get("active_pet", -1))
 	if active_pet >= pets.size():
 		active_pet = -1
-	# Задания (старые сохранения — без заданий)
-	_load_quests(d.get("quests", {}))
+	# Задания (старые сохранения — без заданий); сохранения до цепочки острова — перевод (migrate_quest_chain)
+	var qsrc: Variant = d.get("quests", {})
+	_load_quests(qsrc)
+	var chain := int((qsrc as Dictionary).get("chain", 0)) if qsrc is Dictionary else 0
+	if chain < QuestData.CHAIN_VERSION:
+		migrate_quest_chain()
+	# Склад (старые сохранения — пустой)
+	var st: Variant = d.get("storage", {})
+	if st is Dictionary:
+		var sd: Dictionary = st
+		var si: Variant = sd.get("items", {})
+		storage.from_dict(migrate_items(si as Dictionary) if si is Dictionary else {})
+		storage.load_layout(sd.get("cells", []))
 	# Оружие (переведённые герои — стартовый набор Наёмника, см. ensure_hero). Вторая рука — "offhand"
 	# (раньше "shield"); прежняя пара клинков одним предметом (ItemData.PAIRED) — тот же клинок в обеих руках
 	var w := "" if converted else String(d.get("weapon", ""))
@@ -520,6 +537,30 @@ func _load_quests(src: Variant) -> void:
 	var tr := String(d.get("tracked", ""))
 	if quests_active.has(tr):
 		quest_tracked = tr
+
+
+## Сохранение до цепочки заданий острова (староста → мудрец → охотница → профессия): профессия уже выбрана
+## (или задание на неё сдано) — всё до профессии (QuestData.PRE_JOB) и само задание на профессию считаются сданными:
+## ветеран не проходит старосту заново, задания после профессии и вожаки открыты; Бродяга с ELDER_SKIP_LEVEL ур. —
+## сдана цепочка старосты (начинает у мудреца). Прежнее «Знакомство с городом» в QuestData больше нет — при загрузке
+## оно просто отбрасывается (_load_quests).
+func migrate_quest_chain() -> void:
+	var list: Array = []
+	if job_changed or int(quests_done.get(QuestData.JOB_QUEST, 0)) > 0:
+		list = QuestData.PRE_JOB.duplicate()
+		list.append(QuestData.JOB_QUEST)
+	elif level >= QuestData.ELDER_SKIP_LEVEL:
+		list = QuestData.ELDER_CHAIN.duplicate()
+	for k in list:
+		var id := String(k)
+		quests_active.erase(id)
+		if int(quests_done.get(id, 0)) <= 0:
+			quests_done[id] = 1
+	if not quests_active.has(quest_tracked):
+		quest_tracked = ""
+		for k in quests_active:
+			quest_tracked = String(k)
+			break
 
 
 ## Изученные умения из сохранения: только известные виду, уровни — целые (JSON хранит числа как float).

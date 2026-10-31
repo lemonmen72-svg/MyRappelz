@@ -44,8 +44,8 @@ const MAX_LEVEL := 40
 const NOTE := Color(1.0, 0.86, 0.55)
 const MUTED := Color(0.75, 0.78, 0.9)
 const INFO := Color(0.85, 0.88, 0.95)
-## Задание на профессию (сбрасывается вместе с профессией).
-const JOB_QUEST := "sage_first_job"
+## Задание на профессию (сбрасывается вместе с профессией, как и задания после неё — QuestData.JOB_RESET).
+const JOB_QUEST := QuestData.JOB_QUEST
 ## Вкладки: [id, подпись].
 const TABS := [["hero", "Герой"], ["xp", "Опыт"], ["items", "Предметы"], ["pets", "Питомцы"], ["world", "Мир"]]
 const XP_MULTS := [1, 2, 5, 10, 20, 50]
@@ -316,12 +316,14 @@ static func forget_all(main: Node) -> void:
 	_done(main, "Умения забыты, возвращено %d JP" % back)
 
 
-## Профессия — Бродяга; задание мудреца на профессию можно пройти заново.
+## Профессия — Бродяга; задание на профессию («Доклад мудрецу») и задания после неё можно пройти заново.
 static func reset_job(main: Node) -> void:
-	Game.quests_done.erase(JOB_QUEST)
-	Game.quests_active.erase(JOB_QUEST)
-	if Game.quest_tracked == JOB_QUEST:
-		Game.quest_tracked = ""
+	for k in QuestData.JOB_RESET:
+		var qid := String(k)
+		Game.quests_done.erase(qid)
+		Game.quests_active.erase(qid)
+		if Game.quest_tracked == qid:
+			Game.quest_tracked = ""
 	set_job(main, ClassData.WANDERER)
 	if main.get("quests") != null:
 		(main.quests as Quests).refresh_tracker()

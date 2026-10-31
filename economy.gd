@@ -7,9 +7,20 @@ extends Node
 ## Торгуют несколько NPC (группа "trader", поле npc_id; ассортимент — NpcData.shop): торговец (кнопка «Торговец»)
 ## и Учитель Кирк (карты существ; «Торговля» в его диалоге — Npcs). Окно торговли открыто у одного продавца
 ## (window.seller) и закрывается, если игрок от него отошёл; продавать из сумки можно рядом с любым из них.
+## Склад у Кладовщика Тобина (пункт «Склад» в его диалоге — Npcs): Game.storage (Inventory, 40 ячеек, стопки как
+## в сумке), окно — InventoryWindow в режиме "storage" (склад и сумка рядом); положить — deposit, забрать —
+## withdraw; надетое оружие ячеек сумки не занимает, поэтому на склад не кладётся. Отошёл — окно закрывается.
+## Квестовая добыча: пока у задания есть невыполненная цель collect с drop_from, нужный трофей падает всегда
+## (Quests.quest_loot).
 
 ## Куплено n штук предмета id у NPC seller (слушают задания — Quests).
 signal bought(id: String, n: int, seller: String)
+## Продано n штук предмета id NPC buyer.
+signal sold(id: String, n: int, buyer: String)
+## Использован предмет id (выпито зелье).
+signal used(id: String)
+## На склад положено n штук предмета id.
+signal stored(id: String, n: int)
 
 ## Где стоит торговец (внутри безопасной зоны MobData.SAFE_RADIUS).
 const MERCHANT_POS := Vector3(0, 0, -4)
@@ -19,6 +30,8 @@ const POTION_CD := 5.0
 ## Зелье лечит такую долю максимального здоровья.
 const POTION_HEAL := 0.5
 const GOLD_COLOR := Color(1.0, 0.85, 0.3)
+## Кто хранит склад (NpcData).
+const STORAGE_NPC := "storekeeper"
 
 var main: Node
 var merchant: Merchant
@@ -40,6 +53,7 @@ func setup(m: Node) -> void:
 	add_child(window)
 	window.setup(main, self)
 	Game.inventory.changed.connect(_on_inventory_changed)
+	Game.storage.changed.connect(_on_storage_changed)
 	main.hud.set_button_visible("shop", false)
 	_update_potion_button()
 
@@ -76,6 +90,13 @@ func on_mob_killed(mob: Mob) -> void:
 	Util.float_text(main, mob.global_position + Vector3(0, 2.8, 0), "+%d зол." % g, GOLD_COLOR)
 	Game.changed.emit()
 	var loot := roll_loot(mob.type_id)
+	# Квестовая добыча: трофей для задания падает всегда, пока цель не выполнена
+	var q: Quests = main.get("quests")
+	if q != null:
+		var extra := q.quest_loot(mob.type_id)
+		for k in extra:
+			if int(loot.get(k, 0)) <= 0:
+				loot[k] = int(extra[k])
 	if not loot.is_empty():
 		spawn_drop(mob.global_position, loot)
 
@@ -126,6 +147,7 @@ func use_potion() -> bool:
 	p.heal(int(p.max_hp * POTION_HEAL))
 	_potion_cd = POTION_CD
 	main.hud.set_cooldown("potion", 1.0)
+	used.emit("hp_potion")
 	return true
 
 
@@ -181,6 +203,8 @@ func trader_node(npc_id: String) -> Node3D:
 
 ## Игрок рядом (ближе SHOP_RANGE) с торгующим NPC npc_id; "" — с любым.
 func is_near_trader(npc_id: String = "") -> bool:
+	if npc_id == "":
+		return nearest_trader() != ""
 	if main == null or main.player == null or not main.is_inside_tree():
 		return false
 	var p: Player = main.player
@@ -188,13 +212,32 @@ func is_near_trader(npc_id: String = "") -> bool:
 		var t := n as Node3D
 		if t == null or not is_instance_valid(t):
 			continue
-		if npc_id != "" and String(t.get("npc_id")) != npc_id:
+		if String(t.get("npc_id")) != npc_id:
 			continue
 		var d := p.global_position - t.global_position
 		d.y = 0.0
 		if d.length() < SHOP_RANGE:
 			return true
 	return false
+
+
+## Ближайший торгующий NPC ближе SHOP_RANGE (id; "" — никого): ему уходит проданное.
+func nearest_trader() -> String:
+	if main == null or main.player == null or not main.is_inside_tree():
+		return ""
+	var p: Player = main.player
+	var best := ""
+	var bd := SHOP_RANGE
+	for n in main.get_tree().get_nodes_in_group("trader"):
+		var t := n as Node3D
+		if t == null or not is_instance_valid(t):
+			continue
+		var d := p.global_position - t.global_position
+		d.y = 0.0
+		if d.length() < bd:
+			bd = d.length()
+			best = String(t.get("npc_id"))
+	return best
 
 
 ## Окно сумки: экипировка, сетка ячеек и карточка (InventoryWindow).
@@ -234,7 +277,8 @@ func sell_cell(i: int, n: int = 1) -> int:
 	if price <= 0:
 		_msg("Торговец это не купит")
 		return 0
-	if not is_near_trader():
+	var buyer := nearest_trader()
+	if buyer == "":
 		_msg("Продать можно только торговцу")
 		return 0
 	var have := int(c["n"])
@@ -244,7 +288,67 @@ func sell_cell(i: int, n: int = 1) -> int:
 	Game.gold += price * cnt
 	Game.inventory.remove_at(i, cnt)
 	_msg("Продано: %s ×%d за %d зол." % [ItemData.item_name(id), cnt, price * cnt])
+	sold.emit(id, cnt, buyer)
 	return cnt
+
+
+# ---------- Склад ----------
+
+## Окно склада: ячейки склада, сумка и карточка (InventoryWindow, режим "storage").
+func open_storage() -> void:
+	window.open("storage")
+
+
+func is_storage_open() -> bool:
+	return window != null and window.mode == "storage" and window.is_open()
+
+
+## Игрок рядом с кладовщиком (дальше — окно склада закрывается). Кладовщика в мире нет — нигде не рядом.
+func is_near_storage() -> bool:
+	if main == null:
+		return false
+	var n: Node = main.get("npcs")
+	var npcs := n as Npcs
+	if npcs == null:
+		return false
+	return npcs.distance_to(STORAGE_NPC) <= Npcs.TALK_RANGE + 1.0
+
+
+## Положить на склад n штук из ячейки сумки i (n < 0 — всю стопку). Возвращает, сколько положено.
+func deposit(i: int, n: int = -1) -> int:
+	var c: Dictionary = Game.inventory.cell(i)
+	if c.is_empty():
+		return 0
+	var id := String(c["id"])
+	var have := int(c["n"])
+	var want := have if n < 0 else mini(n, have)
+	var k := mini(want, Game.storage.room_for(id))
+	if k <= 0:
+		_msg("Склад полон")
+		return 0
+	Game.inventory.remove_at(i, k)
+	Game.storage.add(id, k)
+	_msg("На складе: %s ×%d" % [ItemData.item_name(id), k])
+	stored.emit(id, k)
+	return k
+
+
+## Забрать со склада в сумку n штук из ячейки склада i (n < 0 — всю стопку). Возвращает, сколько забрано.
+func withdraw(i: int, n: int = -1) -> int:
+	var c: Dictionary = Game.storage.cell(i)
+	if c.is_empty():
+		return 0
+	var id := String(c["id"])
+	var have := int(c["n"])
+	var want := have if n < 0 else mini(n, have)
+	var k := mini(want, Game.inventory.room_for(id))
+	if k <= 0:
+		_msg("Сумка полна")
+		return 0
+	Game.storage.remove_at(i, k)
+	Game.inventory.add(id, k)
+	_msg("Забрано со склада: %s ×%d" % [ItemData.item_name(id), k])
+	return k
 
 
 func _close_window() -> void:
@@ -295,6 +399,11 @@ func _on_inventory_changed() -> void:
 		window.dirty = true
 
 
+func _on_storage_changed() -> void:
+	if window != null:
+		window.dirty = true
+
+
 func _on_drop_picked(items: Dictionary) -> void:
 	if main != null and main.hud != null:
 		_msg("Подобрано: " + LootDrop.describe(items))
@@ -320,5 +429,8 @@ func _process(delta: float) -> void:
 	if is_shop_open() and not is_near_trader(window.seller):
 		_close_window()
 		_msg("Вы отошли от %s" % NpcData.name_gen(window.seller))
+	elif is_storage_open() and not is_near_storage():
+		_close_window()
+		_msg("Вы отошли от %s" % NpcData.name_gen(STORAGE_NPC))
 	elif window.is_open() and (window.dirty or Game.gold != window.seen_gold):
 		window.refresh()

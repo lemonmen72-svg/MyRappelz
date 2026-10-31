@@ -1,9 +1,10 @@
 extends "res://tests/test_base.gd"
 ## Профессии (этап 1): данные 9 профессий и их древ (формула требований 10 + JLv × 0.75, пререквизиты, вкладки,
 ## оружие), сверх-эволюция (+5 JP за уровень выше 10, потолок 50), новый герой любой расы и пола — Бродяга без умений
-## (кнопки HUD скрыты, в окне героя — подсказка), модель по расе и полу; задание мудреца «Первая профессия» — закрыто
-## до 10 ур., «!» с 10, цели (староста своей деревни, звери 8+ ур.), сдача — окно выбора из трёх профессий расы
-## (по прогону на каждую расу: на 10, 15 и 20 ур.), повторно сменить нельзя; оружие профессий (стартовое, ранги,
+## (кнопки HUD скрыты, в окне героя — подсказка), модель по расе и полу; задание «Доклад мудрецу» (sage_first_job:
+## выдаёт охотница после «Волчьей стаи», сдать — мудрецу; ниже 10 ур. ждёт уровня, вся цепочка до него —
+## tests/test_quest_chain.gd), сдача — окно выбора из трёх профессий расы (по прогону на каждую расу: на 10, 15
+## и 20 ур.), повторно сменить нельзя, после профессии у мудреца — «Первое умение»; оружие профессий (стартовое, ранги,
 ## щит); старое сохранение Наёмника остаётся Наёмником с умениями; движок умений (образцы); админ-панель
 ## (раса и пол на лету, профессия сразу, уровень, JP, «изучить всё», сброс в Бродягу); сохранение пола и профессии.
 
@@ -41,7 +42,8 @@ func run_step() -> void:
 			check(Game.change_job("shaman") == -1 and game.job_change_block("shaman") != "", "повторно сменить профессию нельзя")
 			check(main.quests.state(QID) == "done" and main.quests.accept_block(QID) != "", "задание на профессию сдано")
 			main.npcs.refresh_marks()
-			check(main.npcs.npc("sage").mark_text() == "", "над мудрецом значка нет")
+			check(main.npcs.npc("sage").mark_text() == "!" and main.quests.state("sage_first_skill") == "available",
+			"после профессии у мудреца — «Первое умение»")
 			# Прогон 2: светлые эльфы, 15 ур. — Волшебник, +25 JP
 			_run_job("light_elf", 15, "wizard", 25)
 			step = 5
@@ -219,20 +221,28 @@ func _check_wanderer(player: Player) -> void:
 
 func _check_quest_gate() -> void:
 	var q: Quests = main.quests
-	game.quests_done["sage_town_tour"] = 1
+	# Путь до доклада пройден: староста, мудрец, охотница (сама цепочка — tests/test_quest_chain.gd)
+	for k in QuestData.PRE_JOB:
+		game.quests_done[String(k)] = 1
 	game.level = 9
 	q._changed()
 	main.npcs.refresh_marks()
-	check(q.state(QID) == "locked" and q.accept_block(QID).contains("10 уровня"), "до 10 ур. задание закрыто: %s" % q.accept_block(QID))
-	check(q.npc_quests("sage").has(QID), "в диалоге мудреца — «с 10 уровня»")
-	check(main.npcs.npc("sage").mark_text() == "", "над мудрецом нет «!» на 9 ур.")
+	check(QuestData.giver(QID) == "hunter" and QuestData.turn_in(QID) == "sage", "«Доклад мудрецу»: выдаёт охотница, сдать мудрецу")
+	check(q.state(QID) == "available" and main.npcs.npc("hunter").mark_text() == "!", "у охотницы доклад доступен и на 9 ур.")
+	check(q.accept(QID), "доклад взят на 9 ур.")
+	check(not q.is_ready(QID) and q.goal_progress(QID, 0) == 9, "на 9 ур. доклад ждёт 10 уровня: %d/10" % q.goal_progress(QID, 0))
+	main.npcs.refresh_marks()
+	check(main.npcs.npc("sage").mark_kind == "active", "над мудрецом серый «?»")
+	check(QuestData.text(QID, "progress").contains("десятого уровня") and QuestData.goal_text(QuestData.goals(QID)[0]).contains("10 уровня"),
+		"понятно, чего ждёт доклад: «%s»" % QuestData.goal_text(QuestData.goals(QID)[0]))
 	game.level = 10
 	main.player.apply_class()
-	q._changed()
+	game.changed.emit()
+	check(q.is_ready(QID), "с 10 ур. доклад можно сдать")
 	main.npcs.refresh_marks()
-	check(q.state(QID) == "available", "с 10 ур. задание доступно")
-	check(main.npcs.npc("sage").mark_text() == "!", "над мудрецом «!»: «%s»" % main.npcs.npc("sage").mark_text())
+	check(main.npcs.npc("sage").mark_text() == "?", "над мудрецом «?»: «%s»" % main.npcs.npc("sage").mark_text())
 	check(not bool(NpcData.talk_entry("sage", "profession").get("soon", false)), "пункт «Первая профессия» — рабочий")
+	check(q.abandon(QID) and q.state(QID) == "available", "отказ — доклад снова у охотницы")
 
 
 ## Пройти задание мудреца героем расы race на уровне lvl и выбрать профессию job; ожидаемый бонус — over.
@@ -246,38 +256,12 @@ func _run_job(race: String, lvl: int, job: String, over: int) -> void:
 	game.xp = 0
 	player.apply_class()
 	check(game.class_id == "wanderer" and q.state(QID) == "available", "%s %d ур.: Бродяга, задание доступно" % [race, lvl])
-	# Взять у мудреца через диалог
+	# Взять у охотницы через диалог: на 10+ ур. сразу можно сдавать
 	var npcs: Npcs = main.npcs
-	npcs.open_dialog("sage", "quest", QID)
+	npcs.open_dialog("hunter", "quest", QID)
 	check(npcs.buttons.has("accept"), "кнопка «Взять задание»")
 	npcs.buttons["accept"].pressed.emit()
-	check(q.is_active(QID), "задание взято")
-	# Цели: староста своей деревни, 5 зверей 8+ ур. (слабые не в счёт)
-	var elder := String(QuestData.ELDERS[race])
-	check(QuestData.goal_text(QuestData.goals(QID)[0]).contains("старост"), "цель: поговорить со старостой")
-	npcs.talk_to("kirk")
-	check(not q.goal_done(QID, 0), "разговор не со старостой не в счёт")
-	npcs.talk_to(elder)
-	npcs.close_dialog()
-	check(q.goal_done(QID, 0), "поговорили со старостой своей деревни (%s)" % NpcData.npc_name(elder))
-	var weak: Mob = null
-	var strong: Mob = null
-	for n in get_tree().get_nodes_in_group("mobs"):
-		var m := n as Mob
-		if m == null:
-			continue
-		if m.level >= 8 and strong == null:
-			strong = m
-		elif m.level < 8 and weak == null:
-			weak = m
-	check(strong != null and weak != null, "звери 8+ ур. и слабее есть")
-	if strong == null or weak == null:
-		return
-	q.on_mob_killed(weak)
-	check(q.goal_progress(QID, 1) == 0, "слабый зверь не в счёт")
-	for i in 5:
-		q.on_mob_killed(strong)
-	check(q.is_ready(QID), "задание выполнено")
+	check(q.is_active(QID) and q.is_ready(QID), "доклад взят, на %d ур. — можно сдавать" % lvl)
 	main.npcs.refresh_marks()
 	check(main.npcs.npc("sage").mark_text() == "?", "над мудрецом «?»")
 	# Сдача — окно выбора профессии
