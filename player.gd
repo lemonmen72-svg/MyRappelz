@@ -925,10 +925,13 @@ func _use_hero_skill(sid: String) -> bool:
 	if mp < cost:
 		message.emit("«%s»: не хватает MP (нужно %d)" % [sname, cost])
 		return false
+	# MP списывается до действия: MP, которое умение возвращает («Разбитая воля», «Остаток силы»),
+	# не упирается в максимум при полном MP. Не применилось — MP обратно.
+	mp -= cost
 	var done := _fx.cast(sid, n, sk) if sk.has("fx") else _cast_hero(sid, n, sk)
 	if not done:
+		mp = mini(max_mp, mp + cost)
 		return false
-	mp -= cost
 	_mp_delay = MP_COMBAT_TIME
 	skill_cd[sid] = HeroSkills.cooldown(sid, n) * (1.0 - cdr)
 	# Заклинание: обычная атака — после каста (скорость каста посоха его сокращает)
