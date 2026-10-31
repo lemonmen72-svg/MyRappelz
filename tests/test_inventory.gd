@@ -214,7 +214,8 @@ func run_step() -> void:
 			var kirk_goods := InventoryWindow.goods(game.class_id, "kirk")
 			check(kirk_goods.has("card_panther") and kirk_goods.has("mirror_card") and not kirk_goods.has("card_wolf"),
 				"карты существ — у Учителя Кирка: %s" % [kirk_goods])
-			check(win.buttons.has("good_dagger_steel") and win.buttons.has("good_weapon_bow_r1"), "оружие в товарах")
+			# Наёмнику — его оружие (кинжалы, мечи, арбалет), лука у него нет
+			check(win.buttons.has("good_dagger_steel") and win.buttons.has("good_crossbow_starter") and not win.buttons.has("good_weapon_bow_r1"), "оружие Наёмника в товарах, лука нет")
 			check(not win.buttons.has("good_boar_tusk"), "трофеи не продаются")
 			check(win.buttons.has("cell_0"), "сумка в окне торговца")
 			_press("good_hp_potion")

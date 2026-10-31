@@ -255,7 +255,7 @@ func _check_pairs(player: Player) -> void:
 			["weapon_axe_1h_r1", "dual_axes", ["Axe", "AxeL"]]]:
 		var e: Array = pair
 		var id := String(e[0])
-		var have := game.inventory.count(id)
+		var have: int = game.inventory.count(id)
 		if have < 2:
 			game.inventory.add(id, 2 - have)
 		check(player.equip(id) == "", "%s в руке" % ItemData.item_name(id))

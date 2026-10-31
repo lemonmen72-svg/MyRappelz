@@ -590,7 +590,7 @@ func _check_save(player: Player) -> void:
 
 ## Два меча в обеих руках (мечи — в сумку, если их меньше двух). true — надеты.
 func _swords(player: Player) -> bool:
-	var have := game.inventory.count("weapon_sword_1h_r1")
+	var have: int = game.inventory.count("weapon_sword_1h_r1")
 	if have < 2:
 		game.inventory.add("weapon_sword_1h_r1", 2 - have)
 	return player.equip("weapon_sword_1h_r1") == "" and player.equip("weapon_sword_1h_r1", true) == "" \
