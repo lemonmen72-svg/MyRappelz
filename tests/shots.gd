@@ -23,6 +23,13 @@ const HERO_ROW2 := ["res://assets/characters/hero_assassin_f.glb", "res://assets
 	"res://assets/characters/hero_dark_elf_f_starter.glb", "res://assets/characters/hero_dark_elf_m_starter.glb",
 	"res://assets/characters/hero_light_elf_f_starter.glb", "res://assets/characters/hero_light_elf_m_starter.glb",
 	"res://assets/characters/hero_human_f_starter.glb", "res://assets/characters/hero_human_m_starter.glb"]
+## Новые герои (кадр 94): Неофит, Адепт (тёмные эльфы), Волшебник, Зверолов (светлые эльфы), Шаман, Колдун (люди).
+const HERO_CASTERS := ["res://assets/characters/hero_neophyte_f.glb", "res://assets/characters/hero_neophyte_m.glb",
+	"res://assets/characters/hero_adept_f.glb", "res://assets/characters/hero_adept_m.glb",
+	"res://assets/characters/hero_wizard_f.glb", "res://assets/characters/hero_wizard_m.glb",
+	"res://assets/characters/hero_beastmaster_f.glb", "res://assets/characters/hero_beastmaster_m.glb",
+	"res://assets/characters/hero_shaman_f.glb", "res://assets/characters/hero_shaman_m.glb",
+	"res://assets/characters/hero_conjurer_f.glb", "res://assets/characters/hero_conjurer_m.glb"]
 ## Оружие героев (кадр 91): [модель, вид оружия ItemData, щит во второй руке] — одноручное со щитом, лук, пары,
 ## посох, двуручное.
 const WEAPON_ROW := [
@@ -875,6 +882,30 @@ func run_step() -> void:
 			step = 815
 		815:
 			shot("90_boss")
+			# Маги и звероловы: 12 новых героев (Неофит, Адепт, Волшебник, Зверолов, Шаман, Колдун × 2 пола) — кадр 94
+			_heroes_row(HERO_CASTERS, 0.85, 8.6)
+			wait = 60
+			step = 816
+		816:
+			shot("94_heroes_casters")
+			_heroes.queue_free()
+			_top.queue_free()
+			# Женская пластика: Волшебница и Волшебник идут рядом (шаг на месте, вполоборота к камере) — кадр 95
+			_heroes_row(["res://assets/characters/hero_wizard_f.glb", "res://assets/characters/hero_wizard_m.glb"],
+				1.1, 3.4)
+			for c in _heroes.get_children():
+				var m := c as CharacterModel
+				m.rotation.y = PI + 0.7
+				m.set_move_speed(1.4)
+			wait = 47
+			step = 817
+		817:
+			shot("95_female_walk")
+			_heroes.queue_free()
+			_top.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
+			main.player.visible = true
 			ok_done()
 
 

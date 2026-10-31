@@ -1,0 +1,277 @@
+{
+	"source": "c11.glb",
+	"height": 1.7,
+	"bounds": [
+		[
+			-0.6035,
+			0.0,
+			-0.2362
+		],
+		[
+			0.6039,
+			1.7,
+			0.2367
+		]
+	],
+	"tris": 29999,
+	"verts": 32109,
+	"bones": {
+		"root": "Bone_000",
+		"hips": "Bone_001",
+		"chest": "Bone_002",
+		"neck": "Bone_020",
+		"head": "Bone_018",
+		"head_end": "Bone_034",
+		"hand_r": "Bone_027",
+		"hand_l": "Bone_022",
+		"foot_r": "Bone_009",
+		"foot_l": "Bone_015",
+		"spine": [
+			"Bone_005",
+			"Bone_004",
+			"Bone_003",
+			"Bone_002"
+		],
+		"arms": {
+			"L": [
+				"Bone_025",
+				"Bone_024",
+				"Bone_023",
+				"Bone_022",
+				"Bone_021"
+			],
+			"R": [
+				"Bone_030",
+				"Bone_029",
+				"Bone_028",
+				"Bone_027",
+				"Bone_026"
+			]
+		},
+		"legs": {
+			"L": [
+				"Bone_017",
+				"Bone_016",
+				"Bone_015",
+				"Bone_014",
+				"Bone_013",
+				"Bone_012"
+			],
+			"R": [
+				"Bone_011",
+				"Bone_010",
+				"Bone_009",
+				"Bone_008",
+				"Bone_007",
+				"Bone_006"
+			]
+		},
+		"fingers": {
+			"L": {
+				"thumb": [
+					"Bone_044",
+					"Bone_043",
+					"Bone_042",
+					"Bone_041",
+					"Bone_040"
+				],
+				"index": [
+					"Bone_047",
+					"Bone_046",
+					"Bone_045"
+				],
+				"middle": [
+					"Bone_055",
+					"Bone_054",
+					"Bone_053",
+					"Bone_052"
+				],
+				"ring": [
+					"Bone_051",
+					"Bone_050",
+					"Bone_049",
+					"Bone_048"
+				],
+				"pinky": [
+					"Bone_039",
+					"Bone_038",
+					"Bone_037",
+					"Bone_036",
+					"Bone_035"
+				]
+			},
+			"R": {
+				"thumb": [
+					"Bone_064",
+					"Bone_063",
+					"Bone_062",
+					"Bone_061",
+					"Bone_060"
+				],
+				"index": [
+					"Bone_076",
+					"Bone_075",
+					"Bone_074",
+					"Bone_073"
+				],
+				"middle": [
+					"Bone_072",
+					"Bone_071",
+					"Bone_070",
+					"Bone_069"
+				],
+				"ring": [
+					"Bone_068",
+					"Bone_067",
+					"Bone_066",
+					"Bone_065"
+				],
+				"pinky": [
+					"Bone_059",
+					"Bone_058",
+					"Bone_057",
+					"Bone_056"
+				]
+			}
+		}
+	},
+	"grip_r": {
+		"pos": [
+			-0.006,
+			0.0561,
+			-0.0145
+		],
+		"dir": [
+			-0.9016,
+			-0.0648,
+			-0.4277
+		]
+	},
+	"grip_l": {
+		"pos": [
+			0.006,
+			0.0561,
+			-0.0145
+		],
+		"dir": [
+			0.9016,
+			-0.0648,
+			-0.4277
+		]
+	},
+	"crossbow_rot": [
+		0.4612,
+		-0.606,
+		0.5906,
+		0.267
+	],
+	"face": [
+		0.0754,
+		0.1034,
+		0.0046
+	],
+	"walk_speed": 1.4,
+	"run_speed": 4.2,
+	"clips": {
+		"Idle": {
+			"length": 2.5,
+			"loop": true,
+			"source": "ual1:Idle_Loop + женская пластика (idle)"
+		},
+		"Walking": {
+			"length": 0.979,
+			"loop": true,
+			"source": "ual1:Walk_Loop + женская пластика (walk)"
+		},
+		"Running": {
+			"length": 1.122,
+			"loop": true,
+			"source": "ual1:Jog_Fwd_Loop + женская пластика (run)"
+		},
+		"Sword_Idle": {
+			"length": 1.667,
+			"loop": true,
+			"source": "ual1:Sword_Idle + женская пластика (stance)"
+		},
+		"Crossbow_Idle": {
+			"length": 1.667,
+			"loop": true,
+			"source": "ual1:Pistol_Idle_Loop + женская пластика (stance)"
+		},
+		"Wave": {
+			"length": 2.2,
+			"loop": false,
+			"source": "процедурный (поверх ual1:Idle_Loop + женская пластика (idle))"
+		},
+		"Sword_Slash": {
+			"length": 1.4,
+			"loop": false,
+			"source": "ual2:Sword_Regular_A+Sword_Regular_A_Rec"
+		},
+		"Sword_Attack": {
+			"length": 1.533,
+			"loop": false,
+			"source": "ual1:Sword_Attack"
+		},
+		"Sword_Combo": {
+			"length": 3.0,
+			"loop": false,
+			"source": "ual2:Sword_Regular_Combo"
+		},
+		"Sword_Heavy_Combo": {
+			"length": 4.333,
+			"loop": false,
+			"source": "ual2:Sword_Heavy_Combo"
+		},
+		"Sword_Dash": {
+			"length": 1.567,
+			"loop": false,
+			"source": "ual2:Sword_Dash"
+		},
+		"Sword_Block": {
+			"length": 1.233,
+			"loop": false,
+			"source": "ual2:Sword_Block"
+		},
+		"Dodge": {
+			"length": 1.467,
+			"loop": false,
+			"source": "ual1:Roll"
+		},
+		"Hit": {
+			"length": 0.333,
+			"loop": false,
+			"source": "ual1:Hit_Chest"
+		},
+		"Death": {
+			"length": 2.4,
+			"loop": false,
+			"source": "ual1:Death01"
+		},
+		"Cast": {
+			"length": 1.467,
+			"loop": false,
+			"source": "ual1:Spell_Simple_Enter+Spell_Simple_Shoot+Spell_Simple_Exit"
+		},
+		"Pickup": {
+			"length": 2.5,
+			"loop": false,
+			"source": "ual2:Farm_Harvest"
+		},
+		"Sword_Slash_B": {
+			"length": 1.567,
+			"loop": false,
+			"source": "ual2:Sword_Regular_B+Sword_Regular_B_Rec"
+		},
+		"Sword_Slash_C": {
+			"length": 2.0,
+			"loop": false,
+			"source": "ual2:Sword_Regular_C"
+		},
+		"Crossbow_Shoot": {
+			"length": 0.633,
+			"loop": false,
+			"source": "ual1:Pistol_Shoot"
+		}
+	}
+}
