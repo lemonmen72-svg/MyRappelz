@@ -28,8 +28,8 @@ func _ready() -> void:
 	v.add_theme_constant_override("separation", int(UiScale.px(10)))
 	panel.add_child(v)
 
+	# Подпись «Логин» — в самом поле (placeholder): экран влезает в 720 px на «Крупном»
 	v.add_child(MenuKit.label("Аккаунт", UiScale.FONT_NAME, MenuKit.GOLD))
-	v.add_child(MenuKit.label("Логин", UiScale.FONT_TEXT, MenuKit.MUTED))
 	login_edit = MenuKit.line_edit("Логин", Accounts.last_login())
 	login_edit.text_submitted.connect(func(_t: String) -> void: _on_login())
 	v.add_child(login_edit)
