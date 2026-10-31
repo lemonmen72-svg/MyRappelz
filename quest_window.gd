@@ -105,7 +105,7 @@ func _build() -> void:
 	card.add_theme_constant_override("separation", int(UiScale.px(5)))
 	card_panel.add_child(card)
 	if ids.is_empty():
-		var t := "Активных заданий нет. Учитель Кирк и Мудрец Альдерик в центре города подскажут, с чего начать." if tab == "active" \
+		var t := "Активных заданий нет. Староста вашей деревни, Мудрец Альдерик и Учитель Кирк в центре города подскажут, с чего начать." if tab == "active" \
 			else "Вы ещё не сдали ни одного задания."
 		list.add_child(_text(t, UiScale.FONT_TEXT, MUTED))
 		card.add_child(_label("Журнал заданий", UiScale.FONT_HEAD, GOLD))
@@ -142,7 +142,6 @@ func _quest_button(id: String) -> Button:
 
 
 func _build_card(card: VBoxContainer, id: String) -> void:
-	var q := QuestData.get_quest(id)
 	var title := _label(QuestData.quest_name(id), UiScale.FONT_NAME, GOLD)
 	title.name = "quest_title"
 	card.add_child(title)
@@ -155,9 +154,9 @@ func _build_card(card: VBoxContainer, id: String) -> void:
 	var active := quests.is_active(id)
 	if active and quests.is_ready(id):
 		card.add_child(_text("Все цели выполнены — вернитесь к %s." % NpcData.name_dat(to), UiScale.FONT_BODY, GOOD))
-	card.add_child(_text(String(q.get("desc", "")), UiScale.FONT_TEXT, Color.WHITE))
+	card.add_child(_text(QuestData.text(id, "desc"), UiScale.FONT_TEXT, Color.WHITE))
 	if not active:
-		var said := String(q.get("done", ""))
+		var said := QuestData.text(id, "done")
 		if said != "":
 			card.add_child(_text("%s: «%s»" % [NpcData.npc_name(to), said], UiScale.FONT_BODY, MUTED))
 	card.add_child(_label("Цели", UiScale.FONT_TEXT, GOLD))

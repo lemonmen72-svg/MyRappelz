@@ -2,7 +2,7 @@ extends "res://tests/test_base.gd"
 ## Масштаб интерфейса (UiScale, «Размер интерфейса» в настройках): при каждом размере — «Мелкий», «Средний»,
 ## «Крупный» — круглые кнопки HUD не перекрываются, помещаются на экран, не мельче 56 px и не на панелях,
 ## меню и панель цели на месте, трекер не на кнопках, касание по кнопке работает; все окна (герой, древо,
-## существо, питомцы, сумка, лавка, журнал, диалог, настройки, выбор профессии, админ-панель) и экраны до мира
+## существо, питомцы, сумка, лавка, журнал, диалог, настройки, выбор профессии, админ-панель, склад) и экраны до мира
 ## (вход в аккаунт, выбор персонажа с 4 занятыми слотами и подтверждением удаления, 4 шага создания персонажа)
 ## помещаются в экран,
 ## заголовки и обрезаемые подписи не обрезаны. Кнопки «Размер интерфейса» в настройках применяют размер сразу
@@ -16,7 +16,7 @@ const WINDOWS := [
 	["окно существа", "_w_creature"], ["умения существа", "_w_creature_skills"], ["питомцы", "_w_pets"],
 	["сумка с картой", "_w_bag"], ["лавка Кирка", "_w_shop"], ["журнал заданий", "_w_journal"],
 	["диалог", "_w_dialog"], ["задание в диалоге", "_w_dialog_quest"], ["настройки", "_w_settings"],
-	["выбор профессии", "_w_job"], ["админ-панель", "_w_admin"],
+	["выбор профессии", "_w_job"], ["админ-панель", "_w_admin"], ["склад", "_w_storage"],
 ]
 ## Экраны до мира: [что, ключ] — "login", "select", "create_<шаг 0..3>".
 const SCREENS := [
@@ -32,6 +32,8 @@ var _li := 0
 var _wi := 0
 var _screen: CanvasLayer = null
 var _si := 0
+## Где стоит игрок у Учителя Кирка (окно склада уводит его к кладовщику — для окон Кирка возвращаем).
+var _kirk_pos := Vector3.ZERO
 ## Содержимое user://settings.cfg до теста ("" — файла не было).
 var _cfg_backup := ""
 var _had_cfg := false
@@ -68,6 +70,7 @@ func run_step() -> void:
 			if IslandWorld.current != null:
 				pos.y = IslandWorld.current.height_at(pos.x, pos.z) + 0.1
 			main.player.global_position = pos
+			_kirk_pos = pos
 			main.quests.accept("kirk_first_card")
 			wait = 5
 			step = 1
@@ -127,6 +130,7 @@ func _open_window() -> void:
 
 
 func _w_hero() -> void:
+	main.player.global_position = _kirk_pos
 	main.hero_window.open("hero")
 
 
@@ -183,6 +187,22 @@ func _w_job() -> void:
 
 func _w_admin() -> void:
 	AdminPanel.open(main)
+
+
+## Склад у кладовщика: игрок рядом с ним (иначе окно закроется), на складе стопки, выбрана вещь из сумки.
+func _w_storage() -> void:
+	var n: Npc = main.npcs.npc("storekeeper")
+	if n != null:
+		var to_c := Vector3(-n.global_position.x, 0, -n.global_position.z).normalized()
+		var pos := n.global_position + to_c * 2.0
+		if IslandWorld.current != null:
+			pos.y = IslandWorld.current.height_at(pos.x, pos.z) + 0.1
+		main.player.global_position = pos
+	if game.storage.count("wolf_pelt") == 0:
+		game.storage.add("wolf_pelt", 7)
+		game.storage.add("mirror_card", 2)
+	main.economy.open_storage()
+	main.economy.window.select_cell(game.inventory.find_cell("boar_tusk"))
 
 
 # ---------- HUD ----------

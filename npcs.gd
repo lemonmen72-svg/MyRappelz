@@ -9,11 +9,12 @@ extends Node
 ## Кнопка «Говорить» (HUD "talk", клавиша R) видна, когда игрок ближе TALK_RANGE к NPC с разговором (ближайший);
 ## касание — окно диалога (HUD.create_window, тема Util.ui_theme): реплика NPC и варианты «Задания» (если у NPC
 ## есть задания), «Торговля» (окно торговли Economy с его товарами), пункты о делах NPC (NpcData talk; дела,
-## которых ещё нет, — «— скоро»: страница с рассказом, что будет), «До встречи». Страница «Задания» — задания
-## NPC (Quests.npc_quests): взять, посмотреть прогресс, сдать. Отошёл дальше — диалог закрывается.
+## которых ещё нет, — «— скоро»: страница с рассказом, что будет; пункт с action открывает окно — «Склад»
+## у кладовщика), «До встречи». Страница «Задания» — задания NPC (Quests.npc_quests): взять, посмотреть прогресс,
+## сдать; два и больше доступных — ещё «Взять все». Отошёл дальше — диалог закрывается.
 ## Значки над NPC («!», «?») — Quests.npc_mark, обновляются по Quests.updated и раз в MARK_PERIOD.
 ## Кнопки открытого диалога для тестов (buttons): "opt_quests", "opt_trade", "opt_bye", "opt_<пункт talk>",
-## "dq_<id>", "accept", "complete", "back".
+## "dq_<id>", "accept", "accept_all", "complete", "back".
 
 ## Кнопка «Говорить» видна ближе этого расстояния, м; диалог закрывается дальше TALK_RANGE + 1.
 const TALK_RANGE := 4.0
@@ -403,7 +404,9 @@ func _page_main() -> void:
 	for e in NpcData.talk_options(dialog_npc):
 		var d: Dictionary = e
 		var id := String(d.get("id", ""))
-		var b := _option(NpcData.talk_label(d), "opt_" + id, _on_info.bind(id))
+		var action := String(d.get("action", ""))
+		var b := _option(NpcData.talk_label(d), "opt_" + id,
+			_on_npc_action.bind(action) if action != "" else _on_info.bind(id))
 		if bool(d.get("soon", false)):
 			b.add_theme_color_override("font_color", SOON)
 		opts.add_child(b)
@@ -435,6 +438,12 @@ func _page_quests() -> void:
 	opts.add_theme_constant_override("separation", int(UiScale.px(6)))
 	_body.add_child(opts)
 	if q != null:
+		var avail := 0
+		for k in q.npc_quests(dialog_npc):
+			if q.state(String(k)) == "available":
+				avail += 1
+		if avail >= 2:
+			opts.add_child(_option("Взять все задания (%d)" % avail, "accept_all", _on_accept_all))
 		for k in q.npc_quests(dialog_npc):
 			var id := String(k)
 			var b: Button
@@ -485,19 +494,18 @@ func _page_quest() -> void:
 ## Реплика NPC о задании: предложение, напоминание, похвала перед сдачей.
 func _quest_reply(id: String) -> String:
 	var q: Quests = main.get("quests")
-	var d := QuestData.get_quest(id)
 	var st := q.state(id) if q != null else ""
 	match st:
 		"available":
-			return String(d.get("offer", ""))
+			return QuestData.text(id, "offer")
 		"active":
-			return String(d.get("progress", ""))
+			return QuestData.text(id, "progress")
 		"ready":
 			return NpcData.greet(dialog_npc, "ready")
 		"done":
-			return String(d.get("done", ""))
+			return QuestData.text(id, "done")
 	var why := q.accept_block(id) if q != null else ""
-	return "Не торопись. %s." % why if why != "" else String(d.get("offer", ""))
+	return "Не торопись. %s." % why if why != "" else QuestData.text(id, "offer")
 
 
 func _on_quests() -> void:
@@ -523,6 +531,15 @@ func _on_quest(id: String) -> void:
 	open_dialog(dialog_npc, "quest", id)
 
 
+## Пункт о делах NPC, который открывает окно (action): "storage" — склад кладовщика.
+func _on_npc_action(action: String) -> void:
+	match action:
+		"storage":
+			close_dialog()
+			if main.get("economy") != null:
+				main.economy.open_storage()
+
+
 func _on_trade() -> void:
 	var who := dialog_npc
 	close_dialog()
@@ -537,6 +554,19 @@ func _on_accept(id: String) -> void:
 		_build()
 
 
+## «Взять все задания»: все доступные у этого NPC.
+func _on_accept_all() -> void:
+	var q: Quests = main.quests
+	var n := 0
+	for k in q.npc_quests(dialog_npc):
+		var id := String(k)
+		if q.state(id) == "available" and q.accept(id):
+			n += 1
+	if n > 1:
+		_msg("Взято заданий: %d — журнал (J)" % n)
+	open_dialog(dialog_npc, "quests")
+
+
 func _on_complete(id: String) -> void:
 	# Задание на профессию: сдача — в окне выбора профессии (JobWindow)
 	if bool(QuestData.get_quest(id).get("job_choice", false)) and main.get("job_window") != null:
@@ -544,7 +574,7 @@ func _on_complete(id: String) -> void:
 		main.job_window.open(id)
 		return
 	if main.quests.complete(id):
-		_say_next = String(QuestData.get_quest(id).get("done", ""))
+		_say_next = QuestData.text(id, "done")
 		open_dialog(dialog_npc, "quests")
 	else:
 		_build()
