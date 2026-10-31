@@ -132,7 +132,7 @@ func run_step() -> void:
 			var xp0 := _total_xp()
 			_press("complete")
 			check(q.state("sage_town_tour") == "done", "«Знакомство с городом» сдано")
-			check(game.gold == g0 + 15 and _total_xp() == xp0 + 12, "награда: 12 оп., 15 зол.")
+			check(game.gold == g0 + 15 and _total_xp() == xp0 + 30, "награда: 30 оп., 15 зол.")
 			check(npcs.reply == String(QuestData.get_quest("sage_town_tour")["done"]), "слова мудреца при сдаче")
 			check(npcs.npc("sage").mark_text() == "", "над мудрецом значка нет")
 			check(main.quests.state("kirk_first_card") == "available", "цепочка Кирка не задета")

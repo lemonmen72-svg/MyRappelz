@@ -48,7 +48,12 @@ func run_step() -> void:
 				if w.in_safe_zone(p) or not w.is_walkable(p.x, p.z):
 					bad += 1
 			check(bad == 0, "звери появляются вне безопасных зон и на суше (плохих: %d)" % bad)
-			check(find_mob("anathema_chief") != null and find_mob("anathema_chief").level == 10, "вожак анатем в пещере 10 уровня")
+			check(find_mob("anathema_chief") != null and find_mob("anathema_chief").level == 25, "вожак анатем в пещере 25 уровня")
+			# Уровни зверей острова — до 30 (луга новичков 1–3, к краям и логовам выше)
+			var top := 0
+			for s in main._slots:
+				top = maxi(top, int((s as Dictionary)["level"]))
+			check(top == 30, "самые сильные звери острова — 30 ур. (%d)" % top)
 			check(find_mob("golem") == null and find_mob("boar") == null, "кабанов и стражей на острове нет")
 			wait = 30
 			step = 1

@@ -100,8 +100,10 @@ func run_step() -> void:
 		3:
 			# Эффекты умений напрямую: урон, оглушение и угроза, замедление, морок
 			var pet: Pet = pm.active_pet
-			var g := find_mob("anathema_chief")
-			check(g != null, "найден вожак анатем")
+			# Зверь уровня питомца (по зверю намного выше уровнем умения мажут — Combat.skill_hit_chance)
+			var gp: Vector3 = player.global_position + Vector3(4.0, 0.0, 0.0)
+			var g: Mob = main.spawn_mob("anathema", pet.level, IslandWorld.current.ground(gp.x, gp.z))
+			check(g != null and g.level == pet.level and g.slot == -1, "поставлена анатема %d ур. (main.spawn_mob)" % pet.level)
 			var hp_g := g.hp
 			pet._apply_skill("shadow_fang", g)
 			check(g.hp < hp_g, "«Клык полуночи» ранил: %d → %d" % [hp_g, g.hp])
@@ -116,7 +118,7 @@ func run_step() -> void:
 			g.taunt_time = 0.0
 			g.stun_time = 0.0
 			g.blind_time = 0.0
-			g.returning = true
+			g.consume()
 			# Бой: ИИ сам применяет умения
 			mob = find_mob("wolf")
 			check(mob != null, "найден волк")
@@ -341,8 +343,11 @@ func _check_tables() -> void:
 				and int(x["acc"]) > 0 and float(x["cd"]) > 0.5
 			check(ok, "%s ур.%d: показатели в разумных пределах (крит %.1f%%, уклон %.1f%%, скорость %d%%, MP %d)"
 				% [sp, lvl, float(x["crit"]), float(x["eva"]), int(x["aspd"]), int(x["max_mp"])])
-	check(is_equal_approx(PetStats.hit_chance(10, 1), 0.95), "точность: 95% по зверю своего уровня")
-	check(PetStats.hit_chance(5, 10) >= 0.75 and PetStats.hit_chance(200, 1) <= 1.0, "шанс попасть в пределах 75–100%")
+	check(is_equal_approx(Combat.hit_chance(10.0, 10.0, 1, 1), 0.95), "точность: 95% по зверю своего уровня")
+	check(Combat.hit_chance(5.0, 40.0, 1, 10) < 0.4 and Combat.hit_chance(200.0, 1.0, 10, 1) <= Combat.HIT_MAX,
+		"шанс попасть: по зверю выше — редко, не больше 99%")
+	var pd := PetStats.derived("wolf", 10)
+	check(int(pd["avoid"]) > 0 and int(pd["acc"]) > 0, "у питомца точность и избегание (%d / %d)" % [int(pd["acc"]), int(pd["avoid"])])
 
 
 func _stat_sum(id: String, lvl: int) -> int:

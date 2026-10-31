@@ -22,7 +22,7 @@ extends RefCounted
 const REF_CLASS := "wanderer"
 ## Множители зверей к калибровке героя: HP, атака (+ прибавка ATK_FLAT), физ. и маг. защита.
 const HP_K := 1.0
-const ATK_K := 1.4
+const ATK_K := 1.5
 const ATK_FLAT := 5.0
 const DEF_K := 1.0
 const MDEF_K := 0.75

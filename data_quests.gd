@@ -40,7 +40,7 @@ const QUESTS := {
 			{"type": "buy", "items": ["card_panther", "card_turtle", "card_pheasant"], "npc": "kirk", "n": 1,
 				"counts_existing": true, "text": "Купить карту существа у Учителя Кирка"},
 		],
-		"rewards": {"xp": 15, "gold": 10},
+		"rewards": {"xp": 35, "gold": 10},
 	},
 	"kirk_soul": {
 		"name": "Душа в карте", "giver": "kirk", "turn_in": "kirk", "level": 2, "prev": "kirk_first_card",
@@ -51,7 +51,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "tame", "target": "", "n": 1, "counts_existing": true, "text": "Поймать душу зверя в карту"},
 		],
-		"rewards": {"xp": 25, "gold": 20, "items": {"mirror_card": 1}},
+		"rewards": {"xp": 60, "gold": 20, "items": {"mirror_card": 1}},
 	},
 	"kirk_new_friend": {
 		"name": "Новый друг", "giver": "kirk", "turn_in": "kirk", "level": 2, "prev": "kirk_soul",
@@ -63,7 +63,7 @@ const QUESTS := {
 			{"type": "form", "target": "", "n": 1, "counts_existing": true, "text": "Сформировать существо из карты"},
 			{"type": "summon", "target": "", "n": 1, "counts_existing": true, "text": "Призвать питомца"},
 		],
-		"rewards": {"xp": 30, "items": {"hp_potion": 3}, "jp": 5},
+		"rewards": {"xp": 70, "items": {"hp_potion": 3}, "jp": 5},
 	},
 	"kirk_bond_trial": {
 		"name": "Испытание связи", "giver": "kirk", "turn_in": "kirk", "level": 3, "prev": "kirk_new_friend",
@@ -74,7 +74,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "pet_kill", "target": "", "n": 5, "text": "Победить зверей вместе с питомцем"},
 		],
-		"rewards": {"xp": 40, "gold": 40, "items": {"revive_scroll": 1}},
+		"rewards": {"xp": 100, "gold": 40, "items": {"revive_scroll": 1}},
 	},
 	"sage_first_job": {
 		"name": "Первая профессия", "giver": "sage", "turn_in": "sage", "level": 10, "prev": "",
@@ -87,7 +87,7 @@ const QUESTS := {
 			{"type": "talk", "npc": "@elder", "n": 1, "text": "Поговорить со старостой своей деревни"},
 			{"type": "kill", "target": "", "min_level": 8, "n": 5, "text": "Победить зверей 8 уровня и выше"},
 		],
-		"rewards": {"xp": 400, "gold": 100},
+		"rewards": {"xp": 600, "gold": 100},
 	},
 	"sage_town_tour": {
 		"name": "Знакомство с городом", "giver": "sage", "turn_in": "sage", "level": 1, "prev": "",
@@ -99,7 +99,7 @@ const QUESTS := {
 			{"type": "talk", "npc": "smith", "n": 1},
 			{"type": "talk", "npc": "storekeeper", "n": 1},
 		],
-		"rewards": {"xp": 12, "gold": 15},
+		"rewards": {"xp": 30, "gold": 15},
 	},
 }
 

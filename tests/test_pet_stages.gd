@@ -168,25 +168,34 @@ func _check_rarity() -> void:
 		% [float(wd30["eva"]), float(bd["eva"]), int(wd30["aspd"]), int(bd["aspd"])])
 
 
-## Дикий волк сильнее базового зверя (кабана) того же уровня: HP, атака, опыт.
+## Дикий волк сильнее базового зверя (кабана) того же уровня: «эффективная сила» против героя (Combat), опыт.
+## На высоких уровнях дикие звери — модели старших стадий (MobStats.stage_for).
 func _check_wild() -> void:
+	var hprof := Combat.profile_of(main.player)
 	for lvl in [3, 5]:
 		var w := Mob.new()
 		w.setup("wolf", -1, Vector3.ZERO, lvl)
 		var b := Mob.new()
 		b.setup("boar", -1, Vector3.ZERO, lvl)
 		check(w.rarity == "uncommon", "дикий волк — «Обычный»")
-		check(float(w.max_hp) >= float(b.max_hp) * 1.15 and w.atk > b.atk and w.xp_reward > b.xp_reward,
-			"ур.%d: волк сильнее кабана — HP %d/%d, атака %d/%d, опыт %d/%d" % [lvl, w.max_hp, b.max_hp, w.atk, b.atk,
-			w.xp_reward, b.xp_reward])
+		var rw := Combat.power_ratio(hprof, Combat.profile_of(w))
+		var rb := Combat.power_ratio(hprof, Combat.profile_of(b))
+		check(rw > rb * 1.15 and w.xp_reward > b.xp_reward,
+			"ур.%d: волк сильнее кабана — сила %.2f / %.2f, опыт %d/%d" % [lvl, rw, rb, w.xp_reward, b.xp_reward])
 		w.free()
 		b.free()
 	var m := find_mob("wolf")
 	check(m != null, "волк есть в мире")
 	if m != null:
-		check(m._asset != null and m._asset.species == "wolf", "дикий волк в мире — модель wolf (1-я стадия)")
-		check(m.max_hp > int(MobData.get_type("wolf")["hp"]) or m.level != int(MobData.get_type("wolf")["level"]),
-			"у дикого волка HP с силой редкости: %d" % m.max_hp)
+		var want := CreatureAsset.model_for("wolf", MobStats.stage_for("wolf", m.level))
+		check(m._asset != null and m._asset.species == want, "дикий волк %d ур. в мире — модель %s" % [m.level, want])
+		check(m.max_hp == int(MobStats.derived("wolf", m.level)["max_hp"]), "у дикого волка HP по статам: %d" % m.max_hp)
+	check(MobStats.stage_for("wolf", 5) == 0 and MobStats.stage_for("wolf", 12) == 1 and MobStats.stage_for("wolf", 22) == 2,
+		"дикие звери: с 12 ур. — 2-я стадия, с 22 — 3-я")
+	var hi := Mob.new()
+	hi.setup("wolf", -1, Vector3.ZERO, 24)
+	check(hi.model_id == "wolf_3" and hi.body_scale > 1.3, "волк 24 ур. — модель wolf_3, крупнее (×%.2f)" % hi.body_scale)
+	hi.free()
 
 
 func _window_text() -> String:

@@ -196,6 +196,8 @@ func _fight(role: String) -> bool:
 		stand_near(mob, 2.0)
 		pet.global_position = mob.global_position + Vector3(6.0, 0.2, 0)
 		player.last_target = mob
+		# Зверь мира (статы MobStats) крепче питомца 1-го ур.: бой с уже раненым зверем, чтобы тест шёл недолго
+		mob.hp = maxi(1, mob.max_hp / 3)
 		return false
 	if mob.is_dead:
 		check(pet.skill_uses > 0, "%s применил умение роли (%d)" % [role, pet.skill_uses])

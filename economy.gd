@@ -69,9 +69,8 @@ func handle_action(id: String) -> bool:
 
 ## Зверь убит: золото сразу в кошелёк, предметы — мешочком на землю.
 func on_mob_killed(mob: Mob) -> void:
-	var d := MobData.get_type(mob.type_id)
-	var gold_range: Array = d["gold"]
-	# Золото — с силой редкости вида (MobData.power)
+	# Золото растёт с уровнем зверя (MobData.gold_range) и с силой редкости вида (MobData.power); у боссов — своё
+	var gold_range := MobData.gold_range(mob.type_id, mob.level)
 	var g := roundi(float(randi_range(int(gold_range[0]), int(gold_range[1]))) * MobData.power(mob.type_id))
 	Game.gold += g
 	Util.float_text(main, mob.global_position + Vector3(0, 2.8, 0), "+%d зол." % g, GOLD_COLOR)

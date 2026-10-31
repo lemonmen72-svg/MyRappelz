@@ -846,7 +846,9 @@ func mob_slots(rng: RandomNumberGenerator) -> Array:
 		var r := float(zone.get("radius", 10.0))
 		var lv: Array = zone.get("levels", [1, 1])
 		for m in zone.get("mobs", []):
+			# [вид, сколько] или [вид, сколько, мин. ур., макс. ур.] — свои уровни вида внутри зоны
 			var entry: Array = m
+			var elv: Array = [entry[2], entry[3]] if entry.size() >= 4 else lv
 			for n in int(entry[1]):
 				var pos := Vector3.ZERO
 				var found := false
@@ -864,7 +866,7 @@ func mob_slots(rng: RandomNumberGenerator) -> Array:
 					pos = ground(c.x, c.y)
 				res.append({
 					"type": String(entry[0]), "pos": pos, "zone": String(zone.get("id", "")),
-					"level": rng.randi_range(int(lv[0]), int(lv[1])),
+					"level": rng.randi_range(int(elv[0]), int(elv[1])),
 				})
 	return res
 
