@@ -1805,8 +1805,8 @@ func _setup_asset(path: String) -> bool:
 		# Эмиссия включена заранее (чёрная), чтобы вспышка урона не перекомпилировала шейдер
 		m.emission_enabled = true
 		m.emission = Color.BLACK
-		if Quality.outlines():
-			m.next_pass = _asset_outline_mat()
+		# Без самозатенения картой теней (Quality.model_shadows) и контур — меняются сразу в настройках
+		Quality.track_model(m, _asset_outline_mat())
 		m.set_meta("toon_done", true)
 		mi.material_override = m
 		_flash_mats.append(m)
@@ -2239,8 +2239,7 @@ static func _sword_mat() -> StandardMaterial3D:
 	m.vertex_color_is_srgb = true
 	Util.toon(m)
 	m.metallic_specular = 0.7
-	if Quality.outlines():
-		m.next_pass = _outline_mat()
+	Quality.track_model(m, _outline_mat())
 	m.set_meta("toon_done", true)
 	_sword_material = m
 	return m
@@ -2367,8 +2366,7 @@ func _make_meshes(geo: Dictionary) -> void:
 	# Эмиссия включена заранее (чёрная), чтобы вспышка урона не перекомпилировала шейдер
 	bm.emission_enabled = true
 	bm.emission = Color.BLACK
-	if Quality.outlines():
-		bm.next_pass = _outline_mat()
+	Quality.track_model(bm, _outline_mat())
 	# Хук main.gd (Util.toonify_mesh) уже не тронет: свет и контур настроены здесь
 	bm.set_meta("toon_done", true)
 	body.material_override = bm

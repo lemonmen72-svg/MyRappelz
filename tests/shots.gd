@@ -43,6 +43,9 @@ const WEAPON_ROW := [
 	["res://assets/characters/hero_human_m_starter.glb", "axe_2h", false],
 ]
 var _heroes: Node3D = null
+## Камера кадров настроек графики (120–129) и место героя в городе (у ратуши, видно с камеры кадров 12–14).
+var _gcam: Camera3D = null
+const GFX_HERO := Vector2(4.5, -6.5)
 var _top: Camera3D = null
 var _row: Node3D = null
 var _frames := 0
@@ -983,6 +986,97 @@ func run_step() -> void:
 			step = 834
 		834:
 			shot("97_skills_guard")
+			step = 940
+		940:
+			# Настройки графики (кадры 120–121): вкладка «Графика» — пресет и все настройки
+			main.hud.visible = true
+			main.cam.current = true
+			for z in get_tree().get_nodes_in_group("skill_zones"):
+				z.queue_free()
+			Quality.set_level(Quality.HIGH, false)
+			Quality.apply(get_tree())
+			SettingsMenu.open(main.hud, "graphics")
+			wait = 6
+			step = 941
+		941:
+			shot("120_settings_graphics")
+			if is_instance_valid(SettingsMenu._scroll):
+				SettingsMenu._scroll.scroll_vertical = 100000
+			wait = 4
+			step = 942
+		942:
+			shot("121_settings_graphics_more")
+			main.hud.close_window()
+			# Тени в городе (кадры 122–124): герой у ратуши, дома и их тени — выкл / низкие / высокие
+			var hp := IslandWorld.current.ground(GFX_HERO.x, GFX_HERO.y, 0.2) if IslandWorld.current != null \
+				else Vector3(GFX_HERO.x, 0.2, GFX_HERO.y)
+			main.player.global_position = hp
+			main.player.select_target(null)
+			main.hud.visible = false
+			_gcam = Camera3D.new()
+			main.add_child(_gcam)
+			_gcam.global_position = Vector3(7.0, 4.5, -2.0)
+			_gcam.look_at(Vector3(-1.0, 2.2, -14.0))
+			_gcam.current = true
+			Quality.set_option("shadows", 0, false)
+			Quality.apply(get_tree())
+			wait = 20
+			step = 943
+		943:
+			shot("122_shadows_off")
+			Quality.set_option("shadows", 1, false)
+			Quality.apply(get_tree())
+			wait = 20
+			step = 944
+		944:
+			shot("123_shadows_low")
+			Quality.set_option("shadows", 3, false)
+			Quality.apply(get_tree())
+			wait = 20
+			step = 945
+		945:
+			shot("124_shadows_high")
+			# Герой крупно (кадры 125–129): тени на модели и сглаживание краёв и контуров
+			var pl: Player = main.player
+			var front := pl._model.global_transform.basis * Vector3(0, 0, -1)
+			front.y = 0.0
+			_gcam.global_position = pl.global_position + front.normalized() * 2.6 + Vector3(0.6, 1.4, 0)
+			_gcam.look_at(pl.global_position + Vector3(0, 1.0, 0))
+			wait = 20
+			step = 946
+		946:
+			shot("125_hero_model_shadows_off")
+			# Как было раньше: карта теней на самой модели (самозатенение)
+			Quality.set_option("model_shadows", 1, false)
+			Quality.apply(get_tree())
+			wait = 15
+			step = 947
+		947:
+			shot("126_hero_model_shadows_on")
+			Quality.set_option("model_shadows", 0, false)
+			Quality.set_option("aa", 0, false)
+			Quality.apply(get_tree())
+			wait = 15
+			step = 948
+		948:
+			shot("127_aa_off")
+			Quality.set_option("aa", 1, false)
+			Quality.apply(get_tree())
+			wait = 15
+			step = 949
+		949:
+			shot("128_aa_fxaa")
+			Quality.set_option("aa", 3, false)
+			Quality.apply(get_tree())
+			wait = 15
+			step = 950
+		950:
+			shot("129_aa_msaa4")
+			Quality.set_level(Quality.HIGH, false)
+			Quality.apply(get_tree())
+			_gcam.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
 			ok_done()
 
 

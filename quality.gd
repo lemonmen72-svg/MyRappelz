@@ -1,86 +1,235 @@
 class_name Quality
 extends RefCounted
-## Настройки качества графики: пресеты «Низкое» / «Среднее» (по умолчанию) / «Высокое».
-## Выбор хранится в user://settings.cfg (секция [graphics], ключ quality), читается при первом запросе.
-## Геттеры статические: Quality.level(), Quality.grass_density(), Quality.shadows(), Quality.postfx()...
-## Применение без перезапуска: Quality.apply(get_tree()) — тени солнца, постобработка (PostFx),
-## дальность и контуры растительности. Плотность травы и цветов — при следующем построении мира.
+## Настройки графики (вкладка «Графика» окна настроек, SettingsMenu): общий пресет «Низкое» / «Среднее»
+## (по умолчанию) / «Высокое» / «Максимальное» и отдельные настройки, как в мобильных RPG. Изменили хоть одну
+## настройку вручную, и она не совпадает с пресетом — пресет «Свои» (CUSTOM).
+## Хранится в user://settings.cfg, секция [graphics]: quality — пресет (0–3, 4 — «Свои»), по ключу на каждую
+## настройку (OPTIONS) и fps. Старый файл (только quality 0–2) читается: настройки — по пресету.
+## Геттеры статические: Quality.level(), Quality.option("shadows"), Quality.grass_density(), Quality.shadows()...
+## Применение без перезапуска: Quality.apply(get_tree()) — разрешение 3D и MSAA окна, солнце и тени, постобработка
+## и FXAA (PostFx), дальность растительности и мелочей построек, контуры (и у уже созданных моделей),
+## текстуры, тени на моделях персонажей. Густота травы и цветов — при следующем построении мира.
+##
+## Тени (главное, см. CLAUDE.md «Графика»): карта теней с мягким фильтром PCF (5 или 13 выборок, у GL Compatibility
+## по умолчанию на телефоне — жёсткая, одна выборка), каскады PSSM — первый вплотную к герою (камера в 12 м);
+## в toon/prop-шейдерах тень мягко входит в cel-полосу; модели персонажей и зверей не затеняют сами себя
+## (model_shadows = 0: только cel-свет, тень на землю они бросают).
+## Сглаживание: MSAA 2×/4× 3D-кадра (в Compatibility 4.3 есть) или FXAA своим проходом в postfx.gdshader.
 
 const LOW := 0
 const MEDIUM := 1
 const HIGH := 2
+const ULTRA := 3
+## Настройки изменены вручную и не совпадают ни с одним пресетом.
+const CUSTOM := 4
 const PATH := "user://settings.cfg"
-const NAMES := ["Низкое", "Среднее", "Высокое"]
+const SECTION := "graphics"
+const NAMES := ["Низкое", "Среднее", "Высокое", "Максимальное", "Свои"]
 const DESCRIPTIONS := [
-	"Без теней, текстур и постобработки, трава редкая и только рядом, у кустов и камней нет контуров. Для слабых телефонов.",
-	"Тени рядом с игроком, рисованные текстуры земли и построек, трава средней густоты. Рекомендуется.",
-	"Тени дальше и чётче, мягкое свечение светлых мест, густая трава вдаль, тени от кустов и камней.",
+	"Без теней, рисованных текстур и постобработки, трава редкая и только рядом, без контуров. Для слабых телефонов.",
+	"Мягкие тени рядом с героем, сглаживание MSAA 2×, рисованные текстуры, трава средней густоты. Рекомендуется.",
+	"Родное разрешение, тени дальше и чётче, свечение светлых мест, густая трава вдаль, тени от кустов и камней.",
+	"Всё на максимум: тени в 4 каскада и дальше всех, MSAA 4×, дальше всего видно. Для мощных телефонов.",
+	"Настройки изменены вручную.",
 ]
-## grass_density — доля от полной густоты травы; *_distance — дальность видимости, м;
-## shadow_atlas — размер карты теней солнца; postfx — цветокоррекция и виньетка; bloom — свечение;
-## outlines — контуры (персонажи, звери, постройки, растительность); small_shadows — тени от кустов и камней;
-## render_scale — меньше 1: кадр рисуется высотой 720 px и растягивается (см. apply_resolution);
-## textures — рисованные текстуры земли и построек (WorldTextures; на «Низком» без выборок текстур).
+
+## Порядок настроек во вкладке «Графика».
+const OPTIONS := ["render", "shadows", "aa", "view", "grass", "textures", "outlines", "postfx", "effects", "model_shadows"]
+const TITLES := {
+	"render": "Разрешение 3D", "shadows": "Тени", "aa": "Сглаживание", "view": "Дальность прорисовки",
+	"grass": "Густота травы", "textures": "Детализация текстур", "outlines": "Контуры", "postfx": "Постобработка",
+	"effects": "Качество эффектов", "model_shadows": "Тени на персонажах",
+}
+## Подписи вариантов (номер варианта — значение настройки).
+const LABELS := {
+	"render": ["540p", "720p", "900p", "Родное"],
+	"shadows": ["Выкл", "Низкие", "Средние", "Высокие"],
+	"aa": ["Выкл", "FXAA", "MSAA 2×", "MSAA 4×"],
+	"view": ["Близко", "Средне", "Далеко", "Макс."],
+	"grass": ["Редкая", "Средняя", "Густая"],
+	"textures": ["Низкая", "Средняя", "Высокая"],
+	"outlines": ["Выкл", "Вкл"],
+	"postfx": ["Выкл", "Цвет", "Свечение"],
+	"effects": ["Низкое", "Среднее", "Высокое"],
+	"model_shadows": ["Выкл", "Вкл"],
+}
+## Подсказки под настройками.
+const HINTS := {
+	"render": "Высота кадра 3D-мира (интерфейс всегда чёткий). Меньше — быстрее, но мягче картинка.",
+	"shadows": "Выше — тени дальше, чётче и с мягким краем, но тяжелее для телефона.",
+	"aa": "Убирает «лесенку» на краях моделей и контурах. MSAA — чище, FXAA — дешевле.",
+	"view": "Как далеко видны трава, кусты, камни, деревья и мелочи у построек.",
+	"grass": "Меняется при следующем запуске игры.",
+	"textures": "Рисованные текстуры земли и построек; «Высокая» — без заметного повтора.",
+	"outlines": "Тёмная обводка персонажей, зверей, построек и растительности (аниме-стиль).",
+	"postfx": "«Цвет» — цветокоррекция и виньетка, «Свечение» — ещё мягкое сияние светлых мест.",
+	"effects": "Сколько частиц у умений, ударов и искр.",
+	"model_shadows": "Тени от карты теней на самих моделях. Выкл — чистый cel-свет (рекомендуется).",
+}
+## Значения настроек по пресетам (LOW, MEDIUM, HIGH, ULTRA).
 const PRESETS := [
-	{
-		"grass_density": 0.35, "grass_distance": 24.0, "grass_blades": 4, "flower_density": 0.45,
-		"detail_distance": 45.0, "tree_distance": 90.0,
-		"shadows": false, "shadow_distance": 0.0, "shadow_splits": false, "shadow_atlas": 1024,
-		"small_shadows": false, "postfx": false, "bloom": false, "outlines": false,
-		"render_scale": 0.6, "rich_shaders": false, "textures": false,
-	},
-	{
-		"grass_density": 0.65, "grass_distance": 38.0, "grass_blades": 5, "flower_density": 0.75,
-		"detail_distance": 65.0, "tree_distance": 125.0,
-		"shadows": true, "shadow_distance": 28.0, "shadow_splits": false, "shadow_atlas": 1024,
-		"small_shadows": false, "postfx": false, "bloom": false, "outlines": true,
-		"render_scale": 0.75, "rich_shaders": false, "textures": true,
-	},
-	{
-		"grass_density": 1.0, "grass_distance": 58.0, "grass_blades": 6, "flower_density": 1.0,
-		"detail_distance": 95.0, "tree_distance": 175.0,
-		"shadows": true, "shadow_distance": 60.0, "shadow_splits": true, "shadow_atlas": 4096,
-		"small_shadows": true, "postfx": true, "bloom": true, "outlines": true,
-		"render_scale": 1.0, "rich_shaders": true, "textures": true,
-	},
+	{"render": 1, "shadows": 0, "aa": 0, "view": 0, "grass": 0, "textures": 0, "outlines": 0, "postfx": 0,
+		"effects": 0, "model_shadows": 0},
+	{"render": 1, "shadows": 1, "aa": 2, "view": 1, "grass": 1, "textures": 1, "outlines": 1, "postfx": 0,
+		"effects": 1, "model_shadows": 0},
+	{"render": 3, "shadows": 2, "aa": 2, "view": 2, "grass": 2, "textures": 2, "outlines": 1, "postfx": 2,
+		"effects": 2, "model_shadows": 0},
+	{"render": 3, "shadows": 3, "aa": 3, "view": 3, "grass": 2, "textures": 2, "outlines": 1, "postfx": 2,
+		"effects": 2, "model_shadows": 0},
 ]
+
+## Разрешение 3D: высота кадра мира, px (0 — родное разрешение экрана).
+const RENDER_HEIGHTS := [540, 720, 900, 0]
+## Тени по уровню (0 — выключены): размер карты теней (атлас солнца), режим каскадов, дальность, м,
+## доли дальности границ каскадов, фильтр (RenderingServer.SHADOW_QUALITY_*: в Compatibility SOFT_LOW/MEDIUM —
+## PCF 5 выборок, SOFT_HIGH — 13), смешивание каскадов, тени от кустов и камней.
+const SHADOW_LEVELS := [
+	{},
+	{"atlas": 2048, "splits": 2, "distance": 32.0, "split": [0.42, 0.7, 0.9], "filter": 2, "blend": false,
+		"small": false},
+	{"atlas": 4096, "splits": 2, "distance": 50.0, "split": [0.3, 0.6, 0.85], "filter": 4, "blend": true,
+		"small": true},
+	{"atlas": 4096, "splits": 4, "distance": 80.0, "split": [0.07, 0.18, 0.42], "filter": 4, "blend": true,
+		"small": true},
+]
+## Сдвиг тени (против «ряби» — самозатенения карты теней на гранях): по глубине и вдоль нормали.
+## У Godot по умолчанию 0.1 / 1.0; у построек cull_disabled (двусторонние грани) рябь сильнее — нормаль больше.
+const SHADOW_BIAS := 0.08
+const SHADOW_NORMAL_BIAS := 1.5
+## Дальность прорисовки по уровню, м: трава, кусты/камни/кристаллы, деревья, мелочи у построек (ящики,
+## бочки, огни), декор полей (колосья).
+const VIEW_LEVELS := [
+	{"grass": 24.0, "detail": 45.0, "trees": 90.0, "props": 70.0, "decor": 80.0},
+	{"grass": 38.0, "detail": 65.0, "trees": 125.0, "props": 90.0, "decor": 100.0},
+	{"grass": 58.0, "detail": 95.0, "trees": 175.0, "props": 110.0, "decor": 120.0},
+	{"grass": 72.0, "detail": 120.0, "trees": 220.0, "props": 140.0, "decor": 150.0},
+]
+## Густота травы по уровню: доля полной густоты, травинок в пучке, доля цветов.
+const GRASS_LEVELS := [
+	{"density": 0.35, "blades": 4, "flowers": 0.45},
+	{"density": 0.65, "blades": 5, "flowers": 0.75},
+	{"density": 1.0, "blades": 6, "flowers": 1.0},
+]
+## Доля частиц эффектов по уровню.
+const EFFECTS_SCALE := [0.5, 0.75, 1.0]
 
 ## Ограничение частоты кадров. Без него экраны 90–120 Гц рисуют в 1.5–2 раза больше кадров,
 ## чем нужно, и телефон греется. 30 — меньше всего греется и дольше держит батарея.
 const FPS_OPTIONS := [30, 45, 60]
 const DEFAULT_FPS := 60
-
-static var _level := -1
-static var _fps := -1
-static var _menu_open := false
 ## Предел кадров при открытом окне.
 const MENU_FPS := 30
 
+static var _level := -1
+static var _opts: Dictionary = {}
+static var _fps := -1
+static var _menu_open := false
+## Материалы моделей (персонажи, звери, питомцы): тени на модели по model_shadows — WeakRef.
+static var _model_mats: Array[WeakRef] = []
+## Материалы с контуром (next_pass по outlines; контур — meta "outline") — WeakRef.
+static var _outline_mats: Array[WeakRef] = []
 
-## Текущий пресет (LOW, MEDIUM, HIGH).
+
+# ---------- Пресет и настройки ----------
+
+static func _ensure() -> void:
+	if _level >= 0:
+		return
+	_level = MEDIUM
+	var cf := ConfigFile.new()
+	var loaded := cf.load(PATH) == OK
+	if loaded:
+		_level = clampi(int(cf.get_value(SECTION, "quality", MEDIUM)), LOW, CUSTOM)
+	var base: Dictionary = PRESETS[mini(_level, ULTRA) if _level != CUSTOM else MEDIUM]
+	_opts = {}
+	for k in OPTIONS:
+		var key := String(k)
+		var v := int(base[key])
+		if loaded and cf.has_section_key(SECTION, key):
+			v = int(cf.get_value(SECTION, key, v))
+		_opts[key] = clampi(v, 0, option_count(key) - 1)
+	_level = _match_preset()
+
+
+## Пресет, с которым совпадают все настройки, иначе CUSTOM.
+static func _match_preset() -> int:
+	for i in PRESETS.size():
+		var p: Dictionary = PRESETS[i]
+		var same := true
+		for k in OPTIONS:
+			if int(p[k]) != int(_opts.get(k, -1)):
+				same = false
+				break
+		if same:
+			return i
+	return CUSTOM
+
+
+## Текущий пресет (LOW, MEDIUM, HIGH, ULTRA) или CUSTOM.
 static func level() -> int:
-	if _level < 0:
-		_level = MEDIUM
-		var cf := ConfigFile.new()
-		if cf.load(PATH) == OK:
-			_level = clampi(int(cf.get_value("graphics", "quality", MEDIUM)), LOW, HIGH)
+	_ensure()
 	return _level
 
 
-## Выбирает пресет; save — записать в user://settings.cfg (другие секции файла сохраняются).
+## Выбирает пресет (все настройки — по нему); save — записать в user://settings.cfg (другие секции сохраняются).
+## CUSTOM ничего не меняет.
 static func set_level(l: int, save: bool = true) -> void:
-	_level = clampi(l, LOW, HIGH)
+	_ensure()
+	if l < LOW or l > ULTRA:
+		return
+	var p: Dictionary = PRESETS[l]
+	for k in OPTIONS:
+		_opts[k] = int(p[k])
+	_level = l
 	if save:
-		_save("quality", _level)
+		_save_all()
 
 
-## Предел кадров в секунду (одно из FPS_OPTIONS), по умолчанию 60.
+## Значение настройки (номер варианта, см. LABELS).
+static func option(key: String) -> int:
+	_ensure()
+	return int(_opts.get(key, 0))
+
+
+## Сколько вариантов у настройки.
+static func option_count(key: String) -> int:
+	var labels: Array = LABELS.get(key, [])
+	return labels.size()
+
+
+## Меняет одну настройку; пресет — тот, с которым совпадают все настройки, иначе «Свои».
+static func set_option(key: String, value: int, save: bool = true) -> void:
+	_ensure()
+	if not LABELS.has(key):
+		return
+	_opts[key] = clampi(value, 0, option_count(key) - 1)
+	_level = _match_preset()
+	if save:
+		_save_all()
+
+
+static func option_title(key: String) -> String:
+	return String(TITLES.get(key, key))
+
+
+static func option_label(key: String, v: int = -1) -> String:
+	var labels: Array = LABELS.get(key, [])
+	if labels.is_empty():
+		return ""
+	return String(labels[clampi(option(key) if v < 0 else v, 0, labels.size() - 1)])
+
+
+static func option_hint(key: String) -> String:
+	return String(HINTS.get(key, ""))
+
+
+## Предел кадров в секунду (одно из FPS_OPTIONS), по умолчанию 60. В пресет не входит.
 static func fps_limit() -> int:
 	if _fps < 0:
 		_fps = DEFAULT_FPS
 		var cf := ConfigFile.new()
 		if cf.load(PATH) == OK:
-			_fps = int(cf.get_value("graphics", "fps", DEFAULT_FPS))
+			_fps = int(cf.get_value(SECTION, "fps", DEFAULT_FPS))
 		if not FPS_OPTIONS.has(_fps):
 			_fps = DEFAULT_FPS
 	return _fps
@@ -89,7 +238,7 @@ static func fps_limit() -> int:
 static func set_fps_limit(v: int, save: bool = true) -> void:
 	_fps = v if FPS_OPTIONS.has(v) else DEFAULT_FPS
 	if save:
-		_save("fps", _fps)
+		_save({"fps": _fps})
 	apply_fps()
 
 
@@ -109,11 +258,19 @@ static func set_menu_open(on: bool) -> void:
 	apply_fps()
 
 
-## Записать ключ секции [graphics] (другие ключи и секции файла сохраняются).
-static func _save(key: String, value: Variant) -> void:
+static func _save_all() -> void:
+	var vals := {"quality": _level}
+	for k in OPTIONS:
+		vals[k] = int(_opts[k])
+	_save(vals)
+
+
+## Записать ключи секции [graphics] (другие ключи и секции файла сохраняются).
+static func _save(vals: Dictionary) -> void:
 	var cf := ConfigFile.new()
 	cf.load(PATH)  # нет файла — начнём с пустого
-	cf.set_value("graphics", key, value)
+	for k in vals:
+		cf.set_value(SECTION, String(k), vals[k])
 	var err := cf.save(PATH)
 	if err != OK:
 		push_warning("Не удалось сохранить настройки графики: %d" % err)
@@ -126,81 +283,148 @@ static func reload() -> void:
 
 
 static func level_name(l: int = -1) -> String:
-	return String(NAMES[clampi(level() if l < 0 else l, LOW, HIGH)])
+	return String(NAMES[clampi(level() if l < 0 else l, LOW, CUSTOM)])
 
 
 static func description(l: int = -1) -> String:
-	return String(DESCRIPTIONS[clampi(level() if l < 0 else l, LOW, HIGH)])
+	return String(DESCRIPTIONS[clampi(level() if l < 0 else l, LOW, CUSTOM)])
 
 
-static func _p(key: String) -> Variant:
-	var preset: Dictionary = PRESETS[level()]
-	return preset[key]
+# ---------- Производные параметры ----------
+
+static func _view() -> Dictionary:
+	return VIEW_LEVELS[option("view")]
+
+
+static func _grass() -> Dictionary:
+	return GRASS_LEVELS[option("grass")]
+
+
+static func _shadow() -> Dictionary:
+	return SHADOW_LEVELS[option("shadows")]
 
 
 static func grass_density() -> float:
-	return float(_p("grass_density"))
+	return float(_grass()["density"])
 
 
 static func grass_distance() -> float:
-	return float(_p("grass_distance"))
+	return float(_view()["grass"])
 
 
 ## Травинок в пучке травы (меньше — дешевле вершинный шейдер).
 static func grass_blades() -> int:
-	return int(_p("grass_blades"))
+	return int(_grass()["blades"])
 
 
 static func flower_density() -> float:
-	return float(_p("flower_density"))
+	return float(_grass()["flowers"])
 
 
 ## Дальность кустов, камней и кристаллов, м.
 static func detail_distance() -> float:
-	return float(_p("detail_distance"))
+	return float(_view()["detail"])
 
 
 static func tree_distance() -> float:
-	return float(_p("tree_distance"))
+	return float(_view()["trees"])
+
+
+## Дальность мелочей у построек (ящики, бочки, огни — меши «Props» зон IslandPois), м.
+static func props_distance() -> float:
+	return float(_view()["props"])
+
+
+## Дальность декора полей (колосья), м.
+static func decor_distance() -> float:
+	return float(_view()["decor"])
 
 
 static func shadows() -> bool:
-	return bool(_p("shadows"))
+	return option("shadows") > 0
 
 
 static func shadow_distance() -> float:
-	return float(_p("shadow_distance"))
+	return float(_shadow().get("distance", 0.0))
 
 
+## Тени от кустов и камней.
 static func small_shadows() -> bool:
-	return bool(_p("small_shadows"))
+	return bool(_shadow().get("small", false))
 
 
+## Цветокоррекция и виньетка (PostFx).
 static func postfx() -> bool:
-	return bool(_p("postfx"))
+	return option("postfx") >= 1
 
 
+## Мягкое свечение светлых мест (PostFx, полный вариант шейдера).
 static func bloom() -> bool:
-	return bool(_p("bloom"))
+	return option("postfx") >= 2
 
 
-## Контуры у мелочей (кусты, камни). У деревьев, персонажей и зверей контуры есть всегда.
+## FXAA своим проходом в PostFx.
+static func fxaa() -> bool:
+	return option("aa") == 1
+
+
+## MSAA 3D-кадра (Viewport.MSAA_*).
+static func msaa() -> Viewport.MSAA:
+	match option("aa"):
+		2:
+			return Viewport.MSAA_2X
+		3:
+			return Viewport.MSAA_4X
+	return Viewport.MSAA_DISABLED
+
+
 ## Полные (дорогие) версии шейдеров земли и воды; иначе — облегчённые.
 static func rich_shaders() -> bool:
-	return bool(_p("rich_shaders"))
+	return option("textures") >= 2
 
 
 ## Рисованные текстуры земли и построек (WorldTextures). Полный режим (две выборки против повтора,
 ## triplanar) — вместе с rich_shaders().
 static func textures() -> bool:
-	return bool(_p("textures"))
+	return option("textures") >= 1
 
 
+## Контуры (персонажи, звери, постройки, растительность).
 static func outlines() -> bool:
-	return bool(_p("outlines"))
+	return option("outlines") >= 1
 
 
-## Применяет текущий пресет ко всему, что уже создано: солнце, постобработка, растительность.
+## Доля частиц эффектов (Vfx).
+static func effects_scale() -> float:
+	return float(EFFECTS_SCALE[option("effects")])
+
+
+## Число частиц эффекта с учётом качества (не меньше 1).
+static func particles(amount: int) -> int:
+	return maxi(1, int(roundf(float(amount) * effects_scale())))
+
+
+## Тени карты теней на моделях персонажей и зверей (самозатенение). Выкл — только cel-свет.
+static func model_shadows() -> bool:
+	return option("model_shadows") >= 1
+
+
+## Высота кадра 3D-мира, px (0 — родное разрешение).
+static func render_height() -> int:
+	return int(RENDER_HEIGHTS[option("render")])
+
+
+## Масштаб 3D-кадра (Viewport.scaling_3d_scale) для экрана высотой screen_h px.
+static func render_scale_for(screen_h: float) -> float:
+	var h := render_height()
+	if h <= 0 or screen_h < 2.0:
+		return 1.0
+	return clampf(float(h) / screen_h, 0.25, 1.0)
+
+
+# ---------- Применение ----------
+
+## Применяет текущие настройки ко всему, что уже создано.
 static func apply(tree: SceneTree) -> void:
 	if tree == null or tree.root == null:
 		return
@@ -217,41 +441,117 @@ static func apply(tree: SceneTree) -> void:
 	IslandVegetation.apply_quality(tree)
 	PoiModels.apply_quality()
 	WorldTextures.apply_quality()
+	_set_group_range(tree, "poi_props", props_distance(), 8.0)
+	_set_group_range(tree, "poi_decor", decor_distance(), 8.0)
+	_apply_models()
 
 
-## Разрешение рендера: на «Низком» и «Среднем» кадр рисуется высотой 720 пикселей (ширина — по
-## пропорциям экрана) и растягивается на экран. У телефонов 2400×1080 и больше это в 2–3 раза меньше
-## пикселей. Интерфейс свёрстан под высоту 720, поэтому раскладка не меняется. «Высокое» — родное разрешение.
+## Разрешение и сглаживание окна. Интерфейс рисуется в родном разрешении (растяжение canvas_items, база
+## 1280×720 — раскладка та же), 3D-мир — с высотой render_height() и растягивается билинейно
+## (Viewport.scaling_3d_scale; в GL Compatibility 4.3 есть только билинейное). MSAA — у 3D-кадра.
 static func apply_resolution(tree: SceneTree) -> void:
 	var win := tree.root
-	if float(_p("render_scale")) >= 0.999:
-		win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
-		win.content_scale_size = Vector2i(1280, 720)
-		return
-	var screen := Vector2(DisplayServer.window_get_size())
-	if screen.x < 2.0 or screen.y < 2.0:
-		return
-	var h := minf(720.0, screen.y)
-	win.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
-	win.content_scale_size = Vector2i(int(roundf(h * screen.x / screen.y)), int(h))
+	win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+	win.content_scale_size = Vector2i(1280, 720)
+	win.msaa_3d = msaa()
+	win.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
+	win.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+	win.scaling_3d_scale = render_scale_for(float(win.size.y))
 
 
 ## Тени направленных источников света (солнце) в поддереве root.
 static func apply_lights(root: Node) -> void:
 	if root == null:
 		return
-	var preset: Dictionary = PRESETS[level()]
-	var on := bool(preset["shadows"])
+	var sh := _shadow()
+	var on := not sh.is_empty()
 	if on:
-		RenderingServer.directional_shadow_atlas_set_size(int(preset["shadow_atlas"]), true)
+		RenderingServer.directional_shadow_atlas_set_size(int(sh["atlas"]), true)
+		RenderingServer.directional_soft_shadow_filter_set_quality(int(sh["filter"]) as RenderingServer.ShadowQuality)
 	for n in root.find_children("*", "DirectionalLight3D", true, false):
 		var sun := n as DirectionalLight3D
 		if sun == null:
 			continue
 		sun.shadow_enabled = on
-		if on:
-			sun.directional_shadow_max_distance = float(preset["shadow_distance"])
-			if bool(preset["shadow_splits"]):
-				sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-			else:
-				sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+		if not on:
+			continue
+		sun.shadow_bias = SHADOW_BIAS
+		sun.shadow_normal_bias = SHADOW_NORMAL_BIAS
+		sun.directional_shadow_max_distance = float(sh["distance"])
+		sun.directional_shadow_blend_splits = bool(sh["blend"])
+		sun.directional_shadow_fade_start = 0.85
+		var sp: Array = sh["split"]
+		sun.directional_shadow_split_1 = float(sp[0])
+		sun.directional_shadow_split_2 = float(sp[1])
+		sun.directional_shadow_split_3 = float(sp[2])
+		if int(sh["splits"]) >= 4:
+			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+		else:
+			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+
+
+static func _set_group_range(tree: SceneTree, group: String, dist: float, margin: float) -> void:
+	for n in tree.get_nodes_in_group(group):
+		var gi := n as GeometryInstance3D
+		if gi == null:
+			continue
+		gi.visibility_range_end = dist
+		gi.visibility_range_end_margin = margin
+
+
+## Материал модели персонажа, зверя или питомца: тени на модели — по model_shadows(), контур outline
+## (null — без контура) — по outlines(). Меняются сразу при смене настроек (apply).
+static func track_model(m: Material, outline: Material = null) -> void:
+	if m == null:
+		return
+	if m is BaseMaterial3D:
+		(m as BaseMaterial3D).disable_receive_shadows = not model_shadows()
+		_model_mats = _alive(_model_mats)
+		_model_mats.append(weakref(m))
+	if outline != null:
+		track_outline(m, outline)
+
+
+## Материал с контуром: next_pass = outline, если контуры включены (иначе null). Меняется сразу (apply).
+static func track_outline(m: Material, outline: Material) -> void:
+	if m == null or outline == null:
+		return
+	m.set_meta("outline", outline)
+	m.next_pass = outline if outlines() else null
+	_outline_mats = _alive(_outline_mats)
+	_outline_mats.append(weakref(m))
+
+
+## Список без умерших ссылок (чистится, когда вырос).
+static func _alive(list: Array[WeakRef]) -> Array[WeakRef]:
+	if list.size() < 64 or list.size() % 32 != 0:
+		return list
+	var out: Array[WeakRef] = []
+	for wr in list:
+		if wr.get_ref() != null:
+			out.append(wr)
+	return out
+
+
+static func _apply_models() -> void:
+	var recv := not model_shadows()
+	var alive: Array[WeakRef] = []
+	for wr in _model_mats:
+		var m := wr.get_ref() as BaseMaterial3D
+		if m == null:
+			continue
+		alive.append(wr)
+		if m.disable_receive_shadows != recv:
+			m.disable_receive_shadows = recv
+	_model_mats = alive
+	var ol := outlines()
+	var alive_ol: Array[WeakRef] = []
+	for wr in _outline_mats:
+		var om := wr.get_ref() as Material
+		if om == null:
+			continue
+		alive_ol.append(wr)
+		var want: Material = (om.get_meta("outline") as Material) if ol else null
+		if om.next_pass != want:
+			om.next_pass = want
+	_outline_mats = alive_ol
