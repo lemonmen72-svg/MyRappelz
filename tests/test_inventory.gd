@@ -191,12 +191,15 @@ func run_step() -> void:
 			# Окно торговца: товары, сумка и карточка
 			main._on_action("shop")
 			check(eco.is_shop_open(), "окно торговца открыто")
-			check(win.buttons.has("good_card_panther") and win.buttons.has("good_mirror_card") and win.buttons.has("good_hp_potion"),
-				"товары: карта пантеры, зеркальная карта, зелье")
-			check(not win.buttons.has("good_card_wolf") and not win.buttons.has("good_card_wolf_soul"),
-				"карта волка не продаётся (только добыча)")
-			check(not win.buttons.has("good_card_boar") and not win.buttons.has("good_card_golem"),
-				"карт кабана и стража нет (их нельзя приручить)")
+			check(win.seller == "merchant" and win.buttons.has("good_hp_potion") and win.buttons.has("good_revive_scroll"),
+				"товары торговца: зелье, свиток воскрешения")
+			# Карты существ продаёт Учитель Кирк, у торговца их нет
+			for id in ["card_panther", "card_turtle", "card_pheasant", "mirror_card", "card_wolf", "card_wolf_soul",
+					"card_boar", "card_golem"]:
+				check(not win.buttons.has("good_" + String(id)), "у торговца не продаётся: %s" % id)
+			var kirk_goods := InventoryWindow.goods(game.class_id, "kirk")
+			check(kirk_goods.has("card_panther") and kirk_goods.has("mirror_card") and not kirk_goods.has("card_wolf"),
+				"карты существ — у Учителя Кирка: %s" % [kirk_goods])
 			check(win.buttons.has("good_daggers_steel"), "оружие Наёмника в товарах")
 			check(not win.buttons.has("good_boar_tusk"), "трофеи не продаются")
 			check(win.buttons.has("cell_0"), "сумка в окне торговца")

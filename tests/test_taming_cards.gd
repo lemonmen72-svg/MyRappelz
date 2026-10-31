@@ -1,6 +1,6 @@
 extends "res://tests/test_base.gd"
 ## Приручение картами существ: предметы-карты (пустые, с душой, зеркальная), тиры и цвета, описание карты,
-## покупка карты у торговца, «Приручить» без карты — отказ с подсказкой, где взять; с картой — метка, победа,
+## покупка карты у Учителя Кирка (у торговца карт нет), «Приручить» без карты — отказ с подсказкой, где взять; с картой — метка, победа,
 ## успех (карта с душой), «Сформировать» из карточки в сумке и из окна «Питомцы»; неудача без зеркальной карты —
 ## карта ломается, с зеркальной — ломается зеркальная; значок приручения на панели цели; карта с душой при полной
 ## сумке; кабана и каменного стража приручить нельзя (карт нет, фиолетовый значок, «Приручить» отказывает);
@@ -32,17 +32,22 @@ func run_step() -> void:
 			check(not inv.has("crystal_common"), "кристаллов души у нового героя нет")
 			check(game.gold >= int(ItemData.get_item("card_panther")["buy"]), "стартового золота хватает на карту: %d"
 				% game.gold)
-			player.global_position = Vector3(0, 0.1, -1.5)
+			# Рядом с Учителем Кирком (он продаёт карты существ)
+			var kp: Vector3 = main.npcs.kirk.global_position
+			var to_c := Vector3(-kp.x, 0, -kp.z).normalized()
+			player.global_position = kp + to_c * 2.0 + Vector3(0, 0.1, 0)
 			wait = 3
 			step = 1
 		1:
-			# Покупка карты фазана у торговца
+			# Покупка карты фазана у Учителя Кирка
 			var eco: Economy = main.economy
-			main._on_action("shop")
-			check(eco.is_shop_open(), "окно торговца открыто")
+			eco.open_shop("kirk")
+			check(eco.is_shop_open() and eco.window.seller == "kirk", "окно торговли Учителя Кирка открыто")
 			var win: InventoryWindow = eco.window
 			for id in ["card_panther", "card_turtle", "card_pheasant", "mirror_card"]:
-				check(win.buttons.has("good_" + id), "торговец продаёт: %s" % ItemData.item_name(id))
+				check(win.buttons.has("good_" + id), "Учитель Кирк продаёт: %s" % ItemData.item_name(id))
+			for id in ["card_panther", "mirror_card"]:
+				check(not InventoryWindow.goods(game.class_id, "merchant").has(id), "у торговца нет: %s" % id)
 			for id in ["card_wolf", "card_panther_soul", "card_boar", "card_golem"]:
 				check(not win.buttons.has("good_" + id), "не продаётся: %s" % id)
 			game.gold = 100
@@ -281,7 +286,7 @@ func _unit_lines() -> void:
 	var t := "\n".join(PackedStringArray(Taming.card_lines("card_panther")))
 	check(t.contains("Пантера") and t.contains("Пещера (ур. 6–8)"), "где водится пантера: " + t)
 	check(t.contains("коричневая (базовая)") and t.contains("70%"), "тир и шанс: " + t)
-	check(t.contains("продаётся у торговца"), "где взять карту пантеры")
+	check(t.contains("продаётся у Учителя Кирка в центре города"), "где взять карту пантеры: " + t)
 	check(t.contains("Примените «Приручить» к зверю, затем победите его"), "что делать с картой")
 	t = "\n".join(PackedStringArray(Taming.card_lines("card_wolf")))
 	check(t.contains("Восточный лагерь") and t.contains("выпадает из волка"), "карта волка: " + t)
@@ -291,7 +296,7 @@ func _unit_lines() -> void:
 	t = "\n".join(PackedStringArray(Taming.card_lines("card_wolf_soul")))
 	check(t.contains("Сформируйте существо в окне «Питомцы» или кнопкой «Сформировать»"), "карта с душой: " + t)
 	t = "\n".join(PackedStringArray(Taming.card_lines(ItemData.MIRROR_CARD)))
-	check(t.contains("зеркальная карта") and t.contains("продаётся у торговца"), "зеркальная карта: " + t)
+	check(t.contains("зеркальная карта") and t.contains("продаётся у Учителя Кирка"), "зеркальная карта: " + t)
 	check(Taming.where_to_get("card_wolf") == "выпадает из волка", "карта волка — из волка")
 
 

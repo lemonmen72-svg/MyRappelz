@@ -103,13 +103,16 @@ func run_step() -> void:
 			main._on_action("shop")
 			check(hud.is_window_open() and eco.is_shop_open(), "окно магазина открыто")
 			check(_find_button("good_boar_tusk") == null, "трофеи не продаются торговцем")
-			# Покупка карты существа: касание товара → «Купить»
+			check(_find_button("good_card_panther") == null and _find_button("good_mirror_card") == null,
+				"карты существ продаёт не торговец, а Учитель Кирк")
+			check(not eco.buy("card_panther", 1, "merchant"), "у торговца карту не купить")
+			# Покупка свитка: касание товара → «Купить»
 			game.gold = 100
-			var cards: int = game.inventory.count("card_panther")
-			_press("good_card_panther")
+			var scrolls: int = game.inventory.count("revive_scroll")
+			_press("good_revive_scroll")
 			_press("act_buy")
-			check(game.gold == 75 and game.inventory.count("card_panther") == cards + 1,
-				"куплена карта пантеры: золото %d, карт %d" % [game.gold, game.inventory.count("card_panther")])
+			check(game.gold == 70 and game.inventory.count("revive_scroll") == scrolls + 1,
+				"куплен свиток: золото %d, свитков %d" % [game.gold, game.inventory.count("revive_scroll")])
 			# Покупка ×5
 			game.gold = 100
 			var potions: int = game.inventory.count("hp_potion")
@@ -118,10 +121,10 @@ func run_step() -> void:
 			check(game.gold == 50 and game.inventory.count("hp_potion") == potions + 5, "куплено 5 зелий")
 			# Не хватает золота
 			game.gold = 10
-			cards = game.inventory.count("card_panther")
-			_press("good_card_panther")
+			scrolls = game.inventory.count("revive_scroll")
+			_press("good_revive_scroll")
 			_press("act_buy")
-			check(game.gold == 10 and game.inventory.count("card_panther") == cards, "без золота покупка не проходит")
+			check(game.gold == 10 and game.inventory.count("revive_scroll") == scrolls, "без золота покупка не проходит")
 			check(hud.is_window_open() and eco.is_shop_open(), "окно магазина открыто после покупок")
 			# Трофеи для продажи: окно перестроится само в следующем кадре
 			game.inventory.add("boar_tusk", 3)

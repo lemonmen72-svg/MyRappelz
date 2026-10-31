@@ -1,8 +1,9 @@
 extends Node3D
 ## Главная сцена: создание персонажа (если нет сохранения), затем мир (тренировочный остров
 ## из конфига world/training_island.json), игрок в деревне своей расы, звери по зонам,
-## модули (питомцы, приручение, предметы, окно героя) и интерфейс. Кнопки умений skill1…skill4 показывают
-## умения, назначенные в окне героя (Game.hero.slots); неподходящие оружию — затемнены с подсказкой.
+## модули (питомцы, приручение, предметы, окно героя, задания, NPC) и интерфейс. Кнопки умений skill1…skill4
+## показывают умения, назначенные в окне героя (Game.hero.slots); неподходящие оружию — затемнены с подсказкой.
+## Учитель Кирк (NPC с разговором, заданиями и картами существ) стоит в центре города рядом с торговцем (Npcs).
 
 const RESPAWN_TIME := 20.0
 const AUTOSAVE_TIME := 30.0
@@ -35,6 +36,9 @@ var pets: PetManager
 var taming: Taming
 var economy: Economy
 var world: IslandWorld
+## Задания (журнал, трекер, события) и жители-NPC (Учитель Кирк, диалоги).
+var quests: Quests
+var npcs: Npcs
 ## Окно героя (характеристики, оружие, древо умений).
 var hero_window: CharacterWindow
 ## Поворот камеры вокруг игрока (0 — смотрим на север) и наклон над горизонтом.
@@ -114,6 +118,8 @@ func _build_hud() -> void:
 	hud.add_button("potion", "Зелье", Vector2(470, 80), 45.0, Color(0.85, 0.15, 0.3, 0.45))
 	hud.add_button("shop", "Торговец", Vector2(480, 210), 50.0, Color(0.85, 0.7, 0.2, 0.45))
 	hud.set_button_visible("shop", false)
+	hud.add_button("talk", "Говорить", Vector2(590, 150), 50.0, Color(0.95, 0.6, 0.25, 0.45))
+	hud.set_button_visible("talk", false)
 
 
 func _build_player() -> void:
@@ -147,6 +153,14 @@ func _build_modules() -> void:
 	hero_window.name = "CharacterWindow"
 	add_child(hero_window)
 	hero_window.setup(self)
+	quests = Quests.new()
+	quests.name = "Quests"
+	add_child(quests)
+	quests.setup(self)
+	npcs = Npcs.new()
+	npcs.name = "Npcs"
+	add_child(npcs)
+	npcs.setup(self)
 
 
 func _build_slots() -> void:
@@ -168,6 +182,7 @@ func _on_mob_gone(mob: Mob, killed: bool) -> void:
 		pets.on_mob_killed(mob)
 		taming.on_mob_killed(mob)
 		economy.on_mob_killed(mob)
+		quests.on_mob_killed(mob)
 	get_tree().create_timer(RESPAWN_TIME).timeout.connect(_spawn_slot.bind(mob.slot))
 
 
@@ -185,6 +200,10 @@ func _on_action(id: String) -> void:
 		"settings_window":
 			SettingsMenu.open(hud)
 		_:
+			if quests.handle_action(id):
+				return
+			if npcs.handle_action(id):
+				return
 			if pets.handle_action(id):
 				return
 			if taming.handle_action(id):
