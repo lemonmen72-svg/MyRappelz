@@ -136,7 +136,7 @@ func _zone_has(w: IslandWorld, species: String, lvl: int, high: bool) -> bool:
 		var ok := int(lv[1]) >= lvl if high else int(lv[0]) <= lvl
 		if not ok:
 			continue
-		for s in zd.get("spawns", []):
+		for s in zd.get("mobs", []):
 			if String((s as Array)[0]) == species:
 				return true
 	return false
