@@ -69,6 +69,8 @@ var stats: Dictionary = {}
 ## Изученные умения {id: уровень} и включённые переключаемые {id: true} — словари из записи.
 var skills: Dictionary = {}
 var toggles: Dictionary = {}
+## Действующие эффекты для HUD (значки у полоски HP питомца): включённые переключаемые ("toggle:<id>").
+var effects := StatusEffects.new()
 ## Перезарядки изученных активных умений {id: осталось, с}.
 var skill_cds: Dictionary = {}
 ## Сколько раз применены изученные активные умения.
@@ -428,7 +430,7 @@ func _role_support() -> void:
 					continue
 				if m.global_position.distance_to(owner_node.global_position) > radius:
 					continue
-				m.taunt(self, float(sk["duration"]))
+				m.taunt(self, float(sk["duration"]), StatusEffects.source_role_skill(species))
 				if first == null:
 					first = m
 			if first != null:
@@ -498,7 +500,7 @@ func _threat_hit(m: Mob) -> void:
 	if threat <= 0.0 or not is_instance_valid(m) or m.is_dead or m.target != owner_node:
 		return
 	if randf() < threat:
-		m.taunt(self, 3.0)
+		m.taunt(self, 3.0, StatusEffects.source_pet_skill(species, "provoke"))
 
 
 func _miss_text(t: Mob) -> void:
@@ -609,12 +611,29 @@ func refresh_skills() -> void:
 func _update_aura() -> void:
 	if not is_instance_valid(owner_node):
 		return
+	_sync_toggle_effects()
 	if is_down:
 		owner_node.clear_pet_aura(self)
 		return
 	var b := PetSkills.bonuses(species, skills, toggles, true)
 	owner_node.set_pet_aura(self, float(b.get("atk_pct", 0.0)), roundi(float(b.get("def_flat", 0.0))),
 		float(b.get("hp_regen", 0.0)))
+	# Значки «Уз» и у хозяина: те включённые, что дают бонус и ему (поле owner)
+	var on := {}
+	for id in toggles:
+		if bool(toggles[id]) and bool(PetSkills.get_skill(String(id)).get("owner", false)):
+			on["pet:" + String(id)] = StatusEffects.toggle_info(StatusEffects.source_pet_skill(species, String(id)), pet_name)
+	owner_node.effects.sync_toggles("pet:", on)
+
+
+## Значки включённых переключаемых умений у полоски HP питомца (у погибшего — нет).
+func _sync_toggle_effects() -> void:
+	var on := {}
+	if not is_down:
+		for id in toggles:
+			if bool(toggles[id]):
+				on["toggle:" + String(id)] = StatusEffects.toggle_info(StatusEffects.source_pet_skill(species, String(id)))
+	effects.sync_toggles("toggle:", on)
 
 
 ## Можно ли применить активное умение id сейчас: изучено, перезарядка готова, хватает MP.
@@ -728,7 +747,7 @@ func _apply_skill(id: String, t: Mob) -> void:
 	if n <= 0 or sk.is_empty():
 		return
 	if sk.has("buff"):
-		_apply_buff(sk, n)
+		_apply_buff(sk, n, id)
 		return
 	if not is_instance_valid(t) or t.is_dead:
 		return
@@ -740,6 +759,7 @@ func _apply_skill(id: String, t: Mob) -> void:
 		_area_fx(t.global_position, r, fx)
 	var mult := PetSkills.value(sk["dmg"], n) if sk.has("dmg") else 0.0
 	var hits := int(sk.get("hits", 1))
+	var src := StatusEffects.source_pet_skill(species, id)
 	for m in victims:
 		_skill_fx(m, fx, mult > 1.5)
 		if mult > 0.0:
@@ -752,25 +772,25 @@ func _apply_skill(id: String, t: Mob) -> void:
 		var parent := get_parent()
 		var above := m.global_position + Vector3(0, m._height + 0.9, 0)
 		if sk.has("slow"):
-			m.slow(PetSkills.value(sk["slow"], n), DEBUFF_TIME)
+			m.slow(PetSkills.value(sk["slow"], n), DEBUFF_TIME, src)
 			Util.float_text(parent, above, "Замедлен", Color(0.6, 0.8, 1.0))
 		if sk.has("vuln"):
-			m.expose(PetSkills.value(sk["vuln"], n), DEBUFF_TIME)
+			m.expose(PetSkills.value(sk["vuln"], n), DEBUFF_TIME, src)
 			Util.float_text(parent, above, "Уязвим", Color(1.0, 0.6, 0.4))
 		if sk.has("miss"):
-			m.weaken_aim(PetSkills.value(sk["miss"], n), DEBUFF_TIME)
+			m.weaken_aim(PetSkills.value(sk["miss"], n), DEBUFF_TIME, src)
 			Util.float_text(parent, above, "Сбит прицел", Color(1.0, 0.9, 0.5))
 		if sk.has("weaken"):
-			m.weaken(PetSkills.value(sk["weaken"], n), DEBUFF_TIME)
+			m.weaken(PetSkills.value(sk["weaken"], n), DEBUFF_TIME, src)
 			Util.float_text(parent, above, "Ослаблен", Color(1.0, 0.7, 0.5))
 		if sk.has("stun"):
-			m.stun(float(sk["stun"]))
+			m.stun(float(sk["stun"]), src)
 			Util.float_text(parent, above, "Оглушён!", Color(1, 1, 0.5))
 		if sk.has("blind"):
-			m.blind(PetSkills.value(sk["blind"], n))
+			m.blind(PetSkills.value(sk["blind"], n), src)
 			Util.float_text(parent, above, "Морок!", Color(0.75, 0.65, 1.0))
 		if bool(sk.get("threat", false)):
-			m.taunt(self, 4.0)
+			m.taunt(self, 4.0, src)
 		else:
 			_threat_hit(m)
 
@@ -787,7 +807,7 @@ func _extra_hit(target_ref: Variant, mult: float, fx: Color) -> void:
 
 
 ## Усиление хозяина: атака, защита (меньше урона) или лечение хозяина и питомца.
-func _apply_buff(sk: Dictionary, n: int) -> void:
+func _apply_buff(sk: Dictionary, n: int, id: String = "") -> void:
 	var v := PetSkills.value(sk["value"], n)
 	var parent := get_parent()
 	var c: Color = sk["color"]
@@ -796,11 +816,13 @@ func _apply_buff(sk: Dictionary, n: int) -> void:
 		"atk":
 			owner_node.atk_buff = maxf(owner_node.atk_buff, v)
 			owner_node.atk_buff_time = maxf(owner_node.atk_buff_time, float(sk.get("time", 10.0)))
+			owner_node.add_effect("atk", owner_node.atk_buff_time, StatusEffects.source_pet_skill(species, id))
 			owner_node.stats_changed.emit()
 			Util.float_text(parent, head, "Атака +%d%%" % roundi(v * 100.0), c)
 		"guard":
 			owner_node.guard = maxf(owner_node.guard, v)
 			owner_node.guard_time = maxf(owner_node.guard_time, float(sk.get("time", 10.0)))
+			owner_node.add_effect("guard", owner_node.guard_time, StatusEffects.source_pet_skill(species, id))
 			owner_node._update_guard_fx()
 			owner_node.stats_changed.emit()
 			Util.float_text(parent, head, "Защита!", c)

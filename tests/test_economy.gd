@@ -183,6 +183,7 @@ func run_step() -> void:
 				"пустая сумка: %s" % (used.text if used else "?"))
 			check(_find_button("cell_0") != null, "пустые ячейки видны")
 			check(_button_label("potion") == "Зелье\n0", "на кнопке 0 зелий")
+			check(hud.button_icon("potion") != null and hud.button_icon("potion").count() == 0, "на значке зелья число 0")
 			main._on_action("bag_window")
 			check(not hud.is_window_open(), "сумка закрывается повторным действием")
 			game.inventory.from_dict(saved)

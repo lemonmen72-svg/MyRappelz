@@ -139,6 +139,8 @@ func _update_potion_button() -> void:
 	if main == null or main.hud == null:
 		return
 	main.hud.set_button_text("potion", "Зелье\n%d" % Game.inventory.count("hp_potion"))
+	main.hud.set_button_icon("potion", IconView.item("hp_potion"))
+	main.hud.set_button_count("potion", Game.inventory.count("hp_potion"))
 
 
 # ---------- Торговец ----------

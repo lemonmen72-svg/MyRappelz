@@ -620,6 +620,36 @@ func run_step() -> void:
 			_top.queue_free()
 			main.cam.current = true
 			main.hud.visible = true
+			# Значки эффектов и кнопок (кадр 69): призвана пантера с включёнными «Узами тени» (только следует),
+			# у героя «Щит света» и «Быстрый шаг», от пантеры — «Зов охотницы»; цель — фазан с замедлением,
+			# уязвимостью и уроном со временем
+			main.pets.summon(1)
+			var pet: Pet = main.pets.active_pet
+			if pet != null:
+				pet.set_mode("follow")
+			var ph := find_mob("pheasant")
+			if ph != null:
+				stand_near(ph, 4.0)
+				player._set_target(ph)
+			wait = 40
+			step = 610
+		610:
+			player.hp = player.max_hp
+			player.use_skill("holy_guard")
+			player.use_skill("quick_step")
+			var pet: Pet = main.pets.active_pet
+			if pet != null:
+				pet._apply_buff(PetSkills.get_skill("hunter_call"), 1, "hunter_call")
+			var ph: Mob = player.current_target
+			if ph != null and not ph.is_dead:
+				ph.slow(0.2, 10.0, StatusEffects.source_pet_skill("panther", "dusk_rupture"))
+				ph.expose(0.1, 6.0, StatusEffects.source_pet_skill("panther", "shadow_fang"))
+				ph.add_dot("piercing_arrow", 0.5, 12.0, player, true, StatusEffects.source_hero_skill("piercing_arrow"))
+			wait = 75
+			step = 611
+		611:
+			player.hp = player.max_hp
+			shot("69_status_icons")
 			ok_done()
 
 
