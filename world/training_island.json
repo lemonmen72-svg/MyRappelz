@@ -887,6 +887,25 @@
    ]
   },
   {
+   "id": "east_plains",
+   "name": "Восточные равнины",
+   "center": [
+    140.0,
+    10.0
+   ],
+   "radius": 11.0,
+   "levels": [
+    9,
+    10
+   ],
+   "mobs": [
+    [
+     "centaur",
+     3
+    ]
+   ]
+  },
+  {
    "id": "fish_pond",
    "name": "Пруд у Светлой рощи",
    "center": [

@@ -37,7 +37,12 @@
 Quaternius Universal Animation Library (CC0) переносятся на скелет (BipedRetarget, как tools/retarget_animations.py
 у героя), опорные стопы без проскальзывания, Death — лёжа на земле. Нужны --ual1/--ual2 (подробно — у BIPED_CREATURES).
 
-Новый зверь или стадия эволюции: добавить запись в CREATURES (высота, стиль клипов «cat»/«turtle»/«bird»,
+Кентавр (стиль «centaur», CREATURES["centaur"], стадии centaur_2/_3): скелет Meshy у конской части негоден (передние
+ноги без костей), поэтому ноги, корпус, хвост и кость копья строятся заново по геометрии меша, а кости и веса
+человека (торс, руки, голова) берутся у Meshy (centaur_rig); клипы — centaur_clips (ноги — тот же IK, что у
+четвероногих; копьё в правой руке). Подробно — в разделе «Кентавр». Нужны также scipy (связные части меша).
+
+Новый зверь или стадия эволюции: добавить запись в CREATURES (высота, стиль клипов «cat»/«turtle»/«bird»/«centaur»,
 параметры шага; стадия — stage_cfg(вид, высота, …)) и запустить скрипт с его GLB. Скелеты Meshy разные: лишняя
 нога-копия убирается (merge_twin_legs), у головы уши — самая высокая боковая ветка, прочие ветки — HeadX*, если хвост
 лежит на земле ниже лап — ноги ищутся как парные боковые концы (side_leg_roots). Если роли всё же не найдутся,
@@ -150,6 +155,22 @@ CREATURES.update({
 	"wolf_2": stage_cfg("wolf", 0.95),
 	"wolf_3": stage_cfg("wolf", 0.95),
 })
+
+
+# Кентавр (стиль «centaur»): конская часть — свой скелет по геометрии меша (centaur_rig), человек — кости Meshy.
+# Высота — до наконечника копья (голова ≈ 2.1 м). Шаг — четырёхтакт (левая задняя, левая передняя, правая задняя,
+# правая передняя), бег — галоп. arm_r — насколько далеко от линии руки вершины ещё считаются рукой (доля высоты).
+CREATURES["centaur"] = {
+	"height": 2.25, "tris": 8500, "style": "centaur", "idle_T": 3.0, "arm_r": 0.06, "smooth": 6,
+	"ik_upper": {"FL": 0, "FR": 0, "BL": 0, "BR": 0},
+	"walk": {"T": 0.95, "duty": 0.62, "stride": 0.5, "lift": 0.10, "flex": 0.8, "crouch": 0.03,
+		"td": {"BL": 0.0, "FL": 0.25, "BR": 0.5, "FR": 0.75}},
+	"run": {"T": 0.6, "duty": 0.34, "stride": 0.8, "lift": 0.16, "flex": 0.9, "crouch": 0.06,
+		"td": {"BL": 0.0, "BR": 0.1, "FL": 0.42, "FR": 0.52}},
+}
+CREATURES["centaur_2"] = stage_cfg("centaur", 2.25)
+# У 3-й стадии (полный доспех) швы UV не дают упростить меш ниже ~13 тыс. — упрощение по сваренным позициям
+CREATURES["centaur_3"] = stage_cfg("centaur", 2.25, simplify="welded")
 
 
 # ---------- GLB: чтение ----------
@@ -747,15 +768,20 @@ def weld_same(m: dict) -> dict:
 	return out
 
 
-def simplify_mesh(m: dict, target_tris: int) -> dict:
+def simplify_mesh(m: dict, target_tris: int, welded: bool = False) -> dict:
 	"""Упрощение meshoptimizer: вершины не сдвигаются, остаются исходные (с их UV, нормалями и весами).
 	Сначала свариваются вершины, различающиеся только нормалью (иначе такие «швы» запирают упрощение).
 	Швы UV (вершины с одной позицией и разными UV) meshoptimizer сам держит согласованными;
-	разница UV и нормалей входит в метрику ошибки, чтобы не плыли границы участков текстуры."""
+	разница UV и нормалей входит в метрику ошибки, чтобы не плыли границы участков текстуры.
+	welded (cfg "simplify": "welded") — если швы UV не дают дойти до цели (у сложного доспеха кентавра 3-й стадии
+	упрощение встаёт на ~13 тыс.), упрощается меш со сваренными позициями, а у каждого угла треугольника берётся
+	та копия вершины, при которой UV треугольника компактнее (остаётся на своём участке текстуры)."""
 	import ctypes
 	import meshoptimizer as mo
 	from meshoptimizer._loader import lib
 	m = weld_same(m)
+	if welded:
+		return simplify_welded(m, target_tris)
 	idx = np.ascontiguousarray(m["tris"].astype(np.uint32).ravel())
 	vp = np.ascontiguousarray(m["pos"].astype(np.float32))
 	attrs = np.ascontiguousarray(np.hstack([m["uv"], m["nrm"]]).astype(np.float32))
@@ -774,6 +800,12 @@ def simplify_mesh(m: dict, target_tris: int) -> dict:
 		attrs.shape[1] * 4, aw.ctypes.data_as(P(ctypes.c_float)), len(aw),
 		None, target_tris * 3, 1.0, 0, ctypes.byref(err))
 	t = dest[:n].astype(np.int64).reshape(-1, 3)
+	return finish_simplify(m, t, float(err.value))
+
+
+def finish_simplify(m: dict, t: np.ndarray, err: float) -> dict:
+	"""После упрощения: без вырожденных треугольников, порядок под кэш вершин, только нужные вершины."""
+	import meshoptimizer as mo
 	# Вырожденные треугольники (две вершины в одной точке) — прочь
 	p = m["pos"]
 	cr = np.linalg.norm(np.cross(p[t[:, 1]] - p[t[:, 0]], p[t[:, 2]] - p[t[:, 0]]), axis=1)
@@ -791,8 +823,44 @@ def simplify_mesh(m: dict, target_tris: int) -> dict:
 	for k in ("pos", "nrm", "uv", "joints", "weights"):
 		out[k] = m[k][used]
 	out["tris"] = remap[t]
-	out["simplify_error"] = float(err.value)
+	out["simplify_error"] = err
 	return out
+
+
+def simplify_welded(m: dict, target_tris: int) -> dict:
+	"""Упрощение по сваренным позициям (без швов UV), углы треугольников — копии вершин с компактными UV."""
+	import ctypes
+	import itertools
+	from meshoptimizer._loader import lib
+	q = np.round(m["pos"] / 1e-5).astype(np.int64)
+	_, first, inv = np.unique(q, axis=0, return_index=True, return_inverse=True)
+	inv = inv.ravel()
+	idx = np.ascontiguousarray(inv[m["tris"]].astype(np.uint32).ravel())
+	vp = np.ascontiguousarray(m["pos"][first].astype(np.float32))
+	P = ctypes.POINTER
+	fn = lib.meshopt_simplify
+	fn.argtypes = [P(ctypes.c_uint), P(ctypes.c_uint), ctypes.c_size_t, P(ctypes.c_float), ctypes.c_size_t,
+		ctypes.c_size_t, ctypes.c_size_t, ctypes.c_float, ctypes.c_uint, P(ctypes.c_float)]
+	fn.restype = ctypes.c_size_t
+	dest = np.zeros(len(idx), dtype=np.uint32)
+	err = ctypes.c_float(0.0)
+	n = fn(dest.ctypes.data_as(P(ctypes.c_uint)), idx.ctypes.data_as(P(ctypes.c_uint)), len(idx),
+		vp.ctypes.data_as(P(ctypes.c_float)), len(vp), 12, target_tris * 3, 1.0, 0, ctypes.byref(err))
+	tw = dest[:n].astype(np.int64).reshape(-1, 3)
+	order = np.argsort(inv, kind="stable")
+	starts = np.searchsorted(inv[order], np.arange(len(first) + 1))
+	uv = m["uv"]
+	t = np.zeros_like(tw)
+	for i, tri in enumerate(tw):
+		cands = [order[starts[w]:starts[w + 1]][:4] for w in tri]
+		best = None
+		for combo in itertools.product(*cands):
+			a, b, c = uv[combo[0]], uv[combo[1]], uv[combo[2]]
+			d = float(np.linalg.norm(a - b) + np.linalg.norm(b - c) + np.linalg.norm(c - a))
+			if best is None or d < best[0]:
+				best = (d, combo)
+		t[i] = best[1]
+	return finish_simplify(m, t, float(err.value))
 
 
 def mesh_stats(pos: np.ndarray, tris: np.ndarray) -> dict:
@@ -1940,6 +2008,757 @@ def fish_check_clip(meta: dict, name: str, miny: float, end_min: float) -> tuple
 	return ", в воздухе", miny < 0.5 * rest_lo
 
 
+# ---------- Кентавр (стиль «centaur») ----------
+# Скелет Meshy у кентавра собран плохо: у передних конских ног нет своих костей (их вершины висят на кисти руки,
+# древке копья и задней ноге), копьё — на корне или на костях головы и пальцев, большие куски доспеха — на костях
+# плеча. Поэтому скелет и веса строятся заново по геометрии меша (centaur_rig), а от Meshy берутся только кости
+# и веса человека — торса, рук и головы:
+#  * копьё — прямая через вершины «длинных тонких» костей; вершины у этой оси → своя кость Spear, дочь кисти
+#    правой руки (копьё твёрдое и ходит с кистью);
+#  * ноги — 4 связные части меша ниже брюха, касающиеся земли (срез поднимается, пока частей ровно 4); суставы:
+#    локоть/коленная чашка у брюха, запястье/скакательный, путовый, копыто (точка опоры); веса — полосами
+#    по высоте, у брюха нога плавно переходит в корпус;
+#  * хвост — задняя часть, не касающаяся земли (до высоты, где она срастается с крупом), цепочка Tail* по ней;
+#  * корпус лошади: Root (у задних ног — таз), Spine1, Chest (у передних ног), веса — по Z;
+#  * человек: торс — кости Meshy на пути к ветвлению рук и шеи выше спины лошади (Waist — стык со спиной),
+#    руки — ветки ветвления, голова — путь к макушке; кость дальше 0.25 высоты от родителя переносится к ближайшей
+#    (у Meshy пальцы левой руки висят на наплечнике правой); вершина руки дальше arm_r от линии руки отдаётся торсу.
+#  Затем веса сглаживаются по соседям меша и обрезаются до 4 на вершину.
+# Клипы (centaur_clips): конские ноги — IK как у четвероногих (шаг — четырёхтактный, бег — галоп), торс держится
+# прямо, выпад копьём — торсом и правой рукой (передние ноги приподнимаются), Death — падение набок.
+
+
+def weld_ids(pos: np.ndarray) -> np.ndarray:
+	"""Номер «сваренной» вершины (одинаковая позиция — один номер)."""
+	q = np.round(pos / 1e-5).astype(np.int64)
+	_, w = np.unique(q, axis=0, return_inverse=True)
+	return w.ravel()
+
+
+def part_labels(weld: np.ndarray, tris: np.ndarray, mask: np.ndarray) -> np.ndarray:
+	"""Связные части подмеша из треугольников, у которых все вершины в mask: метка на вершину (-1 — вне mask)."""
+	from scipy.sparse import coo_matrix
+	from scipy.sparse.csgraph import connected_components
+	t = tris[mask[tris].all(1)]
+	n = int(weld.max()) + 1
+	e = weld[np.concatenate([t[:, [0, 1]], t[:, [1, 2]]])]
+	A = coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(n, n))
+	_, lab = connected_components(A, directed=False)
+	lab = lab[weld].astype(np.int64)
+	lab[~mask] = -1
+	return lab
+
+
+def parts(lab: np.ndarray, min_n: int) -> list:
+	"""Части (массивы индексов вершин) размером от min_n, крупные первыми."""
+	ids, cnt = np.unique(lab[lab >= 0], return_counts=True)
+	order = np.argsort(-cnt)
+	return [np.nonzero(lab == ids[k])[0] for k in order if cnt[k] >= min_n]
+
+
+def centaur_spear(pos: np.ndarray, dom: np.ndarray, names: list, H: float) -> dict:
+	"""Ось копья: прямая x(y), z(y) через вершины костей Meshy, у которых вершины вытянуты по высоте и тонки."""
+	bones = []
+	for b in range(len(names)):
+		m = dom == b
+		if m.sum() < 50:
+			continue
+		P = pos[m]
+		if float(np.ptp(P[:, 1])) > 0.3 * H and math.sqrt(float(P[:, [0, 2]].var(0).sum())) < 0.03 * H:
+			bones.append(b)
+	if not bones:
+		raise ValueError("не нашёл копьё (длинную тонкую кость)")
+	P = pos[np.isin(dom, bones)]
+	keep = np.ones(len(P), dtype=bool)
+	for _ in range(5):
+		A = np.stack([P[keep, 1], np.ones(int(keep.sum()))], 1)
+		kx = np.linalg.lstsq(A, P[keep, 0], rcond=None)[0]
+		kz = np.linalg.lstsq(A, P[keep, 2], rcond=None)[0]
+		d = np.hypot(P[:, 0] - (kx[0] * P[:, 1] + kx[1]), P[:, 2] - (kz[0] * P[:, 1] + kz[1]))
+		keep = d < max(3.0 * float(np.median(d[keep])), 0.01 * H)
+	sp = {"kx": kx, "kz": kz, "bones": bones}
+	# Концы — по всем вершинам у оси (наконечник может висеть на другой кости)
+	near = spear_dist(sp, pos) < 0.03 * H
+	sp["top"], sp["bottom"] = float(pos[near, 1].max()), float(pos[near, 1].min())
+	return sp
+
+
+def spear_dist(sp: dict, pos: np.ndarray) -> np.ndarray:
+	"""Расстояние вершин до оси копья в плоскости XZ."""
+	return np.hypot(pos[:, 0] - (sp["kx"][0] * pos[:, 1] + sp["kx"][1]), pos[:, 2] - (sp["kz"][0] * pos[:, 1] + sp["kz"][1]))
+
+
+def spear_point(sp: dict, y: float) -> np.ndarray:
+	return np.array([sp["kx"][0] * y + sp["kx"][1], y, sp["kz"][0] * y + sp["kz"][1]])
+
+
+def seg_dist(P: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.ndarray:
+	"""Расстояние точек P до отрезка ab."""
+	d = b - a
+	t = np.clip(((P - a) @ d) / max(float(d @ d), 1e-12), 0.0, 1.0)
+	return np.linalg.norm(P - (a + t[:, None] * d), axis=1)
+
+
+def poly_dist(P: np.ndarray, pts: list) -> np.ndarray:
+	out = np.full(len(P), 1e9)
+	for a, b in zip(pts, pts[1:]):
+		out = np.minimum(out, seg_dist(P, a, b))
+	return out
+
+
+def ramp(v, a: float, b: float):
+	"""0 при v ≤ a, 1 при v ≥ b, плавно между (a > b — наоборот)."""
+	x = np.clip((np.asarray(v, dtype=np.float64) - a) / (b - a), 0.0, 1.0)
+	return x * x * (3.0 - 2.0 * x)
+
+
+def label_stats(lab: np.ndarray, vals: np.ndarray) -> tuple:
+	"""По меткам частей: (метки, число вершин, мин. и макс. vals)."""
+	m = lab >= 0
+	ids, inv = np.unique(lab[m], return_inverse=True)
+	inv = inv.ravel()
+	mn = np.full(len(ids), 1e9)
+	mx = np.full(len(ids), -1e9)
+	np.minimum.at(mn, inv, vals[m])
+	np.maximum.at(mx, inv, vals[m])
+	return ids, np.bincount(inv, minlength=len(ids)), mn, mx
+
+
+def centaur_rig(g: dict, cfg: dict) -> tuple:
+	"""Скелет и веса кентавра заново (см. описание раздела): возвращает (g с новыми костями и весами, роли)."""
+	H = cfg["height"]
+	pos, tris = g["pos"], g["tris"]
+	V = len(pos)
+	parent = g["parent"].copy()
+	gp, gr = g["gpos"], g["grot"]
+	B0 = len(parent)
+	weld = weld_ids(pos)
+	dom = g["joints"][np.arange(V), np.argmax(g["weights"], 1)]
+	y = pos[:, 1]
+
+	# --- Копьё ---
+	sp = centaur_spear(pos, dom, g["names"], H)
+	ds = spear_dist(sp, pos)
+	r_sp = np.where(y > sp["top"] - 0.3 * H, 0.06 * H, 0.022 * H)  # наконечник шире древка
+	cand = (ds < r_sp) & (y > sp["bottom"] - 0.01 * H) & (y < sp["top"] + 0.01 * H)
+	lab = part_labels(weld, tris, cand)
+	ids, cnt, mn, mx = label_stats(lab, y)
+	spear = np.isin(lab, ids[(mx - mn) > 0.1 * H])
+	print("   копьё: ось у (%.2f, %.2f) внизу, верх %.2f м, %d вершин, кости Meshy %s" % (
+		spear_point(sp, 0.0)[0], spear_point(sp, 0.0)[2], sp["top"], int(spear.sum()), [g["names"][b] for b in sp["bones"]]))
+
+	# --- Ноги: 4 части у земли; срез поднимается, пока их ровно 4 ---
+	free = ~spear
+	best = None
+	for yt in np.arange(0.08, 0.6, 0.01) * H:
+		lab = part_labels(weld, tris, free & (y < yt))
+		ids, cnt, mn, mx = label_stats(lab, y)
+		legs = ids[(mn < 0.03 * H) & (cnt > 0.002 * V)]
+		if len(legs) == 4:
+			best = (float(yt), lab, legs)
+		elif best is not None:
+			break
+	if best is None:
+		raise ValueError("не нашёл 4 конские ноги у земли")
+	y_m, lab_m, leg_ids = best
+	leg_v = [np.nonzero(lab_m == i)[0] for i in leg_ids]
+	tops = []
+	for lv in leg_v:
+		t = lv[y[lv] > y_m - 0.03 * H]
+		c = pos[t].mean(0)
+		r = float(np.percentile(np.hypot(pos[t, 0] - c[0], pos[t, 2] - c[2]), 90))
+		tops.append((c, r))
+	order = sorted(range(4), key=lambda k: -tops[k][0][2])
+	keys = {}
+	for pair, pre in ((order[:2], "F"), (order[2:], "B")):
+		a, b = pair
+		keys[pre + ("L" if tops[a][0][0] > tops[b][0][0] else "R")] = a
+		keys[pre + ("R" if tops[a][0][0] > tops[b][0][0] else "L")] = b
+	leg_of = np.full(V, -1, dtype=np.int64)
+	for k, lv in enumerate(leg_v):
+		leg_of[lv] = k
+
+	# --- Хвост: задняя часть не у земли; поднимаемся, пока она не срастётся с корпусом ---
+	zb_leg = min(tops[keys["BL"]][0][2], tops[keys["BR"]][0][2])
+	ids, cnt, mn, mx = label_stats(lab_m, y)
+	tail_v = np.zeros(0, dtype=np.int64)
+	cands = []
+	for i, n, lo in zip(ids, cnt, mn):
+		if lo >= 0.03 * H and n > 0.002 * V:
+			vv = np.nonzero(lab_m == i)[0]
+			if pos[vv, 2].mean() < zb_leg:
+				cands.append(vv)
+	if cands:
+		seed = max(cands, key=len)
+		legs_all = np.concatenate(leg_v)
+		tail_v = seed
+		for yt in np.arange(y_m + 0.01 * H, 0.75 * H, 0.01 * H):
+			lab = part_labels(weld, tris, free & (y < yt))
+			ls = np.bincount(lab[seed][lab[seed] >= 0]).argmax()
+			vv = np.nonzero(lab == ls)[0]
+			if np.isin(ls, lab[legs_all]) or len(vv) > 0.25 * V:
+				break
+			tail_v = vv
+	is_tail = np.zeros(V, dtype=bool)
+	is_tail[tail_v] = True
+
+	# --- Корпус лошади ---
+	xc = float(np.mean([t[0][0] for t in tops]))
+	zf = float(np.mean([tops[keys[k]][0][2] for k in ("FL", "FR")]))
+	zb = float(np.mean([tops[keys[k]][0][2] for k in ("BL", "BR")]))
+	xf = float(np.mean([tops[keys[k]][0][0] for k in ("FL", "FR")]))
+	xb = float(np.mean([tops[keys[k]][0][0] for k in ("BL", "BR")]))
+	strip = (np.abs(pos[:, 0] - xc) < 0.06 * H) & ~spear & ~is_tail
+	y_back = y_m
+	for yy in np.arange(y_m, 0.8 * H, 0.01 * H):
+		s = strip & (np.abs(y - yy) < 0.005 * H)
+		if s.any() and pos[s, 2].min() < zb + 0.25 * (zf - zb):
+			y_back = float(yy)
+	y_r = 0.5 * (y_m + y_back)
+	P_root = np.array([xb, y_r, zb])
+	P_chest = np.array([xf, y_r, zf])
+
+	# --- Человек: кости Meshy ---
+	ch = children_of(parent)
+	spear_b = set(sp["bones"])
+	for b in range(B0):  # кость далеко от родителя — к ближайшей (пальцы левой руки на наплечнике правой и т. п.)
+		p = int(parent[b])
+		if p < 0 or b in spear_b or len(subtree(ch, b)) > 4:
+			continue
+		if np.linalg.norm(gp[b] - gp[p]) > 0.25 * H:
+			sub = set(subtree(ch, b))
+			others = [o for o in range(B0) if o not in sub and o not in spear_b]
+			q = min(others, key=lambda o: float(np.linalg.norm(gp[o] - gp[b])))
+			print("   кость %s перенесена: %s → %s" % (g["names"][b], g["names"][p], g["names"][q]))
+			parent[b] = q
+			ch = children_of(parent)
+	sp_share = np.bincount(dom[spear], minlength=B0) / np.maximum(np.bincount(dom, minlength=B0), 1)
+	body_b = [b for b in range(B0) if b not in spear_b and sp_share[b] < 0.5]
+	top = max(body_b, key=lambda b: gp[b, 1])
+	hp = path_to(parent, top)
+
+	def lateral(b, c):
+		return max(abs(float(gp[x, 0] - gp[b, 0])) for x in subtree(ch, c))
+
+	shoulder, arm_root = None, {}
+	for b in reversed(hp):
+		side = {}
+		for c in ch[b]:
+			if c in hp or c in spear_b or lateral(b, c) < 0.08 * H:
+				continue
+			s = "L" if max(gp[x, 0] for x in subtree(ch, c)) - gp[b, 0] > gp[b, 0] - min(gp[x, 0] for x in subtree(ch, c)) else "R"
+			if s not in side or lateral(b, c) > lateral(b, side[s]):
+				side[s] = c
+		if len(side) == 2:
+			shoulder, arm_root = b, side
+			break
+	if shoulder is None:
+		raise ValueError("не нашёл плечи (ветвление рук)")
+	ish = hp.index(shoulder)
+	head = None
+	for k in range(len(hp) - 1, ish, -1):
+		if len([c for c in ch[hp[k]] if c not in spear_b]) >= 2:
+			head = hp[k]
+			break
+	if head is None:
+		head = hp[-2] if len(hp) - 2 > ish else hp[-1]
+	neck = hp[ish + 1:hp.index(head)]
+	arms = {}
+	for s, r in arm_root.items():
+		sub = [x for x in subtree(ch, r) if x not in spear_b]
+		far = max(sub, key=lambda x: float(np.linalg.norm(gp[x] - gp[r])))
+		chain = path_to(parent, far)
+		chain = chain[chain.index(r):]
+		seg = [float(np.linalg.norm(gp[chain[k + 1]] - gp[chain[k]])) for k in range(len(chain) - 1)]
+		u = max(range(len(chain) - 2), key=lambda k: seg[k] + seg[k + 1])
+		arms[s] = {"bones": sub, "chain": chain, "u": u}
+	torso_m = [b for b in hp[:ish + 1] if gp[b, 1] > y_back + 0.01 * H]
+	if shoulder not in torso_m:
+		torso_m.append(shoulder)
+	head_set = [x for x in neck + subtree(ch, head) if x not in spear_b]
+
+	# --- Новый скелет ---
+	nb_names, nb_par, nb_pos, nb_rot, src = [], [], [], [], []
+
+	def add(name, par, p, rot=None, s=-1):
+		nb_names.append(name)
+		nb_par.append(par)
+		nb_pos.append(np.asarray(p, dtype=np.float64))
+		nb_rot.append(I3.copy() if rot is None else rot)
+		src.append(s)
+		return len(nb_names) - 1
+
+	ROOT = add("Root", -1, P_root)
+	SPINE = add("Spine1", ROOT, 0.5 * (P_root + P_chest))
+	CHEST = add("Chest", SPINE, P_chest)
+	tz = ~spear & (pos[:, 2] > zf - 0.15 * H) & (np.abs(y - (y_back + 0.05 * H)) < 0.01 * H) & (np.abs(pos[:, 0] - gp[shoulder, 0]) < 0.12 * H)
+	wc = pos[tz].mean(0) if tz.any() else gp[torso_m[0]]
+	WAIST = add("Waist", CHEST, [wc[0], y_back, wc[2]])
+	new_of = {}
+	prev = WAIST
+	for i, b in enumerate(sorted(torso_m, key=lambda b: gp[b, 1])):
+		prev = new_of[b] = add("Torso%d" % (i + 1), prev, gp[b], gr[b], b)
+	torso_top = prev
+	torso_new = [WAIST] + [new_of[b] for b in sorted(torso_m, key=lambda b: gp[b, 1])]
+
+	def add_sub(bones, root_par, main, prefix):
+		n_x = 0
+		for b in sorted(bones):  # g уже в топологическом порядке: родитель раньше
+			p = int(parent[b])
+			par = new_of.get(p, root_par)
+			if b in main:
+				nm = main[b]
+			else:
+				if p not in bones or p in main:
+					n_x += 1
+					k = 0
+				k += 1
+				nm = "%sX%d_%d" % (prefix, n_x, k)
+			new_of[b] = add(nm, par, gp[b], gr[b], b)
+
+	main_n = {b: ("Neck%d" % (i + 1) if len(neck) > 1 else "Neck") for i, b in enumerate(neck)}
+	main_n[head] = "Head"
+	add_sub(head_set, torso_top, main_n, "Head")
+	for s in ("L", "R"):
+		a = arms[s]
+		add_sub(a["bones"], torso_top, {b: "Arm%s%d" % (s, i + 1) for i, b in enumerate(a["chain"])}, "Arm" + s)
+	# Кисть с копьём — ближайший к оси копья сустав правой руки (после предплечья)
+	cr = arms["R"]["chain"]
+	hand_m = min(cr[arms["R"]["u"] + 1:], key=lambda b: float(spear_dist(sp, gp[b][None])[0]))
+	SPEAR = add("Spear", new_of[hand_m], spear_point(sp, float(gp[hand_m, 1])))
+
+	# Ноги: локоть / коленная чашка у брюха, запястье / скакательный, путовый, копыто
+	bw = 0.02 * H
+	leg_new = {}
+	for key in ("FL", "FR", "BL", "BR"):
+		k = keys[key]
+		lv = leg_v[k]
+		c, _r = tops[k]
+		y1 = y_m + 0.03 * H
+		yk = (0.55 if key[0] == "F" else 0.62) * y1
+		yf = 0.2 * y1
+
+		def at(yy, lv=lv):
+			s = lv[np.abs(y[lv] - yy) < 0.015 * H]
+			if len(s) < 10:
+				s = lv[np.argsort(np.abs(y[lv] - yy))[:50]]
+			return pos[s].mean(0)
+
+		p1 = np.array([c[0], y1, c[2]])
+		pk, pf = at(yk), at(yf)
+		pk[1], pf[1] = yk, yf
+		lo = lv[y[lv] < 0.02 * H]
+		p4 = np.array([pos[lo, 0].mean(), float(y[lo].min()), float(np.percentile(pos[lo, 2], 99))])
+		# колено передней ноги выгнуто вперёд, скакательный сустав задней — назад (направление сгиба для IK)
+		mid_z = p1[2] + (pf[2] - p1[2]) * (y1 - yk) / (y1 - yf)
+		if key[0] == "F":
+			pk[2] = max(pk[2], mid_z + 0.01 * H)
+		else:
+			pk[2] = min(pk[2], mid_z - 0.015 * H)
+		par = CHEST if key[0] == "F" else ROOT
+		b1 = add("Leg%s1" % key, par, p1)
+		b2 = add("Leg%s2" % key, b1, pk)
+		b3 = add("Leg%s3" % key, b2, pf)
+		b4 = add("Leg%s4" % key, b3, p4)
+		leg_new[key] = [b1, b2, b3, b4]
+
+	# Хвост: цепочка по центрам срезов (хвост висит вниз)
+	tail_new = []
+	if len(tail_v):
+		ty = y[tail_v]
+		pts = []
+		for yy in np.arange(ty.max() - 0.01 * H, ty.min(), -0.03 * H):
+			s = tail_v[np.abs(ty - yy) < 0.015 * H]
+			if len(s) >= 5:
+				pts.append(pos[s].mean(0))
+		pts.append(pos[tail_v[np.argmin(ty)]])
+		pts = np.array(pts)
+		sl = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(pts, axis=0), axis=1))])
+		n_t = 4
+		prev = ROOT
+		for i in range(n_t):
+			s = sl[-1] * i / n_t
+			p = np.array([np.interp(s, sl, pts[:, d]) for d in range(3)])
+			prev = add("Tail%d" % (i + 1), prev, p)
+			tail_new.append(prev)
+		tail_poly = pts
+		tail_s = sl
+	B = len(nb_names)
+	npar = np.array(nb_par)
+	assert all(npar[b] < b for b in range(1, B))
+	npos = np.array(nb_pos)
+
+	# --- Веса ---
+	W = np.zeros((V, B))
+	# Корпус по Z: Root → Spine1 → Chest
+	zr, zs, zc = P_root[2], 0.5 * (P_root[2] + P_chest[2]), P_chest[2]
+	z = pos[:, 2]
+	a = ramp(z, zr, zs)
+	b_ = ramp(z, zs, zc)
+	body = np.zeros((V, B))
+	body[:, ROOT] = 1.0 - a
+	body[:, SPINE] = a * (1.0 - b_)
+	body[:, CHEST] = a * b_
+	W[:] = body
+	# Ноги
+	for key, bb in leg_new.items():
+		k = keys[key]
+		yk, yf = npos[bb[1], 1], npos[bb[2], 1]
+		w1 = ramp(y, yk - bw, yk + bw)
+		w3 = 1.0 - ramp(y, yf - bw, yf + bw)
+		w2 = np.clip(1.0 - w1 - w3, 0.0, 1.0)
+		lw = np.zeros((V, B))
+		lw[:, bb[0]], lw[:, bb[1]], lw[:, bb[2]] = w1, w2, w3
+		c, r = tops[k]
+		d = np.hypot(pos[:, 0] - c[0], pos[:, 2] - c[2])
+		m = ramp(d, 1.8 * r, 1.0 * r) * ramp(y, y_m + 0.1 * H, y_m)
+		m[leg_of == k] = 1.0
+		m[(leg_of >= 0) & (leg_of != k)] = 0.0
+		W = W * (1.0 - m[:, None]) + lw * m[:, None]
+	# Хвост
+	if tail_new:
+		P = pos[tail_v]
+		best_d = np.full(len(P), 1e9)
+		s_at = np.zeros(len(P))
+		for i in range(len(tail_poly) - 1):
+			a0, a1 = tail_poly[i], tail_poly[i + 1]
+			dv = a1 - a0
+			t = np.clip(((P - a0) @ dv) / max(float(dv @ dv), 1e-12), 0.0, 1.0)
+			dd = np.linalg.norm(P - (a0 + t[:, None] * dv), axis=1)
+			sel = dd < best_d
+			best_d[sel] = dd[sel]
+			s_at[sel] = tail_s[i] + t[sel] * np.sqrt(float(dv @ dv))
+		tw = np.zeros((len(P), B))
+		seg_len = tail_s[-1] / len(tail_new)
+		u = s_at / seg_len
+		for i, tb in enumerate(tail_new):
+			# «шапочка» вокруг отрезка i с плавными краями
+			tw[:, tb] = np.clip(np.minimum(u - i + 0.5, i + 1.5 - u), 0.0, 1.0) if 0 < i < len(tail_new) - 1 else 0.0
+		tw[:, tail_new[0]] = np.clip(1.5 - u, 0.0, 1.0)
+		tw[:, tail_new[-1]] = np.clip(u - (len(tail_new) - 1.5), 0.0, 1.0)
+		tw /= np.maximum(tw.sum(1, keepdims=True), 1e-9)
+		mt = ramp(y[tail_v], y[tail_v].max(), y[tail_v].max() - 0.05 * H)
+		W[tail_v] = tw * mt[:, None] + W[tail_v] * (1.0 - mt[:, None])
+
+	# Торс по высоте: Chest → Waist (стык ±tb) → кости торса Meshy
+	tb = 0.04 * H
+	ty = [npos[b, 1] for b in torso_new]
+	tw = np.zeros((V, B))
+	for i, b in enumerate(torso_new):
+		lo_ = ramp(y, ty[i] - bw, ty[i] + bw) if i > 0 else np.ones(V)
+		hi_ = 1.0 - ramp(y, ty[i + 1] - bw, ty[i + 1] + bw) if i + 1 < len(torso_new) else np.ones(V)
+		tw[:, b] = lo_ * hi_
+	tw /= np.maximum(tw.sum(1, keepdims=True), 1e-9)
+	s = ramp(y, y_back - tb, y_back + tb)
+	torso_w = tw * s[:, None]
+	torso_w[:, CHEST] += 1.0 - s
+
+	# Группы человека по весам Meshy
+	jn, wt = g["joints"], g["weights"]
+
+	def group_sum(bones):
+		bs = np.isin(jn, list(bones))
+		return (wt * bs).sum(1)
+
+	gs_h = group_sum(head_set)
+	gs_l = group_sum(arms["L"]["bones"])
+	gs_r = group_sum(arms["R"]["bones"])
+	front = (pos[:, 2] > zf - 0.15 * H)
+	horse_low = (leg_of >= 0) | is_tail | spear
+	arm_r = cfg.get("arm_r", 0.06) * H
+	is_arm = {}
+	for s_, gs in (("L", gs_l), ("R", gs_r)):
+		a = arms[s_]
+		ch_ = a["chain"][a["u"]:]
+		pts = [gp[b] for b in ch_]
+		if len(pts) >= 2:
+			dv = pts[-1] - pts[-2]
+			pts.append(pts[-1] + dv / max(float(np.linalg.norm(dv)), 1e-9) * 0.08 * H)
+		other = np.maximum(gs_h, gs_r if s_ == "L" else gs_l)
+		is_arm[s_] = (gs > 0.3) & (gs >= other) & (y > y_m) & ~horse_low & (poly_dist(pos, pts) < arm_r)
+	is_head = (gs_h > 0.3) & (y > gp[neck[0] if neck else head, 1] - 0.03 * H) & ~horse_low & ~is_arm["L"] & ~is_arm["R"]
+	human = (front & (y > y_back - tb) & ~horse_low) | is_arm["L"] | is_arm["R"] | is_head
+	W[human] = torso_w[human]
+
+	def meshy_part(mask, bones):
+		"""Веса Meshy на костях bones (в новых номерах); недостающее до 1 — по торсу."""
+		idx = np.nonzero(mask)[0]
+		out = np.zeros((len(idx), B))
+		for k in range(jn.shape[1]):
+			j = jn[idx, k]
+			for b in bones:
+				sel = j == b
+				out[sel, new_of[b]] += wt[idx[sel], k]
+		rest = np.clip(1.0 - out.sum(1), 0.0, 1.0)
+		W[idx] = out + torso_w[idx] * rest[:, None]
+
+	meshy_part(is_head, head_set)
+	meshy_part(is_arm["L"], arms["L"]["bones"])
+	meshy_part(is_arm["R"], arms["R"]["bones"])
+	W[spear] = 0.0
+	W[spear, SPEAR] = 1.0
+
+	# Сглаживание по соседям меша (копьё не трогаем)
+	from scipy.sparse import coo_matrix
+	n = int(weld.max()) + 1
+	e = weld[np.concatenate([tris[:, [0, 1]], tris[:, [1, 2]], tris[:, [2, 0]]])]
+	e = e[e[:, 0] != e[:, 1]]
+	A = coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(n, n)).tocsr()
+	A = ((A + A.T) > 0).astype(np.float64)
+	deg = np.asarray(A.sum(1)).ravel()
+	Ww = np.zeros((n, B))
+	np.add.at(Ww, weld, W)
+	Ww /= np.bincount(weld, minlength=n)[:, None]
+	fixed = np.zeros(n, dtype=bool)
+	fixed[weld[spear]] = True
+	W0 = Ww.copy()
+	for _ in range(cfg.get("smooth", 6)):
+		Ww = 0.5 * Ww + 0.5 * (A @ Ww) / np.maximum(deg, 1)[:, None]
+		Ww[fixed] = W0[fixed]
+	W = Ww[weld]
+	top4 = np.argsort(-W, axis=1)[:, :4]
+	w4 = np.take_along_axis(W, top4, 1)
+	w4 /= np.maximum(w4.sum(1, keepdims=True), 1e-9)
+
+	# Копьё упирается в землю, а копыта чуть выше (у 3-й стадии на 2 см): модель опускается на копыта,
+	# копьё скользит в кисти вверх на столько же
+	hoof = float(y[leg_of >= 0].min())
+	pos2 = pos.copy()
+	if hoof > 0.002 * H:
+		pos2[:, 1] -= hoof
+		pos2[spear, 1] += hoof
+		npos = npos - np.array([0.0, hoof, 0.0])
+		print("   копыта были на %.3f м над землёй — модель опущена, копьё приподнято в кисти" % hoof)
+	out = dict(g)
+	out["pos"] = pos2
+	out["names"] = nb_names
+	out["parent"] = npar
+	out["gpos"] = npos
+	out["grot"] = np.array(nb_rot)
+	out["joints"] = top4.astype(np.int64)
+	out["weights"] = w4
+	out["centaur_debug"] = {"spear": spear, "legs": leg_of, "tail": is_tail, "arm_l": is_arm["L"], "arm_r": is_arm["R"],
+		"head": is_head, "human": human, "y_back": y_back, "y_m": y_m}
+	roles = {
+		"kind": "centaur", "root": ROOT, "hips": ROOT, "chest": CHEST, "spine": [SPINE, CHEST], "back": [],
+		"neck": [new_of[b] for b in neck], "head": new_of[head], "tail": tail_new, "ears": {"L": [], "R": []},
+		"legs": {k: {"chain": v, "toes": []} for k, v in leg_new.items()},
+		"torso": torso_new, "spear": SPEAR,
+		"arms": {s_: {"chain": [new_of[b] for b in arms[s_]["chain"]], "u": arms[s_]["u"]} for s_ in ("L", "R")},
+		"head_extra": [new_of[b] for b in head_set if b not in neck and b != head],
+		"extra": [new_of[b] for s_ in ("L", "R") for b in arms[s_]["bones"] if b not in arms[s_]["chain"]],
+		"names": nb_names,
+	}
+	print("   ноги до %.2f м, спина %.2f м, хвост %d вершин, торс %s, плечи %s, голова %s, руки L %s R %s" % (
+		y_m, y_back, len(tail_v), [g["names"][b] for b in torso_m], g["names"][shoulder], g["names"][head],
+		[g["names"][b] for b in arms["L"]["chain"]], [g["names"][b] for b in arms["R"]["chain"]]))
+	return out, roles
+
+
+class CentaurCtx(Ctx):
+	"""Помощники поз кентавра: торс человека, руки, копьё (в осях модели, как у Ctx)."""
+
+	def __init__(self, rig: Rig, roles: dict, cfg: dict):
+		super().__init__(rig, roles, cfg)
+		self.torso_b = list(roles["torso"])
+		self.arm = {}
+		for s, a in roles["arms"].items():
+			ch_ = a["chain"]
+			u = a["u"]
+			self.arm[s] = {"upper": ch_[u], "fore": ch_[u + 1], "hand": ch_[min(u + 2, len(ch_) - 1)]}
+		self.spear_b = roles["spear"]
+		gp = rig.gpos
+		fa = self.arm["R"]
+		self.fore_len = float(np.linalg.norm(gp[fa["hand"]] - gp[fa["fore"]]))
+
+	def torso(self, P: dict, pitch_up: float = 0.0, yaw: float = 0.0, roll: float = 0.0) -> None:
+		"""Наклон торса человека (распределён по костям от пояса до плеч): pitch_up < 0 — вперёд."""
+		self.chain(P, self.torso_b, pitch_up, yaw, roll)
+
+	def arm_pose(self, P: dict, side: str, upper=None, fore=None, hand=None) -> None:
+		"""Повороты плеча, предплечья и кисти (матрицы в осях модели)."""
+		a = self.arm[side]
+		for key, M in (("upper", upper), ("fore", fore), ("hand", hand)):
+			if M is not None:
+				self.rot(P, a[key], M)
+
+	def hold(self, P: dict, lift: float = 0.04, tilt: float = 0.0, sway: float = 0.0) -> None:
+		"""Копьё в правой руке: приподнять на lift (м) — предплечье вверх, кисть обратно (копьё вертикально);
+		tilt > 0 — наконечник вперёд, sway — покачивание вбок."""
+		a = math.asin(min(max(lift / max(self.fore_len, 1e-3), -0.9), 0.9))
+		self.arm_pose(P, "R", fore=body_rot(a), hand=body_rot(-a - tilt, 0.0, sway))
+
+	def spear_world(self, P: dict, Rw: np.ndarray, Pw: np.ndarray, w: float) -> None:
+		"""Копьё выпущено из руки: мировой поворот Rw и положение Pw (с весом w, 0 — в руке)."""
+		if w <= 0.0:
+			return
+		_L, _T, Gr, Gp, _i = evaluate(self.rig, P)
+		b = self.spear_b
+		p = int(self.rig.parent[b])
+		R0, P0 = Gr[b], Gp[b]
+		Rt = slerp_m(R0, Rw, w)
+		Pt = P0 + (Pw - P0) * w
+		# Gr[b] = Gr[p] @ lrot[b] @ grot[b].T @ d @ grot[b]; у Spear grot = I
+		P["rot"][b] = self.rig.lrot[b].T @ Gr[p].T @ Rt
+		P["trans"][b] = (Pt - Gp[p]) - Gr[p] @ self.rig.lpos[b]
+
+
+def centaur_clips(c: CentaurCtx) -> list:
+	"""Клипы кентавра: покой с переступанием, шаг (четырёхтакт), галоп, выпад копьём, удар, падение набок, умение."""
+	cfg = c.cfg
+	H = c.H
+	W, R = cfg["walk"], cfg["run"]
+	out = []
+	Ti = cfg.get("idle_T", 3.0)
+
+	def idle(t):
+		P = c.pose()
+		ph = TAU * t / Ti
+		br = 0.5 - 0.5 * math.cos(ph)
+		c.body(P, roll=0.012 * math.sin(ph), dy=-0.002 * H * br)
+		c.torso(P, pitch_up=0.03 * br, yaw=0.05 * math.sin(ph + 0.4))
+		c.neck(P, yaw=0.12 * math.sin(ph - 0.3), pitch_up=0.02 * math.sin(2 * ph))
+		c.head(P, yaw=0.10 * math.sin(ph - 0.6), pitch_up=0.03 * math.sin(ph + 1.0))
+		c.arm_pose(P, "L", upper=body_rot(0.04 * math.sin(ph), 0.0, -0.03 * br))
+		c.hold(P, lift=0.04, tilt=0.03 * math.sin(ph), sway=0.04 * math.sin(ph + 1.2))
+		c.tail(P, wave=0.25, phase=ph, lag=0.5, wave_pitch=0.08)
+		# Переступание: задняя правая отдыхает — копыто приподнимается и встаёт на место
+		e = env(t / Ti, 0.35, 0.45, 0.55, 0.65)
+		c.foot(P, "BR", dy=0.06 * e, dz=0.02 * e, flex=0.5 * e)
+		c.stand(P)
+		return P
+
+	out.append({"name": "Idle", "T": Ti, "loop": True, "fn": idle})
+
+	def walk(t):
+		P = c.pose()
+		ph = TAU * t / W["T"]
+		c.body(P, pitch_up=0.012 * math.sin(2 * ph), roll=0.02 * math.sin(ph), yaw=0.015 * math.sin(ph),
+			dy=-W["crouch"] - 0.004 * H * math.cos(2 * ph))
+		c.spine(P, yaw=0.04 * math.sin(ph))
+		c.torso(P, pitch_up=-0.012 * math.sin(2 * ph) - 0.03, roll=-0.02 * math.sin(ph), yaw=-0.04 * math.sin(ph))
+		c.neck(P, yaw=0.03 * math.sin(ph))
+		c.arm_pose(P, "L", upper=body_rot(0.12 * math.sin(ph)), fore=body_rot(0.06 + 0.05 * math.sin(ph)))
+		c.hold(P, lift=0.06 + W["crouch"], tilt=0.03, sway=0.02 * math.sin(ph))
+		c.tail(P, lift=0.1, wave=0.25, phase=ph, lag=0.6, wave_pitch=0.06)
+		c.gait(P, t, W)
+		return P
+
+	out.append({"name": "Walk", "T": W["T"], "loop": True, "fn": walk, "speed": gait_speed(W), "gait": W})
+
+	def run(t):
+		P = c.pose()
+		x = t / R["T"]
+		ph = TAU * x
+		# Галоп: корпус качается «вперёд-назад», торс человека держится прямо и чуть подан вперёд
+		bp = 0.07 * math.cos(TAU * (x - 0.9))
+		c.body(P, pitch_up=bp, dy=-R["crouch"] + 0.025 * math.cos(2 * TAU * (x - 0.43)))
+		c.spine(P, pitch_up=0.12 * math.cos(TAU * (x - 0.42)))
+		c.torso(P, pitch_up=-bp - 0.12 - 0.04 * math.cos(2 * ph))
+		c.neck(P, pitch_up=0.06)
+		c.arm_pose(P, "L", upper=body_rot(0.25 + 0.1 * math.sin(ph)), fore=body_rot(0.5))
+		c.hold(P, lift=0.14 + R["crouch"], tilt=-0.08 + 0.04 * math.sin(2 * ph))
+		c.tail(P, lift=0.7, wave=0.12, phase=ph, wave_pitch=0.2)
+		c.gait(P, t, R)
+		return P
+
+	out.append({"name": "Run", "T": R["T"], "loop": True, "fn": run, "speed": gait_speed(R), "gait": R})
+
+	Ta, hit = 0.9, 0.42
+
+	def attack(t):
+		# Замах: корпус чуть встаёт на дыбы (передние копыта отрываются), копьё поднято над плечом;
+		# выпад: торс и рука вперёд-вниз, наконечник — в цель перед собой; передние копыта бьют в землю
+		P = c.pose()
+		kk = [(0, 0), (0.28, 1), (0.36, 1), (0.9, 0)]
+		wind = keys(t, [(0, 0), (0.28, 1), (0.36, 0.6), (0.44, 0), (0.9, 0)])
+		thr = keys(t, [(0, 0), (0.28, 0), (0.42, 1), (0.56, 1), (0.9, 0)])
+		c.body(P, pitch_up=0.10 * wind - 0.05 * thr, dy=0.01 * H * wind - 0.01 * H * thr)
+		P["root_off"] = P["root_off"] + np.array([0.0, 0.0, -0.05 * wind + 0.10 * thr])
+		c.torso(P, pitch_up=0.12 * wind - 0.32 * thr, yaw=0.30 * wind - 0.15 * thr)
+		c.neck(P, pitch_up=-0.05 * wind + 0.12 * thr)
+		c.head(P, pitch_up=0.05 * thr)
+		c.arm_pose(P, "R", upper=body_rot(-0.9 * wind + 0.8 * thr, 0.0, -0.4 * wind),
+			fore=body_rot(0.6 * wind - 0.9 * thr), hand=body_rot(-0.7 * wind - 1.4 * thr))
+		c.arm_pose(P, "L", upper=body_rot(0.3 * wind + 0.2 * thr, 0.0, 0.2 * wind), fore=body_rot(0.4 * wind))
+		c.tail(P, lift=0.3 * wind, wave=0.25 * env(t, 0.1, 0.3, 0.5, 0.9), phase=TAU * t / 0.5)
+		for k in ("FL", "FR"):
+			c.foot(P, k, dy=0.14 * keys(t, [(0, 0), (0.26, 1), (0.36, 0.3), (0.42, 0), (0.9, 0)]),
+				dz=0.08 * wind, flex=0.7 * wind)
+		c.stand(P)
+		return P
+
+	out.append({"name": "Attack", "T": Ta, "loop": False, "fn": attack, "hit": hit})
+
+	def hit_fn(t):
+		P = c.pose()
+		e = keys(t, [(0, 0), (0.07, 1), (0.4, 0)])
+		c.body(P, pitch_up=0.05 * e, roll=0.04 * e)
+		c.torso(P, pitch_up=0.18 * e, yaw=-0.12 * e)
+		c.neck(P, pitch_up=0.12 * e)
+		c.head(P, pitch_up=0.08 * e, roll=0.08 * e)
+		c.arm_pose(P, "L", upper=body_rot(0.25 * e, 0.0, 0.2 * e))
+		c.hold(P, lift=0.04 + 0.03 * e, tilt=-0.1 * e)
+		c.tail(P, lift=0.3 * e)
+		c.stand(P)
+		return P
+
+	out.append({"name": "Hit", "T": 0.4, "loop": False, "fn": hit_fn})
+
+	Td = 1.4
+	h0 = float(c.rig.gpos[c.root, 1])
+
+	def death(t):
+		# Подгибает ноги, заваливается на левый бок; копьё выпадает из руки и ложится на землю у брюха
+		P = c.pose()
+		x = t / Td
+		roll = -keys(x, [(0, 0), (0.25, 0.1), (0.7, 1.42), (0.84, 1.30), (1.0, 1.36)])
+		c.body(P, pitch_up=keys(x, [(0, 0), (0.25, -0.08), (0.7, -0.02)]), roll=roll,
+			dy=keys(x, [(0, 0), (0.25, -0.12 * h0), (0.7, -0.6 * h0)]))
+		c.torso(P, pitch_up=keys(x, [(0, 0), (0.3, 0.15), (0.8, -0.25)]), roll=keys(x, [(0, 0), (0.8, -0.35)]))
+		c.neck(P, pitch_up=keys(x, [(0, 0), (0.3, 0.2), (0.8, -0.1)]), roll=keys(x, [(0, 0), (0.8, -0.3)]))
+		c.head(P, pitch_up=keys(x, [(0, 0), (0.8, -0.1)]))
+		c.arm_pose(P, "L", upper=body_rot(keys(x, [(0, 0), (0.6, 0.5)]), 0.0, keys(x, [(0, 0), (0.6, 0.6)])))
+		c.arm_pose(P, "R", upper=body_rot(keys(x, [(0, 0), (0.6, 0.3)]), 0.0, keys(x, [(0, 0), (0.75, 0.9)])),
+			fore=body_rot(keys(x, [(0, 0), (0.75, -0.4)])))
+		c.tail(P, lift=keys(x, [(0, 0), (0.6, -0.1)]), yaw=keys(x, [(0, 0), (0.7, 0.4)]))
+		w = 1.0 - smooth((x - 0.15) / 0.35)
+		c.stand(P, w=w)
+		fold_legs(c, P, 1.0 - w)
+		ws = smooth((x - 0.2) / 0.45)
+		if ws > 0.0:
+			_L, _T, Gr, Gp, _i = evaluate(c.rig, P)
+			v = skin_points(c.rig, c.mesh["pos"], c.mesh["joints"], c.mesh["weights"], Gr, Gp)
+			body_min = float(v[~c.spear_mask, 1].min())
+			body = v[~c.spear_mask]
+			# лежит вдоль корпуса наконечником вперёд, на земле за спиной (+X после падения на левый бок)
+			c.spear_world(P, rx(math.pi * 0.5), np.array([float(body[:, 0].max()) + 0.06, body_min + 0.025,
+				float(body[:, 2].mean()) + 0.1 * H]), ws)
+		return P
+
+	out.append({"name": "Death", "T": Td, "loop": False, "fn": death, "fit_after": 0.72})
+
+	def cast(t):
+		# Боевой клич: копьё вверх над головой, корпус приподнят, голова запрокинута
+		P = c.pose()
+		e = keys(t, [(0, 0), (0.3, 1), (0.62, 1), (0.9, 0)])
+		c.body(P, pitch_up=0.08 * e, dy=0.006 * H * e)
+		c.torso(P, pitch_up=0.12 * e)
+		c.neck(P, pitch_up=0.2 * e)
+		c.head(P, pitch_up=0.15 * e)
+		c.arm_pose(P, "R", upper=body_rot(1.9 * e, 0.0, -0.5 * e), fore=body_rot(-0.6 * e), hand=body_rot(-1.3 * e))
+		c.arm_pose(P, "L", upper=body_rot(0.3 * e, 0.0, 0.5 * e), fore=body_rot(0.5 * e))
+		c.tail(P, lift=0.4 * e, wave=0.2 * e, phase=TAU * t / 0.4)
+		for k in ("FL",):
+			c.foot(P, k, dy=0.12 * env(t, 0.1, 0.25, 0.45, 0.6), dz=0.06 * env(t, 0.1, 0.25, 0.45, 0.6),
+				flex=0.8 * env(t, 0.1, 0.25, 0.45, 0.6))
+		c.stand(P)
+		return P
+
+	out.append({"name": "Cast", "T": 0.9, "loop": False, "fn": cast, "cast": 0.45})
+	return out
+
+
 # ---------- Сборка зверя ----------
 
 FPS = 30.0
@@ -2201,15 +3020,18 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 		cfg = fish_cfg(src, cfg, yaw)
 	g = to_game_space(src, cfg["height"], yaw)
 	g = reorder(g, topo_order(g["parent"]))
+	centaur = cfg.get("style") == "centaur"
 	if fish:
 		roles = fish_roles(g["names"], g["parent"], g["gpos"], cfg["length"])
+	elif centaur:
+		g, roles = centaur_rig(g, cfg)
 	else:
 		g = merge_twin_legs(g, cfg["height"])
 		roles = detect_roles(g["names"], g["parent"], g["gpos"], cfg["height"], cfg)
 		if cfg.get("ground") == "feet":
 			lift_tail_to_feet(g, roles, cfg["height"])
 	print("   поворот %d°, масштаб %.4f, исходный меш %d треуг." % (g["yaw_deg"], g["scale"], len(g["tris"])))
-	mesh = simplify_mesh(g, cfg["tris"])
+	mesh = simplify_mesh(g, cfg["tris"], cfg.get("simplify") == "welded")
 	st = mesh_stats(mesh["pos"], mesh["tris"])
 	print("   упрощено: %d треуг., %d вершин, открытых рёбер %d (было %d), ошибка %.4f" % (
 		st["tris"], st["verts"], st["open_edges"], mesh_stats(g["pos"], g["tris"])["open_edges"], mesh["simplify_error"]))
@@ -2235,9 +3057,12 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 			leg.l1, leg.l2, round(leg.reach * 100)))
 	if cfg.get("foot_rigid"):
 		rigid_feet(rig, mesh)
-	c = Ctx(rig, roles, cfg)
+	c = CentaurCtx(rig, roles, cfg) if centaur else Ctx(rig, roles, cfg)
 	c.mesh = mesh
-	if fish:
+	if centaur:
+		c.spear_mask = mesh["joints"][np.arange(len(mesh["pos"])), np.argmax(mesh["weights"], 1)] == roles["spear"]
+		clip_specs = centaur_clips(c)
+	elif fish:
 		clip_specs = fish_clips(c)
 	else:
 		clip_specs = bird_clips(c) if cfg["style"] == "bird" else quad_clips(c)
@@ -2292,6 +3117,10 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 			meta["clips"][cl["name"]].update({"speed": round(cl["speed"], 3), "stride": g2["stride"], "duty": g2["duty"]})
 	if fish:
 		fish_meta(meta, rig, roles, mesh, cfg, clips)
+	if centaur:
+		meta["bones"]["torso"] = [nm[b] for b in roles["torso"]]
+		meta["bones"]["arms"] = {s: [nm[b] for b in a["chain"]] for s, a in roles["arms"].items()}
+		meta["bones"]["spear"] = nm[roles["spear"]]
 	return meta
 
 

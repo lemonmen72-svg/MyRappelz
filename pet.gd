@@ -760,6 +760,9 @@ func _apply_skill(id: String, t: Mob) -> void:
 		if sk.has("miss"):
 			m.weaken_aim(PetSkills.value(sk["miss"], n), DEBUFF_TIME)
 			Util.float_text(parent, above, "Сбит прицел", Color(1.0, 0.9, 0.5))
+		if sk.has("weaken"):
+			m.weaken(PetSkills.value(sk["weaken"], n), DEBUFF_TIME)
+			Util.float_text(parent, above, "Ослаблен", Color(1.0, 0.7, 0.5))
 		if sk.has("stun"):
 			m.stun(float(sk["stun"]))
 			Util.float_text(parent, above, "Оглушён!", Color(1, 1, 0.5))

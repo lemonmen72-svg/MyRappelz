@@ -43,6 +43,9 @@ const DEFAULTS := {
 		"attack_hit_time": 0.35},
 	"wolf": {"height": 0.95, "length": 1.4, "width": 0.35, "walk_speed": 0.65, "run_speed": 4.2,
 		"attack_hit_time": 0.36},
+	# Кентавр (стиль «centaur»): высота — до наконечника копья
+	"centaur": {"height": 2.25, "length": 1.66, "width": 0.8, "walk_speed": 0.85, "run_speed": 3.92,
+		"attack_hit_time": 0.42},
 	# Летающие рыбы (tools/prepare_creatures.py, стиль «fish»): парят на уровне головы героя
 	"flyfish": {"height": 1.84, "length": 1.0, "width": 0.61, "walk_speed": 1.4, "run_speed": 4.0,
 		"attack_hit_time": 0.42, "hover": 1.45},

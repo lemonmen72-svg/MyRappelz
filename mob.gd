@@ -55,6 +55,9 @@ var miss_time := 0.0
 var miss_frac := 0.0
 var vuln_time := 0.0
 var vuln_frac := 0.0
+## Ослабление (умения кентавра): удары зверя слабее на долю weak_frac, пока идёт weak_time.
+var weak_time := 0.0
+var weak_frac := 0.0
 ## Ослабления от умений героя: сон (как оглушение, но будит любой удар), страх (убегает от fear_from
 ## и не бьёт), урон со временем (dots: id умения → {"dps", "left", "acc", "by"}), без лечения (no_regen_time).
 var sleep_time := 0.0
@@ -271,7 +274,7 @@ func _physics_process(delta: float) -> void:
 			dir = to.normalized()
 		elif attack_cd <= 0.0:
 			attack_cd = attack_every
-			var dmg := atk + randi_range(-1, 2)
+			var dmg := _weakened(atk + randi_range(-1, 2))
 			var delay := _asset.play_attack(attack_cd) if _asset != null else 0.0
 			if delay > 0.0:
 				# Удар попадёт в момент удара клипа Attack
@@ -339,7 +342,7 @@ func _reach() -> float:
 ## Удар по площади каменного стража: урон игроку и питомцам вокруг.
 func _slam() -> void:
 	skill_uses += 1
-	var dmg := int(atk * SLAM_POWER)
+	var dmg := _weakened(int(atk * SLAM_POWER))
 	var parent := get_parent()
 	CreatureModels.spawn_ring(parent, global_position, SLAM_RADIUS, Color(0.9, 0.75, 0.5), 0.35)
 	Vfx.death_puff(parent, global_position + Vector3(0, 0.3, 0), 1.6)
@@ -380,6 +383,19 @@ func weaken_aim(frac: float, sec: float) -> void:
 func expose(frac: float, sec: float) -> void:
 	vuln_frac = maxf(vuln_frac if vuln_time > 0.0 else 0.0, maxf(frac, 0.0))
 	vuln_time = maxf(vuln_time, sec)
+
+
+## Ослабление: удары зверя слабее на долю frac (0..0.9) на sec секунд.
+func weaken(frac: float, sec: float) -> void:
+	weak_frac = maxf(weak_frac if weak_time > 0.0 else 0.0, clampf(frac, 0.0, 0.9))
+	weak_time = maxf(weak_time, sec)
+
+
+## Урон удара с учётом ослабления (не меньше 1).
+func _weakened(dmg: int) -> int:
+	if weak_time <= 0.0:
+		return dmg
+	return maxi(1, roundi(float(dmg) * (1.0 - weak_frac)))
 
 
 ## Усыпить на sec секунд: не двигается и не бьёт, пока не получит урон.
@@ -479,6 +495,7 @@ func _tick_debuffs(delta: float) -> void:
 	blind_time = maxf(0.0, blind_time - delta)
 	miss_time = maxf(0.0, miss_time - delta)
 	vuln_time = maxf(0.0, vuln_time - delta)
+	weak_time = maxf(0.0, weak_time - delta)
 
 
 ## Удар мимо (морок или сбитый прицел): над целью «Промах», урона нет.
