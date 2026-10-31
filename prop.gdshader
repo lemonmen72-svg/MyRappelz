@@ -19,6 +19,13 @@ uniform vec4 tint : source_color = vec4(1.0);
 uniform float threshold : hint_range(-1.0, 1.0) = 0.05;
 uniform float softness : hint_range(0.001, 0.3) = 0.04;
 uniform vec4 shadow_color : source_color = vec4(0.72, 0.68, 0.88, 1.0);
+// Тень от других объектов (карта теней, ATTENUATION солнца): мягкая ступенька в cel-полосу. Края карты теней
+// после фильтра PCF — плавный переход 0..1 на 1–2 текселя: его растягиваем (shadow_lo..shadow_hi), а не режем
+// по 0.5 — иначе «лесенка» текселей и рябь самозатенения. На гранях почти вдоль солнца (dot(N, L) у границы
+// света) тень карты гаснет до shadow_fade: там она — в основном рябь, а сторона и так уходит в cel-тень.
+uniform float shadow_lo : hint_range(0.0, 1.0) = 0.15;
+uniform float shadow_hi : hint_range(0.0, 1.0) = 0.8;
+uniform float shadow_fade : hint_range(0.0, 1.0) = 0.15;
 uniform float rim_strength : hint_range(0.0, 1.0) = 0.15;
 uniform float rim_width : hint_range(0.0, 1.0) = 0.3;
 uniform vec4 rim_color : source_color = vec4(1.0, 0.96, 0.88, 1.0);
@@ -52,10 +59,16 @@ void fragment() {
 }
 
 void light() {
-	// Тень от объектов (ATTENUATION) переводит точку на теневую сторону
-	float v = min(dot(NORMAL, LIGHT), ATTENUATION * 2.0 - 1.0);
-	float t = smoothstep(threshold - softness, threshold + softness, v);
-	float k = LIGHT_IS_DIRECTIONAL ? 1.0 : ATTENUATION;
+	float ndl = dot(NORMAL, LIGHT);
+	float t = smoothstep(threshold - softness, threshold + softness, ndl);
+	float k = 1.0;
+	if (LIGHT_IS_DIRECTIONAL) {
+		// Тень от объектов — мягко в ту же cel-полосу (цветная тень shadow_color, не чёрная)
+		float sh = smoothstep(shadow_lo, shadow_hi, ATTENUATION);
+		t *= mix(1.0, sh, smoothstep(threshold, threshold + shadow_fade, ndl));
+	} else {
+		k = ATTENUATION;
+	}
 	vec3 tone = mix(shadow_color.rgb, vec3(1.0), t);
 	DIFFUSE_LIGHT += LIGHT_COLOR * tone * k / PI;
 	float edge = 1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0);

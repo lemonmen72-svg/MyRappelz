@@ -542,8 +542,10 @@ func _finish_zones() -> void:
 		mmi.multimesh = mm
 		mmi.position = z.origin
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mmi.visibility_range_end = NEAR_RANGE
+		mmi.visibility_range_end = Quality.props_distance()
 		mmi.visibility_range_end_margin = 8.0
+		# Дальность — по настройке «Дальность прорисовки» (Quality.apply)
+		mmi.add_to_group("poi_props")
 		z.node.add_child(mmi)
 		for i in z.flames.size():
 			mm.set_instance_transform(i, z.flames[i])
@@ -575,8 +577,9 @@ func _zone_mesh(z: Zone, kit: PoiModels.Kit, props: Dictionary, mesh_name: Strin
 	mi.set_meta("no_outline", true)
 	if near:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.visibility_range_end = NEAR_RANGE
+		mi.visibility_range_end = Quality.props_distance()
 		mi.visibility_range_end_margin = 8.0
+		mi.add_to_group("poi_props")
 		# Ореолы разворачиваются в шейдере, AABB меша — по их центрам: запас на их размер
 		mi.extra_cull_margin = 4.0
 	z.node.add_child(mi)
@@ -1157,7 +1160,8 @@ func _wheat_field(h: Node3D, poi: Dictionary) -> void:
 	mmi.name = "Wheat"
 	mmi.multimesh = mm
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mmi.visibility_range_end = DECOR_RANGE
+	mmi.visibility_range_end = Quality.decor_distance()
+	mmi.add_to_group("poi_decor")
 	node.add_child(mmi)
 	# Пугало посередине
 	_prop(h, "scarecrow", c + Vector2(size.x * 0.12, 0.0).rotated(-rot), rng.randf() * TAU, 0.3, 2.4)

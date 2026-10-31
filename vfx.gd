@@ -175,7 +175,8 @@ static func death_puff(parent: Node, pos: Vector3, size: float = 1.0) -> Node3D:
 ## Постоянные искорки вокруг узла (питомец старших стадий). Возвращает частицы (не удаляются сами).
 static func ambient_sparkles(parent: Node3D, color: Color, radius: float, amount: int = 6) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
-	p.amount = amount
+	# Число частиц — по настройке «Качество эффектов»
+	p.amount = Quality.particles(amount)
 	p.lifetime = 1.3
 	p.explosiveness = 0.0
 	p.randomness = 0.5
@@ -514,7 +515,8 @@ static func _spiral(root: Node3D, amount: int, c: Color, radius: float, height: 
 static func _particles(root: Node3D, amount: int, life: float, c: Color, size: float, speed: float,
 		opts: Dictionary = {}, offset: Vector3 = Vector3.ZERO, delay: float = 0.0) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
-	p.amount = amount
+	# Число частиц — по настройке «Качество эффектов»
+	p.amount = Quality.particles(amount)
 	p.lifetime = life
 	p.one_shot = true
 	p.explosiveness = float(opts.get("explosive", 0.95))

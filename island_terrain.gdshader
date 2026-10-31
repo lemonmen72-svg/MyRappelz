@@ -300,7 +300,8 @@ void fragment() {
 void light() {
 	// Три тона: тень с сиреневым оттенком, полутон на склонах от солнца, полный свет
 	float ndl = dot(NORMAL, LIGHT);
-	float sh = smoothstep(0.25, 0.55, ATTENUATION);
+	// Тень от объектов — мягкий край (после фильтра PCF карты теней), не резкая ступенька по текселям
+	float sh = smoothstep(0.15, 0.75, ATTENUATION);
 	float lit = smoothstep(0.0, 0.06, ndl) * sh;
 	float full = smoothstep(0.40, 0.48, ndl) * sh;
 	vec3 tone = mix(shadow_tint * 0.6, vec3(0.8), lit);

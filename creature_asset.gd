@@ -306,8 +306,8 @@ func _setup_material(id: String, color: Color, tint: Color) -> void:
 	# Эмиссия включена заранее (чёрная), чтобы вспышка урона не перекомпилировала шейдер
 	material.emission_enabled = true
 	material.emission = Color.BLACK
-	if Quality.outlines():
-		material.next_pass = _outline_mat()
+	# Без самозатенения картой теней (Quality.model_shadows) и контур — меняются сразу в настройках
+	Quality.track_model(material, _outline_mat())
 	material.set_meta("toon_done", true)
 
 

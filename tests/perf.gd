@@ -3,10 +3,12 @@ extends "res://tests/test_base.gd"
 ## нескольких точек острова — вызовы отрисовки, объекты, треугольники в кадре и время скриптов.
 ## Строки начинаются с «PERF» — их собирает .github/scripts/screenshots.sh.
 ## Время кадра на программном рендере CI не показательно, важны вызовы, объекты и треугольники.
+## «Максимальное» — только в первых ULTRA_SPOTS точках (время задачи visual ограничено).
 
 const SPOTS := [["город", Vector2(0, 5)], ["поле", Vector2(30, 30)], ["тёмные эльфы", Vector2(72, -58)],
 	["светлые эльфы", Vector2(-80, -50)], ["деревня людей", Vector2(80, 32)], ["порт", Vector2(12, 60)]]
 const FRAMES := 40
+const ULTRA_SPOTS := 2
 
 var _q := 0
 var _spot := 0
@@ -38,10 +40,10 @@ func run_step() -> void:
 					Quality.level_name(_q), SPOTS[_spot][0], int(_acc["draw"] / k), int(_acc["obj"] / k),
 					int(_acc["prim"] / k), _acc["proc"] / k, _acc["phys"] / k])
 				_spot += 1
-				if _spot >= SPOTS.size():
+				if _spot >= (ULTRA_SPOTS if _q == Quality.ULTRA else SPOTS.size()):
 					_spot = 0
 					_q += 1
-				if _q > Quality.HIGH:
+				if _q > Quality.ULTRA:
 					print("PERF узлов в сцене: %d, зверей: %d" % [
 						int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)), count_mobs()])
 					Quality.reload()
