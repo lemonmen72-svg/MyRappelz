@@ -66,6 +66,9 @@ var active_pet := -1
 var quests_active: Dictionary = {}
 var quests_done: Dictionary = {}
 var quest_tracked := ""
+## Множитель опыта за зверей (админ-панель, вкладка «Опыт»: 1, 2, 5, 10, 20, 50): герою и питомцу
+## (main._on_mob_gone, PetManager.on_mob_killed). Хранится в сохранении; без админ-панели — всегда 1.
+var xp_mult := 1
 
 
 func _ready() -> void:
@@ -104,6 +107,7 @@ func reset() -> void:
 	quests_active = {}
 	quests_done = {}
 	quest_tracked = ""
+	xp_mult = 1
 
 
 ## Новый герой: обычно Бродяга (экран создания); профессия cls сразу — автотесты и админ-панель
@@ -320,6 +324,7 @@ func to_dict() -> Dictionary:
 		"pets": pets.duplicate(true),
 		"active_pet": active_pet,
 		"quests": {"active": quests_active.duplicate(true), "done": quests_done.duplicate(), "tracked": quest_tracked},
+		"xp_mult": xp_mult,
 	}
 
 
@@ -355,6 +360,7 @@ func from_dict(d: Dictionary) -> void:
 	level = int(d.get("level", 1))
 	xp = int(d.get("xp", 0))
 	gold = int(d.get("gold", 0))
+	xp_mult = clampi(int(d.get("xp_mult", 1)), 1, 50) if AdminPanel.ADMIN_TOOLS else 1
 	# Кристаллы души старых версий заменены зеркальными картами (ItemData.RENAMED), за редкий и древний —
 	# доплата золотом; убранные карты кабана и стража — тоже зеркальные карты
 	var old_inv: Dictionary = d.get("inventory", {})

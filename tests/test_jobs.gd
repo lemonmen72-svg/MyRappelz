@@ -413,7 +413,8 @@ func _check_old_save(player: Player) -> void:
 	main.hud.close_window()
 
 
-## Админ-панель: раса и пол, профессия, уровень, JP, «изучить всё», полное HP/MP, сброс в Бродягу.
+## Админ-панель (вкладка «Герой»; всё остальное — tests/test_admin_panel.gd): раса и пол, профессия, уровень, JP,
+## «изучить всё», полное HP/MP, сброс в Бродягу.
 func _check_admin(player: Player) -> void:
 	SettingsMenu.open(main.hud)
 	check(SettingsMenu.buttons.has("admin"), "в настройках — кнопка «Админ»")
@@ -436,8 +437,8 @@ func _check_admin(player: Player) -> void:
 	AdminPanel.buttons["jp100"].pressed.emit()
 	check(int(game.hero["jp"]) == jp0 + 100, "+100 JP")
 	var lv0: int = game.level
-	AdminPanel.buttons["lvl_plus5"].pressed.emit()
-	check(game.level == mini(lv0 + 5, AdminPanel.MAX_LEVEL), "уровень +5: %d" % game.level)
+	AdminPanel.buttons["lvl_plus10"].pressed.emit()
+	check(game.level == mini(lv0 + 10, AdminPanel.MAX_LEVEL), "уровень +10: %d" % game.level)
 	AdminPanel.buttons["learn_all"].pressed.emit()
 	var learned := (game.hero["skills"] as Dictionary).size()
 	check(learned > 0, "изучены все доступные умения: %d" % learned)

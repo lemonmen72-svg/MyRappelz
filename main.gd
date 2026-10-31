@@ -198,6 +198,11 @@ func _build_slots() -> void:
 
 
 func _spawn_slot(i: int) -> void:
+	# Слот уже занят живым зверем (админ-панель возродила зверей раньше таймера) — второго не ставим
+	for n in get_tree().get_nodes_in_group("mobs"):
+		var o := n as Mob
+		if o != null and o.slot == i:
+			return
 	var s: Dictionary = _slots[i]
 	var m := Mob.new()
 	m.setup(s["type"], i, s["pos"], int(s.get("level", -1)))
@@ -207,13 +212,17 @@ func _spawn_slot(i: int) -> void:
 
 func _on_mob_gone(mob: Mob, killed: bool) -> void:
 	if killed:
-		player.gain_xp(mob.xp_reward)
-		Util.float_text(self, mob.global_position + Vector3(0, 3.4, 0), "+%d оп." % mob.xp_reward, Color(0.6, 0.9, 1))
+		# Множитель опыта админ-панели (Game.xp_mult; ×1 — обычная игра)
+		var gained: int = mob.xp_reward * Game.xp_mult
+		player.gain_xp(gained)
+		Util.float_text(self, mob.global_position + Vector3(0, 3.4, 0), "+%d оп." % gained, Color(0.6, 0.9, 1))
 		pets.on_mob_killed(mob)
 		taming.on_mob_killed(mob)
 		economy.on_mob_killed(mob)
 		quests.on_mob_killed(mob)
-	get_tree().create_timer(RESPAWN_TIME).timeout.connect(_spawn_slot.bind(mob.slot))
+	# Звери, поставленные админ-панелью (slot -1), не возрождаются
+	if mob.slot >= 0:
+		get_tree().create_timer(RESPAWN_TIME).timeout.connect(_spawn_slot.bind(mob.slot))
 
 
 func _on_action(id: String) -> void:
