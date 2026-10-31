@@ -7,14 +7,32 @@ extends RefCounted
 ## knock, buff, special. Числа эффектов — массивы по уровням умения (HeroSkills.value_at).
 ## Особая механика (блок щитом с ответным уроном, призыв, жертва питомцем, слияние и т. п.) — метод
 ## sp_<имя>(sid, n, target, e) -> bool в этом файле и эффект {"do": "special", "handler": "<имя>"} в данных умения.
+## Механики профессий — в своих файлах (JOB_FX_FILES: job_fx_<профессия>.gd, только static func), у каждого
+## файла шесть функций (fx — этот движок: fx.p — герой, fx.state — запасы профессий, общий словарь):
+##   pre_cast(fx, sid, n, sk) -> String — перед умением (цель уже найдена): проверить и списать свой запас
+##     (искры духа Воина); "" — можно, иначе причина (умение не применяется, MP и перезарядка не тратятся);
+##   special(fx, handler, sid, n, t, e) -> bool — эффект {"do": "special", "handler"}; false — не свой обработчик;
+##   on_basic_hit(fx, t, dealt) — обычная атака героя попала (удар, выстрел, второй удар): заряды, зачарование;
+##   on_hurt(fx, attacker, amount) — героя ударили (урон уже снят): ответный урон;
+##   tick(fx, delta) — каждый кадр (свои таймеры); reset(fx) — смерть героя, смена профессии (снять запасы).
+## Новая профессия — строка в JOB_FX_FILES (файлы грузятся при первом обращении, без циклов preload).
 ## Владелец — Player (поля и помощники: _find_target, _engage, _deal, _shoot, heal, add_timed_bonus, add_hot).
 ## Бой — Combat: урон проходит через защиту зверя (Player._deal / _shoot), по зверю выше героя больше чем на 2 ур.
 ## умение может промахнуться (Player.skill_hits) — и урон, и ослабления.
 
 ## Анимации героя по полю anim.
 const ANIMS := ["attack", "cast", "bash", "spin", "buff", "dash"]
+## Файлы механик профессий (по строке на профессию).
+const JOB_FX_FILES := [
+	"res://job_fx_warrior.gd",
+	"res://job_fx_shaman.gd",
+]
 
 var p: Player
+## Запасы и таймеры механик профессий (искры духа Воина, горение «Неистовства огня» и т. п.).
+var state: Dictionary = {}
+
+static var _job_fx: Array[Script] = []
 
 
 func _init(owner: Player) -> void:
@@ -42,6 +60,11 @@ func cast(sid: String, n: int, sk: Dictionary) -> bool:
 	if use == "melee" or use == "ranged" or use == "magic" or use == "near":
 		if t == null:
 			return p._no_target()
+	var why := job_pre_cast(sid, n, sk)
+	if why != "":
+		p.message.emit("«%s»: %s" % [String(sk.get("name", sid)), why])
+		return false
+	if t != null:
 		p._engage(t)
 	anim(String(sk.get("anim", "attack")))
 	var fx: Array = sk.get("fx", [])
@@ -149,7 +172,7 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 				var h := "sp_" + String(e.get("handler", ""))
 				if has_method(h):
 					call(h, sid, n, t, e)
-				else:
+				elif not job_special(String(e.get("handler", "")), sid, n, t, e):
 					p.message.emit("«%s»: особое действие появится в следующем обновлении" % String(sk.get("name", sid)))
 
 
@@ -249,3 +272,56 @@ static func _find(fx: Array, what: String) -> Dictionary:
 		if String(d.get("do", "")) == what:
 			return d
 	return {}
+
+
+# ---------- Механики профессий (JOB_FX_FILES) ----------
+
+## Скрипты механик профессий (грузятся один раз).
+static func job_scripts() -> Array[Script]:
+	if _job_fx.is_empty():
+		for path in JOB_FX_FILES:
+			var scr := load(String(path)) as Script
+			if scr != null:
+				_job_fx.append(scr)
+	return _job_fx
+
+
+func job_pre_cast(sid: String, n: int, sk: Dictionary) -> String:
+	for scr in job_scripts():
+		var why := String(scr.call("pre_cast", self, sid, n, sk))
+		if why != "":
+			return why
+	return ""
+
+
+func job_special(handler: String, sid: String, n: int, t: Mob, e: Dictionary) -> bool:
+	for scr in job_scripts():
+		if bool(scr.call("special", self, handler, sid, n, t, e)):
+			return true
+	return false
+
+
+## Обычная атака героя попала по t (готовый урон dealt).
+func on_basic_hit(t: Mob, dealt: int) -> void:
+	if t == null or not is_instance_valid(t):
+		return
+	for scr in job_scripts():
+		scr.call("on_basic_hit", self, t, dealt)
+
+
+## Героя ударил attacker (урон amount уже снят).
+func on_hurt(attacker: Node3D, amount: int) -> void:
+	for scr in job_scripts():
+		scr.call("on_hurt", self, attacker, amount)
+
+
+func tick(delta: float) -> void:
+	for scr in job_scripts():
+		scr.call("tick", self, delta)
+
+
+## Снять запасы профессий (смерть, смена профессии).
+func reset() -> void:
+	for scr in job_scripts():
+		scr.call("reset", self)
+	state.clear()
