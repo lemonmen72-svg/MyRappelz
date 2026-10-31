@@ -299,6 +299,8 @@ func _check_pairs(player: Player) -> void:
 
 
 func _check_shield(player: Player) -> void:
+	if not game.inventory.has("weapon_shield_r1"):
+		game.inventory.add("weapon_shield_r1")
 	check(player.equip("weapon_sword_1h_r1") == "", "меч")
 	var def0 := player.defense
 	var block0 := player.block

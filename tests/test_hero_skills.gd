@@ -351,7 +351,9 @@ func _check_stats(player: Player) -> void:
 		% [player.atk, int(d1["patk"]), int(dg["atk"])])
 	check(player.matk == int(d1["matk"]) + int(dg["matk"]), "кинжалы дают и маг. атаку: %d = %d + %d"
 		% [player.matk, int(d1["matk"]), int(dg["matk"])])
-	check(is_equal_approx(player.eva, float(d1["eva"]) / 100.0) and is_equal_approx(player.crit, float(d1["crit"]) / 100.0),
+	# Крит: статы + крит надетого оружия (у кинжалов он свой)
+	var wcrit := float(ItemData.get_item(game.weapon).get("crit", 0.0))
+	check(is_equal_approx(player.eva, float(d1["eva"]) / 100.0) and is_equal_approx(player.crit, float(d1["crit"]) / 100.0 + wcrit),
 		"уклонение %.1f%% и крит %.1f%% героя — из статов" % [player.eva * 100.0, player.crit * 100.0])
 	check(is_equal_approx(player.aspd, float(d1["aspd"]) / 100.0 + 0.25), "скорость атаки от Ловкости и кинжала (+25%%): %d%%"
 		% roundi(player.aspd * 100.0))
