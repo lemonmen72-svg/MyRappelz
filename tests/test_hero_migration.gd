@@ -37,6 +37,7 @@ func run_step() -> void:
 		0:
 			check(game.has_character and game.char_name == "Максим", "старое сохранение загружено при запуске")
 			check(game.race_id == "dark_elf" and game.class_id == "assassin", "воин стал Наёмником (тёмные эльфы)")
+			check(game.job_changed and game.job_level_at_change == 0, "профессия уже получена (без сверх-эволюции)")
 			# Редкий кристалл души → зеркальная карта + 30 зол.
 			check(game.level == OLD_LEVEL and game.xp == OLD_XP and game.gold == OLD_GOLD + 30,
 				"уровень, опыт и золото сохранены (+30 зол. за редкий кристалл): %d" % game.gold)

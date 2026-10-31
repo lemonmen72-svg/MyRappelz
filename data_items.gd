@@ -4,10 +4,12 @@ extends RefCounted
 ## "weapon" (оружие).
 ## buy: цена покупки у NPC (0 = не продаётся; кто чем торгует — NpcData.shop: зелья, свиток и оружие — торговец,
 ## карты существ и зеркальная карта — Учитель Кирк), sell: цена продажи торговцу.
-## Оружие (type "weapon"): weapon — вид ("daggers" парные кинжалы, "dual_swords" парные мечи, "crossbow" арбалет),
-## atk — прибавка к атаке, cd — время между обычными атаками, с, range — дальность, м, crit — прибавка к шансу крита,
-## class — кому подходит (id класса ClassData). Надетое оружие — Game.weapon (id предмета, лежит в сумке,
-## но в окне сумки показано в слоте экипировки, а не в ячейке).
+## Оружие (type "weapon"): weapon — вид (WEAPON_KINDS: одноручный и двуручный меч, кинжал, парные кинжалы "daggers",
+## парные мечи, булавы, топоры, посохи, арбалет, лук, щит), atk — прибавка к атаке, def — к защите (щит),
+## cd — время между обычными атаками, с, range — дальность, м, crit — прибавка к шансу крита, rank — ранг
+## (1 — оружие 1–10 ур.; Бродяга носит только 1-й ранг). Кому подходит — по виду: ClassData weapons профессии
+## (weapon_fits). Надетое оружие — Game.weapon, щит во второй руке — Game.shield (id предметов, лежат в сумке,
+## но в окне сумки показаны в слотах экипировки, а не в ячейках).
 ## Для окна сумки: rarity — редкость ("common" по умолчанию, "improved", "rare", "unique": цвет рамки ячейки),
 ## icon — что рисовать процедурным значком, пока нет картинки (ItemIcon: "flask", "scroll", "card",
 ## "daggers", "swords", "crossbow", "fang", "pelt", "feather", "plate", "shard"), stack — размер стопки в ячейке
@@ -72,35 +74,86 @@ const ITEMS := {
 		"name": "Свиток воскрешения", "type": "consumable", "icon": "scroll", "buy": 30, "sell": 10,
 		"color": Color(0.95, 0.9, 0.6), "desc": "Воскрешает погибшего питомца.",
 	},
+	# ---------- Оружие 1-го ранга (ур. 1–10): у торговца; стартовое у Бродяги и профессий (STARTER_WEAPONS) ----------
+	"weapon_sword_1h_r1": {
+		"name": "Учебный меч", "type": "weapon", "icon": "swords", "weapon": "sword_1h", "rank": 1,
+		"atk": 3, "cd": 0.75, "range": 2.6, "crit": 0.02, "buy": 40, "sell": 8,
+		"color": Color(0.85, 0.87, 0.92), "desc": "Простой одноручный меч новичка. Вторая рука свободна — для щита.",
+	},
+	"weapon_sword_2h_r1": {
+		"name": "Двуручный меч новичка", "type": "weapon", "icon": "swords", "weapon": "sword_2h", "rank": 1,
+		"atk": 6, "cd": 1.05, "range": 2.9, "crit": 0.02, "buy": 55, "sell": 12,
+		"color": Color(0.8, 0.83, 0.92), "desc": "Длинный тяжёлый клинок: бьёт реже, но сильнее.",
+	},
+	"weapon_dagger_r1": {
+		"name": "Кинжал новичка", "type": "weapon", "icon": "daggers", "weapon": "dagger", "rank": 1,
+		"atk": 2, "cd": 0.55, "range": 2.2, "crit": 0.05, "buy": 35, "sell": 7,
+		"color": Color(0.78, 0.75, 0.9), "desc": "Короткий клинок: частые удары и больше критов.",
+	},
+	"weapon_mace_1h_r1": {
+		"name": "Учебная булава", "type": "weapon", "icon": "mace", "weapon": "mace_1h", "rank": 1,
+		"atk": 4, "cd": 0.85, "range": 2.5, "crit": 0.0, "buy": 40, "sell": 8,
+		"color": Color(0.72, 0.7, 0.66), "desc": "Окованная булава в одну руку. Хороша со щитом.",
+	},
+	"weapon_mace_2h_r1": {
+		"name": "Тяжёлая булава новичка", "type": "weapon", "icon": "mace", "weapon": "mace_2h", "rank": 1,
+		"atk": 7, "cd": 1.15, "range": 2.8, "crit": 0.0, "buy": 55, "sell": 12,
+		"color": Color(0.68, 0.66, 0.62), "desc": "Двуручная булава: медленно, зато каждый удар чувствуется.",
+	},
+	"weapon_axe_1h_r1": {
+		"name": "Учебный топор", "type": "weapon", "icon": "axe", "weapon": "axe_1h", "rank": 1,
+		"atk": 4, "cd": 0.8, "range": 2.5, "crit": 0.03, "buy": 40, "sell": 8,
+		"color": Color(0.8, 0.72, 0.6), "desc": "Лёгкий топор в одну руку.",
+	},
+	"weapon_axe_2h_r1": {
+		"name": "Двуручный топор новичка", "type": "weapon", "icon": "axe", "weapon": "axe_2h", "rank": 1,
+		"atk": 7, "cd": 1.1, "range": 2.9, "crit": 0.04, "buy": 55, "sell": 12,
+		"color": Color(0.78, 0.68, 0.55), "desc": "Широкое лезвие на длинной рукояти: самый тяжёлый удар среди оружия новичка.",
+	},
+	"weapon_staff_1h_r1": {
+		"name": "Жезл новичка", "type": "weapon", "icon": "staff", "weapon": "staff_1h", "rank": 1,
+		"atk": 3, "cd": 1.0, "range": 9.0, "crit": 0.0, "buy": 40, "sell": 8,
+		"color": Color(0.82, 0.68, 0.45), "desc": "Короткий жезл: обычная атака — сгусток магии издалека. Вторая рука свободна.",
+	},
+	"weapon_staff_2h_r1": {
+		"name": "Посох новичка", "type": "weapon", "icon": "staff", "weapon": "staff_2h", "rank": 1,
+		"atk": 5, "cd": 1.15, "range": 10.0, "crit": 0.0, "buy": 55, "sell": 12,
+		"color": Color(0.8, 0.64, 0.4), "desc": "Посох в две руки: магический снаряд сильнее и летит дальше.",
+	},
+	"weapon_shield_r1": {
+		"name": "Деревянный щит", "type": "weapon", "icon": "shield", "weapon": "shield", "rank": 1,
+		"atk": 0, "def": 2, "cd": 0.0, "range": 0.0, "crit": 0.0, "buy": 35, "sell": 7,
+		"color": Color(0.62, 0.45, 0.28), "desc": "Щит во вторую руку (к одноручному оружию): защита выше.",
+	},
 	# ---------- Оружие Наёмника: стартовый набор (выдаётся новому и прежнему Наёмнику) ----------
 	"daggers_starter": {
-		"name": "Парные кинжалы", "type": "weapon", "icon": "daggers", "weapon": "daggers", "class": "assassin",
+		"name": "Парные кинжалы", "type": "weapon", "icon": "daggers", "weapon": "daggers", "rank": 1,
 		"atk": 1, "cd": 0.45, "range": 2.2, "crit": 0.05, "buy": 0, "sell": 5,
 		"color": Color(0.78, 0.75, 0.9), "desc": "Короткие клинки: самые частые удары и больше критов.",
 	},
 	"dual_swords_starter": {
-		"name": "Парные мечи", "type": "weapon", "icon": "swords", "weapon": "dual_swords", "class": "assassin",
+		"name": "Парные мечи", "type": "weapon", "icon": "swords", "weapon": "dual_swords", "rank": 1,
 		"atk": 3, "cd": 0.55, "range": 2.4, "crit": 0.0, "buy": 0, "sell": 5,
 		"color": Color(0.85, 0.88, 0.96), "desc": "Два лёгких меча: удары справа и слева по очереди.",
 	},
 	"crossbow_starter": {
-		"name": "Лёгкий арбалет", "type": "weapon", "icon": "crossbow", "weapon": "crossbow", "class": "assassin",
+		"name": "Лёгкий арбалет", "type": "weapon", "icon": "crossbow", "weapon": "crossbow", "rank": 1,
 		"atk": 6, "cd": 1.0, "range": 11.0, "crit": 0.0, "buy": 0, "sell": 5,
 		"color": Color(0.72, 0.52, 0.32), "desc": "Стреляет болтами издалека, но реже.",
 	},
 	# ---------- Оружие у торговца ----------
 	"daggers_steel": {
-		"name": "Стальные кинжалы", "type": "weapon", "icon": "daggers", "rarity": "improved", "weapon": "daggers", "class": "assassin",
+		"name": "Стальные кинжалы", "type": "weapon", "icon": "daggers", "rarity": "improved", "weapon": "daggers", "rank": 1,
 		"atk": 4, "cd": 0.45, "range": 2.2, "crit": 0.06, "buy": 120, "sell": 40,
 		"color": Color(0.7, 0.8, 1.0), "desc": "Закалённые кинжалы странницы.",
 	},
 	"dual_swords_steel": {
-		"name": "Стальные парные мечи", "type": "weapon", "icon": "swords", "rarity": "improved", "weapon": "dual_swords", "class": "assassin",
+		"name": "Стальные парные мечи", "type": "weapon", "icon": "swords", "rarity": "improved", "weapon": "dual_swords", "rank": 1,
 		"atk": 7, "cd": 0.55, "range": 2.4, "crit": 0.0, "buy": 120, "sell": 40,
 		"color": Color(0.75, 0.9, 1.0), "desc": "Пара закалённых мечей.",
 	},
 	"crossbow_heavy": {
-		"name": "Тяжёлый арбалет", "type": "weapon", "icon": "crossbow", "rarity": "improved", "weapon": "crossbow", "class": "assassin",
+		"name": "Тяжёлый арбалет", "type": "weapon", "icon": "crossbow", "rarity": "improved", "weapon": "crossbow", "rank": 1,
 		"atk": 11, "cd": 1.05, "range": 12.0, "crit": 0.02, "buy": 140, "sell": 45,
 		"color": Color(0.85, 0.6, 0.35), "desc": "Мощные болты, бьёт чуть дальше.",
 	},
@@ -123,15 +176,41 @@ const ITEMS := {
 }
 
 
-## Виды оружия: название и кому подходят умения («клинки» — кинжалы и мечи).
+## Виды оружия: name — название, hands — 1 (одноручное: можно щит во вторую руку), 2 (двуручное), "dual" (парное),
+## "off" (щит, вторая рука); attack — обычная атака ("melee" удар, "ranged" стрела или болт, "magic" сгусток магии);
+## model — что держит модель героя (CharacterModel: модель из файла умеет sword, dagger, daggers, dual_swords, crossbow,
+## axe, mace, staff; щит — отдельно). Группы видов для умений — HeroSkills.WEAPON_GROUPS.
+## "daggers" — парные кинжалы (dual_daggers; id прежний ради сохранений).
 const WEAPON_KINDS := {
-	"daggers": {"name": "парные кинжалы", "group": "blades"},
-	"dual_swords": {"name": "парные мечи", "group": "blades"},
-	"crossbow": {"name": "арбалет", "group": "crossbow"},
+	"sword_1h": {"name": "одноручный меч", "hands": 1, "attack": "melee", "model": "sword"},
+	"sword_2h": {"name": "двуручный меч", "hands": 2, "attack": "melee", "model": "sword"},
+	"dagger": {"name": "кинжал", "hands": 1, "attack": "melee", "model": "dagger"},
+	"daggers": {"name": "парные кинжалы", "hands": "dual", "attack": "melee", "model": "daggers"},
+	"dual_swords": {"name": "парные мечи", "hands": "dual", "attack": "melee", "model": "dual_swords"},
+	"mace_1h": {"name": "одноручная булава", "hands": 1, "attack": "melee", "model": "mace"},
+	"mace_2h": {"name": "двуручная булава", "hands": 2, "attack": "melee", "model": "mace"},
+	"axe_1h": {"name": "одноручный топор", "hands": 1, "attack": "melee", "model": "axe"},
+	"axe_2h": {"name": "двуручный топор", "hands": 2, "attack": "melee", "model": "axe"},
+	"dual_axes": {"name": "парные топоры", "hands": "dual", "attack": "melee", "model": "axe"},
+	"staff_1h": {"name": "одноручный посох", "hands": 1, "attack": "magic", "model": "staff"},
+	"staff_2h": {"name": "двуручный посох", "hands": 2, "attack": "magic", "model": "staff"},
+	"crossbow": {"name": "арбалет", "hands": 2, "attack": "ranged", "model": "crossbow"},
+	"bow": {"name": "лук", "hands": 2, "attack": "ranged", "model": "bow"},
+	"shield": {"name": "щит", "hands": "off", "attack": "", "model": ""},
 }
-## Стартовый набор оружия класса и что надето сразу (старые сохранения Наёмника — парные мечи).
+## Стартовый набор оружия профессии: выдаётся новому герою (Бродяга) и при смене профессии (Game.change_job);
+## первое — надевается, щит из набора — во вторую руку. Старые сохранения Наёмника — парные мечи.
 const STARTER_WEAPONS := {
+	"wanderer": ["weapon_sword_1h_r1"],
+	"swordsman": ["weapon_sword_1h_r1", "weapon_shield_r1"],
+	"wizard": ["weapon_staff_2h_r1", "weapon_mace_1h_r1"],
+	"beastmaster": ["weapon_staff_2h_r1", "weapon_mace_1h_r1"],
 	"assassin": ["dual_swords_starter", "daggers_starter", "crossbow_starter"],
+	"neophyte": ["weapon_staff_2h_r1", "weapon_dagger_r1"],
+	"adept": ["weapon_staff_2h_r1", "weapon_dagger_r1"],
+	"warrior": ["weapon_axe_2h_r1", "weapon_axe_1h_r1"],
+	"shaman": ["weapon_staff_2h_r1", "weapon_axe_1h_r1"],
+	"conjurer": ["weapon_sword_1h_r1", "weapon_axe_1h_r1"],
 }
 
 ## Прежние id предметов → новые (старые сохранения переводит Game.from_dict). Кристаллы души заменены картами:
@@ -172,7 +251,7 @@ static func is_weapon(id: String) -> bool:
 	return String(get_item(id).get("type", "")) == "weapon"
 
 
-## Вид оружия предмета ("daggers" | "dual_swords" | "crossbow" | "").
+## Вид оружия предмета (WEAPON_KINDS: "sword_1h", "daggers", "crossbow", "shield" и т. д.; "" — не оружие).
 static func weapon_kind(id: String) -> String:
 	return String(get_item(id).get("weapon", ""))
 
@@ -182,24 +261,60 @@ static func weapon_kind_name(kind: String) -> String:
 	return String(WEAPON_KINDS.get(kind, {}).get("name", kind))
 
 
-## Группа вида оружия для умений: "blades" (кинжалы, мечи), "crossbow" или "".
-static func weapon_group(kind: String) -> String:
-	return String(WEAPON_KINDS.get(kind, {}).get("group", ""))
+## Хват вида оружия: 1, 2, "dual" или "off" (щит).
+static func hands(kind: String) -> Variant:
+	var d: Dictionary = WEAPON_KINDS.get(kind, {})
+	return d.get("hands", 2)
 
 
-## Подходит ли оружие классу.
+## Одноручное оружие (во вторую руку можно щит).
+static func is_one_handed(kind: String) -> bool:
+	var h: Variant = hands(kind)
+	return h is int and int(h) == 1
+
+
+static func is_shield(id: String) -> bool:
+	return weapon_kind(id) == "shield"
+
+
+## Обычная атака оружием вида kind: "melee" | "ranged" | "magic" ("" — щит или не оружие).
+static func weapon_attack(kind: String) -> String:
+	var d: Dictionary = WEAPON_KINDS.get(kind, {})
+	return String(d.get("attack", ""))
+
+
+## Что держит модель героя для вида kind (CharacterModel).
+static func model_kind(kind: String) -> String:
+	var d: Dictionary = WEAPON_KINDS.get(kind, {})
+	return String(d.get("model", ""))
+
+
+static func rank(id: String) -> int:
+	return int(get_item(id).get("rank", 1))
+
+
+## Подходит ли оружие профессии: вид — среди ClassData weapons профессии, Бродяге — только 1-й ранг.
 static func weapon_fits(id: String, class_id: String) -> bool:
-	return is_weapon(id) and String(get_item(id).get("class", "")) == class_id
+	if not is_weapon(id):
+		return false
+	if ClassData.is_wanderer(class_id) and rank(id) > 1:
+		return false
+	return ClassData.weapons(class_id).has(weapon_kind(id))
 
 
-## Пользуется ли класс сменным оружием (есть стартовый набор).
+## Пользуется ли класс сменным оружием (у всех профессий есть стартовый набор).
 static func class_uses_weapons(class_id: String) -> bool:
-	return STARTER_WEAPONS.has(class_id)
+	return STARTER_WEAPONS.has(ClassData.migrate_id(class_id))
+
+
+## Стартовый набор профессии.
+static func starter_weapons(class_id: String) -> Array:
+	return STARTER_WEAPONS.get(ClassData.migrate_id(class_id), [])
 
 
 ## Оружие по умолчанию у класса (первое из стартового набора) или "".
 static func default_weapon(class_id: String) -> String:
-	var a: Array = STARTER_WEAPONS.get(class_id, [])
+	var a := starter_weapons(class_id)
 	return String(a[0]) if not a.is_empty() else ""
 
 
@@ -208,6 +323,8 @@ static func weapon_stats_text(id: String) -> String:
 	var it := get_item(id)
 	if it.is_empty():
 		return ""
+	if is_shield(id):
+		return "защита +%d (во второй руке)" % int(it.get("def", 0))
 	var t := "атака +%d, удар раз в %.2f с, дальность %.1f м" % [int(it.get("atk", 0)), float(it.get("cd", 1.0)),
 		float(it.get("range", 2.0))]
 	if float(it.get("crit", 0.0)) > 0.0:

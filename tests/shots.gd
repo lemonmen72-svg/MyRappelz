@@ -36,7 +36,7 @@ const BAG_ITEMS := [
 
 
 func race_class() -> Array:
-	return ["light_elf", "cleric"]
+	return ["light_elf", "wizard"]
 
 
 func before_start() -> void:
@@ -218,7 +218,7 @@ func run_step() -> void:
 			main.pets.recall()
 			game.race_id = "dark_elf"
 			game.class_id = "assassin"
-			game.level = 7
+			game.level = 25
 			player.apply_class()
 			game.hero["jp"] = 40
 			for e in HERO_SKILLS:
@@ -635,8 +635,10 @@ func run_step() -> void:
 			step = 610
 		610:
 			player.hp = player.max_hp
-			player.use_skill("holy_guard")
-			player.use_skill("quick_step")
+			player.add_timed_bonus("focus_moment", 25.0, {"crit": 0.15})
+			player.speed_buff = 0.3
+			player.speed_buff_time = 5.0
+			player.add_effect("speed", 5.0, StatusEffects.source_hero_skill("quick_pace"))
 			var pet: Pet = main.pets.active_pet
 			if pet != null:
 				pet._apply_buff(PetSkills.get_skill("hunter_call"), 1, "hunter_call")
@@ -751,6 +753,53 @@ func run_step() -> void:
 			main.cam.current = true
 			main.hud.visible = true
 			player.visible = true
+			# Профессии: экран создания (раса и пол, все — Бродяги)
+			var cc := CharacterCreate.new()
+			_create = cc
+			get_tree().root.add_child(cc)
+			cc._select_race("human")
+			cc._select_gender("m")
+			wait = 20
+			step = 807
+		807:
+			shot("83_create_race")
+			_create.queue_free()
+			# Бродяга 12 ур.: выбор профессии у мудреца (окно с тремя карточками, сверх-эволюция +10)
+			game.race_id = "light_elf"
+			game.level = 12
+			game.admin_set_job("wanderer")
+			player.apply_class()
+			main.job_window.open("")
+			main.job_window._on_pick("swordsman")
+			wait = 20
+			step = 808
+		808:
+			shot("84_job_choice")
+			main.hud.close_window()
+			# HUD Бродяги: кнопок умений нет
+			var ph := find_mob("pheasant")
+			if ph != null:
+				stand_near(ph, 4.0)
+				player._set_target(ph)
+			wait = 30
+			step = 809
+		809:
+			shot("85_wanderer_hud")
+			# Древо новой профессии: Мечник, вкладка «Щит и булава»
+			game.change_job("swordsman")
+			player.apply_class()
+			main.hero_window.open("shield")
+			wait = 20
+			step = 810
+		810:
+			shot("86_job_tree")
+			# Админ-панель (Настройки → Админ)
+			AdminPanel.open(main)
+			wait = 20
+			step = 811
+		811:
+			shot("87_admin_panel")
+			main.hud.close_window()
 			ok_done()
 
 

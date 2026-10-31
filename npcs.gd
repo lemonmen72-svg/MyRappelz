@@ -538,6 +538,11 @@ func _on_accept(id: String) -> void:
 
 
 func _on_complete(id: String) -> void:
+	# Задание на профессию: сдача — в окне выбора профессии (JobWindow)
+	if bool(QuestData.get_quest(id).get("job_choice", false)) and main.get("job_window") != null:
+		close_dialog()
+		main.job_window.open(id)
+		return
 	if main.quests.complete(id):
 		_say_next = String(QuestData.get_quest(id).get("done", ""))
 		open_dialog(dialog_npc, "quests")

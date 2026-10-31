@@ -1,8 +1,9 @@
 extends Node3D
 ## Главная сцена: создание персонажа (если нет сохранения), затем мир (тренировочный остров
 ## из конфига world/training_island.json), игрок в деревне своей расы, звери по зонам,
-## модули (питомцы, приручение, предметы, окно героя, задания, NPC) и интерфейс. Кнопки умений skill1…skill4
-## показывают умения, назначенные в окне героя (Game.hero.slots); неподходящие оружию — затемнены с подсказкой.
+## модули (питомцы, приручение, предметы, окно героя, задания, NPC, выбор профессии) и интерфейс. Кнопки умений
+## skill1…skill4 показывают умения, назначенные в окне героя (Game.hero.slots); неподходящие оружию — затемнены
+## с подсказкой; у Бродяги умений нет — кнопки скрыты.
 ## Жители-NPC (Npcs): Учитель Кирк (задания, карты существ), мудрец, кузнец и кладовщик в центре города рядом
 ## с торговцем, старосты в деревнях рас, охотница в Западном лагере, глава наёмников у входа в пещеру.
 
@@ -61,6 +62,8 @@ var quests: Quests
 var npcs: Npcs
 ## Окно героя (характеристики, оружие, древо умений).
 var hero_window: CharacterWindow
+## Окно выбора первой профессии (сдача задания мудреца).
+var job_window: JobWindow
 ## Поворот камеры вокруг игрока (0 — смотрим на север) и наклон над горизонтом.
 var cam_yaw := 0.0
 var cam_pitch := atan2(9.0, 8.5)
@@ -83,8 +86,8 @@ func _ready() -> void:
 		return
 	var cc := CharacterCreate.new()
 	add_child(cc)
-	cc.created.connect(func(n: String, r: String, c: String):
-		Game.new_character(n, r, c)
+	cc.created.connect(func(n: String, r: String, g: String):
+		Game.new_character(n, r, ClassData.WANDERER, g)
 		cc.queue_free()
 		_start_world())
 
@@ -184,6 +187,10 @@ func _build_modules() -> void:
 	npcs.name = "Npcs"
 	add_child(npcs)
 	npcs.setup(self)
+	job_window = JobWindow.new()
+	job_window.name = "JobWindow"
+	add_child(job_window)
+	job_window.setup(self)
 
 
 func _build_slots() -> void:

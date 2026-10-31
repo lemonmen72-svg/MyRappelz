@@ -1,5 +1,5 @@
 extends "res://tests/test_base.gd"
-## Аниме-модель персонажа (CharacterModel): собирается для всех 6 сочетаний раса/класс,
+## Аниме-модель персонажа (CharacterModel): собирается для всех профессий (и Бродяги),
 ## у эльфов есть уши, у каждого класса — своё оружие, бюджет мешей и вызовов отрисовки
 ## (детали склеены в меш со скелетом), кости скелета повторяют узлы, анимации без ошибок.
 ## Модель игрока и торговца — CharacterModel; экран создания строит 3D-превью.
@@ -156,31 +156,40 @@ func run_step() -> void:
 		6:
 			check(create._preview_model != null and is_instance_valid(create._preview_model),
 				"экран создания: 3D-превью построено")
-			# Доступна одна профессия — Наёмник: другие расы и классы затемнены («скоро») и не выбираются
-			check(create._race == "dark_elf" and create._class == "assassin", "по умолчанию — тёмная эльфийка-Наёмник")
-			var hb: Button = create._race_btns["human"]
-			check(hb.disabled and hb.text.contains("скоро"), "раса «Люди» затемнена: %s" % hb.text)
-			check(not (create._race_btns["dark_elf"] as Button).disabled, "тёмные эльфы доступны")
-			var wl: Button = null
-			for b in create._class_box.get_children():
-				if (b as Button).text.begins_with("Чернокнижник"):
-					wl = b as Button
-			check(wl != null and wl.disabled and wl.text.contains("скоро"), "класс «Чернокнижник» затемнён")
+			# Все три расы и оба пола доступны, класс не выбирается — все начинают Бродягой
+			check(create._race == "dark_elf" and create._gender == "f", "по умолчанию — тёмная эльфийка")
+			for rid in ClassData.RACES:
+				check(not (create._race_btns[rid] as Button).disabled, "раса «%s» доступна" % ClassData.race(rid)["name"])
+			check(create._gender_btns.has("f") and create._gender_btns.has("m"), "выбор пола: женский и мужской")
 			create._select_race("human")
-			create._select_class("warlock")
-			check(create._race == "dark_elf" and create._class == "assassin", "недоступные раса и класс не выбираются")
-			check(create._class_stats7.visible and create._class_stats7.text.contains("Ловкость"),
-				"у Наёмника 7 статов: %s" % create._class_stats7.text)
+			create._select_gender("m")
+			check(create._race == "human" and create._gender == "m", "выбраны люди, мужской")
+			check(create._class_title.text == "Бродяга", "карточка: Бродяга")
+			var jobs := create._jobs_box.get_child_count()
+			check(jobs >= 3, "три профессии расы в карточке (%d)" % jobs)
+			check(create._stats7.text.contains("Ловкость"), "7 статов Бродяги: %s" % create._stats7.text)
+			create._select_race("dark_elf")
+			create._select_gender("f")
 			wait = 5
 			step = 7
 		7:
 			var pm: CharacterModel = create._preview_model
 			check(pm != null and pm._asset != null and pm.has_ears(), "превью: главный герой из файла")
-			check(create._preview_caption.text.contains("Наёмник"), "превью: подпись «%s»" % create._preview_caption.text)
+			check(create._preview_caption.text.contains("Бродяга"), "превью: подпись «%s»" % create._preview_caption.text)
 			var got: Array = []
-			create.created.connect(func(n: String, r: String, c: String): got.append_array([n, r, c]))
+			create.created.connect(func(n: String, r: String, g: String): got.append_array([n, r, g]))
 			create._on_start()
-			check(got.size() == 3 and got[1] == "dark_elf" and got[2] == "assassin", "«Начать игру» — Наёмник: %s" % [got])
+			check(got.size() == 3 and got[1] == "dark_elf" and got[2] == "f", "«Начать игру» — раса и пол: %s" % [got])
+			check(CharacterModel.hero_asset("dark_elf", "f", "assassin") == CharacterModel.MAIN_ASSET
+				or ResourceLoader.exists(CharacterModel.HERO_ASSET_DIR + "hero_assassin_f.glb"), "тёмная эльфийка-Наёмник — героиня")
+			for rid in ClassData.RACES:
+				for g in ["f", "m"]:
+					var path := CharacterModel.hero_asset(String(rid), String(g), "assassin")
+					check(path == CharacterModel.MAIN_ASSET or path.get_file().begins_with("hero_"),
+						"модель %s/%s: %s" % [rid, g, path.get_file()])
+			check(CharacterModel.hero_asset("light_elf", "m", "swordsman") == CharacterModel.HERO_ASSET_DIR + "hero_swordsman_m.glb"
+				or not ResourceLoader.exists(CharacterModel.HERO_ASSET_DIR + "hero_swordsman_m.glb"),
+				"модель по профессии: hero_<профессия>_<пол>.glb")
 			create.queue_free()
 			ok_done()
 
@@ -188,7 +197,7 @@ func run_step() -> void:
 ## Главный герой из файла: загрузка, материалы, метки, меч, клипы, бёдра без смещения по земле.
 func _hero_start() -> void:
 	var spec := CharacterModel.spec_for("human", "warrior")
-	check(spec.get("asset", "") == CharacterModel.MAIN_ASSET, "главный герой у всех рас и классов")
+	check(spec.get("asset", "") == CharacterModel.hero_asset("human", "f", "warrior"), "модель героя по расе и полу")
 	hero = CharacterModel.new()
 	hero.setup(spec)
 	main.add_child(hero)

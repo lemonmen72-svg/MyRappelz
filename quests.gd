@@ -91,6 +91,8 @@ func accept_block(id: String) -> String:
 	var prev := String(q.get("prev", ""))
 	if prev != "" and int(Game.quests_done.get(prev, 0)) <= 0:
 		return "Сначала выполните задание «%s»" % QuestData.quest_name(prev)
+	if bool(q.get("wanderer_only", false)) and not ClassData.is_wanderer(Game.class_id):
+		return "Профессия уже выбрана"
 	var lvl := int(q.get("level", 1))
 	if Game.level < lvl:
 		return "Задание доступно с %d уровня" % lvl
@@ -104,6 +106,8 @@ func level_locked(id: String) -> bool:
 	var q := QuestData.get_quest(id)
 	var prev := String(q.get("prev", ""))
 	if prev != "" and int(Game.quests_done.get(prev, 0)) <= 0:
+		return false
+	if bool(q.get("wanderer_only", false)) and not ClassData.is_wanderer(Game.class_id):
 		return false
 	return Game.level < int(q.get("level", 1))
 
@@ -317,7 +321,8 @@ func on_mob_killed(mob: Mob) -> void:
 	if mob == null:
 		return
 	var sp := mob.type_id
-	_event("kill", func(g: Dictionary) -> bool: return _species_ok(g, sp))
+	var lvl := mob.level
+	_event("kill", func(g: Dictionary) -> bool: return _species_ok(g, sp) and lvl >= int(g.get("min_level", 0)))
 	if _pet_out():
 		_event("pet_kill", func(g: Dictionary) -> bool: return _species_ok(g, sp))
 
@@ -348,7 +353,7 @@ func on_bought(id: String, n: int, seller: String) -> void:
 
 ## Разговор с NPC npc_id (открыт диалог).
 func on_talk(npc_id: String) -> void:
-	_event("talk", func(g: Dictionary) -> bool: return String(g.get("npc", "")) == npc_id)
+	_event("talk", func(g: Dictionary) -> bool: return QuestData.goal_npc(g) == npc_id)
 
 
 # ---------- Трекер ----------

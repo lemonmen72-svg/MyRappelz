@@ -1,37 +1,30 @@
 class_name CharacterCreate
 extends CanvasLayer
-## Экран создания персонажа: слева имя, раса, класс; в центре — 3D-превью персонажа
-## (SubViewport, медленно вращается, можно крутить пальцем, касание — показать атаку);
-## справа — карточка класса: описание, характеристики 1-го уровня (у Наёмника ещё 7 статов) и два умения.
-## Пока доступна одна профессия — тёмная эльфийка-Наёмник (ClassData.is_playable): остальные расы и классы
-## видны, но затемнены с подписью «скоро» и не выбираются.
+## Экран создания персонажа: слева имя, раса и пол; в центре — 3D-превью героя (модель расы и пола —
+## CharacterModel.hero_asset, SubViewport, медленно вращается, можно крутить пальцем, касание — показать атаку);
+## справа — карточка: все начинают Бродягой (описание, 7 статов 1-го уровня) и три профессии расы, одну из которых
+## мудрец Альдерик предложит выбрать с 10 уровня. Класс на этом экране не выбирается.
 ## Рассчитан на 1280×720 и касания пальцем; размеры шрифтов и кнопок — UiScale (настройка «Размер интерфейса»).
 
-signal created(char_name: String, race_id: String, class_id: String)
+signal created(char_name: String, race_id: String, gender: String)
 
-## [ключ ClassData.stats_for(), подпись]
-const STAT_ROWS := [
-	["max_hp", "Здоровье"], ["atk", "Атака"], ["def", "Защита"],
-	["range", "Дальность"], ["speed", "Скорость"],
-]
 const GOLD := Color(0.95, 0.8, 0.4)
 const MUTED := Color(0.7, 0.72, 0.78)
 
 var _race := "dark_elf"
-var _class := "assassin"
+var _gender := "f"
 var _name_edit: LineEdit
 var _race_btns: Dictionary = {}
-var _class_box: HBoxContainer
+var _gender_btns: Dictionary = {}
 var _race_desc: Label
 var _class_stripe: ColorRect
 var _class_title: Label
 var _class_sub: Label
 var _class_desc: Label
-var _class_stats7: Label
-var _stat_bars: Dictionary = {}
-var _stat_vals: Dictionary = {}
-var _stat_max: Dictionary = {}
-var _skills_box: VBoxContainer
+## 7 статов Бродяги 1-го уровня.
+var _stats7: Label
+## Три профессии расы (подписи).
+var _jobs_box: VBoxContainer
 var _preview_pivot: Node3D
 var _preview_model: CharacterModel
 var _preview_caption: Label
@@ -39,8 +32,6 @@ var _drag_pause := 0.0
 
 
 func _ready() -> void:
-	_calc_stat_max()
-
 	var bg := ColorRect.new()
 	bg.color = Color(0.05, 0.07, 0.1)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -100,8 +91,6 @@ func _build_left() -> PanelContainer:
 	v.add_child(race_box)
 	for rid in ClassData.RACES:
 		var b := _choice_button(String(ClassData.race(rid)["name"]), UiScale.BUTTON_H - 4)
-		if not ClassData.race_playable(String(rid)):
-			_soon(b)
 		b.pressed.connect(_select_race.bind(String(rid)))
 		race_box.add_child(b)
 		_race_btns[rid] = b
@@ -110,13 +99,16 @@ func _build_left() -> PanelContainer:
 	_race_desc.custom_minimum_size = Vector2(0, UiScale.px(40))
 	v.add_child(_race_desc)
 
-	v.add_child(_label("Класс", UiScale.FONT_TEXT, MUTED))
-	_class_box = HBoxContainer.new()
-	_class_box.add_theme_constant_override("separation", int(UiScale.px(6)))
-	v.add_child(_class_box)
-	var only := _label("Пока доступна одна профессия — Наёмник. Остальные появятся позже.", UiScale.FONT_SMALL, MUTED)
-	only.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(only)
+	v.add_child(_label("Пол", UiScale.FONT_TEXT, MUTED))
+	var gbox := HBoxContainer.new()
+	gbox.add_theme_constant_override("separation", int(UiScale.px(6)))
+	v.add_child(gbox)
+	for e in ClassData.GENDERS:
+		var g := String(e[0])
+		var gb := _choice_button(String(e[1]), UiScale.BUTTON_H - 4)
+		gb.pressed.connect(_select_gender.bind(g))
+		gbox.add_child(gb)
+		_gender_btns[g] = gb
 
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -210,18 +202,20 @@ func _build_preview() -> PanelContainer:
 	return panel
 
 
-## Пересобрать модель превью под выбранные расу и класс и показать атаку.
+## Пересобрать модель превью под выбранные расу и пол (Бродяга с учебным мечом) и показать атаку.
 func _update_preview() -> void:
 	if _preview_pivot == null:
 		return
 	if _preview_model != null and is_instance_valid(_preview_model):
 		_preview_model.queue_free()
 	_preview_model = CharacterModel.new()
-	_preview_model.setup(CharacterModel.spec_for(_race, _class))
+	_preview_model.setup(CharacterModel.spec_for(_race, ClassData.WANDERER,
+		ItemData.weapon_kind(ItemData.default_weapon(ClassData.WANDERER)), _gender))
 	_preview_pivot.add_child(_preview_model)
 	if _preview_model.is_inside_tree():
 		_preview_model.play_attack()
-	_preview_caption.text = "%s · %s" % [String(ClassData.race(_race)["name"]), String(ClassData.cls(_class)["name"])]
+	_preview_caption.text = "%s · %s · Бродяга" % [String(ClassData.race(_race)["name"]),
+		ClassData.gender_name(_gender).to_lower()]
 
 
 ## Перетаскивание по превью вращает персонажа, касание — показать атаку.
@@ -277,46 +271,15 @@ func _build_right() -> PanelContainer:
 	_class_desc = _label("", UiScale.FONT_TEXT, Color(0.9, 0.9, 0.92))
 	_class_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_class_desc)
+	_stats7 = _label("", UiScale.FONT_BODY, Color(0.85, 0.86, 0.9))
+	_stats7.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(_stats7)
 
 	v.add_child(HSeparator.new())
-	v.add_child(_label("Характеристики (1-й уровень)", UiScale.FONT_TEXT, GOLD))
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", int(UiScale.px(10)))
-	grid.add_theme_constant_override("v_separation", int(UiScale.px(3)))
-	v.add_child(grid)
-	for row in STAT_ROWS:
-		var key: String = row[0]
-		var name_l := _label(String(row[1]), UiScale.FONT_BODY, Color(0.9, 0.9, 0.92))
-		name_l.custom_minimum_size = Vector2(UiScale.px(90), 0)
-		grid.add_child(name_l)
-		var bar := ProgressBar.new()
-		bar.show_percentage = false
-		bar.min_value = 0.0
-		bar.max_value = 1.0
-		bar.custom_minimum_size = UiScale.v2(80, 12)
-		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		var back := StyleBoxFlat.new()
-		back.bg_color = Color(0.18, 0.19, 0.24)
-		back.set_corner_radius_all(4)
-		bar.add_theme_stylebox_override("background", back)
-		grid.add_child(bar)
-		_stat_bars[key] = bar
-		var val := _label("", UiScale.FONT_BODY, Color.WHITE)
-		val.custom_minimum_size = Vector2(UiScale.px(120), 0)
-		grid.add_child(val)
-		_stat_vals[key] = val
-
-	_class_stats7 = _label("", UiScale.FONT_BODY, Color(0.85, 0.86, 0.9))
-	_class_stats7.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(_class_stats7)
-
-	v.add_child(HSeparator.new())
-	v.add_child(_label("Умения", UiScale.FONT_TEXT, GOLD))
-	_skills_box = VBoxContainer.new()
-	_skills_box.add_theme_constant_override("separation", int(UiScale.px(5)))
-	v.add_child(_skills_box)
+	v.add_child(_label("Профессии расы — выбор на %d уровне" % ClassData.JOB_LEVEL, UiScale.FONT_TEXT, GOLD))
+	_jobs_box = VBoxContainer.new()
+	_jobs_box.add_theme_constant_override("separation", int(UiScale.px(5)))
+	v.add_child(_jobs_box)
 	return panel
 
 
@@ -327,14 +290,6 @@ func _label(text: String, font_size: int, col: Color) -> Label:
 	l.add_theme_font_size_override("font_size", UiScale.fs(font_size))
 	l.add_theme_color_override("font_color", col)
 	return l
-
-
-## Недоступный вариант: затемнён, с подписью «скоро», не нажимается.
-func _soon(b: Button) -> void:
-	b.text += " — скоро"
-	b.disabled = true
-	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_BODY))
 
 
 ## Кнопка выбора; height — для «Среднего» размера интерфейса (по умолчанию UiScale.BUTTON_H).
@@ -348,19 +303,8 @@ func _choice_button(text: String, height: float = 44.0) -> Button:
 	return b
 
 
-## Максимум каждой характеристики среди классов на 1 уровне (для длины полос).
-func _calc_stat_max() -> void:
-	for cid in ClassData.CLASSES:
-		var s := ClassData.stats_for(String(cid), 1)
-		for row in STAT_ROWS:
-			var key: String = row[0]
-			var val: float = float(s[key])
-			var cur: float = _stat_max.get(key, 0.0)
-			_stat_max[key] = maxf(cur, val)
-
-
 func _select_race(rid: String) -> void:
-	if not ClassData.race_playable(rid):
+	if not ClassData.RACES.has(rid):
 		return
 	_race = rid
 	var r := ClassData.race(rid)
@@ -368,103 +312,53 @@ func _select_race(rid: String) -> void:
 		var b: Button = _race_btns[k]
 		b.set_pressed_no_signal(k == rid)
 	_race_desc.text = String(r["desc"])
-	var classes: Array = r["classes"]
-	if not classes.has(_class) or not ClassData.is_playable(_class):
-		for cid in classes:
-			if ClassData.is_playable(String(cid)):
-				_class = String(cid)
-				break
-
-	for c in _class_box.get_children():
-		c.queue_free()
-	for cid in classes:
-		var b := _choice_button(String(ClassData.cls(cid)["name"]))
-		b.set_pressed_no_signal(cid == _class)
-		if not ClassData.is_playable(String(cid)):
-			b.text = String(ClassData.cls(cid)["name"]) + "\nскоро"
-			b.disabled = true
-			b.focus_mode = Control.FOCUS_NONE
-			b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_BODY))
-		b.pressed.connect(_select_class.bind(String(cid)))
-		_class_box.add_child(b)
-	_select_class(_class)
+	_refresh_card()
 
 
-func _select_class(cid: String) -> void:
-	if not ClassData.is_playable(cid):
+func _select_gender(g: String) -> void:
+	if g != "f" and g != "m":
 		return
-	_class = cid
-	for b in _class_box.get_children():
-		var btn := b as Button
-		if btn != null and not btn.is_queued_for_deletion():
-			btn.set_pressed_no_signal(btn.text == String(ClassData.cls(cid)["name"]))
+	_gender = g
+	_refresh_card()
 
-	var c := ClassData.cls(cid)
+
+## Карточка справа: Бродяга (описание, 7 статов) и три профессии выбранной расы; превью.
+func _refresh_card() -> void:
+	for k in _gender_btns:
+		(_gender_btns[k] as Button).set_pressed_no_signal(k == _gender)
+	var c := ClassData.cls(ClassData.WANDERER)
 	var col: Color = c["color"]
-	var kind: String = c["attack"]
-	_class_stripe.color = col
-	_class_title.text = String(c["name"])
-	_class_title.add_theme_color_override("font_color", col.lightened(0.25))
-	_class_sub.text = "%s · %s" % [String(ClassData.race(_race)["name"]), ClassData.attack_name(kind)]
+	_class_stripe.color = col.lightened(0.2)
+	_class_title.text = "Бродяга"
+	_class_title.add_theme_color_override("font_color", col.lightened(0.45))
+	_class_sub.text = "%s · начальная профессия всех рас · %s" % [String(ClassData.race(_race)["name"]), String(c["weapon_text"])]
 	_class_desc.text = String(c["desc"])
-
-	var s := ClassData.stats_for(cid, 1)
-	for row in STAT_ROWS:
-		var key: String = row[0]
-		var v: float = float(s[key])
-		var bar: ProgressBar = _stat_bars[key]
-		var mx: float = _stat_max.get(key, 1.0)
-		bar.value = v / mx if mx > 0.0 else 0.0
-		var fill := StyleBoxFlat.new()
-		fill.bg_color = col.lightened(0.15)
-		fill.set_corner_radius_all(4)
-		bar.add_theme_stylebox_override("fill", fill)
-		var lbl: Label = _stat_vals[key]
-		match key:
-			"range":
-				lbl.text = "%s м (%s)" % [_num(v), ClassData.attack_name(kind)]
-			"speed":
-				lbl.text = "%s м/с" % _num(v)
-			_:
-				lbl.text = _num(v)
-
-	_class_stats7.visible = HeroStats.has_stats(cid)
-	if _class_stats7.visible:
-		var st := HeroStats.base_stats(cid, 1)
-		var parts: PackedStringArray = []
-		for k in Stats.STATS:
-			parts.append("%s %d" % [String(Stats.STAT_NAMES[k]), int(st[k])])
-		_class_stats7.text = " · ".join(parts)
-
-	for ch in _skills_box.get_children():
+	var st := HeroStats.base_stats(ClassData.WANDERER, 1)
+	var parts: PackedStringArray = []
+	for k in Stats.STATS:
+		parts.append("%s %d" % [String(Stats.STAT_NAMES[k]), int(st[k])])
+	_stats7.text = " · ".join(parts)
+	for ch in _jobs_box.get_children():
 		ch.queue_free()
-	for sid in c["skills"]:
-		var sk := ClassData.skill(String(sid))
+	for jid in ClassData.jobs_of(_race):
+		var j := ClassData.cls(String(jid))
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", 0)
 		var top := HBoxContainer.new()
 		top.add_theme_constant_override("separation", int(UiScale.px(8)))
-		top.add_child(_label(String(sk.get("name", sid)), UiScale.FONT_HEAD, Color(1, 0.85, 0.5)))
-		top.add_child(_label("перезарядка %s с" % _num(float(sk.get("cd", 0.0))), UiScale.FONT_BODY, MUTED))
+		var jc: Color = j["color"]
+		top.add_child(_label(String(j["name"]), UiScale.FONT_HEAD, jc.lightened(0.35)))
+		top.add_child(_label(String(j["role"]), UiScale.FONT_BODY, MUTED))
 		box.add_child(top)
-		var d := _label(String(sk.get("desc", "")), UiScale.FONT_BODY, Color(0.85, 0.86, 0.9))
+		var d := _label(String(j["desc"]), UiScale.FONT_SMALL, Color(0.85, 0.86, 0.9))
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(d)
-		_skills_box.add_child(box)
-
+		_jobs_box.add_child(box)
 	_update_preview()
 
 
-func _num(v: float) -> String:
-	if is_equal_approx(v, roundf(v)):
-		return str(roundi(v))
-	return "%.1f" % v
-
-
 func _on_start() -> void:
-	if not ClassData.is_playable(_class):
-		return
 	var n := _name_edit.text.strip_edges()
 	if n == "":
 		n = "Герой"
-	created.emit(n, _race, _class)
+	created.emit(n, _race, _gender)

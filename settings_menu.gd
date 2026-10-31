@@ -7,7 +7,7 @@ extends RefCounted
 ## Тени солнца, постобработка, дальность и контуры растительности применяются сразу
 ## (Quality.apply), густота травы и цветов — при следующем запуске игры.
 ## Открытие: SettingsMenu.open(hud) (действие HUD "settings_window").
-## Кнопки открытого окна для тестов (buttons): "ui_<0..2>", "quality_<0..2>", "fps_<30|45|60>".
+## Кнопки открытого окна для тестов (buttons): "ui_<0..2>", "quality_<0..2>", "fps_<30|45|60>", "admin" (AdminPanel).
 
 ## Размер окна для «Среднего» размера интерфейса (было 680×600).
 const WINDOW_SIZE := Vector2(620, 590)
@@ -57,6 +57,13 @@ static func open(hud: HUD) -> void:
 		_choice(fps_row, "fps_%d" % fps, str(fps), fps == Quality.fps_limit(), func() -> void: SettingsMenu._select_fps(hud, fps))
 	body.add_child(_wrap_label("Меньше кадров — телефон меньше греется и дольше держит батарея.", UiScale.FONT_BODY,
 		NOTE_COLOR))
+
+	# Админ-панель для тестирования (AdminPanel.ADMIN_TOOLS = false — убрать)
+	if AdminPanel.ADMIN_TOOLS:
+		var admin_row := _row(body)
+		var main_node := hud.get_parent()
+		_choice(admin_row, "admin", "Админ: раса, пол, профессия, уровень", false,
+			func() -> void: AdminPanel.open(main_node))
 
 
 static func _row(body: VBoxContainer) -> HBoxContainer:

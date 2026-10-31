@@ -2,7 +2,10 @@ extends Node
 ## Основа автотестов (без экрана). Создаёт нового персонажа, запускает main.tscn и каждый кадр
 ## вызывает run_step(), пока не вызван ok_done() или fail(). Пропуск кадров: wait = N.
 ## Наследник: extends "res://tests/test_base.gd", переопределяет run_step() и при нужде
-## race_class() / before_start(). Запуск:
+## race_class() / hero_level() / before_start(). Герой с профессией в race_class() (например, ["dark_elf", "assassin"])
+## создаётся уже сменившим профессию (Game.new_character); ["human", "wanderer"] — новичок-Бродяга.
+## Помощники профессий: become_job(job) — сменить профессию сразу (как админ-панель), learn_skills(ids) — изучить
+## умения (JP добавляются). Запуск:
 ## godot --headless --fixed-fps 60 --path . res://tests/runner.tscn -- res://tests/<файл>.gd
 
 const MAX_FRAMES := 60 * 300
@@ -16,9 +19,14 @@ var done := false
 var last_msg := ""
 
 
-## [раса, класс] персонажа для теста.
+## [раса, профессия] персонажа для теста (профессия — уже получена; "wanderer" — Бродяга).
 func race_class() -> Array:
 	return ["human", "warrior"]
+
+
+## Уровень героя в начале теста (JP — как накоплены к этому уровню).
+func hero_level() -> int:
+	return 1
 
 
 ## Вызывается после создания персонажа, до запуска мира (можно выдать предметы, питомцев).
@@ -37,6 +45,10 @@ func _ready() -> void:
 	game.delete_save()
 	var rc := race_class()
 	game.new_character("Тест", rc[0], rc[1])
+	var lvl := hero_level()
+	if lvl > 1:
+		game.level = lvl
+		game.hero["jp"] = HeroSkills.default_jp(lvl)
 	before_start()
 	main = load("res://main.tscn").instantiate()
 	get_tree().root.add_child.call_deferred(main)
@@ -133,3 +145,20 @@ func touch(pressed: bool, index: int, pos: Vector2) -> void:
 func button_center(id: String) -> Vector2:
 	var p: Panel = main.hud._buttons[id]["panel"]
 	return p.position + p.size / 2.0
+
+
+## Сменить профессию героя сразу (как админ-панель: умения прежней — сброс с возвратом JP, оружие профессии).
+func become_job(job: String) -> void:
+	game.admin_set_job(job)
+	main.player.apply_class()
+
+
+## Изучить умения ids (по порядку; JP добавляются, нужен уровень game.level) и пересчитать игрока.
+func learn_skills(ids: Array) -> void:
+	game.hero["jp"] = int(game.hero.get("jp", 0)) + 500
+	for id in ids:
+		var sid := String(id)
+		var why := HeroSkills.learn_block(game.hero, game.class_id, game.level, sid)
+		check(HeroSkills.learn(game.hero, game.class_id, game.level, sid), "изучено «%s» %s" % [
+			String(HeroSkills.get_skill(sid).get("name", sid)), why])
+	main.player.refresh_skills()

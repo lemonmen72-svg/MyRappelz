@@ -8,7 +8,8 @@ extends "res://tests/test_base.gd"
 ## JP за опыт, окно героя (вкладка «Герой»: 7 характеристик и боевые показатели, выбор оружия; древо по вкладкам,
 ## карточка, «+ JP», «На кнопку»), 7 статов героя и производные (HeroStats: калибровка 1-го уровня, рост, точность
 ## и промахи, атака арбалета от Меткости), сохранение и загрузка, старые сохранения (воин → Наёмник),
-## древо других классов.
+## Бродяга без умений. Требования умений — 10 + JLv вики × 0.75 (профессия с 10 ур.); герой теста — Наёмник,
+## уже сменивший профессию (race_class), уровень для изучения поднимается до 40.
 
 const MainScript := preload("res://main.gd")
 
@@ -201,22 +202,21 @@ func run_step() -> void:
 			wait = 3
 			step = 12
 		12:
-			# Другие классы: два умения в древе (одна вкладка), без сменного оружия
+			# Бродяга: умений нет — кнопки скрыты, в окне героя одна вкладка «Умения» с подсказкой
 			game.race_id = "human"
-			game.class_id = "warrior"
+			game.class_id = "wanderer"
 			player.apply_class()
-			check(player.weapon_kind == "" and game.weapon == "", "у воина оружие задано классом")
-			check(player.skill_id("skill1") == "cleave" and player.skill_id("skill2") == "war_cry", "умения воина на кнопках")
-			check(not main.hud.is_button_visible("skill3") and not main.hud.is_button_visible("skill4"),
-				"у воина кнопки 3 и 4 скрыты")
-			check(player.max_mp == 0 and not main.hud._mp_bar.visible, "у воина нет MP")
+			check(game.weapon == "weapon_sword_1h_r1" and player.weapon_kind == "sword_1h", "у Бродяги учебный меч")
+			check((game.hero["skills"] as Dictionary).is_empty(), "у Бродяги нет умений")
+			for i in 4:
+				check(not main.hud.is_button_visible("skill%d" % (i + 1)), "кнопка умения %d скрыта" % (i + 1))
+			check(not player.use_skill("skill1") and main.hud._msg_label.text.contains("10 уровне"),
+				"кнопка пуста: %s" % main.hud._msg_label.text)
 			var hw: CharacterWindow = main.hero_window
 			hw.open("hero")
-			check(hw.is_open() and hw.tab == "hero", "окно героя воина")
-			check(hw.buttons.has("tab_common") and not hw.buttons.has("tab_blades"), "одна вкладка умений")
-			hw.buttons["tab_common"].pressed.emit()
-			check(hw.tree != null and hw.tree.icons.size() == 2 and hw.tree.rows.size() == 1, "древо воина: 2 умения, 1 ярус")
-			check(hw.buttons.has("slot_1"), "умение воина можно назначить на кнопку")
+			check(hw.is_open() and hw.buttons.has("tab_wanderer") and not hw.buttons.has("tab_blades"), "одна вкладка «Умения»")
+			hw.buttons["tab_wanderer"].pressed.emit()
+			check(_window_text().contains("Умения появятся после выбора профессии на 10 уровне"), "подсказка у Бродяги")
 			main.hud.close_window()
 			ok_done()
 
@@ -244,7 +244,7 @@ func _check_data() -> void:
 		var prev := 0
 		for n in range(1, mx + 1):
 			var need := HeroSkills.level_needed(sid, n)
-			if need < prev or need < 1 or need > 12:
+			if need < prev or need < 10 or need > 40:
 				bad += " %s: ур. %d" % [sid, n]
 			prev = need
 			if HeroSkills.effect_text(sid, n) == "" or HeroSkills.requirement_text(sid, n) == "":
@@ -266,16 +266,20 @@ func _check_data() -> void:
 	for t in HeroSkills.TABS:
 		check(HeroSkills.list_tab("assassin", String(t[0])).size() >= 5, "вкладка «%s»: умений %d"
 			% [String(t[1]), HeroSkills.list_tab("assassin", String(t[0])).size()])
-	check(HeroSkills.level_needed("charge_stab", 1) == 2 and HeroSkills.level_needed("dark_strike", 1) == 3
-		and HeroSkills.level_needed("bloody_blade", 1) == 5 and HeroSkills.level_needed("critical_shot", 1) == 11
-		and HeroSkills.level_needed("drain_arrow", 1) == 12, "уровень профессии вики × 0.3: 5→2, 10→3, 15→5, 35→11, 40→12")
+	check(HeroSkills.level_needed("charge_stab", 1) == 14 and HeroSkills.level_needed("dark_strike", 1) == 18
+		and HeroSkills.level_needed("bloody_blade", 1) == 21 and HeroSkills.level_needed("critical_shot", 1) == 36
+		and HeroSkills.level_needed("drain_arrow", 1) == 40 and HeroSkills.level_needed("blade_mastery", 1) == 11,
+		"ур. = 10 + JLv × 0.75: 1→11, 5→14, 10→18, 15→21, 35→36, 40→40")
+	check(HeroSkills.level_needed("shadow_step", 1) == 10 and HeroSkills.level_needed("backstab", 1) == 10,
+		"стартовые «Шаг тени» и «Удар в спину» — с получения профессии (10 ур.)")
 	var total := HeroSkills.total_cost("assassin")
 	var have := HeroSkills.default_jp(15)
 	check(float(have) >= float(total) * 0.35 and float(have) <= float(total) * 0.65,
 		"к 15 ур. %d JP — примерно половина древа (%d JP)" % [have, total])
 	check(HeroSkills.icon_path("charge_stab") == "res://assets/icons/skills/charge_stab.png", "значок: assets/icons/skills/<id>.png")
-	check(HeroSkills.list_for("warrior") == ["cleave", "war_cry"] and HeroSkills.tabs_for("warrior").size() == 1,
-		"у воина в древе два умения класса")
+	check(HeroSkills.list_for("warrior").size() == 24 and HeroSkills.tabs_for("warrior").size() == 3,
+		"у Воина своё древо: 24 умения, 3 вкладки")
+	check(HeroSkills.list_for("wanderer").is_empty() and HeroSkills.tabs_for("wanderer").is_empty(), "у Бродяги умений нет")
 	check(HeroSkills.weapon_block("dual_shot", "dual_swords") == "Нужен арбалет"
 		and HeroSkills.weapon_block("charge_stab", "crossbow") == "Нужны клинки"
 		and HeroSkills.weapon_block("charge_stab", "daggers") == "" and HeroSkills.weapon_block("oblivion", "crossbow") == "",
@@ -301,7 +305,8 @@ func _check_start(player: Player) -> void:
 ## 7 статов героя (HeroStats) и производные: калибровка 1-го уровня под прежние числа Наёмника, рост с уровнем
 ## (близко к прежнему ClassData), точность и промахи, атака арбалета от Меткости, общий код со статами питомцев.
 func _check_stats(player: Player) -> void:
-	check(HeroStats.has_stats("assassin") and not HeroStats.has_stats("warrior"), "статы — у Наёмника")
+	check(HeroStats.has_stats("assassin") and HeroStats.has_stats("warrior") and HeroStats.has_stats("wanderer"),
+		"статы — у всех профессий и Бродяги")
 	var s1 := HeroStats.base_stats("assassin", 1)
 	check(s1 == {"str": 21, "vit": 22, "agi": 25, "int": 18, "wis": 18, "dex": 25, "luck": 12},
 		"статы 1-го уровня (асура, Strider ур. проф. 3): %s" % [s1])
@@ -379,18 +384,18 @@ func _check_model(player: Player, parts: Array, what: String) -> void:
 ## Изучение: уровень, пререквизит, JP; пассивки владения — только со своим оружием.
 func _check_learning(player: Player) -> void:
 	var rec: Dictionary = game.hero
-	check(HeroSkills.learn_block(rec, "assassin", 1, "charge_stab").contains("ур. 2"), "«Пронзающий выпад» — со 2 уровня")
-	check(HeroSkills.learn_block(rec, "assassin", 1, "critical_shot").contains("ур. 11"), "«Выстрел в сердце» — с 11 уровня")
-	game.level = 12
+	check(HeroSkills.learn_block(rec, "assassin", 1, "charge_stab").contains("ур. 14"), "«Пронзающий выпад» — с 14 уровня")
+	check(HeroSkills.learn_block(rec, "assassin", 1, "critical_shot").contains("ур. 36"), "«Выстрел в сердце» — с 36 уровня")
+	game.level = 40
 	player.recalc_stats()
 	rec["jp"] = 0
-	check(HeroSkills.learn_block(rec, "assassin", 12, "blade_mastery").contains("JP"), "без JP не изучить")
+	check(HeroSkills.learn_block(rec, "assassin", 40, "blade_mastery").contains("JP"), "без JP не изучить")
 	rec["jp"] = 200
-	check(HeroSkills.learn_block(rec, "assassin", 12, "dark_strike").contains("Пронзающий выпад"),
+	check(HeroSkills.learn_block(rec, "assassin", 40, "dark_strike").contains("Пронзающий выпад"),
 		"«Три тени» требует «Пронзающий выпад»")
 	# Пассивка владения клинками: с мечами атака выше, с арбалетом — без неё
 	var atk0 := player.atk
-	check(HeroSkills.learn(rec, "assassin", 12, "blade_mastery"), "изучена «Школа клинка»")
+	check(HeroSkills.learn(rec, "assassin", 40, "blade_mastery"), "изучена «Школа клинка»")
 	check(int(rec["jp"]) == 200 - HeroSkills.jp_cost("blade_mastery", 1), "списано %d JP" % HeroSkills.jp_cost("blade_mastery", 1))
 	player.refresh_skills()
 	check(player.atk > atk0, "«Школа клинка» с мечами: атака %d → %d" % [atk0, player.atk])
@@ -398,7 +403,7 @@ func _check_learning(player: Player) -> void:
 	var bow_atk := player.atk
 	var b := HeroSkills.bonuses(rec, "assassin", "crossbow")
 	check(not b.has("atk_pct"), "с арбалетом «Школа клинка» не действует")
-	check(HeroSkills.learn(rec, "assassin", 12, "crossbow_mastery"), "изучена «Твёрдая рука»")
+	check(HeroSkills.learn(rec, "assassin", 40, "crossbow_mastery"), "изучена «Твёрдая рука»")
 	player.refresh_skills()
 	check(player.atk > bow_atk, "«Твёрдая рука» с арбалетом: атака %d → %d" % [bow_atk, player.atk])
 	check(player.equip("dual_swords_starter") == "", "мечи")
@@ -406,8 +411,8 @@ func _check_learning(player: Player) -> void:
 	# Общие пассивки: уклонение и HP
 	var eva0 := player.eva
 	var hp0 := player.max_hp
-	check(HeroSkills.learn(rec, "assassin", 12, "evasion_expert"), "изучена «Неуловимость»")
-	check(HeroSkills.learn(rec, "assassin", 12, "armor_mastery"), "изучена «Стойкость странницы»")
+	check(HeroSkills.learn(rec, "assassin", 40, "evasion_expert"), "изучена «Неуловимость»")
+	check(HeroSkills.learn(rec, "assassin", 40, "armor_mastery"), "изучена «Стойкость странницы»")
 	player.refresh_skills()
 	check(player.eva > eva0, "уклонение %d%% → %d%%" % [roundi(eva0 * 100.0), roundi(player.eva * 100.0)])
 	check(player.max_hp > hp0, "макс. HP %d → %d" % [hp0, player.max_hp])

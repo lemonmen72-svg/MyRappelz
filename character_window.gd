@@ -3,9 +3,10 @@ extends Node
 ## Окно героя (кнопка «Герой» в HUD, клавиша K). Вкладки сверху (не прокручиваются):
 ## «Герой» — 3D-превью с оружием в руках, уровень и опыт, HP/MP, очки умений, 7 характеристик (HeroStats, как
 ## у питомцев) и боевые показатели (HP, MP, физ./маг. атака и защита, точность, уклонение, крит, скорость атаки,
-## восстановление HP/MP, дальность, бег — с оружием и умениями), выбор оружия (у Наёмника — из сумки: парные
-## кинжалы, парные мечи, арбалет);
-## древо умений — у Наёмника три вкладки «Общие» / «Мечи и кинжалы» / «Арбалет», у других классов одна «Умения».
+## восстановление HP/MP, дальность, бег — с оружием и умениями), выбор оружия из сумки (подходящее профессии,
+## щит — во вторую руку, «Снять щит»);
+## древо умений — вкладки профессии (у Наёмника «Общие» / «Мечи и кинжалы» / «Арбалет», у других — JobSkills.TABS);
+## у Бродяги одна вкладка «Умения» с подсказкой: умения появятся после выбора профессии на 10 уровне.
 ## Древо — SkillTree (ярусы по уровню героя, линии пререквизитов), справа карточка выбранного умения:
 ## тип, оружие, уровень, эффект сейчас и на следующем, требования, «+ N JP», у переключаемых «Вкл/Выкл»,
 ## у активных и переключаемых — «На кнопку 1…4» (кнопки умений в HUD).
@@ -49,11 +50,14 @@ func open(which: String = "") -> bool:
 	buttons.clear()
 	tree = null
 	_pivot = null
-	var body: VBoxContainer = main.hud.create_window("Герой: %s" % Game.char_name, WINDOW_SIZE)
+	var body: VBoxContainer = main.hud.create_window("Герой: %s · %s" % [Game.char_name, ClassData.job_name(Game.class_id)],
+		WINDOW_SIZE)
 	_body = body
 	_add_tabs(body)
 	if tab == "hero":
 		_build_hero(body)
+	elif tab == "wanderer":
+		_build_wanderer(body)
 	else:
 		_build_skills(body)
 	return true
@@ -87,9 +91,16 @@ func _player() -> Player:
 
 func _tab_ids() -> Array:
 	var res: Array = []
-	for t in HeroSkills.tabs_for(Game.class_id):
+	for t in _tabs():
 		res.append(String(t[0]))
 	return res
+
+
+## Вкладки древа (у Бродяги — одна «Умения» с подсказкой).
+func _tabs() -> Array:
+	if ClassData.is_wanderer(Game.class_id):
+		return [["wanderer", "Умения"]]
+	return HeroSkills.tabs_for(Game.class_id)
 
 
 # ---------- Вкладки ----------
@@ -106,7 +117,7 @@ func _add_tabs(body: VBoxContainer) -> void:
 	else:
 		body.add_child(bar)
 	_tab_button(bar, "hero", "Герой")
-	for t in HeroSkills.tabs_for(Game.class_id):
+	for t in _tabs():
 		_tab_button(bar, String(t[0]), String(t[1]))
 
 
@@ -139,8 +150,8 @@ func _build_hero(body: VBoxContainer) -> void:
 	info.add_theme_constant_override("separation", int(UiScale.px(3)))
 	top.add_child(info)
 	info.add_child(_label(Game.char_name, UiScale.FONT_NAME, GOLD))
-	info.add_child(_label("%s · %s" % [String(ClassData.race(Game.race_id)["name"]),
-		String(ClassData.cls(Game.class_id)["name"])], UiScale.FONT_TEXT, MUTED))
+	info.add_child(_label("%s · %s · %s" % [String(ClassData.race(Game.race_id)["name"]),
+		ClassData.gender_name(Game.gender).to_lower(), ClassData.job_name(Game.class_id)], UiScale.FONT_TEXT, MUTED))
 	info.add_child(_bar_line("Опыт", Game.xp, Game.xp_to_next(Game.level), Color(0.95, 0.82, 0.3),
 		"Ур. %d" % Game.level))
 	info.add_child(_bar_line("HP", p.hp, p.max_hp, Color(0.35, 0.85, 0.4)))
@@ -156,7 +167,7 @@ func _build_hero(body: VBoxContainer) -> void:
 	to_sk.text = "Открыть умения"
 	to_sk.focus_mode = Control.FOCUS_NONE
 	to_sk.custom_minimum_size = Vector2(0, UiScale.button_h())
-	to_sk.pressed.connect(_on_tab.bind(String(HeroSkills.tabs_for(Game.class_id)[0][0])))
+	to_sk.pressed.connect(_on_tab.bind(String(_tabs()[0][0])))
 	jp_row.add_child(to_sk)
 	buttons["to_skills"] = to_sk
 	info.add_child(_label("JP копятся за победы: %d за каждый уровень опыта." % HeroSkills.JP_PER_LEVEL, UiScale.FONT_BODY, MUTED))
@@ -173,7 +184,7 @@ func _build_hero(body: VBoxContainer) -> void:
 		g1.add_theme_constant_override("v_separation", 0)
 		col.add_child(g1)
 		var st: Dictionary = p.hero_stats["stats"]
-		var main_stat := String(HeroStats.MAIN_STAT["ranged" if p.attack_kind == "ranged" else "melee"])
+		var main_stat := String(HeroStats.MAIN_STAT.get(p.attack_kind, "str"))
 		for k in Stats.STATS:
 			var key := String(k)
 			g1.add_child(_label(String(Stats.STAT_NAMES[key]) + (" ★" if key == main_stat else ""), UiScale.FONT_TEXT, MUTED))
@@ -185,7 +196,8 @@ func _build_hero(body: VBoxContainer) -> void:
 	body.add_child(head)
 	head.add_child(_label("Боевые показатели", UiScale.FONT_HEAD, GOLD))
 	if not p.hero_stats.is_empty():
-		var note := _label("★ — от главной характеристики оружия: клинки — Сила, арбалет — Меткость", UiScale.FONT_SMALL, MUTED)
+		var note := _label("★ — от главной характеристики оружия: ближний бой — Сила, стрельба — Меткость, магия — Интеллект",
+			UiScale.FONT_SMALL, MUTED)
 		note.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		head.add_child(note)
 	var g := GridContainer.new()
@@ -197,30 +209,49 @@ func _build_hero(body: VBoxContainer) -> void:
 		g.add_child(_label(String(r[0]), UiScale.FONT_TEXT, MUTED))
 		g.add_child(_label(String(r[1]), UiScale.FONT_TEXT, Color.WHITE))
 
-	# Оружие
-	var wrow := HBoxContainer.new()
-	wrow.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
+	# Оружие (и щит во второй руке)
+	var wrow := HFlowContainer.new()
+	wrow.add_theme_constant_override("h_separation", int(UiScale.px(UiScale.GAP)))
+	wrow.add_theme_constant_override("v_separation", int(UiScale.px(4)))
 	body.add_child(wrow)
 	wrow.add_child(_label("Оружие:", UiScale.FONT_HEAD, GOLD))
-	if not ItemData.class_uses_weapons(Game.class_id):
-		wrow.add_child(_label("задано классом — %s" % _class_weapon_name(), UiScale.FONT_TEXT, MUTED))
-		return
 	for id in Game.inventory.ids():
 		var wid := String(id)
 		if not ItemData.weapon_fits(wid, Game.class_id):
 			continue
-		var it := ItemData.get_item(wid)
 		var b := Button.new()
-		b.text = "%s\nатака +%d · %.2f с · %.1f м" % [ItemData.item_name(wid), int(it.get("atk", 0)),
-			float(it.get("cd", 1.0)), float(it.get("range", 2.0))]
+		b.text = "%s\n%s" % [ItemData.item_name(wid), _weapon_line(wid)]
 		b.focus_mode = Control.FOCUS_NONE
 		b.custom_minimum_size = Vector2(0, UiScale.px(50))
 		b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_SMALL))
 		b.toggle_mode = true
-		b.button_pressed = wid == Game.weapon
+		b.button_pressed = wid == Game.weapon or wid == Game.shield
 		b.pressed.connect(_on_weapon.bind(wid))
 		wrow.add_child(b)
 		buttons["weapon_" + wid] = b
+	if Game.has_shield():
+		var off := Button.new()
+		off.text = "Снять щит"
+		off.focus_mode = Control.FOCUS_NONE
+		off.custom_minimum_size = Vector2(0, UiScale.px(50))
+		off.pressed.connect(_on_unshield)
+		wrow.add_child(off)
+		buttons["unequip_shield"] = off
+
+
+## Кратко об оружии на кнопке: «атака +3 · 0.75 с · 2.6 м», у щита — «защита +2».
+func _weapon_line(id: String) -> String:
+	var it := ItemData.get_item(id)
+	if ItemData.is_shield(id):
+		return "защита +%d" % int(it.get("def", 0))
+	return "атака +%d · %.2f с · %.1f м" % [int(it.get("atk", 0)), float(it.get("cd", 1.0)), float(it.get("range", 2.0))]
+
+
+func _on_unshield() -> void:
+	Game.unequip_shield()
+	_player().refresh_skills()
+	_player()._build_model()
+	refresh()
 
 
 ## Строки боевых показателей: [название, значение]. У героя со статами — набор как в окне существа
@@ -236,9 +267,9 @@ func _combat_rows(p: Player) -> Array:
 		rows.append(["Макс. HP", str(p.max_hp)])
 		rows.append(["Макс. MP", str(p.max_mp)])
 		rows.append(["Физ. атака ★", "%d (%s)" % [p.cur_atk(), _attack_text(p)]])
-		rows.append(["Маг. атака", str(int(hs["matk"]))])
+		rows.append(["Маг. атака", str(p.cur_matk())])
 		rows.append(["Физ. защита", str(p.defense + p.aura_def)])
-		rows.append(["Маг. защита", str(int(hs["mdef"]))])
+		rows.append(["Маг. защита", str(p.mdef)])
 		rows.append(["Точность", str(p.accuracy)])
 	rows.append(["Уклонение", "%.1f%%" % (p.cur_eva() * 100.0)])
 	rows.append(["Шанс крита", "%.1f%%" % (p.cur_crit() * 100.0)])
@@ -248,6 +279,8 @@ func _combat_rows(p: Player) -> Array:
 		rows.append(["Скорость атаки", "%d%% · %.2f уд./с" % [roundi(p.aspd * 100.0), aps]])
 		rows.append(["Восст. HP", "%.1f/с" % (p.hp_regen + p.aura_regen)])
 		rows.append(["Восст. MP", "%.1f/с" % p.mp_regen_rate(true)])
+	if p.block > 0.0:
+		rows.append(["Блок", "%.1f%%" % (p.block * 100.0)])
 	rows.append(["Дальность", "%.1f м" % p.attack_range])
 	rows.append(["Скорость бега", "%.1f м/с" % p.cur_speed()])
 	if hs.is_empty():
@@ -261,20 +294,9 @@ func _attack_text(p: Player) -> String:
 			return "болтами"
 		"daggers", "dual_swords":
 			return "клинками"
-	return ClassData.attack_name(p.attack_kind)
-
-
-func _class_weapon_name() -> String:
-	match String(ClassData.cls(Game.class_id).get("weapon", "")):
-		"axe":
-			return "топор"
-		"bow":
-			return "лук"
-		"sword_shield":
-			return "меч и щит"
-		"staff":
-			return "посох"
-	return "меч"
+		"":
+			return ClassData.attack_name(p.attack_kind)
+	return ItemData.weapon_kind_name(p.weapon_kind)
 
 
 func _on_weapon(id: String) -> void:
@@ -361,12 +383,29 @@ func _build_preview(p: Player) -> Control:
 	vp.add_child(_pivot)
 	var m := CharacterModel.new()
 	m.name = "PreviewModel"
-	m.setup(CharacterModel.spec_for(Game.race_id, Game.class_id, p._weapon_kind))
+	m.setup(CharacterModel.spec_for(Game.race_id, Game.class_id, p.weapon_kind, Game.gender, p.has_shield))
 	_pivot.add_child(m)
 	return svc
 
 
 # ---------- Вкладки древа ----------
+
+## Бродяга: умений нет — подсказка и профессии расы с ключевыми умениями.
+func _build_wanderer(body: VBoxContainer) -> void:
+	body.add_child(_label(HeroSkills.WANDERER_NOTE + ".", UiScale.FONT_HEAD, GOLD))
+	body.add_child(_label("Очки умений копятся уже сейчас: %d JP. С %d уровня Мудрец Альдерик (город, у ратуши) даст задание "
+		% [int(Game.hero.get("jp", 0)), ClassData.JOB_LEVEL] + "на профессию. Чем позже выбор (до %d ур.), тем больше бонус сверх-эволюции: +%d JP за уровень."
+		% [ClassData.OVER_LEVEL_CAP, ClassData.OVER_JP_PER_LEVEL], UiScale.FONT_TEXT, MUTED, UiScale.px(WINDOW_SIZE.x - 60.0)))
+	for jid in ClassData.jobs_of(Game.race_id):
+		var j := ClassData.cls(String(jid))
+		var names: PackedStringArray = []
+		for sid in j.get("key_skills", []):
+			names.append(String(HeroSkills.get_skill(String(sid), String(jid)).get("name", sid)))
+		var jc: Color = j["color"]
+		body.add_child(_label("%s — %s" % [String(j["name"]), String(j["role"])], UiScale.FONT_HEAD, jc.lightened(0.35)))
+		body.add_child(_label("Оружие: %s. Умения: %s." % [String(j["weapon_text"]), ", ".join(names)], UiScale.FONT_BODY,
+			Color(0.88, 0.9, 0.95), UiScale.px(WINDOW_SIZE.x - 60.0)))
+
 
 func _build_skills(body: VBoxContainer) -> void:
 	var p := _player()
@@ -375,7 +414,8 @@ func _build_skills(body: VBoxContainer) -> void:
 	body.add_child(head)
 	head.add_child(_label("Очки умений: %d JP" % int(Game.hero.get("jp", 0)), UiScale.FONT_HEAD, GOLD))
 	if p.weapon_kind != "":
-		head.add_child(_label("В руках: %s" % ItemData.weapon_kind_name(p.weapon_kind), UiScale.FONT_TEXT, Color.WHITE))
+		head.add_child(_label("В руках: %s%s" % [ItemData.weapon_kind_name(p.weapon_kind), " и щит" if p.has_shield else ""],
+			UiScale.FONT_TEXT, Color.WHITE))
 	if p.max_mp > 0:
 		var up := p.toggle_upkeep()
 		head.add_child(_label("MP %d / %d%s" % [p.mp, p.max_mp, ("  (поддержка −%d / 10 с)" % up) if up > 0 else ""],
@@ -416,7 +456,7 @@ func _tree_item(id: String, p: Player) -> Dictionary:
 		"kind": String(sk["kind"]), "level": cur, "max": HeroSkills.max_level(id),
 		"row": HeroSkills.level_needed(id, 1), "pre": pre, "learned": cur > 0,
 		"can": HeroSkills.learn_block(Game.hero, Game.class_id, Game.level, id) == "",
-		"unfit": not HeroSkills.weapon_ok(id, p.weapon_kind),
+		"unfit": not HeroSkills.weapon_ok(id, p.weapon_kind, p.has_shield),
 		"on": HeroSkills.toggle_on(Game.hero, id), "icon": HeroSkills.icon_path(id),
 	}
 
@@ -449,12 +489,17 @@ func _card(id: String, p: Player) -> Control:
 	if on:
 		meta += " · ВКЛЮЧЕНО"
 	box.add_child(_label(meta, UiScale.FONT_BODY, GOOD if on else MUTED, w))
-	var wb := HeroSkills.weapon_block(id, p.weapon_kind)
+	var wb := HeroSkills.weapon_block(id, p.weapon_kind, p.has_shield)
 	if wb != "":
 		box.add_child(_label("Не подходит к текущему оружию: %s" % wb.to_lower(), UiScale.FONT_BODY, BAD, w))
 	box.add_child(_label(String(sk.get("desc", "")), UiScale.FONT_BODY, MUTED, w))
 	if cur > 0:
 		box.add_child(_label("Сейчас: " + HeroSkills.effect_text(id, cur), UiScale.FONT_BODY, Color.WHITE, w))
+		var need_now := HeroSkills.level_needed(id, cur)
+		if need_now > Game.level:
+			# Старые сохранения: изучено по прежним требованиям — не отбирается
+			box.add_child(_label("Изучено раньше; по новым правилам этот уровень — с ур. %d" % need_now, UiScale.FONT_BODY,
+				BAD, w))
 	if cur < mx:
 		box.add_child(_label("Ур. %d: %s" % [cur + 1, HeroSkills.effect_text(id, cur + 1)], UiScale.FONT_BODY, Color(0.85, 0.88, 1.0), w))
 		var req := "Нужно: " + HeroSkills.requirement_text(id, cur + 1)

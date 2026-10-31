@@ -15,7 +15,7 @@ var ship_y := 0.0
 
 
 func race_class() -> Array:
-	return ["light_elf", "cleric"]
+	return ["light_elf", "wizard"]
 
 
 func run_step() -> void:

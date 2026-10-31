@@ -172,9 +172,11 @@ func _unit_data() -> void:
 			check(String(d.get("label", "")) != "" and String(d.get("text", "")) != "", "%s: пункт %s с текстом" % [id, d.get("id")])
 			if bool(d.get("soon", false)):
 				soon += 1
-		check(soon >= 1, "%s: будущее дело с пометкой «скоро»" % id)
+		# У мудреца «Первая профессия» теперь рабочая (задание на профессию), остальные дела — «скоро»
+		check(soon >= 1 or id == "sage", "%s: будущее дело с пометкой «скоро»" % id)
 		check(not NpcData.is_trader(id), "%s: не торгует" % id)
-	check(String(NpcData.talk_entry("sage", "profession").get("text", "")).contains("12-му уровню"), "мудрец о первой профессии")
+	check(String(NpcData.talk_entry("sage", "profession").get("text", "")).contains("десятого уровня")
+		and not bool(NpcData.talk_entry("sage", "profession").get("soon", false)), "мудрец о первой профессии (рабочий пункт)")
 	check(String(NpcData.talk_entry("sage", "guide/pets").get("text", "")).contains("Кирк"), "справочник мудреца: питомцы — к Кирку")
 	check(NpcData.talk_entry("sage", "guide/nope").is_empty() and NpcData.talk_entry("smith", "").is_empty(),
 		"неизвестный пункт — пусто")

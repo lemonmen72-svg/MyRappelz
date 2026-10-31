@@ -1,14 +1,15 @@
 class_name Player
 extends CharacterBody3D
-## Персонаж игрока. Уровень, опыт и золото хранятся в Game. Характеристики: у Наёмника — из 7 статов
-## (HeroStats: HP, MP, атака, защита, точность, уклонение, крит, скорость атаки, восстановление HP), у остальных
-## классов — из ClassData; поверх — надетое оружие (Game.weapon, ItemData) и умения героя (Game.hero, HeroSkills:
-## пассивные и переключаемые). Обычная атака героя со статами может промахнуться (точность против уровня зверя,
+## Персонаж игрока. Уровень, опыт и золото хранятся в Game. Характеристики — из 7 статов профессии (HeroStats: HP,
+## MP, атака, маг. атака, защита, точность, уклонение, крит, скорость атаки, восстановление HP); поверх — надетое
+## оружие и щит (Game.weapon, Game.shield, ItemData) и умения героя (Game.hero, HeroSkills: пассивные, включённые
+## переключаемые и усиления на время). Обычная атака может промахнуться (точность против уровня зверя,
 ## Stats.hit_chance), умения бьют без промаха.
-## Атака по типу класса или оружия: ближний бой (melee), лук или арбалет (ranged) и магия (magic) — снаряд Projectile.
-## Умения на кнопках "skill1"…"skill4" (Game.hero.slots): умения классов (ClassData) и древа героя (HeroSkills:
-## требуют MP, подходящее оружие — клинки или арбалет — и перезарядку). MP и уклонение — у классов с полями mp и eva.
-## Временные усиления. Внешний вид — CharacterModel.
+## Атака по виду оружия: ближний бой (melee), лук или арбалет (ranged), посох — магия (magic: сгусток Projectile,
+## сила — маг. атака).
+## Умения на кнопках "skill1"…"skill4" (Game.hero.slots): умения Наёмника — _cast_hero, умения с полем fx — движок
+## HeroSkillFx; требуют MP, подходящее оружие и перезарядку. У Бродяги умений нет (кнопки скрыты).
+## Временные усиления. Внешний вид — CharacterModel (раса, пол, профессия, оружие).
 
 signal stats_changed
 signal message(text: String)
@@ -54,8 +55,20 @@ var attack_time := 0.8
 var crit := 0.05
 ## "melee" | "ranged" | "magic"
 var attack_kind := "melee"
-## Вид надетого сменного оружия ("daggers" | "dual_swords" | "crossbow"; "" — оружие задано классом).
+## Вид надетого оружия (ItemData.WEAPON_KINDS; "" — без оружия) и щит во второй руке.
 var weapon_kind := ""
+var has_shield := false
+## Магическая атака (сила заклинаний и магической обычной атаки) и магическая защита.
+var matk := 10
+var mdef := 0
+## Шанс блока (щит: удар зверя без урона), снижение получаемого урона от умений (доля), сокращение перезарядки.
+var block := 0.0
+var skill_guard := 0.0
+var cdr := 0.0
+## Усиления на время от умений движка (HeroSkillFx "buff"): id умения → {"left": с, "bonus": {ключ: число}}.
+var timed_bonus: Dictionary = {}
+## Лечение со временем (HeroSkillFx "hot"): [{"id", "node", "per_sec", "left", "acc"}].
+var hots: Array = []
 ## Скорость атаки (1.0 = 100%: от Ловкости и умений), множитель урона обычной атаки, шанс второго удара (выстрела),
 ## доля урона выстрела в MP, незаметность (звери замечают ближе, удары реже отвлекают зверя от питомца).
 var aspd := 1.0
@@ -105,10 +118,12 @@ var _last_crit := false
 var _mp_acc := 0.0
 var _mp_delay := 0.0
 var _upkeep_acc := 0.0
+var _fx: HeroSkillFx
 
 
 func _ready() -> void:
 	add_to_group("player")
+	_fx = HeroSkillFx.new(self)
 	collision_layer = 2
 	collision_mask = 1
 	Game.ensure_hero()
@@ -127,15 +142,17 @@ func _ready() -> void:
 	_build_model()
 
 
-## Пересчитать характеристики: класс и уровень (Game.class_id, Game.level) — у Наёмника через 7 статов (HeroStats),
-## оружие (Game.weapon), пассивные и включённые переключаемые умения героя (HeroSkills.bonuses — только
-## подходящие оружию).
+## Пересчитать характеристики: профессия и уровень (Game.class_id, Game.level) через 7 статов (HeroStats),
+## оружие и щит (Game.weapon, Game.shield), пассивные и включённые переключаемые умения героя (HeroSkills.bonuses —
+## только подходящие оружию) и усиления на время (timed_bonus).
 func recalc_stats() -> void:
 	var s := ClassData.stats_for(Game.class_id, Game.level)
 	max_hp = s["max_hp"]
 	max_mp = s["max_mp"]
 	atk = s["atk"]
+	matk = atk
 	defense = s["def"]
+	mdef = defense
 	speed = s["speed"]
 	attack_range = s["range"]
 	attack_time = s["cd"]
@@ -145,33 +162,52 @@ func recalc_stats() -> void:
 	accuracy = -1
 	hp_regen = 0.0
 	hero_stats = {}
+	weapon_kind = Game.weapon_kind()
+	has_shield = Game.has_shield()
+	var b := HeroSkills.bonuses(Game.hero, Game.class_id, weapon_kind, has_shield)
+	for id in timed_bonus:
+		var tb: Dictionary = timed_bonus[id]["bonus"]
+		for k in tb:
+			b[k] = float(b.get(k, 0.0)) + float(tb[k])
+	var extra: Dictionary = {}
+	for k in Stats.STATS:
+		if b.has(k):
+			extra[k] = b[k]
 	var stat_aspd := 1.0
 	if HeroStats.has_stats(Game.class_id):
-		var h := HeroStats.derived(Game.class_id, Game.level)
+		var h := HeroStats.derived(Game.class_id, Game.level, extra)
 		hero_stats = h
 		max_hp = int(h["max_hp"])
 		max_mp = int(h["max_mp"])
 		atk = int(h["patk"])
+		matk = int(h["matk"])
 		defense = int(h["def"])
+		mdef = int(h["mdef"])
 		crit = float(h["crit"]) / 100.0
 		eva = float(h["eva"]) / 100.0
 		accuracy = int(h["acc"])
 		hp_regen = float(h["hp_regen"])
 		stat_aspd = float(h["aspd"]) / 100.0
-	weapon_kind = Game.weapon_kind()
 	if weapon_kind != "":
 		var w := ItemData.get_item(Game.weapon)
-		# Арбалет: атака дальнего боя (от Меткости и Ловкости), клинки — ближнего (от Силы)
-		if weapon_kind == "crossbow" and not hero_stats.is_empty():
+		attack_kind = ItemData.weapon_attack(weapon_kind)
+		# Стрельба — атака дальнего боя (от Меткости и Ловкости), посох — маг. атака, остальное — от Силы
+		if attack_kind == "ranged" and not hero_stats.is_empty():
 			atk = int(hero_stats["ratk"])
+		elif attack_kind == "magic":
+			atk = matk
 		atk += int(w.get("atk", 0))
+		if attack_kind == "magic":
+			matk = atk
 		attack_time = float(w.get("cd", attack_time))
 		attack_range = float(w.get("range", attack_range))
 		crit += float(w.get("crit", 0.0))
-		attack_kind = "ranged" if weapon_kind == "crossbow" else "melee"
-	var b := HeroSkills.bonuses(Game.hero, Game.class_id, weapon_kind)
-	atk = roundi(float(atk) * (1.0 + _bv(b, "atk_pct"))) + roundi(_bv(b, "atk_flat"))
-	defense += roundi(_bv(b, "def_flat"))
+	if has_shield:
+		defense += int(ItemData.get_item(Game.shield).get("def", 0))
+	atk = roundi(float(atk) * (1.0 + _bv(b, "atk_pct") + (_bv(b, "matk_pct") if attack_kind == "magic" else 0.0))) + roundi(_bv(b, "atk_flat"))
+	matk = roundi(float(matk) * (1.0 + _bv(b, "matk_pct")))
+	defense = roundi(float(defense + roundi(_bv(b, "def_flat"))) * (1.0 + _bv(b, "def_pct")))
+	mdef += roundi(_bv(b, "mdef_flat"))
 	eva = clampf(eva + _bv(b, "eva"), 0.0, 0.6)
 	crit += _bv(b, "crit")
 	speed *= 1.0 + _bv(b, "speed_pct")
@@ -182,11 +218,71 @@ func recalc_stats() -> void:
 	double_chance = _bv(b, "double")
 	mp_drain = _bv(b, "mp_drain")
 	stealth = _bv(b, "stealth")
-	max_hp = roundi(float(max_hp) * (1.0 + _bv(b, "hp_pct") + _bv(b, "hp_from_eva") * eva))
-	max_mp = roundi(float(max_mp) * (1.0 + _bv(b, "mp_from_eva") * eva))
+	block = clampf(_bv(b, "block"), 0.0, 0.75)
+	skill_guard = clampf(_bv(b, "guard"), 0.0, 0.9)
+	cdr = clampf(_bv(b, "cdr"), 0.0, 0.5)
+	hp_regen += _bv(b, "regen")
+	max_hp = roundi(float(max_hp) * (1.0 + _bv(b, "hp_pct") + _bv(b, "hp_from_eva") * eva)) + roundi(_bv(b, "hp_flat"))
+	max_mp = roundi(float(max_mp) * (1.0 + _bv(b, "mp_from_eva") * eva + _bv(b, "mp_pct")))
 	hp = mini(hp, max_hp)
 	mp = mini(mp, max_mp)
 	_sync_toggle_effects()
+
+
+## Усиление на время от умения sid (HeroSkillFx "buff"): bonus — {ключ HeroSkills.BONUS_NAMES: число} на sec секунд,
+## значок у полоски HP ("buff:<id>"). Повтор продлевает.
+func add_timed_bonus(sid: String, sec: float, bonus: Dictionary) -> void:
+	if sec <= 0.0:
+		return
+	timed_bonus[sid] = {"left": sec, "bonus": bonus}
+	effects.add("buff:" + sid, sec, StatusEffects.effect_info("buff", StatusEffects.source_hero_skill(sid)))
+	recalc_stats()
+	stats_changed.emit()
+
+
+## Лечение со временем от умения sid: всего total HP цели node (герой или питомец) за sec секунд.
+func add_hot(sid: String, node: Node3D, total: float, sec: float) -> void:
+	if node == null or sec <= 0.0 or total <= 0.0:
+		return
+	hots.append({"id": sid, "node": node, "per_sec": total / sec, "left": sec, "acc": 0.0})
+	if node == self:
+		effects.add("hot:" + sid, sec, StatusEffects.effect_info("hot", StatusEffects.source_hero_skill(sid)))
+
+
+func _tick_timed(delta: float) -> void:
+	if not timed_bonus.is_empty():
+		var expired := false
+		for id in timed_bonus.keys():
+			var e: Dictionary = timed_bonus[id]
+			e["left"] = float(e["left"]) - delta
+			effects.sync("buff:" + String(id), float(e["left"]))
+			if float(e["left"]) <= 0.0:
+				timed_bonus.erase(id)
+				expired = true
+		if expired:
+			recalc_stats()
+			stats_changed.emit()
+	var i := hots.size() - 1
+	while i >= 0:
+		var h: Dictionary = hots[i]
+		h["left"] = float(h["left"]) - delta
+		h["acc"] = float(h["acc"]) + float(h["per_sec"]) * delta
+		var node: Variant = h["node"]
+		var whole := int(float(h["acc"]))
+		var valid := is_instance_valid(node)
+		var mine := valid and (node as Object) == self
+		if whole >= 1 and valid:
+			h["acc"] = float(h["acc"]) - float(whole)
+			if mine:
+				hp = mini(max_hp, hp + whole)
+				stats_changed.emit()
+			elif (node as Node).has_method("heal"):
+				(node as Node).call("heal", whole)
+		if mine:
+			effects.sync("hot:" + String(h["id"]), float(h["left"]))
+		if float(h["left"]) <= 0.0 or not valid:
+			hots.remove_at(i)
+		i -= 1
 
 
 ## Значки включённых переключаемых умений героя (без таймера) — после любого пересчёта (вкл./выкл.,
@@ -209,10 +305,12 @@ static func _bv(b: Dictionary, key: String) -> float:
 	return float(b.get(key, 0.0))
 
 
-## Применить сменившиеся Game.class_id / Game.race_id: умения героя и оружие (Game.ensure_hero),
+## Применить сменившиеся Game.class_id / Game.race_id / Game.gender: умения героя и оружие (Game.ensure_hero),
 ## характеристики, внешний вид.
 func apply_class() -> void:
 	Game.ensure_hero()
+	timed_bonus.clear()
+	hots.clear()
 	recalc_stats()
 	hp = max_hp
 	mp = max_mp
@@ -228,7 +326,7 @@ func refresh_skills() -> void:
 	stats_changed.emit()
 
 
-## Надеть оружие id из сумки (Наёмник). "" — получилось, иначе причина. Модель меняет оружие в руках,
+## Надеть оружие id из сумки (щит — во вторую руку). "" — получилось, иначе причина. Модель меняет оружие в руках,
 ## переключаемые умения, которым оружие не подходит, выключаются.
 func equip(id: String) -> String:
 	if id == Game.weapon:
@@ -242,7 +340,7 @@ func equip(id: String) -> String:
 	var off: PackedStringArray = []
 	for t in Game.last_dropped_toggles:
 		off.append(String(HeroSkills.get_skill(String(t)).get("name", t)))
-	var text := "В руках: %s" % ItemData.item_name(id)
+	var text := ("Во второй руке: %s" if ItemData.is_shield(id) else "В руках: %s") % ItemData.item_name(id)
 	if not off.is_empty():
 		text += ". Выключено: %s" % ", ".join(off)
 	message.emit(text)
@@ -252,6 +350,11 @@ func equip(id: String) -> String:
 
 func cur_atk() -> int:
 	return roundi(float(atk) * (1.0 + atk_buff + aura_atk + shade_atk))
+
+
+## Магическая атака с усилениями (умения-заклинания, power "matk").
+func cur_matk() -> int:
+	return roundi(float(matk) * (1.0 + atk_buff + aura_atk + shade_atk))
 
 
 ## Шанс крита с «Танцем теней».
@@ -297,6 +400,7 @@ func _physics_process(delta: float) -> void:
 	regen_delay = maxf(0.0, regen_delay - delta)
 	_mp_delay = maxf(0.0, _mp_delay - delta)
 	_tick_skills(delta)
+	_tick_timed(delta)
 	_tick_mp(delta)
 
 	if current_target != null and (not is_instance_valid(current_target) or current_target.is_dead):
@@ -434,13 +538,19 @@ func set_toggle(id: String, on: bool) -> String:
 		return ""
 	var sk := HeroSkills.get_skill(id)
 	if on:
-		var wb := HeroSkills.weapon_block(id, weapon_kind)
+		var wb := HeroSkills.weapon_block(id, weapon_kind, has_shield)
 		if wb != "":
 			return wb
 		var cost := HeroSkills.mp_cost(id, n)
 		if mp < cost:
 			return "Не хватает MP (нужно %d)" % cost
 		mp -= cost
+		# Одно умение группы за раз («одно лезвие / одна подпитка / одно созвучие»)
+		var grp := String(sk.get("group", ""))
+		if grp != "":
+			for other in tg.keys():
+				if String(HeroSkills.get_skill(String(other)).get("group", "")) == grp:
+					tg.erase(other)
 		tg[id] = true
 		_mp_delay = MP_COMBAT_TIME
 		_announce(String(sk["name"]), "включено")
@@ -483,6 +593,12 @@ func clear_buffs() -> void:
 	shade_crit = 0.0
 	for k in ["atk", "speed", "guard", "shade"]:
 		effects.remove(String(k))
+	for id in timed_bonus:
+		effects.remove("buff:" + String(id))
+	timed_bonus.clear()
+	for h in hots:
+		effects.remove("hot:" + String((h as Dictionary)["id"]))
+	hots.clear()
 	_update_guard_fx()
 
 
@@ -664,33 +780,25 @@ func assign_slot(id: String, i: int) -> bool:
 ## Почему умение на кнопке slot сейчас нельзя применить из-за оружия ("" — можно; пусто — тоже "").
 func slot_block(slot: String) -> String:
 	var sid := skill_id(slot)
-	if sid == "" or not HeroSkills.SKILLS.has(sid):
+	if sid == "" or not HeroSkills.is_skill(sid):
 		return ""
 	if HeroSkills.kind(sid) == "toggle" and HeroSkills.toggle_on(Game.hero, sid):
 		return ""
-	return HeroSkills.weapon_block(sid, weapon_kind)
+	return HeroSkills.weapon_block(sid, weapon_kind, has_shield)
 
 
 ## Умение по кнопке "skill1"…"skill4" (или по id). true, если применено (переключаемое — включено/выключено).
 func use_skill(slot: String) -> bool:
 	var sid := skill_id(slot)
 	if sid == "":
-		message.emit("Кнопка пуста: назначьте умение в окне героя (K)")
+		if ClassData.is_wanderer(Game.class_id):
+			message.emit(HeroSkills.WANDERER_NOTE)
+		else:
+			message.emit("Кнопка пуста: назначьте умение в окне героя (K)")
 		return false
-	if HeroSkills.SKILLS.has(sid):
-		return _use_hero_skill(sid)
-	var sk := ClassData.skill(sid)
-	if sk.is_empty():
+	if not HeroSkills.is_skill(sid):
 		return false
-	var left: float = skill_cd.get(sid, 0.0)
-	if left > 0.0:
-		message.emit("«%s» перезаряжается: %.1f с" % [String(sk["name"]), left])
-		return false
-	if not _cast(sid, sk):
-		return false
-	skill_cd[sid] = float(sk["cd"])
-	stats_changed.emit()
-	return true
+	return _use_hero_skill(sid)
 
 
 ## Умение древа героя: изучено, подходит оружию, перезарядка готова, хватает MP.
@@ -705,6 +813,9 @@ func _use_hero_skill(sid: String) -> bool:
 	if k == "passive":
 		message.emit("«%s» — пассивное умение, действует само" % sname)
 		return false
+	if not HeroSkills.is_ready(sid):
+		message.emit("«%s»: действие умения появится в следующем обновлении" % sname)
+		return false
 	if k == "toggle":
 		var on := not HeroSkills.toggle_on(Game.hero, sid)
 		var err := set_toggle(sid, on)
@@ -712,7 +823,7 @@ func _use_hero_skill(sid: String) -> bool:
 			message.emit("«%s»: %s" % [sname, err])
 			return false
 		return true
-	var wb := HeroSkills.weapon_block(sid, weapon_kind)
+	var wb := HeroSkills.weapon_block(sid, weapon_kind, has_shield)
 	if wb != "":
 		message.emit("«%s»: %s" % [sname, wb])
 		return false
@@ -724,20 +835,19 @@ func _use_hero_skill(sid: String) -> bool:
 	if mp < cost:
 		message.emit("«%s»: не хватает MP (нужно %d)" % [sname, cost])
 		return false
-	if not _cast_hero(sid, n, sk):
+	var done := _fx.cast(sid, n, sk) if sk.has("fx") else _cast_hero(sid, n, sk)
+	if not done:
 		return false
 	mp -= cost
 	_mp_delay = MP_COMBAT_TIME
-	skill_cd[sid] = HeroSkills.cooldown(sid, n)
+	skill_cd[sid] = HeroSkills.cooldown(sid, n) * (1.0 - cdr)
 	stats_changed.emit()
 	return true
 
 
 ## Перезарядка умения sid в секундах (у умений героя — по изученному уровню).
 func skill_total_cd(sid: String) -> float:
-	if HeroSkills.SKILLS.has(sid):
-		return HeroSkills.cooldown(sid, maxi(1, HeroSkills.skill_level(Game.hero, sid)))
-	return float(ClassData.skill(sid).get("cd", 0.0))
+	return HeroSkills.cooldown(sid, maxi(1, HeroSkills.skill_level(Game.hero, sid))) * (1.0 - cdr)
 
 
 ## Доля оставшейся перезарядки умения на кнопке "skill1"…"skill4": 0 = готово, 1 = только что использовано.
@@ -750,116 +860,6 @@ func cooldown_frac(slot: String) -> float:
 	if total <= 0.0:
 		return 0.0
 	return clampf(left / total, 0.0, 1.0)
-
-
-func _cast(sid: String, sk: Dictionary) -> bool:
-	var sname: String = sk["name"]
-	var mult: float = sk.get("mult", 1.0)
-	var radius: float = sk.get("radius", 0.0)
-	var time: float = sk.get("time", 0.0)
-	var value: float = sk.get("value", 0.0)
-	var fx_parent := get_parent()
-	match sid:
-		"cleave":
-			var hits := _mobs_around(global_position, radius)
-			if hits.is_empty():
-				return _no_target()
-			var main_t := _find_target(radius)
-			if main_t == null:
-				main_t = hits[0]
-			_engage(main_t)
-			_anim_spin()
-			for m in hits:
-				_deal(m, _roll(mult, false))
-			Vfx.slash_arc(fx_parent, global_position + Vector3(0, 0.9, 0) + _forward() * radius * 0.5,
-				_forward(), Color(1, 0.6, 0.3), radius * 0.8)
-			Projectile.burst(fx_parent, global_position + Vector3(0, 0.5, 0), Color(1, 0.55, 0.25), radius, 0.3)
-			_announce(sname, "урон по %d врагам" % hits.size())
-		"war_cry":
-			atk_buff = value
-			atk_buff_time = time
-			add_effect("atk", time, StatusEffects.source_hero_skill(sid))
-			_anim_buff()
-			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(1, 0.3, 0.2), 2.5, 0.4)
-			_announce(sname, "атака +%d%% на %d с" % [roundi(value * 100.0), roundi(time)])
-		"power_shot":
-			var t := _find_target(attack_range)
-			if t == null:
-				return _no_target()
-			_engage(t)
-			_anim_attack()
-			_shoot(t, _roll(mult, false), 1.6, Callable())
-			_announce(sname, "")
-		"quick_step":
-			speed_buff = value
-			speed_buff_time = time
-			add_effect("speed", time, StatusEffects.source_hero_skill(sid))
-			_anim_buff()
-			Projectile.burst(fx_parent, global_position + Vector3(0, 0.3, 0), Color(0.5, 1, 0.6), 1.8, 0.3)
-			_announce(sname, "скорость +%d%% на %d с" % [roundi(value * 100.0), roundi(time)])
-		"shield_bash":
-			var t := _find_target(attack_range + MELEE_SKILL_REACH)
-			if t == null:
-				return _no_target()
-			_engage(t)
-			_anim_bash()
-			_deal(t, _roll(mult, false))
-			Vfx.hit_spark(fx_parent, t.aim_point(), Color(1, 1, 0.5), 1.5)
-			if not t.is_dead:
-				t.stun(time, StatusEffects.source_hero_skill(sid))
-				Util.float_text(fx_parent, t.global_position + Vector3(0, 2.4 * t.body_scale + 0.8, 0),
-					"Оглушён!", Color(1, 1, 0.5))
-			_announce(sname, "")
-		"holy_guard":
-			guard = value
-			guard_time = time
-			add_effect("guard", time, StatusEffects.source_hero_skill(sid))
-			_update_guard_fx()
-			_anim_buff()
-			_announce(sname, "урон −%d%% на %d с" % [roundi(value * 100.0), roundi(time)])
-		"holy_bolt":
-			var t := _find_target(attack_range)
-			if t == null:
-				return _no_target()
-			_engage(t)
-			_anim_attack()
-			_shoot(t, _roll(mult, false), 1.6, Callable())
-			_announce(sname, "")
-		"heal":
-			heal(maxi(1, int(float(max_hp) * value)))
-			var pet := _active_pet()
-			var extra := ""
-			if pet != null and pet.has_method("heal"):
-				var pmax: int = int(pet.get("max_hp"))
-				pet.call("heal", maxi(1, int(float(pmax) * value)))
-				Projectile.burst(fx_parent, pet.global_position + Vector3(0, 0.8, 0), Color(0.5, 1, 0.5), 1.4, 0.4)
-				extra = "вы и питомец"
-			_anim_attack()
-			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.5, 1, 0.5), 1.6, 0.4)
-			_announce(sname, extra)
-		"dark_burst":
-			var t := _find_target(attack_range)
-			if t == null:
-				return _no_target()
-			_engage(t)
-			_anim_attack()
-			var cb := func(hit: Mob, _dealt: int) -> void:
-				_explode(hit, radius, mult)
-			_shoot(t, _roll(mult, false), 1.9, cb)
-			_announce(sname, "")
-		"drain":
-			var t := _find_target(attack_range)
-			if t == null:
-				return _no_target()
-			_engage(t)
-			_anim_attack()
-			var cb := func(_hit: Mob, dealt: int) -> void:
-				heal(maxi(1, int(float(dealt) * value)))
-			_shoot(t, _roll(mult, false), 1.4, cb)
-			_announce(sname, "")
-		_:
-			return false
-	return true
 
 
 ## Умение древа героя уровня n. false — не применилось (нет цели), MP и перезарядка не тратятся.
@@ -980,16 +980,6 @@ func _anim_skill(sid: String) -> void:
 			_anim_attack()
 
 
-## Взрыв тьмы: урон всем зверям вокруг center_mob, кроме него самого (он уже получил урон снарядом).
-func _explode(center_mob: Mob, radius: float, mult: float) -> void:
-	var center := center_mob.global_position
-	Projectile.burst(get_parent(), center + Vector3(0, 0.6, 0), _class_color(), radius, 0.4)
-	for m in _mobs_around(center, radius):
-		if m == center_mob:
-			continue
-		_deal(m, _roll(mult, false))
-
-
 func _mobs_around(center: Vector3, r: float) -> Array[Mob]:
 	var res: Array[Mob] = []
 	for n in get_tree().get_nodes_in_group("mobs"):
@@ -1047,9 +1037,15 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 	if attacker is Mob and cur_eva() > 0.0 and randf() < cur_eva():
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "Уклонение", Color(0.7, 0.95, 1.0))
 		return
+	# Блок щитом: удар зверя приходится в щит
+	if attacker is Mob and block > 0.0 and randf() < block:
+		Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "Блок", Color(0.75, 0.85, 1.0))
+		return
 	amount = maxi(1, amount - int((defense + aura_def) * 0.5))
 	if guard_time > 0.0:
 		amount = maxi(1, roundi(float(amount) * (1.0 - guard)))
+	if skill_guard > 0.0:
+		amount = maxi(1, roundi(float(amount) * (1.0 - skill_guard)))
 	hp -= amount
 	regen_delay = 6.0
 	if _has_model():
@@ -1105,11 +1101,10 @@ func gain_xp(amount: int) -> void:
 func _build_model() -> void:
 	if _model != null and is_instance_valid(_model):
 		_model.queue_free()
-	var c := ClassData.cls(Game.class_id)
-	_weapon_kind = weapon_kind if weapon_kind != "" else String(c.get("weapon", "sword"))
 	_model = CharacterModel.new()
 	_model.name = "Model"
-	_model.setup(CharacterModel.spec_for(Game.race_id, Game.class_id, _weapon_kind))
+	_model.setup(CharacterModel.spec_for(Game.race_id, Game.class_id, weapon_kind, Game.gender, has_shield))
+	_weapon_kind = _model.weapon_kind
 	add_child(_model)
 
 	# Сияние «Щита света»
