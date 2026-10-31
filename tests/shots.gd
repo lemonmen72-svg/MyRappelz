@@ -21,7 +21,7 @@ var _frames := 0
 var _fish: Variant = null
 ## Летающие рыбы в ряд рядом с героем — кадр 52.
 const FISH_ROW := ["flyfish", "flyfish_sail", "flyfish_drake"]
-## Анатемы в ряд рядом с героем — кадр 56.
+## Анатемы в ряд рядом с героем — кадр 56. Кентавр: стадии рядом с героем — кадр 55, в мире — кадр 58.
 const ANATHEMA_ROW := ["anathema", "anathema_blade", "anathema_chief"]
 ## Умения Наёмника для кадров окна героя [id, уровень].
 const HERO_SKILLS := [["blade_mastery", 2], ["charge_stab", 2], ["dark_strike", 1], ["evasion_expert", 2],
@@ -500,6 +500,28 @@ func run_step() -> void:
 			step = 524
 		524:
 			shot("54_flyfish_dead")
+			step = 540
+		540:
+			# Кентавр: три стадии рядом с героем (питомец 1-й стадии ростом с героя, к 3-й — выше)
+			_build_stage_row([["centaur", 0], ["centaur", 1], ["centaur", 2]])
+			var first := _row.get_child(0) as Node3D
+			main.player.visible = true
+			main.player.global_position = first.global_position + Vector3(-1.3, 0.1, 0.3)
+			wait = 40
+			step = 541
+		541:
+			_tick_stage_row()
+			shot("55_stages_centaur")
+			_row.queue_free()
+			_top.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
+			# Дикий кентавр в мире (Восточные равнины), цель героя
+			_fish_view("centaur", 6.0)
+			wait = 60
+			step = 542
+		542:
+			shot("58_centaur_world")
 			step = 560
 		560:
 			# Анатемы (ящеры с костяными клинками) рядом с героем

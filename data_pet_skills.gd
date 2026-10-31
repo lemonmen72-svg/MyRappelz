@@ -1,6 +1,6 @@
 class_name PetSkills
 extends RefCounted
-## Умения питомцев (механика и числа — по образцу Rappelz: Pantera, Tortus, Poultry; названия, описания
+## Умения питомцев (механика и числа — по образцу Rappelz: Pantera, Tortus, Poultry, Kentauros; названия, описания
 ## и значки свои). Умение изучается и повышается за очки умений (JP) в окне существа (CreatureWindow).
 ## Уровни умения открываются блоками по стадиям эволюции: tiers = [[уровень вики, макс. ур. умения], ...]
 ## на 1-й, 2-й и 3-й стадии ([0, 0] — на этой стадии умения ещё нет). Уровень вики → наш: × 0.3 (req_level()).
@@ -11,7 +11,8 @@ extends RefCounted
 ##
 ## Поля активных: dmg — доля главной атаки роли за удар, hits — число ударов, radius — по площади вокруг цели,
 ## threat — зверь переключается на питомца, charge — рывок к цели в 3–10 м, slow / vuln / miss — замедление,
-## уязвимость (больше урона) и промахи зверя (доля, 10 с), stun — оглушение (с), blind — морок: зверь бьёт мимо (с),
+## уязвимость (больше урона) и промахи зверя (доля, 10 с), weaken — ослабление: удары зверя слабее (доля, 10 с),
+## stun — оглушение (с), blind — морок: зверь бьёт мимо (с),
 ## buff — "atk" (атака хозяина, % на time с), "guard" (хозяин получает меньше урона), "heal" (лечение хозяина
 ## и питомца, доля макс. HP). prio — порядок выбора ИИ (больше — раньше).
 ## Поля пассивных и переключаемых: bonus — что усиливает (PetStats.derived), value; owner — бонус и хозяину.
@@ -230,6 +231,50 @@ const SKILLS := {
 		"tiers": [[45, 5], [95, 10], [145, 15]], "bonus": "hp_regen", "value": [0.5, 0.25], "owner": true,
 		"mp": [46.0, 36.0], "upkeep": [3.0, 3.0],
 	},
+	# ---------- Кентавр (боец-копейщик: физический урон, числа — по Kentauros вики) ----------
+	"spear_flurry": {  # ← Continuous Attack: 2 удара по 90%…230%
+		"name": "Двойной выпад", "kind": "active", "glyph": "В", "color": Color(0.8, 0.55, 0.3), "jp": 1,
+		"desc": "Два быстрых укола копьём подряд.",
+		"tiers": [[10, 5], [60, 10], [110, 15]], "mp": [54.0, 9.0], "cd": 8.0, "cast": 0.5,
+		"dmg": [0.9, 0.1], "hits": 2, "prio": 40,
+	},
+	"piercing_strike": {  # ← Kentauros Strike: 200%…480% + атака цели −13%…−27% на 10 с
+		"name": "Пронзающий удар", "kind": "active", "glyph": "П", "color": Color(0.85, 0.45, 0.25), "jp": 1,
+		"desc": "Тяжёлый удар копьём с разгона: большой урон, и 10 с удары цели слабее.",
+		"tiers": [[20, 5], [70, 10], [120, 15]], "pre": ["spear_flurry", [1, 6, 11]],
+		"mp": [117.0, 13.0], "cd": 15.0, "cast": 0.75, "dmg": [2.0, 0.2], "weaken": [0.13, 0.01], "prio": 60,
+	},
+	"hoof_quake": {  # ← Kentauros' Shuddering: 60%…200% + оглушение 2 с, угроза
+		"name": "Топот копыт", "kind": "active", "glyph": "Т", "color": Color(0.65, 0.45, 0.3), "jp": 2,
+		"desc": "Кентавр встаёт на дыбы и обрушивает копыта: урон и оглушение на 2 с, зверь переключается на него.",
+		"tiers": [[30, 5], [80, 10], [130, 15]], "mp": [159.0, 9.0], "cd": 20.0, "cast": 0.0,
+		"dmg": [0.6, 0.1], "stun": 2.0, "threat": true, "prio": 70,
+	},
+	"spear_storm": {  # ← Kentauros Blast: 3 удара по 170%…260%
+		"name": "Копейный шквал", "kind": "active", "glyph": "Ш", "color": Color(0.9, 0.5, 0.2), "jp": 2,
+		"desc": "Три мощных удара копьём подряд.",
+		"tiers": [[0, 0], [90, 5], [140, 10]], "mp": [209.0, 19.0], "cd": 45.0, "cast": 0.5,
+		"dmg": [1.7, 0.1], "hits": 3, "prio": 90,
+	},
+	"war_horn": {  # ← Encouragement: Strength (+12%…+57% Силы на 10 с)
+		"name": "Боевой рог", "kind": "active", "glyph": "Р", "color": Color(0.95, 0.65, 0.3), "jp": 2,
+		"desc": "Кентавр трубит в рог: атака хозяина выше на 15 с.",
+		"tiers": [[0, 0], [85, 5], [135, 10]], "mp": [98.0, 21.0], "cd": 90.0, "cast": 0.5,
+		"buff": "atk", "value": [0.06, 0.025], "time": 15.0, "prio": 85,
+	},
+	"ruin_storm": {  # ← Storm of Ruin: 240% по площади + атака целей −30% на 10 с
+		"name": "Сокрушающий вихрь", "kind": "active", "glyph": "С", "color": Color(0.75, 0.3, 0.15), "jp": 2,
+		"desc": "Копьё вихрем бьёт всех зверей вокруг цели: урон, и 10 с их удары слабее.",
+		"tiers": [[0, 0], [0, 0], [150, 1]], "pre": ["spear_storm", [0, 0, 6]],
+		"mp": [597.0, 0.0], "cd": 90.0, "cast": 0.75, "dmg": [2.4, 0.0], "radius": 5.0,
+		"weaken": [0.3, 0.0], "prio": 100,
+	},
+	"steppe_bond": {  # ← Unity: Kentauros (+P.Atk хозяину и питомцу +68…+320 — сильнее, чем у пантеры)
+		"name": "Узы степи", "kind": "toggle", "glyph": "У", "color": Color(0.9, 0.6, 0.35), "jp": 2,
+		"desc": "Пока включено, атака хозяина и кентавра выше.",
+		"tiers": [[45, 5], [95, 10], [145, 15]], "bonus": "atk_pct", "value": [0.06, 0.015], "owner": true,
+		"mp": [46.0, 36.0], "upkeep": [3.0, 3.0],
+	},
 	# ---------- Кабан, волк, каменный страж (своё: одно активное по роли) ----------
 	"fierce_rush": {
 		"name": "Свирепый натиск", "kind": "active", "glyph": "С", "color": RED, "jp": 1,
@@ -256,6 +301,9 @@ const SPECIES_SKILLS := {
 	"pheasant": ["inner_fire", "hardening", "spark_peck", "provoke", "shrill_cry", "vitality", "deep_spring",
 		"daze", "spur_strike", "mending", "calm_mind", "dawn_bond", "keen_eye", "dawn_song", "feather_storm",
 		"feather_step", "dawn_curse", "ancestor_gift"],
+	"centaur": ["inner_fire", "hardening", "spear_flurry", "provoke", "piercing_strike", "vitality", "deep_spring",
+		"daze", "hoof_quake", "mending", "calm_mind", "steppe_bond", "keen_eye", "war_horn", "spear_storm",
+		"endless_life", "ruin_storm", "ancestor_gift"],
 	"boar": ["inner_fire", "hardening", "vitality", "fierce_rush"],
 	"wolf": ["inner_fire", "hardening", "vitality", "fierce_rush"],
 	"golem": ["inner_fire", "hardening", "vitality", "ground_roar"],
@@ -517,6 +565,8 @@ static func effect_text(id: String, n: int) -> String:
 		parts.append("урон по цели +%s на 10 с" % _pct(value(sk["vuln"], n)))
 	if sk.has("miss"):
 		parts.append("промахи зверя +%s на 10 с" % _pct(value(sk["miss"], n)))
+	if sk.has("weaken"):
+		parts.append("атака зверя −%s на 10 с" % _pct(value(sk["weaken"], n)))
 	if sk.has("stun"):
 		parts.append("оглушение %s с" % _num(float(sk["stun"])))
 	if sk.has("blind"):
