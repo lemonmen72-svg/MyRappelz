@@ -62,7 +62,7 @@ static func open(hud: HUD) -> void:
 	if AdminPanel.ADMIN_TOOLS:
 		var admin_row := _row(body)
 		var main_node := hud.get_parent()
-		_choice(admin_row, "admin", "Админ: раса, пол, профессия, уровень", false,
+		_choice(admin_row, "admin", "Админ-панель: герой, опыт, предметы, питомцы, мир", false,
 			func() -> void: AdminPanel.open(main_node))
 
 

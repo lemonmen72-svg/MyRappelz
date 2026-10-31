@@ -819,12 +819,18 @@ func run_step() -> void:
 			step = 811
 		811:
 			shot("88_job_tree")
-			# Админ-панель (Настройки → Админ)
-			AdminPanel.open(main)
+			# Админ-панель (Настройки → Админ-панель): вкладка «Герой»
+			AdminPanel.open(main, "hero")
 			wait = 20
 			step = 812
 		812:
-			shot("87_admin_panel")
+			shot("92_admin_hero")
+			# Вкладка «Мир»: звери, скорость бега, перенос
+			AdminPanel.open(main, "world")
+			wait = 20
+			step = 813
+		813:
+			shot("93_admin_world")
 			main.hud.close_window()
 			ok_done()
 

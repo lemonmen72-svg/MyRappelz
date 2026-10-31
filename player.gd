@@ -367,8 +367,9 @@ func cur_eva() -> float:
 	return clampf(eva + shade_eva, 0.0, 0.6)
 
 
+## Скорость бега с усилением; ×2 / ×3 — тест из админ-панели (AdminPanel.speed_mult).
 func cur_speed() -> float:
-	return speed * (1.0 + speed_buff)
+	return speed * (1.0 + speed_buff) * float(AdminPanel.speed_mult)
 
 
 ## Восстановление MP в секунду: в бою (in_combat) или на отдыхе.
@@ -1033,6 +1034,9 @@ func _set_target(t: Mob) -> void:
 
 
 func take_damage(amount: int, attacker: Node3D) -> void:
+	# «Бессмертие» админ-панели: урон не проходит
+	if AdminPanel.god:
+		return
 	# Уклонение — только от ударов зверей
 	if attacker is Mob and cur_eva() > 0.0 and randf() < cur_eva():
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "Уклонение", Color(0.7, 0.95, 1.0))
