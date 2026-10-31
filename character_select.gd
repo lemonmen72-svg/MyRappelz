@@ -134,8 +134,9 @@ func _card(i: int) -> PanelContainer:
 	v.add_theme_constant_override("separation", int(UiScale.px(6)))
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(v)
-	v.add_child(_pass(MenuKit.label("Слот %d" % (i + 1), UiScale.FONT_SMALL, MenuKit.MUTED)))
 	if s.is_empty():
+		# Номер — только у пустого слота (у занятого карточка ниже: экран влезает в 720 px на «Крупном»)
+		v.add_child(_pass(MenuKit.label("Слот %d" % (i + 1), UiScale.FONT_SMALL, MenuKit.MUTED)))
 		var sp := Control.new()
 		sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
