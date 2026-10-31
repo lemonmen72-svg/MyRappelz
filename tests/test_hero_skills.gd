@@ -48,8 +48,8 @@ func run_step() -> void:
 			check(player._model.find_child("SwordL", true, false) == null, "с арбалетом клинков в руках нет")
 			check(player.equip("hp_potion") != "", "зелье не надеть как оружие")
 			check(player.equip("daggers_steel") != "", "оружие не из сумки не надеть")
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан")
 			place_far(mob, 8.0)
 			player.select_target(mob)
 			hp_before = mob.hp
@@ -80,7 +80,7 @@ func run_step() -> void:
 			check(main.hud.is_blocked("skill1") and main.hud.button_text("skill1").contains("нужны клинки"),
 				"кнопка «Удар в спину» затемнена с подсказкой: %s" % main.hud.button_text("skill1").replace("\n", " "))
 			check(player.slot_block("skill2") == "" and not main.hud.is_blocked("skill2"), "«Шаг тени» — с любым оружием")
-			mob = find_mob("boar")
+			mob = find_mob("pheasant")
 			stand_near(mob)
 			player.select_target(mob)
 			check(not player.use_skill("skill1"), "с арбалетом «Удар в спину» не применить")
@@ -103,7 +103,7 @@ func run_step() -> void:
 			check(not player.assign_slot("blade_mastery", 3), "пассивное на кнопку не назначить")
 			mob = find_mob("wolf")
 			if mob == null:
-				mob = find_mob("boar")
+				mob = find_mob("pheasant")
 			stand_near(mob)
 			player.select_target(mob)
 			player.mp = player.max_mp
@@ -130,7 +130,7 @@ func run_step() -> void:
 			check(main.hud._msg_label.text.contains("Нужен арбалет"), "сообщение: %s" % main.hud._msg_label.text)
 			check(player.equip("crossbow_starter") == "", "надет арбалет")
 			check(not main.hud.is_blocked("skill4") and main.hud.is_blocked("skill3"), "с арбалетом: кнопка 4 доступна, 3 — нет")
-			mob = find_mob("boar")
+			mob = find_mob("pheasant")
 			place_far(mob, 8.0)
 			player.select_target(mob)
 			mp_before = player.mp
@@ -149,12 +149,12 @@ func run_step() -> void:
 			var rec: Dictionary = game.hero
 			check(player.equip("dual_swords_starter") == "", "снова мечи")
 			check(HeroSkills.learn(rec, "assassin", game.level, "sleeping_dust"), "изучена «Сонная пыльца»")
-			mob = find_mob("boar")
+			mob = find_mob("pheasant")
 			stand_near(mob)
 			player.select_target(mob)
 			player.mp = player.max_mp
 			check(player.use_skill("sleeping_dust"), "«Сонная пыльца» применена")
-			check(mob.sleep_time >= 7.9, "кабан спит %.1f с" % mob.sleep_time)
+			check(mob.sleep_time >= 7.9, "фазан спит %.1f с" % mob.sleep_time)
 			mob.take_damage(1, player)
 			check(mob.sleep_time == 0.0, "удар будит")
 			mob.knock_back(player.global_position, 5.0)
@@ -351,15 +351,15 @@ func _check_stats(player: Player) -> void:
 	check(player.atk == int(d1["ratk"]) + int(cb["atk"]), "атака арбалета от Меткости: %d" % player.atk)
 	check(player.equip("dual_swords_starter") == "", "снова мечи")
 	# Точность: по зверям своего уровня без промахов, по сильным — изредка
-	var boar := find_mob("boar")
-	check(boar != null and player.hit_chance(boar) >= 1.0, "по кабану 1-го ур. без промахов")
+	var weak := find_mob("pheasant")
+	check(weak != null and player.hit_chance(weak) >= 1.0, "по фазану 1-го ур. без промахов")
 	var hc10 := Stats.hit_chance(player.accuracy, 10)
-	check(hc10 >= 0.75 and hc10 < 1.0, "по стражу 10-го ур. попадание %d%%" % roundi(hc10 * 100.0))
+	check(hc10 >= 0.75 and hc10 < 1.0, "по зверю 10-го ур. попадание %d%%" % roundi(hc10 * 100.0))
 	var acc0 := player.accuracy
 	player.accuracy = 0
 	var miss := 0
 	for i in 200:
-		if not player._basic_hits(boar):
+		if not player._basic_hits(weak):
 			miss += 1
 	player.accuracy = acc0
 	check(miss > 0 and miss < 100, "при низкой точности промахи: %d из 200" % miss)
@@ -413,7 +413,7 @@ func _check_learning(player: Player) -> void:
 	check(player.max_hp > hp0, "макс. HP %d → %d" % [hp0, player.max_hp])
 	# Уклонение работает от ударов зверей
 	var dodged := 0
-	var m := find_mob("boar")
+	var m := find_mob("pheasant")
 	for i in 100:
 		player.hp = player.max_hp
 		player.take_damage(5, m)

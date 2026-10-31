@@ -2,8 +2,10 @@ class_name MobData
 extends RefCounted
 ## Звери мира: характеристики, редкость, приручение (карта существа и её тир), добыча.
 ## Где и какого уровня они появляются — mob_zones в world/training_island.json.
-## id зверя совпадает с id вида питомца (PetData; у летающих рыб вида питомца нет). Пантера, черепаха, фазан, волк
-## и летающие рыбы — модели из файлов (CreatureAsset, assets/creatures/), остальные — из примитивов (CreatureModels).
+## id зверя совпадает с id вида питомца (PetData; у летающих рыб и анатем вида питомца нет). Пантера, черепаха, фазан,
+## волк, летающие рыбы и анатемы — модели из файлов (CreatureAsset, assets/creatures/), кабан и страж — из примитивов
+## (CreatureModels) и в мире больше не появляются.
+## defense — защита относительно обычной (по умолчанию 1.0), attack_cd — пауза между ударами (по умолчанию 1.3 с).
 ## flying: true — летающий зверь (парит на уровне головы героя, падает только после смерти).
 
 ## Радиус безопасной зоны города новичков в центре мира (там торговец, звери туда не заходят).
@@ -88,6 +90,32 @@ const TYPES := {
 		"loot": [["drake_crest", 0.6, 1, 2], ["hp_potion", 0.25, 1, 2], ["revive_scroll", 0.08, 1, 1],
 			["mirror_card", 0.08, 1, 1]],
 	},
+	# Анатемы — человекоподобные ящеры с костяными клинками на предплечьях (модели Максима из файлов, двуногие,
+	# клипы — Quaternius UAL). Физический ближний бой: высокая атака, частые удары (attack_cd), но низкая защита
+	# (defense < 1: по ним проходит больше урона). Не приручаются и не бывают питомцами (вида в PetData нет).
+	"anathema": {
+		"name": "Анатема", "gen": "анатемы", "level": 6, "hp": 95, "atk": 18, "speed": 4.0, "xp": 75, "gold": [10, 20],
+		"color": Color(0.22, 0.32, 0.2), "scale": 1.0, "rarity": "common", "tameable": false,
+		"defense": 0.7, "attack_cd": 1.0,
+		"loot": [["lizard_scale", 0.55, 1, 2], ["hp_potion", 0.15, 1, 1], ["revive_scroll", 0.04, 1, 1]],
+	},
+	"anathema_blade": {
+		"name": "Анатема-рубака", "gen": "анатемы-рубаки", "level": 8, "hp": 140, "atk": 23, "speed": 4.2, "xp": 120,
+		"gold": [16, 30], "color": Color(0.2, 0.3, 0.18), "scale": 1.0, "rarity": "common", "tameable": false,
+		"defense": 0.7, "attack_cd": 1.0,
+		"loot": [["bone_blade", 0.5, 1, 1], ["lizard_scale", 0.4, 1, 1], ["hp_potion", 0.2, 1, 1],
+			["revive_scroll", 0.06, 1, 1]],
+	},
+	# Вожак анатем — главный враг логова в пещере (вместо каменного стража): крепче остальных
+	"anathema_chief": {
+		"name": "Вожак анатем", "gen": "вожака анатем", "level": 10, "hp": 320, "atk": 24, "speed": 4.0, "xp": 260,
+		"gold": [60, 120], "color": Color(0.24, 0.3, 0.18), "scale": 1.0, "rarity": "rare", "tameable": false,
+		"defense": 0.8, "attack_cd": 1.1,
+		"loot": [["chief_spike", 1.0, 1, 2], ["bone_blade", 0.5, 1, 1], ["hp_potion", 0.4, 1, 2],
+			["revive_scroll", 0.15, 1, 1], ["mirror_card", 0.3, 1, 1]],
+	},
+	# Кабан и каменный страж — модели из примитивов: в мире больше не появляются (на острове только существа
+	# Максима), данные — для совместимости (старые сохранения, тесты)
 	"golem": {
 		"name": "Каменный страж", "gen": "каменного стража", "level": 10, "hp": 400, "atk": 24, "speed": 2.6, "xp": 250, "gold": [60, 120],
 		"color": Color(0.5, 0.5, 0.45), "scale": 2.0, "rarity": "unique", "tameable": false, "power": 1.0,
@@ -117,6 +145,21 @@ static func rarity_color(rarity: String) -> Color:
 ## Можно ли приручить зверя этого вида (неизвестный вид — нельзя).
 static func tameable(id: String) -> bool:
 	return TYPES.has(id) and bool(get_type(id).get("tameable", true))
+
+
+## Защита вида относительно обычной (1.0; поле "defense"): < 1 — по зверю проходит больше урона.
+static func defense(id: String) -> float:
+	return clampf(float(get_type(id).get("defense", 1.0)), 0.2, 3.0)
+
+
+## Множитель получаемого зверем урона: 1 / защита (у анатем ≈ 1.4).
+static func damage_taken(id: String) -> float:
+	return 1.0 / defense(id)
+
+
+## Пауза между ударами зверя, с (поле "attack_cd"; у анатем удары чаще).
+static func attack_cd(id: String) -> float:
+	return float(get_type(id).get("attack_cd", 1.3))
 
 
 ## Летающий зверь (парит над землёй, падает только после смерти).

@@ -93,6 +93,8 @@ func _draw() -> void:
 			_fish_scale(base)
 		"fin":
 			_fin(base)
+		"spike":
+			_spike(base)
 		_:
 			_letter(base)
 
@@ -373,6 +375,18 @@ func _shard(c: Color) -> void:
 	var pts := _poly([Vector2(0.44, 0.36), Vector2(0.56, 0.52), Vector2(0.46, 0.62), Vector2(0.56, 0.76)])
 	draw_polyline(pts, Color(rune.r, rune.g, rune.b, 0.35), _s(0.07), true)
 	draw_polyline(pts, rune, _s(0.03), true)
+
+
+## Костяной шип: высокий изогнутый рог с зазубринами по внутреннему краю и бликом.
+func _spike(c: Color) -> void:
+	var shape := _poly([Vector2(0.3, 0.88), Vector2(0.36, 0.56), Vector2(0.5, 0.3), Vector2(0.72, 0.1),
+		Vector2(0.64, 0.34), Vector2(0.7, 0.4), Vector2(0.6, 0.5), Vector2(0.66, 0.58), Vector2(0.58, 0.68),
+		Vector2(0.62, 0.88)])
+	draw_colored_polygon(shape, c)
+	draw_colored_polygon(_poly([Vector2(0.36, 0.84), Vector2(0.4, 0.56), Vector2(0.52, 0.34), Vector2(0.45, 0.58),
+		Vector2(0.42, 0.84)]), c.lightened(0.3))
+	draw_line(_p(0.32, 0.86), _p(0.6, 0.86), c.darkened(0.35), _s(0.04))
+	_outline(shape, INK, _s(0.03))
 
 
 ## Чешуйка: округлый щиток с острым краем, полосками роста и бликом.

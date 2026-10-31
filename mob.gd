@@ -4,7 +4,8 @@ extends CharacterBody3D
 ## Модели видов строит CreatureModels (пантера, черепаха и фазан — модели из файлов, CreatureAsset:
 ## клипы Idle/Walk/Run по скорости, Attack с моментом удара, Hit, Death; пока зверь спит, анимации стоят).
 ## Метка приручения (Taming) видна кольцом под зверем и ромбом-печатью над головой.
-## Уникальный каменный страж раз в несколько секунд бьёт по площади (с замахом).
+## Уникальный каменный страж раз в несколько секунд бьёт по площади (с замахом); в мире его больше нет (данные — для
+## совместимости). Анатемы (двуногие ящеры) бьют чаще (attack_every), но получают больше урона (damage_taken).
 ## Летающие рыбы (MobData flying) парят: высота парения зашита в модель (CreatureAsset hover), коллизия и узел
 ## зверя — на земле; целиться (снаряды, дуги ударов, вспышки) — в aim_point() / mid_point() на высоте тела.
 ## После смерти клип Death роняет рыбу на землю.
@@ -36,6 +37,10 @@ var home := Vector3.ZERO
 var aggro_range := 7.0
 var leash := 22.0
 var attack_cd := 0.0
+## Пауза между ударами (MobData.attack_cd: у анатем удары чаще).
+var attack_every := 1.3
+## Множитель получаемого урона (MobData.damage_taken: низкая защита анатем — больше 1).
+var damage_taken := 1.0
 var is_dead := false
 ## Оглушение: зверь не двигается и не атакует, пока > 0.
 var stun_time := 0.0
@@ -103,6 +108,8 @@ func setup(id: String, spawn_slot: int, pos: Vector3, lvl: int = -1) -> void:
 	xp_reward = d["xp"]
 	color = d["color"]
 	body_scale = d["scale"]
+	attack_every = MobData.attack_cd(type_id)
+	damage_taken = MobData.damage_taken(type_id)
 	if lvl > 0 and lvl != level:
 		var f := maxf(0.5, 1.0 + 0.25 * float(lvl - level))
 		max_hp = maxi(1, roundi(float(max_hp) * f))
@@ -263,7 +270,7 @@ func _physics_process(delta: float) -> void:
 		elif to.length() > _reach():
 			dir = to.normalized()
 		elif attack_cd <= 0.0:
-			attack_cd = 1.3
+			attack_cd = attack_every
 			var dmg := atk + randi_range(-1, 2)
 			var delay := _asset.play_attack(attack_cd) if _asset != null else 0.0
 			if delay > 0.0:
@@ -578,6 +585,9 @@ func _heal(delta: float, frac_per_sec: float) -> void:
 func take_damage(amount: int, attacker: Node3D, crit: bool = false, periodic: bool = false) -> void:
 	if is_dead:
 		return
+	# Защита вида: у анатем (низкая защита) урон по ним больше
+	if not is_equal_approx(damage_taken, 1.0):
+		amount = maxi(1, roundi(float(amount) * damage_taken))
 	if vuln_time > 0.0:
 		amount = roundi(float(amount) * (1.0 + vuln_frac))
 	hp -= amount

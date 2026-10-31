@@ -19,24 +19,24 @@ func run_step() -> void:
 			check(player._weapon_kind == "sword_shield", "у стража меч и щит")
 			check(player.skill_id("skill1") == "shield_bash" and player.skill_id("skill2") == "holy_guard",
 				"умения стража на кнопках")
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан")
 			player.select_target(mob)
 			t0 = frame
 			step = 1
 		1:
 			if not mob_ok(mob):
-				check(true, "страж убил кабана")
+				check(true, "страж убил фазана")
 				step = 2
 				return
 			if frame - t0 > 60 * 30:
-				fail("страж не убил кабана за 30 с")
+				fail("страж не убил фазана за 30 с")
 				return
 			stand_near(mob)
 			player.try_attack()
 		2:
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан для «Удара щитом»")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан для «Удара щитом»")
 			stand_near(mob)
 			player.select_target(mob)
 			hp_before = mob.hp
@@ -71,8 +71,8 @@ func run_step() -> void:
 			check(player.guard_time == 0.0, "усиления сброшены при смене класса")
 			check(player.skill_id("skill1") == "backstab" and player.skill_id("skill2") == "shadow_step",
 				"умения убийцы на кнопках")
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан для «Удара в спину»")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан для «Удара в спину»")
 			stand_near(mob)
 			player.select_target(mob)
 			hp_before = mob.hp
@@ -85,7 +85,7 @@ func run_step() -> void:
 		5:
 			mob = find_mob("wolf")
 			if mob == null:
-				mob = find_mob("boar")
+				mob = find_mob("pheasant")
 			check(mob != null, "найден зверь для «Шага тени»")
 			place_far(mob, 8.0)
 			player.select_target(mob)

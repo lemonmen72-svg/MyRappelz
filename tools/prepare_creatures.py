@@ -33,6 +33,10 @@
 плавники), модель парит на высоте hover уже в позе покоя и во всех клипах, Death роняет её на землю. Подробно —
 у FISH_CREATURES; проверка: в воздухе во всех клипах, кроме Death, в конце Death — лёжа на земле.
 
+Двуногие гуманоиды (стиль «biped», BIPED_CREATURES — анатемы): роли костей гуманоида Meshy, клипы не процедурные —
+Quaternius Universal Animation Library (CC0) переносятся на скелет (BipedRetarget, как tools/retarget_animations.py
+у героя), опорные стопы без проскальзывания, Death — лёжа на земле. Нужны --ual1/--ual2 (подробно — у BIPED_CREATURES).
+
 Новый зверь или стадия эволюции: добавить запись в CREATURES (высота, стиль клипов «cat»/«turtle»/«bird»,
 параметры шага; стадия — stage_cfg(вид, высота, …)) и запустить скрипт с его GLB. Скелеты Meshy разные: лишняя
 нога-копия убирается (merge_twin_legs), у головы уши — самая высокая боковая ветка, прочие ветки — HeadX*, если хвост
@@ -3000,6 +3004,8 @@ meshes/generate_lods=true
 
 def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 	from PIL import Image
+	if cfg.get("style") == "biped":
+		return build_biped(cid, src_path, cfg, out_dir)
 	print("== %s: %s" % (cid, src_path))
 	src = load_source(src_path)
 	fish = cfg.get("style") == "fish"
@@ -3217,6 +3223,8 @@ def check(out_dir: str, ids: list, meta_all: dict, preview: str = "") -> bool:
 			cid, len(m["joints"]), len(m["tris"]), len(m["pos"]), m["images"], hi[1] - lo[1], lo[1], hi[1],
 			hi[2] - lo[2], hi[0] - lo[0]))
 		face_ok = hz > 0.0 and G0[head][1, 3] > 0.3 * (hi[1] - lo[1])
+		if meta.get("kind") == "biped":
+			face_ok = biped_check_rest(meta, G0, idx)
 		print("   голова в покое: %s → морда в %s" % (np.round(G0[head][:3, 3], 3), "+Z" if face_ok else "НЕ +Z (!)"))
 		if fish:
 			ok &= bool(face_ok) and fish_check_rest(meta, lo, hi, G0[head][:3, 3])
@@ -3296,9 +3304,9 @@ def write_preview(out: str, cid: str, clip: str, m: dict, sticks: list, verts_at
 	names = [m["nodes"][j].get("name", "") for j in joints]
 	marks = {}
 	for k, n in enumerate(names):
-		if n.startswith(("LegFL", "LegBL", "LegL", "ToeL", "WingL", "FinL")):
+		if n.startswith(("LegFL", "LegBL", "LegL", "ToeL", "WingL", "FinL", "ArmL", "HandL", "ShoulderL", "FingerL")):
 			marks[k] = (40, 90, 220)
-		elif n.startswith(("LegFR", "LegBR", "LegR", "ToeR", "WingR", "FinR")):
+		elif n.startswith(("LegFR", "LegBR", "LegR", "ToeR", "WingR", "FinR", "ArmR", "HandR", "ShoulderR", "FingerR")):
 			marks[k] = (220, 50, 40)
 	H = meta["height"]
 	span = max(meta["length"], H) * 1.2
@@ -3326,6 +3334,584 @@ def write_preview(out: str, cid: str, clip: str, m: dict, sticks: list, verts_at
 	img.save(os.path.join(out, "%s_%s.png" % (cid, clip)))
 
 
+# ---------- Двуногие (стиль «biped»): гуманоид Meshy + клипы Quaternius UAL ----------
+# Анатемы — ящеры на двух ногах: скелет Meshy гуманоидный (28–35 костей Bone_NNN, без анимаций, руки в A-позе,
+# ноги «на пальцах» — пятка-скакательный сустав высоко). Клипы не процедурные: из Quaternius Universal Animation
+# Library (CC0, UAL1/UAL2 Standard — те же файлы, что у героя, tools/retarget_animations.py) переносятся на скелет
+# по ролям костей (biped_roles) тем же способом, что у героя: глобальный поворот кости = поворот кости библиотеки
+# от её позы покоя × опорная поза зверя. Опорная поза — поза покоя Meshy, у которой руки подняты в T-позу
+# библиотеки (направления плеча, предплечья, кисти), а ноги довёрнуты вокруг оси X к общему наклону (у Meshy одна
+# нога бывает выставлена вперёд — иначе зверь бы хромал); голень, «пятка» и пальцы ящера остаются своими.
+# Смещение таза — по отношению длин ног, на кость Hips (Root по X/Z на месте: игра его всё равно закрепляет).
+# После переноса: опорная нога стоит (на шаге и беге стопа в опорной фазе едет назад ровно со скоростью хода,
+# в остальных клипах — неподвижна; IK бедро + голень, стопа и пальцы сохраняют поворот), низ меша не ниже земли,
+# Death заканчивается лёжа на земле. Скорость шага и бега — по опорной стопе клипа (без проскальзывания).
+# Кости: Root, Hips, Spine*, Chest, Neck*, Head, HeadEnd*, Shoulder{L,R}, Arm{L,R}1 (плечо), Arm{L,R}2 (предплечье
+# с клинком), Hand{L,R}, Hand{L,R}_* / Finger*, Leg{L,R}1… (бедро, голень, «пятка», пальцы).
+# Запуск: python3 -I tools/prepare_creatures.py --ual1 <UAL1_Standard.glb> --ual2 <UAL2_Standard.glb> anathema=<a18.glb> …
+# У вида: height — рост, tris — треугольников, clips — свои клипы поверх BIPED_CLIPS (клип → (библиотека, [клипы
+# библиотеки подряд])); hit — момент удара в Attack (по умолчанию — когда кисть быстрее всего), cast — эффект в Cast.
+BIPED_CLIPS = {
+	"Idle": ("ual1", ["Sword_Idle"]),  # боевая стойка, цикл
+	"Walk": ("ual1", ["Walk_Loop"]),
+	"Run": ("ual1", ["Jog_Fwd_Loop"]),
+	"Attack": ("ual2", ["Sword_Regular_A", "Sword_Regular_A_Rec"]),  # удар клинком предплечья и возврат
+	"Hit": ("ual1", ["Hit_Chest"]),
+	"Death": ("ual1", ["Death01"]),  # падает на спину
+	"Cast": ("ual1", ["Spell_Simple_Enter", "Spell_Simple_Shoot", "Spell_Simple_Exit"]),
+}
+BIPED_CREATURES = {
+	# Анатема: размашистый удар-крюк
+	"anathema": {"style": "biped", "height": 1.9, "tris": 8000,
+		"clips": {"Attack": ("ual2", ["Melee_Hook", "Melee_Hook_Rec"])}},
+	# Анатема-рубака: косой удар клинком
+	"anathema_blade": {"style": "biped", "height": 2.0, "tris": 8000, "clips": {}},
+	# Вожак анатем: удар наотмашь обратным ходом
+	"anathema_chief": {"style": "biped", "height": 2.2, "tris": 8000,
+		"clips": {"Attack": ("ual2", ["Sword_Regular_B", "Sword_Regular_B_Rec"])}},
+}
+CREATURES.update(BIPED_CREATURES)
+# Пути к UAL1_Standard.glb / UAL2_Standard.glb (задаёт main по --ual1/--ual2)
+BIPED_UAL = {"ual1": "", "ual2": ""}
+
+
+def _retarget_module():
+	"""tools/retarget_animations.py по пути файла (под python -I папки скрипта нет в sys.path)."""
+	import importlib.util
+	p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "retarget_animations.py")
+	spec = importlib.util.spec_from_file_location("retarget_animations", p)
+	mod = importlib.util.module_from_spec(spec)
+	spec.loader.exec_module(mod)
+	return mod
+
+
+def qm_batch(q: np.ndarray) -> np.ndarray:
+	"""Кватернионы (…, 4) (x, y, z, w) → матрицы (…, 3, 3)."""
+	q = q / np.linalg.norm(q, axis=-1, keepdims=True)
+	x, y, z, w = np.moveaxis(q, -1, 0)
+	return np.stack([
+		np.stack([1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)], -1),
+		np.stack([2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)], -1),
+		np.stack([2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)], -1)], -2)
+
+
+def biped_leg_chains(parent: np.ndarray, gpos: np.ndarray, height_lo: float, height: float) -> dict:
+	"""Две ноги: ветки, у которых все концы у земли; L — с +X (левая сторона зверя, морда в +Z)."""
+	lr = leg_roots(parent, gpos, height_lo + 0.1 * height)
+	if len(lr) != 2:
+		raise ValueError("двуногий: ждём 2 ноги у земли, найдено %d" % len(lr))
+	ch = children_of(parent)
+	out = {}
+	for r in lr:
+		c = [r]
+		while len(ch[c[-1]]) == 1:
+			c.append(ch[c[-1]][0])
+		out["L" if gpos[r, 0] > np.mean(gpos[lr, 0]) else "R"] = c
+	if len(out) != 2:
+		raise ValueError("двуногий: ноги не разошлись по сторонам")
+	return out
+
+
+def biped_yaw(src: dict) -> float:
+	"""Куда смотрит двуногий: пальцы ног (от «пятки» к пальцам) — вперёд. Поворот вокруг Y (кратный 90°) в +Z."""
+	pos, gp = src["pos"], src["gpos"]
+	lo, hi = pos.min(0), pos.max(0)
+	legs = biped_leg_chains(src["parent"], gp, lo[1], hi[1] - lo[1])
+	d = sum(gp[c[min(3, len(c) - 1)]] - gp[c[min(2, len(c) - 2)]] for c in legs.values())
+	if abs(d[2]) >= abs(d[0]):
+		return 0.0 if d[2] > 0 else math.pi
+	return -math.pi * 0.5 if d[0] > 0 else math.pi * 0.5
+
+
+def biped_roles(names: list, parent: np.ndarray, gpos: np.ndarray, height: float) -> dict:
+	"""Роли костей гуманоида Meshy (морда в +Z, X — влево): ноги — две ветки у земли; таз — их общий родитель;
+	путь к макушке — позвоночник, грудь — первая кость на нём с двумя боковыми ветками (руки), дальше шея и голова
+	(последняя кость пути — макушка HeadEnd, перед ней — Head). Рука: ключица, плечо, предплечье, кисть, дальше концы."""
+	B = len(parent)
+	ch = children_of(parent)
+	roots = [b for b in range(B) if parent[b] < 0]
+	if len(roots) != 1:
+		raise ValueError("ждём один корень скелета, найдено %d" % len(roots))
+	root = roots[0]
+	legs = biped_leg_chains(parent, gpos, 0.0, height)
+	pelvis = int(parent[legs["L"][0]])
+	if int(parent[legs["R"][0]]) != pelvis:
+		raise ValueError("двуногий: ноги растут из разных костей")
+	leg_set = set()
+	for c in legs.values():
+		leg_set.update(subtree(ch, c[0]))
+	body = [b for b in range(B) if b not in leg_set]
+	top = max(body, key=lambda b: gpos[b, 1])
+	path = path_to(parent, top)
+	if pelvis not in path:
+		raise ValueError("двуногий: таз не на пути к макушке")
+	ip = path.index(pelvis)
+	ic = None
+	for k in range(ip, len(path) - 1):
+		side = [c for c in ch[path[k]] if c not in leg_set and c != path[k + 1]]
+		if len(side) >= 2:
+			ic = k
+			break
+	if ic is None:
+		raise ValueError("двуногий: не нашёл груди с руками")
+	chest = path[ic]
+	side = sorted([c for c in ch[chest] if c != path[ic + 1]], key=lambda c: gpos[c, 0])
+	arm_roots = {"R": side[0], "L": side[-1]}
+	arms = {}
+	for s, r in arm_roots.items():
+		c = [r]
+		while len(ch[c[-1]]) == 1:
+			c.append(ch[c[-1]][0])
+		if len(c) < 4:
+			raise ValueError("двуногий: короткая рука %s" % s)
+		arms[s] = c
+	after = path[ic + 1:]
+	roles = {"kind": "biped", "root": root, "hips": pelvis, "chest": chest, "legs": legs, "arms": arms,
+		"spine": path[ip + 1:ic + 1], "pre": path[:ip]}
+	if len(after) >= 3:
+		roles["neck"], roles["head"], roles["head_end"] = after[:-2], after[-2], [after[-1]]
+	elif len(after) == 2:
+		roles["neck"], roles["head"], roles["head_end"] = [], after[0], [after[1]]
+	else:
+		roles["neck"], roles["head"], roles["head_end"] = [], after[0], []
+	nm = {}
+	for i, b in enumerate(roles["pre"]):
+		nm[b] = "Root" if i == 0 else "Root%d" % (i + 1)
+	nm[pelvis] = "Root" if pelvis == root else "Hips"
+	for i, b in enumerate(roles["spine"]):
+		nm[b] = "Chest" if b == chest else "Spine%d" % (i + 1)
+	for i, b in enumerate(roles["neck"]):
+		nm[b] = "Neck%d" % (i + 1) if len(roles["neck"]) > 1 else "Neck"
+	nm[roles["head"]] = "Head"
+	for i, b in enumerate(roles["head_end"]):
+		nm[b] = "HeadEnd" if i == 0 else "HeadEnd%d" % (i + 1)
+	for s, c in arms.items():
+		for b, n in zip(c, ["Shoulder" + s, "Arm%s1" % s, "Arm%s2" % s, "Hand" + s]):
+			nm[b] = n
+		for i, b in enumerate(c[4:]):
+			nm[b] = "Hand%s_%d" % (s, i + 1)
+		for fi, f in enumerate(ch[c[-1]] if len(c) >= 4 else []):
+			for i, b in enumerate(subtree(ch, f)):
+				nm[b] = "Finger%s%d_%d" % (s, fi + 1, i + 1)
+	for s, c in legs.items():
+		for i, b in enumerate(c):
+			nm[b] = "Leg%s%d" % (s, i + 1)
+		for ti, t in enumerate(ch[c[-1]]):
+			for i, b in enumerate(subtree(ch, t)):
+				nm[b] = "Toe%s%d_%d" % (s, ti + 1, i + 1)
+	roles["extra"] = []
+	n_extra = 0
+	for b in range(B):
+		if b in nm:
+			continue
+		p = int(parent[b])
+		if p in nm and not nm[p].startswith("Extra"):
+			n_extra += 1
+			for i, x in enumerate(subtree(ch, b)):
+				nm[x] = "Extra%d_%d" % (n_extra, i + 1)
+				roles["extra"].append(x)
+	missing = [names[b] for b in range(B) if b not in nm]
+	if missing:
+		raise ValueError("кости без роли: %s" % missing)
+	roles["names"] = [nm[b] for b in range(B)]
+	if len(set(roles["names"])) != B:
+		raise ValueError("повтор имён костей: %s" % roles["names"])
+	return roles
+
+
+class BipedRetarget:
+	"""Перенос клипов UAL на скелет двуногого (Rig в осях модели): опорная поза, клип → локальные повороты/сдвиги."""
+
+	def __init__(self, ra, src, rig: Rig, roles: dict):
+		self.ra, self.src, self.rig, self.roles = ra, src, rig, roles
+		qn = ra.qnorm
+		B = rig.B
+		self.rest_q = qn(np.array([m_to_q(rig.grot[b]) for b in range(B)]))
+		self.lrest_q = qn(np.array([m_to_q(rig.lrot[b]) for b in range(B)]))
+		sp, sr = src.fk(*src.rest_pose())
+		self.sp0, self.sr0 = sp[0], sr[0]
+		m = {roles["hips"]: "pelvis", roles["head"]: "Head"}
+		sn = ["spine_01", "spine_02", "spine_03"]
+		n = len(roles["spine"])
+		for k, b in enumerate(roles["spine"]):
+			m[b] = sn[min(2, max(0, int(math.ceil((k + 1) * 3.0 / n)) - 1))]
+		for b in roles["neck"]:
+			m[b] = "neck_01"
+		for s, c in roles["arms"].items():
+			for b, nmb in zip(c, ["clavicle_", "upperarm_", "lowerarm_", "hand_"]):
+				m[b] = nmb + s.lower()
+		for s, c in roles["legs"].items():
+			for b, nmb in zip(c, ["thigh_", "calf_", "foot_", "ball_"]):
+				m[b] = nmb + s.lower()
+		self.map = {}
+		for b, nmb in m.items():
+			i = src.find(nmb)
+			if i < 0:
+				raise ValueError("в библиотеке нет кости %s" % nmb)
+			self.map[b] = i
+		self._build_ref()
+		# Масштаб смещения таза: высота таза над опорой ноги у зверя и у библиотеки
+		gp = rig.gpos
+		self.contact = {s: c[min(3, len(c) - 1)] for s, c in roles["legs"].items()}
+		ours = float(gp[roles["hips"], 1] - gp[self.contact["L"], 1])
+		theirs = float(self.sp0[src.find("pelvis"), 1] - self.sp0[src.find("ball_l"), 1])
+		self.k = ours / theirs
+
+	def _build_ref(self) -> None:
+		ra, rig, roles = self.ra, self.rig, self.roles
+		B = rig.B
+		G = np.zeros((B, 4))
+		gpos = rig.gpos
+		# Ноги: поворот вокруг X у бедра к общему наклону «бедро → опора» (обе ноги симметрично)
+		ang = {}
+		for s, c in roles["legs"].items():
+			d = gpos[c[min(3, len(c) - 1)]] - gpos[c[0]]
+			ang[s] = math.atan2(d[2], -d[1])
+		mean = sum(ang.values()) / len(ang)
+		leg_rot = {c[0]: ra.q_axis_angle(np.array([1.0, 0.0, 0.0]), -(mean - ang[s])) for s, c in roles["legs"].items()}
+		align = {}
+		for s, c in roles["arms"].items():
+			pairs = [("clavicle_", "upperarm_"), ("upperarm_", "lowerarm_"), ("lowerarm_", "hand_"), ("hand_", "middle_01_")]
+			for k in range(min(4, len(c))):
+				child = c[k + 1] if k + 1 < len(c) else (rig.ch[c[k]][0] if rig.ch[c[k]] else -1)
+				if child >= 0:
+					align[c[k]] = (child, pairs[k][0] + s.lower(), pairs[k][1] + s.lower())
+		keep_world = {roles["hips"], roles["head"]} | set(roles["spine"]) | set(roles["neck"])
+		for b in range(B):
+			p = rig.parent[b]
+			if p < 0:
+				G[b] = self.rest_q[b]
+				continue
+			if b in keep_world:
+				G[b] = self.rest_q[b]
+			elif b in leg_rot:
+				G[b] = ra.qnorm(ra.qmul(leg_rot[b], self.rest_q[b]))
+			else:
+				G[b] = ra.qnorm(ra.qmul(G[p], self.lrest_q[b]))
+			if b in align:
+				child, sa, sb = align[b]
+				d_t = ra.qrot(G[b], rig.lpos[child])
+				d_s = self.sp0[self.src.find(sb)] - self.sp0[self.src.find(sa)]
+				G[b] = ra.qnorm(ra.qmul(ra.q_between(d_t, d_s), G[b]))
+		self.ref_q = G
+		Lr = np.zeros((B, 4))
+		for b in range(B):
+			p = rig.parent[b]
+			Lr[b] = G[b] if p < 0 else ra.qnorm(ra.qmul(ra.qconj(G[p]), G[b]))
+		self.lref_q = Lr
+
+	def fk(self, Lq: np.ndarray, Lt: np.ndarray) -> tuple:
+		"""Локальные (F, B, 4/3) → глобальные повороты и позиции (кости по порядку «родитель раньше детей»)."""
+		ra = self.ra
+		Gq = np.zeros_like(Lq)
+		Gp = np.zeros_like(Lt)
+		for b in range(self.rig.B):
+			p = self.rig.parent[b]
+			if p < 0:
+				Gq[:, b], Gp[:, b] = Lq[:, b], Lt[:, b]
+			else:
+				Gq[:, b] = ra.qmul(Gq[:, p], Lq[:, b])
+				Gp[:, b] = Gp[:, p] + ra.qrot(Gq[:, p], Lt[:, b])
+		return Gq, Gp
+
+	def clip(self, lib_names: list, loop: bool = False) -> tuple:
+		"""Клипы библиотеки подряд → времена, локальные повороты и сдвиги костей зверя (опора ещё не поправлена)."""
+		ra, src, rig, roles = self.ra, self.src, self.rig, self.roles
+		ts, rs = [], []
+		for nmc in lib_names:
+			ln = src.length(nmc)
+			fr = max(2, int(round(ln * FPS)) + 1)
+			lt, lr = src.sample(nmc, np.linspace(0.0, ln, fr))
+			if ts:
+				lt, lr = lt[1:], lr[1:]
+			ts.append(lt)
+			rs.append(lr)
+		lt, lr = np.concatenate(ts), np.concatenate(rs)
+		F = lt.shape[0]
+		times = np.arange(F) / FPS
+		sp, sr = src.fk(lt, lr)
+		B = rig.B
+		Lq = np.repeat(self.lref_q[None], F, axis=0)
+		Lt = np.repeat(rig.lpos[None], F, axis=0)
+		Gq = np.zeros((F, B, 4))
+		for b in range(B):
+			p = rig.parent[b]
+			pq = Gq[:, p] if p >= 0 else np.repeat(np.array([[0.0, 0.0, 0.0, 1.0]]), F, axis=0)
+			if b in self.map:
+				s = self.map[b]
+				delta = ra.qmul(sr[:, s], ra.qconj(self.sr0[s])[None])
+				g = ra.qnorm(ra.qmul(delta, self.ref_q[b][None]))
+				Gq[:, b] = g
+				Lq[:, b] = ra.qnorm(ra.qmul(ra.qconj(pq), g))
+			else:
+				Gq[:, b] = ra.qmul(pq, Lq[:, b])
+		# Смещение таза библиотеки (в масштабе зверя): высота — на корень; по X/Z у циклов — на кость Hips (корень
+		# в циклах игра закрепляет по X/Z), у прочих клипов — тоже на корень (тело не отрывается от корня)
+		pel = src.find("pelvis")
+		off = (sp[:, pel] - self.sp0[pel][None]) * self.k
+		h = roles["hips"]
+		r0 = roles["root"]
+		side = off * np.array([1.0, 0.0, 1.0])
+		Lt[:, r0] = rig.lpos[r0][None] + (off - side if loop and h != r0 else off)
+		if loop and h != r0:
+			pr = self.rest_q[rig.parent[h]]
+			Lt[:, h] = rig.lpos[h][None] + ra.qrot(ra.qconj(pr)[None], side)
+		return times, ra.continuous(Lq), Lt
+
+	def two_bone(self, Gq: np.ndarray, Gp: np.ndarray, Lq: np.ndarray, side: str, want: np.ndarray) -> float:
+		"""Один кадр: опору ноги side — в точку want (бедро + голень, «пятка» и пальцы сохраняют мировой поворот).
+		Gq/Gp — глобальные кадра (меняются на месте только для ноги), Lq — локальные кадра. Возвращает недостачу, м."""
+		ra = self.ra
+		c = self.roles["legs"][side]
+		a, kn, an = c[0], c[1], c[2]
+		ct = self.contact[side]
+		Pa, Pk, Ph, Pc = Gp[a], Gp[kn], Gp[an], Gp[ct]
+		Ph2 = Ph + (want - Pc)
+		l1, l2 = np.linalg.norm(Pk - Pa), np.linalg.norm(Ph - Pk)
+		dv = Ph2 - Pa
+		d = float(np.linalg.norm(dv))
+		short = max(0.0, d - (l1 + l2) * 0.9995)
+		d = min(max(d, abs(l1 - l2) + 1e-4), (l1 + l2) * 0.9995)
+		u = dv / max(np.linalg.norm(dv), 1e-9)
+		bend = (Pk - Pa) - u * float(np.dot(Pk - Pa, u))
+		if np.linalg.norm(bend) < 1e-6:
+			bend = np.array([0.0, 0.0, 1.0]) - u * u[2]
+		bend /= np.linalg.norm(bend)
+		x = (l1 * l1 - l2 * l2 + d * d) / (2.0 * d)
+		y = math.sqrt(max(l1 * l1 - x * x, 0.0))
+		K2 = Pa + u * x + bend * y
+		H2 = Pa + u * d
+		qa = ra.qnorm(ra.qmul(ra.q_between(Pk - Pa, K2 - Pa), Gq[a]))
+		gk0 = ra.qmul(qa, Lq[kn])
+		dk = ra.qrot(gk0, self.rig.lpos[an])
+		qk = ra.qnorm(ra.qmul(ra.q_between(dk, H2 - K2), gk0))
+		p = self.rig.parent[a]
+		Lq[a] = ra.qnorm(ra.qmul(ra.qconj(Gq[p]), qa))
+		Lq[kn] = ra.qnorm(ra.qmul(ra.qconj(qa), qk))
+		Lq[an] = ra.qnorm(ra.qmul(ra.qconj(qk), Gq[an]))
+		return short
+
+
+def biped_plant(rt: BipedRetarget, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, speed=None) -> tuple:
+	"""Опорные стопы не скользят: интервалы, где опора ноги у земли, — опора стоит (speed is None — неподвижно;
+	иначе едет назад со скоростью хода speed, если она 0 — оценивается по клипу). Возвращает (скорость, недостача)."""
+	ra, rig = rt.ra, rt.rig
+	F = len(times)
+	Gq, Gp = rt.fk(Lq, Lt)
+	rest_y = {s: float(rig.gpos[b, 1]) for s, b in rt.contact.items()}
+	loco = speed is not None
+	# Опорная фаза: опора низко (до 2.5 % роста над своей нижней точкой) и медленно поднимается/опускается
+	H = float(rig.gpos[:, 1].max())
+	stance = {}
+	for s, b in rt.contact.items():
+		y = Gp[:, b, 1]
+		stance[s] = y < y.min() + 0.025 * H
+	if loco and speed == 0.0:
+		vs = []
+		for s, b in rt.contact.items():
+			z = Gp[:, b, 2]
+			dz = np.gradient(z, times)
+			st = stance[s] & (dz < 0.0)
+			if st.any():
+				vs.extend((-dz[st]).tolist())
+		speed = float(np.median(vs)) if vs else 0.0
+	v = speed if loco else 0.0
+	n = F - 1 if loco else F  # у цикла последний кадр = первый
+	short = 0.0
+	want = np.zeros((F, 2, 3))
+	wts = np.zeros((F, 2))
+	for si, (s, b) in enumerate(sorted(rt.contact.items())):
+		st = stance[s][:n]
+		# Интервалы опоры: (кадр, непрерывное время); у цикла — с первого кадра переноса, через конец цикла
+		segs, cur = [], []
+		if st.all():
+			segs = [[(f, float(times[f])) for f in range(n)]]
+		else:
+			s0 = int(np.argmin(st)) if loco else 0
+			for i in range(n):
+				f = (s0 + i) % n
+				t = float(times[f]) + (float(times[n]) if loco and s0 + i >= n else 0.0)
+				if st[f]:
+					cur.append((f, t))
+				elif cur:
+					segs.append(cur)
+					cur = []
+			if cur:
+				segs.append(cur)
+		for sg in segs:
+			seg = [f for f, _ in sg]
+			tt = np.array([t for _, t in sg])
+			mid = float(np.mean(tt))
+			P = np.array([Gp[f, b] + np.array([0.0, 0.0, v * (t - mid)]) for f, t in zip(seg, tt)])
+			anchor = P.mean(0)
+			for f, t in zip(seg, tt):
+				want[f, si] = anchor + np.array([0.0, 0.0, -v * (t - mid)])
+				want[f, si, 1] = rest_y[s]
+				wts[f, si] = 1.0
+			# Плавный выход из опоры: поправка затухает за 3 кадра по обе стороны
+			for edge, step in ((seg[0], -1), (seg[-1], 1)):
+				corr = want[edge, si] - Gp[edge, b]
+				for j in range(1, 4):
+					f = edge + step * j
+					if loco:
+						f %= n
+					if f < 0 or f >= n or wts[f, si] > 0.0:
+						continue
+					w = 1.0 - j / 4.0
+					want[f, si] = Gp[f, b] + corr * w
+					want[f, si, 1] = max(want[f, si, 1], rest_y[s] + 0.006)
+					wts[f, si] = w
+	for f in range(n):
+		for si, (s, b) in enumerate(sorted(rt.contact.items())):
+			if wts[f, si] <= 0.0:
+				continue
+			Gq1, Gp1 = rt.fk(Lq[f:f + 1], Lt[f:f + 1])
+			short = max(short, rt.two_bone(Gq1[0], Gp1[0], Lq[f], s, want[f, si]))
+	if loco:
+		Lq[n] = Lq[0]
+		Lt[n] = Lt[0]
+	return (v if loco else 0.0), short
+
+
+def biped_ground(rt: BipedRetarget, mesh: dict, Lq: np.ndarray, Lt: np.ndarray, death: bool) -> float:
+	"""Низ меша не ниже земли (корень вверх на недостачу). death — в конце клипа тело ложится ровно на землю
+	(с середины падения корень плавно подгоняется под низ меша). Возвращает наибольший подъём, м."""
+	F = Lq.shape[0]
+	Gq, Gp = rt.fk(Lq, Lt)
+	Gr = qm_batch(Gq)
+	miny = np.array([float(skin_points(rt.rig, mesh["pos"], mesh["joints"], mesh["weights"], Gr[f], Gp[f])[:, 1].min())
+		for f in range(F)])
+	root = 0
+	lift = np.maximum(0.0, -miny)
+	if death:
+		w = np.array([smooth((f / max(F - 1, 1) - 0.45) / 0.35) for f in range(F)])
+		lift = lift * (1.0 - w) + (-miny) * w
+	Lt[:, root, 1] += lift
+	return float(np.max(np.abs(lift)))
+
+
+def biped_hand_peak(rt: BipedRetarget, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray) -> float:
+	"""Момент удара: самая быстрая кисть (концы клинков), не в первой и не в последней пятой части клипа."""
+	Gq, Gp = rt.fk(Lq, Lt)
+	best, bt = -1.0, float(times[len(times) // 3])
+	for s, c in rt.roles["arms"].items():
+		hp = Gp[:, c[min(3, len(c) - 1)]]
+		v = np.linalg.norm(np.gradient(hp, times, axis=0), axis=1)
+		for f in range(len(times)):
+			if 0.15 * times[-1] <= times[f] <= 0.7 * times[-1] and v[f] > best:
+				best, bt = float(v[f]), float(times[f])
+	return round(bt, 3)
+
+
+def build_biped(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
+	"""Двуногий из Meshy: упрощение, масштаб, понятные кости, клипы UAL (см. BIPED_CREATURES)."""
+	from PIL import Image
+	if not BIPED_UAL["ual1"] or not BIPED_UAL["ual2"]:
+		raise SystemExit("двуногим нужны клипы Quaternius UAL: --ual1 <UAL1_Standard.glb> --ual2 <UAL2_Standard.glb>")
+	ra = _retarget_module()
+	libs = {k: ra.Skeleton(ra.Glb(p)) for k, p in BIPED_UAL.items()}
+	print("== %s: %s" % (cid, src_path))
+	src = load_source(src_path)
+	g = to_game_space(src, cfg["height"], biped_yaw(src))
+	g = reorder(g, topo_order(g["parent"]))
+	roles = biped_roles(g["names"], g["parent"], g["gpos"], cfg["height"])
+	print("   поворот %d°, масштаб %.4f, исходный меш %d треуг." % (g["yaw_deg"], g["scale"], len(g["tris"])))
+	mesh = simplify_mesh(g, cfg["tris"])
+	st = mesh_stats(mesh["pos"], mesh["tris"])
+	print("   упрощено: %d треуг., %d вершин, открытых рёбер %d (было %d), ошибка %.4f" % (
+		st["tris"], st["verts"], st["open_edges"], mesh_stats(g["pos"], g["tris"])["open_edges"], mesh["simplify_error"]))
+	k = cfg["height"] / float(mesh["pos"][:, 1].max() - mesh["pos"][:, 1].min())
+	shift = np.array([0.0, -float(mesh["pos"][:, 1].min()) * k, 0.0])
+	mesh["pos"] = mesh["pos"] * k + shift
+	g["gpos"] = g["gpos"] * k + shift
+	rig = Rig(roles["names"], g["parent"], g["grot"], g["gpos"])
+	nm = rig.names
+	for s in ("L", "R"):
+		print("   нога %s: %s; рука %s: %s" % (s, " ".join(nm[b] for b in roles["legs"][s]), s,
+			" ".join(nm[b] for b in roles["arms"][s])))
+	print("   позвоночник: %s" % " ".join(nm[b] for b in roles["pre"] + [roles["hips"]] + roles["spine"] + roles["neck"]
+		+ [roles["head"]] + roles["head_end"]))
+	rts = {k2: BipedRetarget(ra, s2, rig, roles) for k2, s2 in libs.items()}
+	print("   масштаб смещения таза %.3f" % rts["ual1"].k)
+	specs = dict(BIPED_CLIPS)
+	specs.update(cfg.get("clips", {}))
+	clips = []
+	for name in ("Idle", "Walk", "Run", "Attack", "Hit", "Death", "Cast"):
+		lib, names = specs[name]
+		rt = rts[lib]
+		times, Lq, Lt = rt.clip(names, name in ("Idle", "Walk", "Run"))
+		loco = name in ("Walk", "Run")
+		speed, short = (0.0, 0.0)
+		if name != "Death":
+			speed, short = biped_plant(rt, times, Lq, Lt, 0.0 if loco else None)
+		lift = biped_ground(rt, mesh, Lq, Lt, name == "Death")
+		cl = {"name": name, "T": float(times[-1]), "loop": name in ("Idle", "Walk", "Run"), "times": times,
+			"rot": Lq, "trans": Lt, "short": short, "lib": "%s:%s" % (lib, "+".join(names))}
+		if loco:
+			cl["speed"] = speed
+		if name == "Attack":
+			cl["hit"] = cfg.get("hit", biped_hand_peak(rt, times, Lq, Lt))
+		if name == "Cast":
+			cl["cast"] = cfg.get("cast", 0.7)  # середина Spell_Simple_Shoot
+		print("   %-6s %.2f с ← %s%s; опора не достала %.3f м, подъём над землёй до %.3f м" % (
+			name, cl["T"], cl["lib"], (", скорость %.2f м/с" % speed) if loco else "", short, lift))
+		clips.append(cl)
+	os.makedirs(out_dir, exist_ok=True)
+	write_glb(os.path.join(out_dir, cid + ".glb"), cid, rig, mesh, clips)
+	if src["image"] is not None:
+		im = Image.open(io.BytesIO(src["image"])).convert("RGB")
+		if im.size != (1024, 1024):
+			im = im.resize((1024, 1024), Image.LANCZOS)
+		im.save(os.path.join(out_dir, cid + ".png"), optimize=True)
+	for ext, tpl in ((".png.import", PNG_IMPORT), (".glb.import", GLB_IMPORT)):
+		p = os.path.join(out_dir, cid + ext)
+		if not os.path.exists(p):
+			with open(p, "w") as f:
+				f.write(tpl.format(name=cid))
+	lo, hi = mesh["pos"].min(0), mesh["pos"].max(0)
+	clip_meta = {cl["name"]: {"length": round(cl["T"], 3), "loop": cl["loop"], "source": cl["lib"]} for cl in clips}
+	for cl in clips:
+		if "speed" in cl:
+			clip_meta[cl["name"]]["speed"] = round(cl["speed"], 3)
+	contact = rts["ual1"].contact
+	return {
+		"kind": "biped",
+		"height": round(float(hi[1] - lo[1]), 3),
+		"length": round(float(hi[2] - lo[2]), 3),
+		"width": round(float(hi[0] - lo[0]), 3),
+		"bounds": [[round(float(x), 3) for x in lo], [round(float(x), 3) for x in hi]],
+		"walk_speed": round(next(cl["speed"] for cl in clips if cl["name"] == "Walk"), 3),
+		"run_speed": round(next(cl["speed"] for cl in clips if cl["name"] == "Run"), 3),
+		"attack_hit_time": next(cl["hit"] for cl in clips if cl["name"] == "Attack"),
+		"cast_time": next(cl["cast"] for cl in clips if cl["name"] == "Cast"),
+		"clips": clip_meta,
+		"head_rest": [round(float(x), 3) for x in rig.gpos[roles["head"]]],
+		"tris": int(len(mesh["tris"])),
+		"verts": int(len(mesh["pos"])),
+		"bones": {
+			"root": nm[roles["root"]], "hips": nm[roles["hips"]], "chest": nm[roles["chest"]], "head": nm[roles["head"]],
+			"spine": [nm[b] for b in roles["spine"]], "neck": [nm[b] for b in roles["neck"]],
+			"legs": {s: [nm[b] for b in c] for s, c in sorted(roles["legs"].items())},
+			"feet": {s: nm[b] for s, b in sorted(contact.items())},
+			"arms": {s: [nm[b] for b in c] for s, c in sorted(roles["arms"].items())},
+			"hands": {s: nm[c[min(3, len(c) - 1)]] for s, c in sorted(roles["arms"].items())},
+			"other": [nm[b] for b in roles["head_end"] + roles["extra"]],
+		},
+		"source": os.path.basename(src_path),
+	}
+
+
+def biped_check_rest(meta: dict, G0: dict, idx: dict) -> bool:
+	"""Поза покоя двуногого: пальцы ног (от «пятки» к опоре) смотрят в +Z, голова — над тазом."""
+	bn = meta["bones"]
+	d = 0.0
+	for s, chain in bn["legs"].items():
+		d += G0[idx[bn["feet"][s]]][2, 3] - G0[idx[chain[2]]][2, 3]
+	head_up = G0[idx[bn["head"]]][1, 3] > G0[idx[bn["hips"]]][1, 3] + 0.2 * meta["height"]
+	print("   двуногий: пальцы ног вперёд на %.3f м, голова над тазом: %s" % (d / 2.0, "да" if head_up else "НЕТ (!)"))
+	return bool(d > 0.0 and head_up)
+
+
 # ---------- Запуск ----------
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -3337,7 +3923,10 @@ def main() -> None:
 	ap.add_argument("--out", default=os.path.join(ROOT, "assets", "creatures"), help="куда писать (по умолчанию assets/creatures)")
 	ap.add_argument("--check", action="store_true", help="только проверить готовые GLB из creatures.json, ничего не писать")
 	ap.add_argument("--preview", default="", help="папка для картинок-проверок (палочки и меш по кадрам)")
+	ap.add_argument("--ual1", default="", help="UAL1_Standard.glb (Quaternius) — клипы двуногих (стиль «biped»)")
+	ap.add_argument("--ual2", default="", help="UAL2_Standard.glb (Quaternius) — клипы двуногих")
 	args = ap.parse_args()
+	BIPED_UAL.update({"ual1": args.ual1, "ual2": args.ual2})
 	meta_path = os.path.join(args.out, "creatures.json")
 	meta_all = {}
 	if os.path.exists(meta_path):
