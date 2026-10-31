@@ -7,35 +7,61 @@ extends CanvasLayer
 ## левее — квадратик цвета тира карты (коричневый, синий, фиолетовый, жёлтый).
 ## Меню справа вверху: «Герой / Питомцы / Сумка / Задания / Настройки» (кнопки помельче — помещаются на 1280
 ## рядом с панелью цели). Под меню — трекер заданий (Quests; касание по нему не вращает камеру — add_blocker).
+## Размеры (джойстик, кнопки, панели, меню, окна) — из UiScale: базовые числа ниже даны для «Среднего» размера
+## интерфейса и умножаются на UiScale.k(); смена размера в «Настройках» — apply_ui_scale() (HUD перестраивается сразу).
 ## На ПК: WASD/стрелки, Пробел = атака, 1–4 = умения, T = приручить, Q = зелье, K = окно героя,
 ## P = питомцы, C = окно существа, I или B = сумка, E = торговец, R = говорить, J = задания,
 ## F = питомец атакует, G = питомец за мной, O = настройки.
 
 ## Нажатие кнопки действия (касание, клавиша или кнопка меню).
 signal action(id: String)
+## Размер интерфейса изменился (apply_ui_scale): модули перестраивают свои элементы на HUD (трекер заданий).
+signal scale_changed
 
-const JOY_RADIUS := 110.0
+## Базовые размеры («Средний», умножаются на UiScale.k()).
+## Джойстик: радиус основы и ручки, центр в покое — от левого нижнего угла (было 110 / 45 / (210, 190)).
+const JOY_RADIUS := 80.0
+const JOY_KNOB := 32.0
+const JOY_HOME := Vector2(150, 140)
 ## Джойстик не начинается выше этой линии: там панели и кнопки меню.
-const JOY_TOP := 230.0
+const JOY_TOP := 190.0
 ## Вращение камеры не начинается выше этой линии (кнопки меню справа вверху).
-const CAM_TOP := 90.0
+const CAM_TOP := 66.0
+## Наименьший радиус круглой кнопки после масштаба, px (диаметр не меньше 56 — под палец).
+const BUTTON_MIN_R := 28.0
+## Зона касания круглой кнопки — радиус × TOUCH_K.
+const TOUCH_K := 1.1
 const KEYS := {
 	KEY_SPACE: "attack", KEY_1: "skill1", KEY_2: "skill2", KEY_3: "skill3", KEY_4: "skill4", KEY_T: "tame",
 	KEY_Q: "potion", KEY_K: "hero_window",
 	KEY_P: "pets_window", KEY_I: "bag_window", KEY_E: "shop", KEY_F: "pet_attack", KEY_G: "pet_follow", KEY_O: "settings_window",
 	KEY_C: "creature_window", KEY_B: "bag_window", KEY_R: "talk", KEY_J: "quest_window",
 }
-## Кнопки меню: размер шрифта и поля по бокам (меньше, чем в окнах: пять кнопок и панель цели на 1280).
-const MENU_FONT := 20
+## Кнопки меню: размер шрифта и поля (меньше, чем в окнах: пять кнопок и панель цели на 1280).
+const MENU_FONT := 15
 const MENU_PAD := 8
-## Панель цели: ширина полоски и наименьший отступ слева (правее панели игрока).
-const TARGET_W := 320.0
-const TARGET_MIN_X := 400.0
+const MENU_PAD_Y := 6
+## Панель игрока: отступ от края и ширина полосок HP/MP/опыта (было 340), шрифт строки под ними.
+const PANEL_X := 14.0
+const PANEL_W := 260.0
+const STATS_FONT := 14
+## Панель питомца: ширина полосок (было 240), шрифт.
+const PET_W := 180.0
+const PET_FONT := 14
+## Панель цели: ширина полоски и наименьший отступ слева (правее панели игрока), шрифт подписи.
+const TARGET_W := 240.0
+const TARGET_MIN_X := 430.0
+const TARGET_FONT := 15
+## Сообщения на экране: высота строки сверху и шрифт (было 190 / 28).
+const MSG_Y := 165.0
+const MSG_FONT := 19
 
 var move_vec := Vector2.ZERO
 
 ## id -> {"panel": Panel, "label": Label, "offset": Vector2, "r": float, "hold": bool, "touch": int,
-## "color": Color (заливка), "blocked": bool (не подходит оружие — затемнена)}
+## "color": Color (заливка), "blocked": bool (не подходит оружию — затемнена),
+## "base_offset": Vector2, "base_r": float (как передано в add_button, для «Среднего»)}.
+## offset и r — уже с масштабом UiScale.
 var _buttons := {}
 var _joy_idx := -1
 ## Касания камеры (индекс → последняя позиция): один палец в правой половине экрана вне кнопок
@@ -44,6 +70,8 @@ var _cam_touches := {}
 var _cam_drag := Vector2.ZERO
 var _cam_zoom := 1.0
 var _joy_center := Vector2.ZERO
+## Радиус джойстика с масштабом.
+var _joy_r := JOY_RADIUS
 var _view := Vector2(1280, 720)
 var _window: Control = null
 var _target: Node3D = null
@@ -71,84 +99,192 @@ var target_card_tier := ""
 var _msg_label: Label
 var _msg_time := 0.0
 var _menu: HBoxContainer
+## Кнопки питомца под его панелью («Атакуй», «За мной», «Существо»).
+var _pet_btns: HBoxContainer
 ## Элементы интерфейса поверх мира (трекер заданий): касание по ним не начинает джойстик и вращение камеры.
 var _blockers: Array[Control] = []
 
 
 func _ready() -> void:
 	_joy_base = _circle(JOY_RADIUS, Color(1, 1, 1, 0.12))
-	_joy_knob = _circle(45.0, Color(1, 1, 1, 0.35))
+	_joy_knob = _circle(JOY_KNOB, Color(1, 1, 1, 0.35))
 
-	_hp_bar = _bar(self, Vector2(20, 20), Vector2(340, 26), Color(0.85, 0.2, 0.2))
-	_mp_bar = _bar(self, Vector2(20, 49), Vector2(340, 11), Color(0.35, 0.5, 1.0))
-	_xp_bar = _bar(self, Vector2(20, 63), Vector2(340, 7), Color(0.9, 0.8, 0.2))
-	_stats_label = _label(self, Vector2(20, 72), 22)
+	_hp_bar = _bar(self, Color(0.85, 0.2, 0.2))
+	_mp_bar = _bar(self, Color(0.35, 0.5, 1.0))
+	_xp_bar = _bar(self, Color(0.9, 0.8, 0.2))
+	_stats_label = _label(self)
 
 	_pet_box = Control.new()
-	_pet_box.position = Vector2(20, 108)
 	_pet_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_pet_box)
-	_pet_label = _label(_pet_box, Vector2(0, 0), 20)
-	_pet_bar = _bar(_pet_box, Vector2(0, 30), Vector2(240, 14), Color(0.3, 0.75, 1.0))
-	_pet_mp_bar = _bar(_pet_box, Vector2(0, 47), Vector2(240, 9), Color(0.55, 0.45, 1.0))
-	var pet_btns := HBoxContainer.new()
-	pet_btns.position = Vector2(0, 62)
-	pet_btns.add_theme_constant_override("separation", 8)
-	_pet_box.add_child(pet_btns)
-	pet_btns.add_child(_menu_button("Атакуй", "pet_attack"))
-	pet_btns.add_child(_menu_button("За мной", "pet_follow"))
-	pet_btns.add_child(_menu_button("Существо", "creature_window"))
+	_pet_label = _label(_pet_box)
+	_pet_bar = _bar(_pet_box, Color(0.3, 0.75, 1.0))
+	_pet_mp_bar = _bar(_pet_box, Color(0.55, 0.45, 1.0))
+	_pet_btns = HBoxContainer.new()
+	_pet_box.add_child(_pet_btns)
+	_pet_btns.add_child(_menu_button("Атакуй", "pet_attack"))
+	_pet_btns.add_child(_menu_button("За мной", "pet_follow"))
+	_pet_btns.add_child(_menu_button("Существо", "creature_window"))
 
 	_target_box = Control.new()
 	_target_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_target_box)
-	_target_label = _label(_target_box, Vector2(-80, 0), 22)
+	_target_label = _label(_target_box)
 	_target_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_target_label.size = Vector2(480, 30)
-	_target_bar = _bar(_target_box, Vector2(0, 32), Vector2(320, 16), Color(0.9, 0.35, 0.2))
-	_tame_badge = _square(_target_box, Vector2(-30, 29), 22.0, 11)
-	_tame_tier = _square(_target_box, Vector2(-47, 34), 12.0, 2)
+	_target_bar = _bar(_target_box, Color(0.9, 0.35, 0.2))
+	_tame_badge = _square(_target_box, 2)
+	_tame_tier = _square(_target_box, 2)
 	_set_tame_badge("", "")
 	_target_box.visible = false
 
-	_msg_label = _label(self, Vector2(0, 190), 28)
+	_msg_label = _label(self)
 	_msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_msg_label.add_theme_color_override("font_color", Color(1, 0.95, 0.5))
 
 	_menu = HBoxContainer.new()
 	_menu.name = "Menu"
-	_menu.add_theme_constant_override("separation", 6)
 	add_child(_menu)
 	for e in [["Герой", "hero_window"], ["Питомцы", "pets_window"], ["Сумка", "bag_window"],
 			["Задания", "quest_window"], ["Настройки", "settings_window"]]:
-		var mb := _menu_button(String(e[0]), String(e[1]))
-		_compact(mb)
-		_menu.add_child(mb)
+		_menu.add_child(_menu_button(String(e[0]), String(e[1])))
 
+	_apply_sizes()
 	update_pet(null)
 	get_viewport().size_changed.connect(_layout)
 	_layout()
+
+
+## Размер интерфейса изменился (UiScale.set_level): тема, панели, кнопки, джойстик и открытое окно — заново.
+func apply_ui_scale() -> void:
+	Util.refresh_theme()
+	_apply_sizes()
+	for id in _buttons:
+		_size_button(String(id))
+	_layout()
+	if is_window_open():
+		var base: Vector2 = _window.get_meta("base_size", _window.size)
+		_window.size = UiScale.window_size(base, _view)
+		_keep_window_on_screen()
+	scale_changed.emit()
+
+
+## Размеры и шрифты панелей, джойстика и меню по UiScale (положение на экране — в _layout).
+func _apply_sizes() -> void:
+	_joy_r = UiScale.px(JOY_RADIUS)
+	_resize_circle(_joy_base, _joy_r)
+	_resize_circle(_joy_knob, UiScale.px(JOY_KNOB))
+
+	var x := UiScale.px(PANEL_X)
+	var w := UiScale.px(PANEL_W)
+	var hp_h := UiScale.px(18)
+	var mp_h := UiScale.px(8)
+	var xp_h := maxf(4.0, UiScale.px(5))
+	_size_bar(_hp_bar, Vector2(x, x), Vector2(w, hp_h))
+	_size_bar(_mp_bar, Vector2(x, x + hp_h + 2.0), Vector2(w, mp_h))
+	_size_bar(_xp_bar, Vector2(x, x + hp_h + mp_h + 4.0), Vector2(w, xp_h))
+	var stats_font := UiScale.fs(STATS_FONT)
+	_stats_label.position = Vector2(x, x + hp_h + mp_h + xp_h + 5.0)
+	_font(_stats_label, stats_font)
+
+	var pet_font := UiScale.fs(PET_FONT)
+	var pw := UiScale.px(PET_W)
+	_pet_box.position = Vector2(x, _stats_label.position.y + float(stats_font) * 1.45 + UiScale.px(8))
+	_pet_label.position = Vector2.ZERO
+	_font(_pet_label, pet_font)
+	var py := float(pet_font) * 1.45 + 1.0
+	_size_bar(_pet_bar, Vector2(0, py), Vector2(pw, UiScale.px(10)))
+	_size_bar(_pet_mp_bar, Vector2(0, py + UiScale.px(10) + 2.0), Vector2(pw, UiScale.px(6)))
+	_pet_btns.position = Vector2(0, py + UiScale.px(16) + UiScale.px(8))
+	_pet_btns.add_theme_constant_override("separation", int(UiScale.px(6)))
+	for b in _pet_btns.get_children():
+		_compact(b as Button)
+	_pet_btns.reset_size()
+
+	var tw := UiScale.px(TARGET_W)
+	var tf := UiScale.fs(TARGET_FONT)
+	_font(_target_label, tf)
+	_target_label.position = Vector2(-tw * 0.25, 0)
+	_target_label.size = Vector2(tw * 1.5, float(tf) * 1.45)
+	var bar_y := float(tf) * 1.45 + 2.0
+	var bar_h := UiScale.px(12)
+	_size_bar(_target_bar, Vector2(0, bar_y), Vector2(tw, bar_h))
+	var bs := UiScale.px(18)
+	_place_square(_tame_badge, Vector2(-bs - UiScale.px(6), bar_y + (bar_h - bs) * 0.5), bs, int(bs * 0.5))
+	var ts := UiScale.px(10)
+	_place_square(_tame_tier, Vector2(-bs - ts - UiScale.px(10), bar_y + (bar_h - ts) * 0.5), ts, 2)
+
+	_font(_msg_label, UiScale.fs(MSG_FONT))
+
+	_menu.add_theme_constant_override("separation", int(UiScale.px(5)))
+	for b in _menu.get_children():
+		_compact(b as Button)
+	_menu.reset_size()
 
 
 # ---------- Кнопки действий ----------
 
 ## Круглая кнопка. offset: центр, отсчитанный от правого нижнего угла экрана.
 ## hold = true: кнопку можно держать (is_held), иначе срабатывает action при касании.
+## offset и radius — для «Среднего» размера интерфейса (умножаются на UiScale.k(); радиус не меньше BUTTON_MIN_R).
+## Длинная подпись переносится по словам в ширину кружка (button_text — исходный текст).
 func add_button(id: String, text: String, offset: Vector2, radius: float, color: Color, hold := false) -> void:
 	var p := _circle(radius, color)
 	var l := Label.new()
-	l.text = text
-	l.size = p.size
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override("font_size", int(clampf(radius * 0.36, 15.0, 28.0)))
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
-	l.add_theme_constant_override("outline_size", 5)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(l)
 	_buttons[id] = {"panel": p, "label": l, "offset": offset, "r": radius, "hold": hold, "touch": -1,
-		"color": color, "blocked": false}
+		"color": color, "blocked": false, "base_offset": offset, "base_r": radius, "text": text}
+	_size_button(id)
 	_layout()
+
+
+## Радиус, центр и шрифт круглой кнопки по UiScale.
+func _size_button(id: String) -> void:
+	var b: Dictionary = _buttons[id]
+	var r := maxf(BUTTON_MIN_R, UiScale.px(float(b["base_r"])))
+	b["r"] = r
+	b["offset"] = (b["base_offset"] as Vector2) * UiScale.k()
+	var p: Panel = b["panel"]
+	_resize_circle(p, r)
+	var l: Label = b["label"]
+	l.add_theme_font_size_override("font_size", int(clampf(r * 0.33, 11.0, 22.0)))
+	l.add_theme_constant_override("outline_size", 4)
+	_fit_button_text(id)
+
+
+## Подпись кнопки: перенос по словам в ширину кружка, по центру кружка.
+func _fit_button_text(id: String) -> void:
+	var b: Dictionary = _buttons[id]
+	var r := float(b["r"])
+	var l: Label = b["label"]
+	l.text = _wrap_words(l, String(b["text"]), r * 2.0 * 0.86)
+	var ms := l.get_combined_minimum_size()
+	l.size = ms
+	l.position = (Vector2(r, r) - ms / 2.0).round()
+
+
+## Текст с переносами: слова по строкам не шире max_w (шрифт подписи l); переносы в тексте сохраняются.
+static func _wrap_words(l: Label, text: String, max_w: float) -> String:
+	var font := l.get_theme_font("font")
+	var fsz := l.get_theme_font_size("font_size")
+	if font == null:
+		return text
+	var out := PackedStringArray()
+	for para in text.split("\n"):
+		var line := ""
+		for w in String(para).split(" ", false):
+			var word := String(w)
+			var cand: String = word if line == "" else line + " " + word
+			if line != "" and font.get_string_size(cand, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz).x > max_w:
+				out.append(line)
+				line = word
+			else:
+				line = cand
+		out.append(line)
+	return "\n".join(out)
 
 
 func set_button_visible(id: String, v: bool) -> void:
@@ -157,8 +293,9 @@ func set_button_visible(id: String, v: bool) -> void:
 
 
 func set_button_text(id: String, text: String) -> void:
-	if _buttons.has(id):
-		_buttons[id]["label"].text = text
+	if _buttons.has(id) and String(_buttons[id]["text"]) != text:
+		_buttons[id]["text"] = text
+		_fit_button_text(id)
 
 
 ## frac > 0: кнопка на перезарядке (затемнена). Кнопка с неподходящим оружием (set_blocked) — темнее всегда.
@@ -198,9 +335,10 @@ func button_color(id: String) -> Color:
 	return Color.WHITE
 
 
+## Подпись кнопки как задана (без переносов, которые добавляет HUD).
 func button_text(id: String) -> String:
 	if _buttons.has(id):
-		return (_buttons[id]["label"] as Label).text
+		return String(_buttons[id]["text"])
 	return ""
 
 
@@ -266,30 +404,54 @@ func menu_rect() -> Rect2:
 
 ## Прямоугольник полоски HP цели (и подписи над ней) на экране.
 func target_rect() -> Rect2:
-	return Rect2(_target_box.position, Vector2(TARGET_W, 48))
+	return Rect2(_target_box.position, Vector2(_target_bar.size.x, _target_bar.position.y + _target_bar.size.y))
+
+
+## Прямоугольник панели игрока (полоски HP/MP/опыта и строка под ними) на экране.
+func player_rect() -> Rect2:
+	var r := Rect2(_hp_bar.position, _hp_bar.size)
+	for c in [_mp_bar, _xp_bar, _stats_label]:
+		var ctl := c as Control
+		var ms := ctl.get_combined_minimum_size()
+		r = r.merge(Rect2(ctl.position, Vector2(maxf(ctl.size.x, ms.x), maxf(ctl.size.y, ms.y))))
+	return r
+
+
+## Прямоугольник открытого окна на экране (Rect2() — окна нет).
+func window_rect() -> Rect2:
+	if not is_window_open():
+		return Rect2()
+	return Rect2(_window.position, _window.size)
 
 
 ## Создаёт окно по центру экрана и возвращает контейнер для содержимого.
+## sz — размер для «Среднего» размера интерфейса: окно = sz × UiScale.k(), но не больше экрана.
+## Если содержимое шире или выше, окно растёт и всё равно держится по центру (_keep_window_on_screen).
 ## Пока окно открыто, джойстик и круглые кнопки не работают. Открыто только одно окно.
 func create_window(title: String, sz: Vector2) -> VBoxContainer:
 	close_window()
 	Quality.set_menu_open(true)
 	var panel := PanelContainer.new()
 	panel.theme = Util.ui_theme()
-	panel.size = sz
-	panel.position = (_view - sz) / 2.0
+	panel.set_meta("base_size", sz)
+	var wsz := UiScale.window_size(sz, _view)
+	panel.size = wsz
+	panel.position = _centered(wsz)
 	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 10)
+	root.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	panel.add_child(root)
 	var head := HBoxContainer.new()
 	root.add_child(head)
 	var t := Label.new()
 	t.text = title
-	t.add_theme_font_size_override("font_size", 30)
+	t.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TITLE))
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	t.clip_text = true
+	t.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	head.add_child(t)
 	var close := Button.new()
 	close.text = "Закрыть"
+	close.focus_mode = Control.FOCUS_NONE
 	close.pressed.connect(close_window)
 	head.add_child(close)
 	var scroll := ScrollContainer.new()
@@ -298,12 +460,26 @@ func create_window(title: String, sz: Vector2) -> VBoxContainer:
 	root.add_child(scroll)
 	var body := VBoxContainer.new()
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 8)
+	body.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	scroll.add_child(body)
 	add_child(panel)
 	_window = panel
 	_release_all()
 	return body
+
+
+## Окно по центру экрана: содержимое могло его расширить (минимальный размер больше заданного).
+func _keep_window_on_screen() -> void:
+	if not is_window_open():
+		return
+	var pos := _centered(_window.size)
+	if _window.position != pos:
+		_window.position = pos
+
+
+## Левый верхний угол прямоугольника sz по центру экрана (не левее и не выше края).
+func _centered(sz: Vector2) -> Vector2:
+	return Vector2(maxf(0.0, roundf((_view.x - sz.x) / 2.0)), maxf(0.0, roundf((_view.y - sz.y) / 2.0)))
 
 
 func close_window() -> void:
@@ -329,8 +505,10 @@ func update_player(p: Player) -> void:
 	_xp_bar.max_value = Game.xp_to_next(Game.level)
 	_xp_bar.value = Game.xp
 	var mp_text := ("   MP %d/%d" % [p.mp, p.max_mp]) if p.max_mp > 0 else ""
-	_stats_label.text = "%s  Ур. %d   HP %d/%d%s   Золото: %d" % [
-		Game.char_name, Game.level, p.hp, p.max_hp, mp_text, Game.gold]
+	var t := "%s  Ур. %d   HP %d/%d%s   Золото: %d" % [Game.char_name, Game.level, p.hp, p.max_hp, mp_text, Game.gold]
+	if t != _stats_label.text:
+		_stats_label.text = t
+		_place_target()
 
 
 ## pet: узел питомца с полями pet_name, level, hp, max_hp и (необязательно) mp, max_mp, или null.
@@ -365,26 +543,33 @@ func show_message(t: String, sec: float = 3.0) -> void:
 
 func _circle(radius: float, fill: Color) -> Panel:
 	var p := Panel.new()
-	p.size = Vector2(radius * 2.0, radius * 2.0)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = fill
-	sb.set_corner_radius_all(int(radius))
 	sb.border_color = Color(1.0, 0.95, 0.82, 0.85)
-	sb.set_border_width_all(4)
 	sb.shadow_color = Color(0, 0, 0, 0.3)
-	sb.shadow_size = 6
 	sb.anti_aliasing = true
 	p.add_theme_stylebox_override("panel", sb)
+	_resize_circle(p, radius)
 	add_child(p)
 	return p
 
 
-## Маленький значок (кружок при radius = sz/2, квадратик при малом radius) на панели цели.
-func _square(parent: Node, pos: Vector2, sz: float, radius: int) -> Panel:
+## Новый радиус кружка (центр сохраняется): размер, скругление, толщина рамки и тень.
+func _resize_circle(p: Panel, radius: float) -> void:
+	var c := p.position + p.size / 2.0
+	p.size = Vector2(radius * 2.0, radius * 2.0)
+	p.position = c - p.size / 2.0
+	var sb := p.get_theme_stylebox("panel") as StyleBoxFlat
+	if sb != null:
+		sb.set_corner_radius_all(int(radius))
+		sb.set_border_width_all(3 if radius < 45.0 else 4)
+		sb.shadow_size = 4 if radius < 45.0 else 6
+
+
+## Маленький значок (кружок или квадратик со скруглением radius) на панели цели; размер — _place_square.
+func _square(parent: Node, radius: int) -> Panel:
 	var p := Panel.new()
-	p.position = pos
-	p.size = Vector2(sz, sz)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color.WHITE
@@ -395,6 +580,14 @@ func _square(parent: Node, pos: Vector2, sz: float, radius: int) -> Panel:
 	p.add_theme_stylebox_override("panel", sb)
 	parent.add_child(p)
 	return p
+
+
+func _place_square(p: Panel, pos: Vector2, sz: float, radius: int) -> void:
+	p.position = pos
+	p.size = Vector2(sz, sz)
+	var sb := p.get_theme_stylebox("panel") as StyleBoxFlat
+	if sb != null:
+		sb.set_corner_radius_all(radius)
 
 
 ## Значок приручения цели: state — Taming.BADGE_* ("" — скрыть), tier — тир карты.
@@ -417,35 +610,47 @@ func _set_tame_badge(state: String, tier: String) -> void:
 		(_tame_tier.get_theme_stylebox("panel") as StyleBoxFlat).bg_color = ItemData.card_tier_color(tier)
 
 
-func _bar(parent: Node, pos: Vector2, sz: Vector2, col: Color) -> ProgressBar:
+## Полоска (HP, MP, опыт); положение и размер — _size_bar.
+func _bar(parent: Node, col: Color) -> ProgressBar:
 	var b := ProgressBar.new()
 	b.show_percentage = false
-	b.position = pos
-	b.size = sz
 	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = col
-	fill.set_corner_radius_all(int(sz.y / 2.0))
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0.08, 0.1, 0.2, 0.6)
 	bg.border_color = Color(1.0, 0.95, 0.82, 0.8)
-	bg.set_border_width_all(2)
-	bg.set_corner_radius_all(int(sz.y / 2.0))
 	b.add_theme_stylebox_override("fill", fill)
 	b.add_theme_stylebox_override("background", bg)
 	parent.add_child(b)
 	return b
 
 
-func _label(parent: Node, pos: Vector2, font_size: int) -> Label:
+func _size_bar(b: ProgressBar, pos: Vector2, sz: Vector2) -> void:
+	var r := int(sz.y / 2.0)
+	var fill := b.get_theme_stylebox("fill") as StyleBoxFlat
+	var bg := b.get_theme_stylebox("background") as StyleBoxFlat
+	if fill != null:
+		fill.set_corner_radius_all(r)
+	if bg != null:
+		bg.set_corner_radius_all(r)
+		bg.set_border_width_all(1 if sz.y < 8.0 else 2)
+	b.position = pos
+	b.size = sz
+
+
+## Подпись поверх мира с чёрной обводкой; размер шрифта — _font.
+func _label(parent: Node) -> Label:
 	var l := Label.new()
-	l.position = pos
-	l.add_theme_font_size_override("font_size", font_size)
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
-	l.add_theme_constant_override("outline_size", 6)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(l)
 	return l
+
+
+func _font(l: Label, font_size: int) -> void:
+	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_constant_override("outline_size", clampi(roundi(float(font_size) * 0.28), 3, 6))
 
 
 func _menu_button(text: String, id: String) -> Button:
@@ -458,20 +663,24 @@ func _menu_button(text: String, id: String) -> Button:
 	return b
 
 
-## Кнопка меню помельче: шрифт MENU_FONT, поля по бокам MENU_PAD.
+## Кнопка меню и питомца помельче: шрифт MENU_FONT, поля MENU_PAD / MENU_PAD_Y (с масштабом UiScale).
 func _compact(b: Button) -> void:
-	b.add_theme_font_size_override("font_size", MENU_FONT)
+	if b == null:
+		return
+	b.add_theme_font_size_override("font_size", UiScale.fs(MENU_FONT))
 	var th := Util.ui_theme()
 	for st in ["normal", "hover", "pressed", "disabled"]:
 		var src := th.get_stylebox(st, "Button") as StyleBoxFlat
 		if src == null:
 			continue
 		var sb := src.duplicate() as StyleBoxFlat
-		sb.content_margin_left = MENU_PAD
-		sb.content_margin_right = MENU_PAD
-		sb.content_margin_top = 10
-		sb.content_margin_bottom = 10
+		sb.content_margin_left = UiScale.px(MENU_PAD)
+		sb.content_margin_right = UiScale.px(MENU_PAD)
+		sb.content_margin_top = UiScale.px(MENU_PAD_Y)
+		sb.content_margin_bottom = UiScale.px(MENU_PAD_Y)
+		sb.set_corner_radius_all(int(UiScale.px(8)))
 		b.add_theme_stylebox_override(st, sb)
+	b.reset_size()
 
 
 func _layout() -> void:
@@ -480,21 +689,27 @@ func _layout() -> void:
 		var b: Dictionary = _buttons[id]
 		var p: Panel = b["panel"]
 		p.position = _view - b["offset"] - p.size / 2.0
-	_msg_label.position = Vector2(0, 190)
-	_msg_label.size = Vector2(_view.x, 40)
-	_menu.position = Vector2(_view.x - _menu.get_combined_minimum_size().x - 20.0, 16)
-	# Чуть левее центра, но не под кнопками меню справа вверху и не на панели игрока слева
-	var tx := minf((_view.x - TARGET_W) / 2.0 - 50.0, _menu.position.x - TARGET_W - 24.0)
-	_target_box.position = Vector2(maxf(TARGET_MIN_X, tx), 14)
-	if _window != null and is_instance_valid(_window):
-		_window.position = (_view - _window.size) / 2.0
+	_msg_label.position = Vector2(0, UiScale.px(MSG_Y))
+	_msg_label.size = Vector2(_view.x, float(UiScale.fs(MSG_FONT)) * 1.5)
+	var edge := UiScale.px(12)
+	_menu.position = Vector2(_view.x - _menu.get_combined_minimum_size().x - edge, edge)
+	_place_target()
+	_keep_window_on_screen()
 	if _joy_idx == -1:
 		_reset_joy()
 
 
+## Панель цели: чуть левее центра, но не под кнопками меню справа вверху и не на панели игрока слева.
+func _place_target() -> void:
+	var tw := UiScale.px(TARGET_W)
+	var tx := minf((_view.x - tw) / 2.0 - UiScale.px(50), _menu.position.x - tw - UiScale.px(20))
+	var min_x := maxf(UiScale.px(TARGET_MIN_X), player_rect().end.x + UiScale.px(16))
+	_target_box.position = Vector2(maxf(min_x, tx), UiScale.px(10))
+
+
 func _reset_joy() -> void:
 	_joy_idx = -1
-	_joy_center = Vector2(210.0, _view.y - 190.0)
+	_joy_center = Vector2(UiScale.px(JOY_HOME.x), _view.y - UiScale.px(JOY_HOME.y))
 	_joy_base.position = _joy_center - _joy_base.size / 2.0
 	_joy_knob.position = _joy_center - _joy_knob.size / 2.0
 	move_vec = Vector2.ZERO
@@ -514,7 +729,7 @@ func _button_at(p: Vector2) -> String:
 		if not panel.visible:
 			continue
 		var c := panel.position + panel.size / 2.0
-		if p.distance_to(c) <= b["r"] * 1.15:
+		if p.distance_to(c) <= float(b["r"]) * TOUCH_K:
 			return id
 	return ""
 
@@ -548,12 +763,12 @@ func _input(event: InputEvent) -> void:
 				if _buttons[id]["hold"]:
 					_buttons[id]["touch"] = te.index
 				action.emit(id)
-			elif _joy_idx == -1 and p.x < _view.x * 0.5 and p.y > JOY_TOP:
+			elif _joy_idx == -1 and p.x < _view.x * 0.5 and p.y > UiScale.px(JOY_TOP):
 				_joy_idx = te.index
 				_joy_center = p
 				_joy_base.position = p - _joy_base.size / 2.0
 				_joy_knob.position = p - _joy_knob.size / 2.0
-			elif p.y > CAM_TOP and _cam_touches.size() < 2 and (p.x >= _view.x * 0.5 or _cam_touches.size() == 1):
+			elif p.y > UiScale.px(CAM_TOP) and _cam_touches.size() < 2 and (p.x >= _view.x * 0.5 or _cam_touches.size() == 1):
 				# Второй палец (для щипка) может быть и в левой половине
 				_cam_touches[te.index] = p
 		else:
@@ -583,11 +798,11 @@ func _input(event: InputEvent) -> void:
 		return
 	if de != null and de.index == _joy_idx:
 		var d := de.position - _joy_center
-		var dist := minf(d.length(), JOY_RADIUS)
+		var dist := minf(d.length(), _joy_r)
 		var dir := Vector2.ZERO
 		if d.length() > 0.001:
 			dir = d.normalized()
-		move_vec = dir * (dist / JOY_RADIUS)
+		move_vec = dir * (dist / _joy_r)
 		_joy_knob.position = _joy_center + dir * dist - _joy_knob.size / 2.0
 
 
@@ -606,6 +821,7 @@ func _process(delta: float) -> void:
 		move_vec = v.normalized()
 
 	_refresh_target()
+	_keep_window_on_screen()
 
 	if _msg_time > 0.0:
 		_msg_time -= delta

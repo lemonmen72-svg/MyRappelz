@@ -20,7 +20,8 @@ const KIRK_SPOT := Vector2(-7.5, -6.0)
 const ROAD_CLEAR := 3.2
 ## Не ближе к торговцу и точкам старта, м.
 const KEEP_AWAY := 2.5
-const DIALOG_SIZE := Vector2(940, 610)
+## Окно диалога — для «Среднего» размера интерфейса (умножается на UiScale.k(); было 940×610).
+const DIALOG_SIZE := Vector2(760, 520)
 const MARK_PERIOD := 0.3
 const GOLD := Color(1.0, 0.85, 0.3)
 const MUTED := Color(0.76, 0.78, 0.88)
@@ -232,7 +233,7 @@ func _build() -> void:
 	buttons.clear()
 	var q: Quests = main.get("quests")
 	_body = main.hud.create_window(NpcData.npc_name(dialog_npc), DIALOG_SIZE)
-	var sub := _label(String(NpcData.npc(dialog_npc).get("title", "")), 18, MUTED)
+	var sub := _label(String(NpcData.npc(dialog_npc).get("title", "")), UiScale.FONT_BODY, MUTED)
 	_body.add_child(sub)
 	match page:
 		"quests":
@@ -257,7 +258,7 @@ func _build() -> void:
 func _page_main() -> void:
 	var q: Quests = main.get("quests")
 	var opts := VBoxContainer.new()
-	opts.add_theme_constant_override("separation", 8)
+	opts.add_theme_constant_override("separation", int(UiScale.px(6)))
 	_body.add_child(opts)
 	var qt := "Задания"
 	if q != null:
@@ -275,7 +276,7 @@ func _page_main() -> void:
 func _page_quests() -> void:
 	var q: Quests = main.get("quests")
 	var opts := VBoxContainer.new()
-	opts.add_theme_constant_override("separation", 8)
+	opts.add_theme_constant_override("separation", int(UiScale.px(6)))
 	_body.add_child(opts)
 	if q != null:
 		for k in q.npc_quests(dialog_npc):
@@ -302,9 +303,9 @@ func _page_quest() -> void:
 	var q: Quests = main.get("quests")
 	var id := page_quest
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
+	box.add_theme_constant_override("separation", int(UiScale.px(5)))
 	_body.add_child(box)
-	box.add_child(_label(QuestData.quest_name(id), 24, GOLD))
+	box.add_child(_label(QuestData.quest_name(id), UiScale.FONT_HEAD, GOLD))
 	var st := q.state(id) if q != null else "locked"
 	var goals := QuestData.goals(id)
 	for gi in goals.size():
@@ -312,10 +313,10 @@ func _page_quest() -> void:
 		var have := q.goal_progress(id, gi) if q != null else 0
 		var done := q.goal_done(id, gi) if q != null else false
 		box.add_child(QuestWindow.goal_row(g, have, done))
-	box.add_child(_label("Награда", 20, GOLD))
+	box.add_child(_label("Награда", UiScale.FONT_TEXT, GOLD))
 	box.add_child(QuestWindow.reward_row(id))
 	var acts := HBoxContainer.new()
-	acts.add_theme_constant_override("separation", 10)
+	acts.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	_body.add_child(acts)
 	match st:
 		"available":
@@ -409,13 +410,13 @@ func _speech(text: String) -> PanelContainer:
 	sb.bg_color = Color(0.06, 0.07, 0.17, 0.75)
 	sb.border_color = Color(0.98, 0.88, 0.6, 0.5)
 	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(14)
-	sb.set_content_margin_all(14)
+	sb.set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
+	sb.set_content_margin_all(UiScale.px(UiScale.PAD))
 	p.add_theme_stylebox_override("panel", sb)
-	var l := _label("«%s»" % text, 22, Color.WHITE)
+	var l := _label("«%s»" % text, UiScale.FONT_TEXT + 1, Color.WHITE)
 	l.name = "SpeechText"
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(DIALOG_SIZE.x - 140.0, 0)
+	l.custom_minimum_size = Vector2(UiScale.px(DIALOG_SIZE.x - 90.0), 0)
 	p.add_child(l)
 	return p
 
@@ -426,17 +427,18 @@ func _option(text: String, node_name: String, cb: Callable) -> Button:
 	b.name = node_name
 	b.focus_mode = Control.FOCUS_NONE
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	b.custom_minimum_size = Vector2(320, 56)
-	b.add_theme_font_size_override("font_size", 22)
+	b.custom_minimum_size = Vector2(UiScale.px(280), UiScale.button_h())
+	b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT + 1))
 	b.pressed.connect(cb)
 	buttons[node_name] = b
 	return b
 
 
+## Подпись; font_size — для «Среднего» размера интерфейса (UiScale.FONT_*).
 func _label(text: String, font_size: int, color: Color) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_font_size_override("font_size", UiScale.fs(font_size))
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
 	l.add_theme_constant_override("outline_size", 4)

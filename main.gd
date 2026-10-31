@@ -19,12 +19,23 @@ const CAM_PITCH_MIN := deg_to_rad(18.0)
 const CAM_PITCH_MAX := deg_to_rad(75.0)
 ## Чувствительность вращения камеры, радиан на пиксель.
 const CAM_SENS := 0.006
+## Круглые кнопки HUD: центр от правого нижнего угла и радиус — для «Среднего» размера интерфейса
+## (HUD умножает на UiScale.k()). Атака в углу, умения дугой вокруг неё (зазоры ≥ 10 px), выше — «Приручить»,
+## левее — «Зелье», «Торговец», «Говорить». Было: атака r 85, умения r 50–55, остальные r 45–50.
+const ATTACK_BUTTON := [Vector2(120, 120), 60.0]
 ## Кнопки умений: центр от правого нижнего угла, радиус, цвет.
 const SKILL_BUTTONS := [
-	["skill1", Vector2(330, 110), 55.0, Color(0.9, 0.55, 0.15, 0.45)],
-	["skill2", Vector2(310, 270), 55.0, Color(0.6, 0.3, 0.9, 0.45)],
-	["skill3", Vector2(440, 330), 50.0, Color(0.85, 0.3, 0.45, 0.45)],
-	["skill4", Vector2(270, 400), 50.0, Color(0.25, 0.6, 0.8, 0.45)],
+	["skill1", Vector2(243, 107), 37.0, Color(0.9, 0.55, 0.15, 0.45)],
+	["skill2", Vector2(223, 189), 37.0, Color(0.6, 0.3, 0.9, 0.45)],
+	["skill3", Vector2(154, 239), 35.0, Color(0.85, 0.3, 0.45, 0.45)],
+	["skill4", Vector2(70, 233), 35.0, Color(0.25, 0.6, 0.8, 0.45)],
+]
+## Остальные круглые кнопки: [id, подпись, центр, радиус, цвет].
+const OTHER_BUTTONS := [
+	["tame", "Приручить", Vector2(60, 330), 34.0, Color(0.2, 0.7, 0.3, 0.45)],
+	["potion", "Зелье", Vector2(340, 62), 32.0, Color(0.85, 0.15, 0.3, 0.45)],
+	["shop", "Торговец", Vector2(330, 170), 34.0, Color(0.85, 0.7, 0.2, 0.45)],
+	["talk", "Говорить", Vector2(420, 110), 34.0, Color(0.95, 0.6, 0.25, 0.45)],
 ]
 ## Цвет кнопки включённого переключаемого умения.
 const TOGGLE_ON_COLOR := Color(0.3, 0.85, 0.45, 0.6)
@@ -111,14 +122,12 @@ func _build_hud() -> void:
 	add_child(hud)
 	hud.action.connect(_on_action)
 	# Центры кнопок отсчитываются от правого нижнего угла экрана
-	hud.add_button("attack", "Атака", Vector2(170, 180), 85.0, Color(0.9, 0.2, 0.2, 0.45), true)
+	hud.add_button("attack", "Атака", ATTACK_BUTTON[0], float(ATTACK_BUTTON[1]), Color(0.9, 0.2, 0.2, 0.45), true)
 	for b in SKILL_BUTTONS:
 		hud.add_button(String(b[0]), "", b[1], float(b[2]), b[3])
-	hud.add_button("tame", "Приручить", Vector2(130, 345), 48.0, Color(0.2, 0.7, 0.3, 0.45))
-	hud.add_button("potion", "Зелье", Vector2(470, 80), 45.0, Color(0.85, 0.15, 0.3, 0.45))
-	hud.add_button("shop", "Торговец", Vector2(480, 210), 50.0, Color(0.85, 0.7, 0.2, 0.45))
+	for b in OTHER_BUTTONS:
+		hud.add_button(String(b[0]), String(b[1]), b[2], float(b[3]), b[4])
 	hud.set_button_visible("shop", false)
-	hud.add_button("talk", "Говорить", Vector2(590, 150), 50.0, Color(0.95, 0.6, 0.25, 0.45))
 	hud.set_button_visible("talk", false)
 
 

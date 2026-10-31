@@ -365,6 +365,39 @@ func run_step() -> void:
 		41:
 			# Трекер справа вверху под меню; над Кирком серый «?»
 			shot("38_quest_tracker")
+			SettingsMenu.open(main.hud)
+			wait = 5
+			step = 42
+		42:
+			shot("39_settings")
+			main.hud.close_window()
+			# HUD при «Мелком» и «Крупном» размере интерфейса (UiScale; без сохранения в настройки)
+			UiScale.set_level(UiScale.SMALL, false)
+			main.hud.apply_ui_scale()
+			wait = 5
+			step = 43
+		43:
+			shot("40_hud_small")
+			UiScale.set_level(UiScale.LARGE, false)
+			main.hud.apply_ui_scale()
+			wait = 5
+			step = 44
+		44:
+			shot("41_hud_large")
+			main.hero_window.open("blades")
+			wait = 8
+			step = 45
+		45:
+			shot("42_hero_skills_large")
+			main.hud.close_window()
+			main.economy.open_bag()
+			wait = 5
+			step = 46
+		46:
+			shot("43_bag_large")
+			main.hud.close_window()
+			UiScale.set_level(UiScale.MEDIUM, false)
+			main.hud.apply_ui_scale()
 			ok_done()
 
 

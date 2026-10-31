@@ -10,13 +10,14 @@ extends Node
 ## Значки: res://assets/icons/pets/<вид>/<id умения>.png (нет файла — кружок с буквой).
 ## Живёт в PetManager (pets.creature). Данные — запись Game.pets[index]; призванный питомец пересчитывается сразу.
 
-const WINDOW_SIZE := Vector2(1180, 660)
+## Размеры — для «Среднего» размера интерфейса (умножаются на UiScale.k(); было 1180×660, древо 660×420).
+const WINDOW_SIZE := Vector2(1060, 600)
 ## Ширина переносимого текста по умолчанию.
-const TEXT_W := 800.0
+const TEXT_W := 700.0
 ## Древо умений и карточка рядом (помещаются в окно без прокрутки).
-const TREE_SIZE := Vector2(660, 420)
-const CARD_W := 430.0
-const PREVIEW_SIZE := Vector2i(300, 300)
+const TREE_SIZE := Vector2(600, 410)
+const CARD_W := 380.0
+const PREVIEW_SIZE := Vector2(230, 230)
 const GOLD := Color(1.0, 0.85, 0.45)
 const MUTED := Color(0.78, 0.8, 0.9)
 const GOOD := Color(0.55, 1.0, 0.6)
@@ -130,7 +131,7 @@ func _live_pet(rec: Dictionary) -> Pet:
 
 func _add_tabs(body: VBoxContainer) -> void:
 	var bar := HBoxContainer.new()
-	bar.add_theme_constant_override("separation", 10)
+	bar.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	# Над прокруткой: вкладки всегда на виду
 	var root: Node = null
 	if body.get_parent() != null:
@@ -152,7 +153,7 @@ func _tab_button(bar: HBoxContainer, key: String, text: String, active: bool, cb
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(170, 56)
+	b.custom_minimum_size = Vector2(UiScale.px(130), UiScale.px(UiScale.TAB_H))
 	b.toggle_mode = key != "back"
 	b.button_pressed = active
 	b.pressed.connect(cb)
@@ -188,25 +189,25 @@ func _build_stats(body: VBoxContainer, rec: Dictionary) -> void:
 		mp = mmp
 
 	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 20)
+	top.add_theme_constant_override("separation", int(UiScale.px(16)))
 	body.add_child(top)
 	top.add_child(_build_preview(rec))
 
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 6)
+	info.add_theme_constant_override("separation", int(UiScale.px(4)))
 	top.add_child(info)
-	var nm := _label(String(rec.get("name", "Питомец")), 32, GOLD)
+	var nm := _label(String(rec.get("name", "Питомец")), UiScale.FONT_NAME, GOLD)
 	info.add_child(nm)
 	info.add_child(_label("%s · %s · %s" % [String(MobData.get_type(sp)["name"]), PetData.role_name(sp),
-		MobData.rarity_name(sp)], 22, MUTED))
+		MobData.rarity_name(sp)], UiScale.FONT_HEAD, MUTED))
 	var stage := PetData.stage_for(lvl)
 	var stage_line := "Стадия эволюции %d из 3: %s" % [stage + 1, PetData.stage_name(sp, lvl)]
 	if stage < PetData.STAGE_LEVELS.size() - 1:
 		stage_line += " (следующая — с ур. %d)" % int(PetData.STAGE_LEVELS[stage + 1])
-	info.add_child(_label(stage_line, 22, Color.WHITE))
+	info.add_child(_label(stage_line, UiScale.FONT_HEAD, Color.WHITE))
 	var status := "погиб — воскресите свитком" if dead else ("призван" if pet != null else "отдыхает")
-	info.add_child(_label("Уровень %d / %d  ·  %s" % [lvl, PetData.MAX_LEVEL, status], 22,
+	info.add_child(_label("Уровень %d / %d  ·  %s" % [lvl, PetData.MAX_LEVEL, status], UiScale.FONT_HEAD,
 		BAD if dead else Color.WHITE))
 	if lvl < PetData.MAX_LEVEL:
 		var need := PetData.xp_to_next(lvl)
@@ -214,31 +215,31 @@ func _build_stats(body: VBoxContainer, rec: Dictionary) -> void:
 	info.add_child(_bar_line("HP", hp, mhp, Color(0.35, 0.85, 0.4)))
 	info.add_child(_bar_line("MP", mp, mmp, Color(0.4, 0.55, 1.0)))
 	var jp_row := HBoxContainer.new()
-	jp_row.add_theme_constant_override("separation", 16)
+	jp_row.add_theme_constant_override("separation", int(UiScale.px(12)))
 	info.add_child(jp_row)
-	var jp := _label("Очки умений: %d JP" % int(rec.get("jp", 0)), 24, GOLD)
+	var jp := _label("Очки умений: %d JP" % int(rec.get("jp", 0)), UiScale.FONT_HEAD, GOLD)
 	jp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	jp_row.add_child(jp)
 	var to_sk := Button.new()
 	to_sk.text = "Открыть умения"
 	to_sk.focus_mode = Control.FOCUS_NONE
-	to_sk.custom_minimum_size = Vector2(0, 56)
+	to_sk.custom_minimum_size = Vector2(0, UiScale.button_h())
 	to_sk.pressed.connect(_on_tab.bind("skills"))
 	jp_row.add_child(to_sk)
 	buttons["to_skills"] = to_sk
 	info.add_child(_label("JP копятся за победы питомца: %d за каждый уровень опыта." % PetSkills.JP_PER_LEVEL,
-		18, MUTED))
+		UiScale.FONT_BODY, MUTED))
 
 	var cols := HBoxContainer.new()
-	cols.add_theme_constant_override("separation", 40)
+	cols.add_theme_constant_override("separation", int(UiScale.px(32)))
 	body.add_child(cols)
 	# 7 характеристик
 	var left := VBoxContainer.new()
 	cols.add_child(left)
-	left.add_child(_label("Характеристики", 24, GOLD))
+	left.add_child(_label("Характеристики", UiScale.FONT_HEAD, GOLD))
 	var g1 := GridContainer.new()
 	g1.columns = 2
-	g1.add_theme_constant_override("h_separation", 24)
+	g1.add_theme_constant_override("h_separation", int(UiScale.px(18)))
 	g1.add_theme_constant_override("v_separation", 2)
 	left.add_child(g1)
 	var stats: Dictionary = st["stats"]
@@ -246,26 +247,26 @@ func _build_stats(body: VBoxContainer, rec: Dictionary) -> void:
 	for k in PetStats.STATS:
 		var key := String(k)
 		var mark := " ★" if key == main_stat or (PetData.role(sp) == "healer" and key == "wis") else ""
-		g1.add_child(_label(String(PetStats.STAT_NAMES[key]) + mark, 21, MUTED))
-		g1.add_child(_label(str(int(stats[key])), 21, Color.WHITE))
+		g1.add_child(_label(String(PetStats.STAT_NAMES[key]) + mark, UiScale.FONT_TEXT, MUTED))
+		g1.add_child(_label(str(int(stats[key])), UiScale.FONT_TEXT, Color.WHITE))
 	# Боевые показатели (две колонки пар)
 	var right := VBoxContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cols.add_child(right)
-	right.add_child(_label("Боевые показатели", 24, GOLD))
+	right.add_child(_label("Боевые показатели", UiScale.FONT_HEAD, GOLD))
 	var g2 := GridContainer.new()
 	g2.columns = 4
-	g2.add_theme_constant_override("h_separation", 24)
+	g2.add_theme_constant_override("h_separation", int(UiScale.px(18)))
 	g2.add_theme_constant_override("v_separation", 2)
 	right.add_child(g2)
 	var main_key := "matk" if PetStats.is_magic(sp) else "patk"
 	for pair in PetStats.DERIVED_NAMES:
 		var key := String(pair[0])
 		var title := String(pair[1]) + (" ★" if key == main_key else "")
-		g2.add_child(_label(title, 21, MUTED))
-		g2.add_child(_label(_derived_text(key, st), 21, Color.WHITE))
+		g2.add_child(_label(title, UiScale.FONT_TEXT, MUTED))
+		g2.add_child(_label(_derived_text(key, st), UiScale.FONT_TEXT, Color.WHITE))
 	body.add_child(_label("★ — главная характеристика и атака роли: от неё считается урон умений%s." %
-		(", лечение — от Мудрости" if PetData.role(sp) == "healer" else ""), 18, MUTED))
+		(", лечение — от Мудрости" if PetData.role(sp) == "healer" else ""), UiScale.FONT_BODY, MUTED))
 
 
 func _derived_text(key: String, st: Dictionary) -> String:
@@ -282,28 +283,29 @@ func _derived_text(key: String, st: Dictionary) -> String:
 ## Полоска «HP 120 / 300».
 func _bar_line(title: String, v: int, mx: int, col: Color) -> Control:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	var l := _label(title, 21, MUTED)
-	l.custom_minimum_size = Vector2(70, 0)
+	row.add_theme_constant_override("separation", int(UiScale.px(10)))
+	var l := _label(title, UiScale.FONT_TEXT, MUTED)
+	l.custom_minimum_size = Vector2(UiScale.px(56), 0)
 	row.add_child(l)
 	var b := ProgressBar.new()
 	b.show_percentage = false
-	b.custom_minimum_size = Vector2(360, 20)
+	b.custom_minimum_size = UiScale.v2(280, 14)
 	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	b.max_value = maxi(1, mx)
 	b.value = clampi(v, 0, maxi(1, mx))
+	var r := int(UiScale.px(7))
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = col
-	fill.set_corner_radius_all(10)
+	fill.set_corner_radius_all(r)
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0.05, 0.06, 0.14, 0.8)
 	bg.border_color = Color(1.0, 0.95, 0.82, 0.7)
 	bg.set_border_width_all(2)
-	bg.set_corner_radius_all(10)
+	bg.set_corner_radius_all(r)
 	b.add_theme_stylebox_override("fill", fill)
 	b.add_theme_stylebox_override("background", bg)
 	row.add_child(b)
-	row.add_child(_label("%d / %d" % [v, mx], 21, Color.WHITE))
+	row.add_child(_label("%d / %d" % [v, mx], UiScale.FONT_TEXT, Color.WHITE))
 	return row
 
 
@@ -313,11 +315,12 @@ func _build_preview(rec: Dictionary) -> Control:
 	var lvl := int(rec.get("level", 1))
 	var svc := SubViewportContainer.new()
 	svc.stretch = true
-	svc.custom_minimum_size = Vector2(PREVIEW_SIZE)
+	var psz := UiScale.v2(PREVIEW_SIZE.x, PREVIEW_SIZE.y)
+	svc.custom_minimum_size = psz
 	var vp := SubViewport.new()
 	vp.own_world_3d = true
 	vp.msaa_3d = Viewport.MSAA_2X
-	vp.size = PREVIEW_SIZE
+	vp.size = Vector2i(psz)
 	svc.add_child(vp)
 
 	var env := Environment.new()
@@ -377,26 +380,26 @@ func _build_skills(body: VBoxContainer, rec: Dictionary) -> void:
 	var lvl := int(rec.get("level", 1))
 	var pet := _live_pet(rec)
 	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 24)
+	head.add_theme_constant_override("separation", int(UiScale.px(20)))
 	body.add_child(head)
-	head.add_child(_label("Очки умений: %d JP" % int(rec.get("jp", 0)), 24, GOLD))
+	head.add_child(_label("Очки умений: %d JP" % int(rec.get("jp", 0)), UiScale.FONT_HEAD, GOLD))
 	var st := PetData.stage_for(lvl)
-	head.add_child(_label("Ур. %d, стадия %d" % [lvl, st + 1], 21, Color.WHITE))
+	head.add_child(_label("Ур. %d, стадия %d" % [lvl, st + 1], UiScale.FONT_TEXT, Color.WHITE))
 	if pet != null:
 		var up := pet.toggle_upkeep()
 		head.add_child(_label("MP %d / %d%s" % [pet.mp, pet.max_mp,
-			("  (поддержка −%d / 10 с)" % up) if up > 0 else ""], 21, Color(0.6, 0.75, 1.0)))
+			("  (поддержка −%d / 10 с)" % up) if up > 0 else ""], UiScale.FONT_TEXT, Color(0.6, 0.75, 1.0)))
 	var ids := PetSkills.list_for(sp)
 	if selected == "" or not ids.has(selected):
 		selected = _default_pick(rec, ids)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 14)
+	row.add_theme_constant_override("separation", int(UiScale.px(12)))
 	body.add_child(row)
 	var items: Array = []
 	for id in ids:
 		items.append(_tree_item(rec, String(id), pet))
 	tree = SkillTree.new()
-	tree.setup(items, TREE_SIZE, selected)
+	tree.setup(items, UiScale.v2(TREE_SIZE.x, TREE_SIZE.y), selected)
 	tree.picked.connect(_on_pick)
 	row.add_child(tree)
 	for id in tree.icons:
@@ -437,20 +440,22 @@ static func icon_path(species: String, id: String) -> String:
 ## Карточка умения: название, тип, уровень, эффект сейчас и на следующем, требования, «+ JP», «Вкл/Выкл».
 func _card(rec: Dictionary, id: String, pet: Pet) -> Control:
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(CARD_W, TREE_SIZE.y)
+	panel.custom_minimum_size = UiScale.v2(CARD_W, TREE_SIZE.y)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.13, 0.15, 0.28, 0.95)
 	sb.border_color = Color(1.0, 0.85, 0.5, 0.6)
 	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(14)
-	sb.set_content_margin_all(12)
+	sb.set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
+	sb.set_content_margin_all(UiScale.px(10))
 	panel.add_theme_stylebox_override("panel", sb)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
+	box.add_theme_constant_override("separation", int(UiScale.px(3)))
 	panel.add_child(box)
+	# Ширина текста карточки (с масштабом)
+	var w := UiScale.px(CARD_W - 24.0)
 	var sk := PetSkills.get_skill(id)
 	if sk.is_empty():
-		box.add_child(_label("Выберите умение в древе", 20, MUTED, CARD_W - 30.0))
+		box.add_child(_label("Выберите умение в древе", UiScale.FONT_TEXT, MUTED, w))
 		return panel
 	var lvl := int(rec.get("level", 1))
 	var cur := PetSkills.skill_level(rec, id)
@@ -458,7 +463,7 @@ func _card(rec: Dictionary, id: String, pet: Pet) -> Control:
 	var cap := PetSkills.cap_for(id, lvl)
 	var block := PetSkills.learn_block(rec, id)
 	var kind := String(sk["kind"])
-	box.add_child(_label(String(sk["name"]), 26, GOLD, CARD_W - 30.0))
+	box.add_child(_label(String(sk["name"]), UiScale.FONT_NAME, GOLD, w))
 	var lvl_text := "ур. %d/%d" % [cur, mx]
 	if cap < mx:
 		lvl_text += " (сейчас до %d)" % cap
@@ -466,33 +471,33 @@ func _card(rec: Dictionary, id: String, pet: Pet) -> Control:
 	var on := kind == "toggle" and PetSkills.toggle_on(rec, id)
 	if on:
 		meta += " · ВКЛЮЧЕНО"
-	box.add_child(_label(meta, 18, GOOD if on else MUTED, CARD_W - 30.0))
-	box.add_child(_label(String(sk["desc"]), 18, MUTED, CARD_W - 30.0))
+	box.add_child(_label(meta, UiScale.FONT_BODY, GOOD if on else MUTED, w))
+	box.add_child(_label(String(sk["desc"]), UiScale.FONT_BODY, MUTED, w))
 	if cur > 0:
-		box.add_child(_label("Сейчас: " + PetSkills.effect_text(id, cur), 18, Color.WHITE, CARD_W - 30.0))
+		box.add_child(_label("Сейчас: " + PetSkills.effect_text(id, cur), UiScale.FONT_BODY, Color.WHITE, w))
 	if cur < mx:
-		box.add_child(_label("Ур. %d: %s" % [cur + 1, PetSkills.effect_text(id, cur + 1)], 18,
-			Color(0.85, 0.88, 1.0), CARD_W - 30.0))
+		box.add_child(_label("Ур. %d: %s" % [cur + 1, PetSkills.effect_text(id, cur + 1)], UiScale.FONT_BODY,
+			Color(0.85, 0.88, 1.0), w))
 		var req := "Нужно: " + PetSkills.requirement_text(id, cur + 1)
 		if block == "":
-			box.add_child(_label(req + " — можно изучить", 18, GOOD, CARD_W - 30.0))
+			box.add_child(_label(req + " — можно изучить", UiScale.FONT_BODY, GOOD, w))
 		else:
-			box.add_child(_label(req + " — " + block, 18, BAD, CARD_W - 30.0))
+			box.add_child(_label(req + " — " + block, UiScale.FONT_BODY, BAD, w))
 	if kind == "active" and pet != null and cur > 0:
 		var left := float(pet.skill_cds.get(id, 0.0))
 		if left > 0.0:
-			box.add_child(_label("Перезарядка: %.0f с" % ceilf(left), 18, MUTED))
+			box.add_child(_label("Перезарядка: %.0f с" % ceilf(left), UiScale.FONT_BODY, MUTED))
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(spacer)
 	var btns := HBoxContainer.new()
-	btns.add_theme_constant_override("separation", 10)
+	btns.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	box.add_child(btns)
 	if cur < mx:
 		var plus := Button.new()
 		plus.text = "+ %d JP" % int(sk["jp"])
 		plus.focus_mode = Control.FOCUS_NONE
-		plus.custom_minimum_size = Vector2(150, 56)
+		plus.custom_minimum_size = Vector2(UiScale.px(120), UiScale.button_h())
 		plus.disabled = block != ""
 		plus.pressed.connect(_on_learn.bind(id))
 		btns.add_child(plus)
@@ -501,7 +506,7 @@ func _card(rec: Dictionary, id: String, pet: Pet) -> Control:
 		var tb := Button.new()
 		tb.text = "Выкл" if on else "Вкл"
 		tb.focus_mode = Control.FOCUS_NONE
-		tb.custom_minimum_size = Vector2(130, 56)
+		tb.custom_minimum_size = Vector2(UiScale.px(100), UiScale.button_h())
 		tb.pressed.connect(_on_toggle.bind(id))
 		btns.add_child(tb)
 		buttons["toggle_" + id] = tb
@@ -559,11 +564,12 @@ func _on_toggle(id: String) -> void:
 	refresh()
 
 
-## Подпись; wrap_w > 0 — перенос строк по этой ширине.
+## Подпись; font_size — для «Среднего» размера интерфейса (UiScale.FONT_*); wrap_w > 0 — перенос строк
+## по этой ширине (уже с масштабом).
 func _label(text: String, font_size: int, col: Color, wrap_w: float = 0.0) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_font_size_override("font_size", UiScale.fs(font_size))
 	l.add_theme_color_override("font_color", col)
 	if wrap_w > 0.0:
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

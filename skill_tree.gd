@@ -20,15 +20,17 @@ extends Control
 
 signal picked(id: String)
 
+## Размеры — для «Среднего» размера интерфейса (умножаются на UiScale.k(): row_min(), icon_min() и т. д.).
+## Значки крупнее относительно текста: подписи мелкие (UiScale.FONT_SMALL / FONT_TINY), значок до 58 px.
 ## Высота строки: не меньше (иначе ярусы сливаются) и не больше.
-const ROW_MIN := 60.0
-const ROW_MAX := 88.0
+const ROW_MIN := 54.0
+const ROW_MAX := 74.0
 ## Ширина подписи яруса слева и ширина колонки значков.
-const LABEL_W := 74.0
-const COL_MIN := 74.0
-const COL_MAX := 118.0
-const ICON_MIN := 44.0
-const ICON_MAX := 66.0
+const LABEL_W := 70.0
+const COL_MIN := 60.0
+const COL_MAX := 100.0
+const ICON_MIN := 42.0
+const ICON_MAX := 58.0
 const GOLD := Color(1.0, 0.82, 0.38)
 const LINE_ON := Color(1.0, 0.85, 0.45, 0.9)
 const LINE_OFF := Color(0.6, 0.62, 0.75, 0.45)
@@ -48,6 +50,16 @@ var _learned: Dictionary = {}
 var _row_y: Array = []
 
 static var _tex_cache: Dictionary = {}
+
+
+## Наименьшая высота яруса с масштабом интерфейса (больше ярусов, чем size.y / row_min(), не бывает).
+static func row_min() -> float:
+	return UiScale.px(ROW_MIN)
+
+
+## Наименьший значок с масштабом интерфейса.
+static func icon_min() -> float:
+	return UiScale.px(ICON_MIN)
 
 
 ## Картинка значка по пути или null (файла нет). Проверка через ResourceLoader — работает и в собранном APK.
@@ -81,8 +93,9 @@ func setup(list: Array, sz: Vector2, sel: String = "") -> void:
 	_make_rows(sz.y)
 	if rows.is_empty():
 		return
-	var row_h := minf(ROW_MAX, sz.y / float(rows.size()))
-	icon_size = clampf(row_h - 14.0, ICON_MIN, ICON_MAX)
+	var row_h := minf(UiScale.px(ROW_MAX), sz.y / float(rows.size()))
+	icon_size = clampf(row_h - UiScale.px(12), icon_min(), UiScale.px(ICON_MAX))
+	var label_w := UiScale.px(LABEL_W)
 	# Колонки: умение под своим пререквизитом, если там свободно
 	var col_of: Dictionary = {}
 	var ncols := 1
@@ -101,9 +114,9 @@ func setup(list: Array, sz: Vector2, sel: String = "") -> void:
 			used[c] = true
 			col_of[String(id)] = c
 			ncols = maxi(ncols, c + 1)
-	var avail := sz.x - LABEL_W
-	var col_w := clampf(avail / float(ncols), COL_MIN, COL_MAX)
-	var x0 := LABEL_W + maxf(0.0, (avail - col_w * float(ncols)) * 0.5)
+	var avail := sz.x - label_w
+	var col_w := clampf(avail / float(ncols), UiScale.px(COL_MIN), UiScale.px(COL_MAX))
+	var x0 := label_w + maxf(0.0, (avail - col_w * float(ncols)) * 0.5)
 	for ri in rows.size():
 		var r: Dictionary = rows[ri]
 		var cy := row_h * (float(ri) + 0.5)
@@ -111,10 +124,11 @@ func setup(list: Array, sz: Vector2, sel: String = "") -> void:
 		var lt := "ур. %d" % int(r["from"]) if int(r["from"]) == int(r["to"]) else "ур. %d–%d" % [int(r["from"]), int(r["to"])]
 		var l := Label.new()
 		l.text = lt
-		l.add_theme_font_size_override("font_size", 17)
+		var lf := UiScale.fs(UiScale.FONT_SMALL)
+		l.add_theme_font_size_override("font_size", lf)
 		l.add_theme_color_override("font_color", Color(0.78, 0.8, 0.9))
-		l.position = Vector2(0, cy - 12.0)
-		l.size = Vector2(LABEL_W - 6.0, 24)
+		l.position = Vector2(0, cy - float(lf) * 0.75)
+		l.size = Vector2(label_w - 4.0, float(lf) * 1.5)
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(l)
 		for id in r["ids"]:
@@ -140,7 +154,7 @@ func _make_rows(h: float) -> void:
 	var groups: Array = []
 	for lv in levels:
 		groups.append([lv])
-	var max_rows := maxi(1, int(floor(h / ROW_MIN)))
+	var max_rows := maxi(1, int(floor(h / row_min())))
 	while groups.size() > max_rows:
 		var best := 0
 		var best_gap := INF
@@ -213,7 +227,7 @@ func _add_icon(it: Dictionary, center: Vector2) -> void:
 	if can:
 		sb.border_color = GOLD
 		sb.shadow_color = Color(1.0, 0.8, 0.3, 0.75)
-		sb.shadow_size = 9
+		sb.shadow_size = int(UiScale.px(8))
 	if id == selected:
 		sb.border_color = Color.WHITE
 		bw = 5
@@ -229,8 +243,8 @@ func _add_icon(it: Dictionary, center: Vector2) -> void:
 		tr.texture = tex
 		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tr.position = Vector2(4, 4)
-		tr.size = Vector2(s - 8.0, s - 8.0)
+		tr.position = Vector2(3, 3)
+		tr.size = Vector2(s - 6.0, s - 6.0)
 		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(tr)
 	else:
@@ -243,7 +257,7 @@ func _add_icon(it: Dictionary, center: Vector2) -> void:
 		g.add_theme_font_size_override("font_size", int(s * 0.44))
 		g.add_theme_color_override("font_color", Color.WHITE)
 		g.add_theme_color_override("font_outline_color", col.darkened(0.6))
-		g.add_theme_constant_override("outline_size", 6)
+		g.add_theme_constant_override("outline_size", 5)
 		g.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(g)
 	if kind == "passive":
@@ -253,29 +267,32 @@ func _add_icon(it: Dictionary, center: Vector2) -> void:
 		rs.draw_center = false
 		rs.border_color = Color(1, 1, 1, 0.45)
 		rs.set_border_width_all(2)
-		rs.set_corner_radius_all(int(s * 0.5) - 6)
+		rs.set_corner_radius_all(int(s * 0.5) - 5)
 		rs.anti_aliasing = true
 		ring.add_theme_stylebox_override("panel", rs)
-		ring.position = Vector2(6, 6)
-		ring.size = Vector2(s - 12.0, s - 12.0)
+		ring.position = Vector2(5, 5)
+		ring.size = Vector2(s - 10.0, s - 10.0)
 		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(ring)
 	elif kind == "toggle":
 		var on := bool(it.get("on", false))
-		b.add_child(_dot(Vector2(s * 0.5 - 6.0, s - 14.0), 12.0,
+		var dd := UiScale.px(11)
+		b.add_child(_dot(Vector2((s - dd) * 0.5, s - dd - 2.0), dd,
 			Color(0.35, 1.0, 0.5) if on else Color(1, 1, 1, 0.85)))
 	if bool(it.get("unfit", false)):
-		b.add_child(_dot(Vector2(s - 15.0, 1.0), 14.0, Color(1.0, 0.35, 0.3)))
+		var ud := UiScale.px(12)
+		b.add_child(_dot(Vector2(s - ud - 1.0, 1.0), ud, Color(1.0, 0.35, 0.3)))
 	# Уровень мелко в углу
 	var lv := Label.new()
 	lv.text = "%d/%d" % [int(it.get("level", 0)), int(it.get("max", 1))]
-	lv.add_theme_font_size_override("font_size", 14)
+	var lvf := UiScale.fs(UiScale.FONT_TINY)
+	lv.add_theme_font_size_override("font_size", lvf)
 	lv.add_theme_color_override("font_color", GOLD if learned else Color(0.85, 0.86, 0.95))
 	lv.add_theme_color_override("font_outline_color", Color.BLACK)
-	lv.add_theme_constant_override("outline_size", 5)
+	lv.add_theme_constant_override("outline_size", 4)
 	lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	lv.position = Vector2(s - 40.0, s - 18.0)
-	lv.size = Vector2(44, 20)
+	lv.position = Vector2(s - float(lvf) * 3.0, s - float(lvf) * 1.35)
+	lv.size = Vector2(float(lvf) * 3.0 + 4.0, float(lvf) * 1.5)
 	lv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(lv)
 	if not learned and not can:

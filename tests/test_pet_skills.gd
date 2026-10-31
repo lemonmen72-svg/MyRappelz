@@ -433,9 +433,9 @@ func _check_tree(cw: CreatureWindow) -> void:
 		return
 	var ids := PetSkills.list_for("panther")
 	check(tr.icons.size() == ids.size(), "древо: значок на каждое умение (%d)" % tr.icons.size())
-	var max_rows := int(floor(CreatureWindow.TREE_SIZE.y / SkillTree.ROW_MIN))
+	var max_rows := int(floor(tr.custom_minimum_size.y / SkillTree.row_min()))
 	check(tr.rows.size() >= 3 and tr.rows.size() <= max_rows, "ярусов %d — помещаются (до %d)" % [tr.rows.size(), max_rows])
-	check(tr.icon_size >= SkillTree.ICON_MIN, "значки не мельче %d px: %.0f" % [int(SkillTree.ICON_MIN), tr.icon_size])
+	check(tr.icon_size >= SkillTree.icon_min(), "значки не мельче %d px: %.0f" % [int(SkillTree.icon_min()), tr.icon_size])
 	check(tr.row_of("inner_fire") == 0 and tr.row_of("inner_fire") < tr.row_of("shadow_bond")
 		and tr.row_of("shadow_bond") < tr.row_of("midnight_vortex"), "ярусы сверху вниз по требуемому уровню")
 	check(tr.row_of("shadow_rend") < tr.row_of("dusk_rupture") and tr.row_of("shadow_squall") < tr.row_of("midnight_vortex"),

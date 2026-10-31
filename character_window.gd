@@ -12,10 +12,11 @@ extends Node
 ## Значки умений героя: res://assets/icons/skills/<id>.png (нет файла — кружок с буквой).
 ## Живёт в main (main.hero_window). Данные — Game.hero, Game.weapon; игрок пересчитывается сразу.
 
-const WINDOW_SIZE := Vector2(1180, 660)
-const TREE_SIZE := Vector2(660, 430)
-const CARD_W := 430.0
-const PREVIEW_SIZE := Vector2i(230, 270)
+## Размеры — для «Среднего» размера интерфейса (умножаются на UiScale.k(); было 1180×660, древо 660×430).
+const WINDOW_SIZE := Vector2(1060, 600)
+const TREE_SIZE := Vector2(600, 410)
+const CARD_W := 380.0
+const PREVIEW_SIZE := Vector2(200, 240)
 const GOLD := Color(1.0, 0.85, 0.45)
 const MUTED := Color(0.78, 0.8, 0.9)
 const GOOD := Color(0.55, 1.0, 0.6)
@@ -95,7 +96,7 @@ func _tab_ids() -> Array:
 
 func _add_tabs(body: VBoxContainer) -> void:
 	var bar := HBoxContainer.new()
-	bar.add_theme_constant_override("separation", 10)
+	bar.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	var root: Node = null
 	if body.get_parent() != null:
 		root = body.get_parent().get_parent()
@@ -113,7 +114,7 @@ func _tab_button(bar: HBoxContainer, id: String, text: String) -> void:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(150, 56)
+	b.custom_minimum_size = Vector2(UiScale.px(120), UiScale.px(UiScale.TAB_H))
 	b.toggle_mode = true
 	b.button_pressed = tab == id
 	b.pressed.connect(_on_tab.bind(id))
@@ -130,79 +131,79 @@ func _on_tab(which: String) -> void:
 func _build_hero(body: VBoxContainer) -> void:
 	var p := _player()
 	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 18)
+	top.add_theme_constant_override("separation", int(UiScale.px(16)))
 	body.add_child(top)
 	top.add_child(_build_preview(p))
 
 	var info := VBoxContainer.new()
-	info.add_theme_constant_override("separation", 4)
+	info.add_theme_constant_override("separation", int(UiScale.px(3)))
 	top.add_child(info)
-	info.add_child(_label(Game.char_name, 30, GOLD))
+	info.add_child(_label(Game.char_name, UiScale.FONT_NAME, GOLD))
 	info.add_child(_label("%s · %s" % [String(ClassData.race(Game.race_id)["name"]),
-		String(ClassData.cls(Game.class_id)["name"])], 21, MUTED))
+		String(ClassData.cls(Game.class_id)["name"])], UiScale.FONT_TEXT, MUTED))
 	info.add_child(_bar_line("Опыт", Game.xp, Game.xp_to_next(Game.level), Color(0.95, 0.82, 0.3),
 		"Ур. %d" % Game.level))
 	info.add_child(_bar_line("HP", p.hp, p.max_hp, Color(0.35, 0.85, 0.4)))
 	if p.max_mp > 0:
 		info.add_child(_bar_line("MP", p.mp, p.max_mp, Color(0.4, 0.55, 1.0)))
 	var jp_row := HBoxContainer.new()
-	jp_row.add_theme_constant_override("separation", 16)
+	jp_row.add_theme_constant_override("separation", int(UiScale.px(12)))
 	info.add_child(jp_row)
-	var jp := _label("Очки умений: %d JP" % int(Game.hero.get("jp", 0)), 23, GOLD)
+	var jp := _label("Очки умений: %d JP" % int(Game.hero.get("jp", 0)), UiScale.FONT_HEAD, GOLD)
 	jp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	jp_row.add_child(jp)
 	var to_sk := Button.new()
 	to_sk.text = "Открыть умения"
 	to_sk.focus_mode = Control.FOCUS_NONE
-	to_sk.custom_minimum_size = Vector2(0, 52)
+	to_sk.custom_minimum_size = Vector2(0, UiScale.button_h())
 	to_sk.pressed.connect(_on_tab.bind(String(HeroSkills.tabs_for(Game.class_id)[0][0])))
 	jp_row.add_child(to_sk)
 	buttons["to_skills"] = to_sk
-	info.add_child(_label("JP копятся за победы: %d за каждый уровень опыта." % HeroSkills.JP_PER_LEVEL, 17, MUTED))
+	info.add_child(_label("JP копятся за победы: %d за каждый уровень опыта." % HeroSkills.JP_PER_LEVEL, UiScale.FONT_BODY, MUTED))
 
 	# 7 характеристик (как у питомцев): у героя со статами (Наёмник)
 	if not p.hero_stats.is_empty():
 		var col := VBoxContainer.new()
-		col.add_theme_constant_override("separation", 2)
+		col.add_theme_constant_override("separation", int(UiScale.px(2)))
 		top.add_child(col)
-		col.add_child(_label("Характеристики", 23, GOLD))
+		col.add_child(_label("Характеристики", UiScale.FONT_HEAD, GOLD))
 		var g1 := GridContainer.new()
 		g1.columns = 2
-		g1.add_theme_constant_override("h_separation", 18)
+		g1.add_theme_constant_override("h_separation", int(UiScale.px(14)))
 		g1.add_theme_constant_override("v_separation", 0)
 		col.add_child(g1)
 		var st: Dictionary = p.hero_stats["stats"]
 		var main_stat := String(HeroStats.MAIN_STAT["ranged" if p.attack_kind == "ranged" else "melee"])
 		for k in Stats.STATS:
 			var key := String(k)
-			g1.add_child(_label(String(Stats.STAT_NAMES[key]) + (" ★" if key == main_stat else ""), 19, MUTED))
-			g1.add_child(_label(str(int(st[key])), 19, Color.WHITE))
+			g1.add_child(_label(String(Stats.STAT_NAMES[key]) + (" ★" if key == main_stat else ""), UiScale.FONT_TEXT, MUTED))
+			g1.add_child(_label(str(int(st[key])), UiScale.FONT_TEXT, Color.WHITE))
 
 	# Боевые показатели (с оружием, умениями и усилениями; по три пары в ряд)
 	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 16)
+	head.add_theme_constant_override("separation", int(UiScale.px(12)))
 	body.add_child(head)
-	head.add_child(_label("Боевые показатели", 23, GOLD))
+	head.add_child(_label("Боевые показатели", UiScale.FONT_HEAD, GOLD))
 	if not p.hero_stats.is_empty():
-		var note := _label("★ — от главной характеристики оружия: клинки — Сила, арбалет — Меткость", 16, MUTED)
+		var note := _label("★ — от главной характеристики оружия: клинки — Сила, арбалет — Меткость", UiScale.FONT_SMALL, MUTED)
 		note.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		head.add_child(note)
 	var g := GridContainer.new()
 	g.columns = 6
-	g.add_theme_constant_override("h_separation", 18)
+	g.add_theme_constant_override("h_separation", int(UiScale.px(14)))
 	g.add_theme_constant_override("v_separation", 0)
 	body.add_child(g)
 	for r in _combat_rows(p):
-		g.add_child(_label(String(r[0]), 19, MUTED))
-		g.add_child(_label(String(r[1]), 19, Color.WHITE))
+		g.add_child(_label(String(r[0]), UiScale.FONT_TEXT, MUTED))
+		g.add_child(_label(String(r[1]), UiScale.FONT_TEXT, Color.WHITE))
 
 	# Оружие
 	var wrow := HBoxContainer.new()
-	wrow.add_theme_constant_override("separation", 10)
+	wrow.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	body.add_child(wrow)
-	wrow.add_child(_label("Оружие:", 23, GOLD))
+	wrow.add_child(_label("Оружие:", UiScale.FONT_HEAD, GOLD))
 	if not ItemData.class_uses_weapons(Game.class_id):
-		wrow.add_child(_label("задано классом — %s" % _class_weapon_name(), 20, MUTED))
+		wrow.add_child(_label("задано классом — %s" % _class_weapon_name(), UiScale.FONT_TEXT, MUTED))
 		return
 	for id in Game.inventory.ids():
 		var wid := String(id)
@@ -213,8 +214,8 @@ func _build_hero(body: VBoxContainer) -> void:
 		b.text = "%s\nатака +%d · %.2f с · %.1f м" % [ItemData.item_name(wid), int(it.get("atk", 0)),
 			float(it.get("cd", 1.0)), float(it.get("range", 2.0))]
 		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(0, 66)
-		b.add_theme_font_size_override("font_size", 18)
+		b.custom_minimum_size = Vector2(0, UiScale.px(50))
+		b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_SMALL))
 		b.toggle_mode = true
 		b.button_pressed = wid == Game.weapon
 		b.pressed.connect(_on_weapon.bind(wid))
@@ -286,28 +287,29 @@ func _on_weapon(id: String) -> void:
 ## Полоска «HP 120 / 300».
 func _bar_line(title: String, v: int, mx: int, col: Color, prefix: String = "") -> Control:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	var l := _label(prefix if prefix != "" else title, 20, MUTED)
-	l.custom_minimum_size = Vector2(70, 0)
+	row.add_theme_constant_override("separation", int(UiScale.px(10)))
+	var l := _label(prefix if prefix != "" else title, UiScale.FONT_TEXT, MUTED)
+	l.custom_minimum_size = Vector2(UiScale.px(56), 0)
 	row.add_child(l)
 	var b := ProgressBar.new()
 	b.show_percentage = false
-	b.custom_minimum_size = Vector2(250, 18)
+	b.custom_minimum_size = UiScale.v2(210, 14)
 	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	b.max_value = maxi(1, mx)
 	b.value = clampi(v, 0, maxi(1, mx))
+	var r := int(UiScale.px(7))
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = col
-	fill.set_corner_radius_all(9)
+	fill.set_corner_radius_all(r)
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0.05, 0.06, 0.14, 0.8)
 	bg.border_color = Color(1.0, 0.95, 0.82, 0.7)
 	bg.set_border_width_all(2)
-	bg.set_corner_radius_all(9)
+	bg.set_corner_radius_all(r)
 	b.add_theme_stylebox_override("fill", fill)
 	b.add_theme_stylebox_override("background", bg)
 	row.add_child(b)
-	row.add_child(_label("%s %d / %d" % [title, v, mx], 19, Color.WHITE))
+	row.add_child(_label("%s %d / %d" % [title, v, mx], UiScale.FONT_TEXT, Color.WHITE))
 	return row
 
 
@@ -315,11 +317,12 @@ func _bar_line(title: String, v: int, mx: int, col: Color, prefix: String = "") 
 func _build_preview(p: Player) -> Control:
 	var svc := SubViewportContainer.new()
 	svc.stretch = true
-	svc.custom_minimum_size = Vector2(PREVIEW_SIZE)
+	var psz := UiScale.v2(PREVIEW_SIZE.x, PREVIEW_SIZE.y)
+	svc.custom_minimum_size = psz
 	var vp := SubViewport.new()
 	vp.own_world_3d = true
 	vp.msaa_3d = Viewport.MSAA_2X
-	vp.size = PREVIEW_SIZE
+	vp.size = Vector2i(psz)
 	svc.add_child(vp)
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
@@ -368,26 +371,26 @@ func _build_preview(p: Player) -> Control:
 func _build_skills(body: VBoxContainer) -> void:
 	var p := _player()
 	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 24)
+	head.add_theme_constant_override("separation", int(UiScale.px(20)))
 	body.add_child(head)
-	head.add_child(_label("Очки умений: %d JP" % int(Game.hero.get("jp", 0)), 23, GOLD))
+	head.add_child(_label("Очки умений: %d JP" % int(Game.hero.get("jp", 0)), UiScale.FONT_HEAD, GOLD))
 	if p.weapon_kind != "":
-		head.add_child(_label("В руках: %s" % ItemData.weapon_kind_name(p.weapon_kind), 20, Color.WHITE))
+		head.add_child(_label("В руках: %s" % ItemData.weapon_kind_name(p.weapon_kind), UiScale.FONT_TEXT, Color.WHITE))
 	if p.max_mp > 0:
 		var up := p.toggle_upkeep()
 		head.add_child(_label("MP %d / %d%s" % [p.mp, p.max_mp, ("  (поддержка −%d / 10 с)" % up) if up > 0 else ""],
-			20, Color(0.6, 0.75, 1.0)))
+			UiScale.FONT_TEXT, Color(0.6, 0.75, 1.0)))
 	var ids := HeroSkills.list_tab(Game.class_id, tab)
 	if selected == "" or not ids.has(selected):
 		selected = _default_pick(ids)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 14)
+	row.add_theme_constant_override("separation", int(UiScale.px(12)))
 	body.add_child(row)
 	var items: Array = []
 	for id in ids:
 		items.append(_tree_item(String(id), p))
 	tree = SkillTree.new()
-	tree.setup(items, TREE_SIZE, selected)
+	tree.setup(items, UiScale.v2(TREE_SIZE.x, TREE_SIZE.y), selected)
 	tree.picked.connect(_on_pick)
 	row.add_child(tree)
 	for id in tree.icons:
@@ -420,73 +423,73 @@ func _tree_item(id: String, p: Player) -> Dictionary:
 
 func _card(id: String, p: Player) -> Control:
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(CARD_W, TREE_SIZE.y)
+	panel.custom_minimum_size = UiScale.v2(CARD_W, TREE_SIZE.y)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.13, 0.15, 0.28, 0.95)
 	sb.border_color = Color(1.0, 0.85, 0.5, 0.6)
 	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(14)
-	sb.set_content_margin_all(12)
+	sb.set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
+	sb.set_content_margin_all(UiScale.px(10))
 	panel.add_theme_stylebox_override("panel", sb)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
+	box.add_theme_constant_override("separation", int(UiScale.px(3)))
 	panel.add_child(box)
-	var w := CARD_W - 30.0
+	var w := UiScale.px(CARD_W - 24.0)
 	var sk := HeroSkills.get_skill(id)
 	if sk.is_empty():
-		box.add_child(_label("Выберите умение в древе", 20, MUTED, w))
+		box.add_child(_label("Выберите умение в древе", UiScale.FONT_TEXT, MUTED, w))
 		return panel
 	var cur := HeroSkills.skill_level(Game.hero, id)
 	var mx := HeroSkills.max_level(id)
 	var kind := HeroSkills.kind(id)
 	var block := HeroSkills.learn_block(Game.hero, Game.class_id, Game.level, id)
 	var on := kind == "toggle" and HeroSkills.toggle_on(Game.hero, id)
-	box.add_child(_label(String(sk["name"]), 26, GOLD, w))
+	box.add_child(_label(String(sk["name"]), UiScale.FONT_NAME, GOLD, w))
 	var meta := "%s · оружие: %s · ур. %d/%d" % [HeroSkills.kind_name(id), HeroSkills.weapon_name(id), cur, mx]
 	if on:
 		meta += " · ВКЛЮЧЕНО"
-	box.add_child(_label(meta, 17, GOOD if on else MUTED, w))
+	box.add_child(_label(meta, UiScale.FONT_BODY, GOOD if on else MUTED, w))
 	var wb := HeroSkills.weapon_block(id, p.weapon_kind)
 	if wb != "":
-		box.add_child(_label("Не подходит к текущему оружию: %s" % wb.to_lower(), 17, BAD, w))
-	box.add_child(_label(String(sk.get("desc", "")), 17, MUTED, w))
+		box.add_child(_label("Не подходит к текущему оружию: %s" % wb.to_lower(), UiScale.FONT_BODY, BAD, w))
+	box.add_child(_label(String(sk.get("desc", "")), UiScale.FONT_BODY, MUTED, w))
 	if cur > 0:
-		box.add_child(_label("Сейчас: " + HeroSkills.effect_text(id, cur), 17, Color.WHITE, w))
+		box.add_child(_label("Сейчас: " + HeroSkills.effect_text(id, cur), UiScale.FONT_BODY, Color.WHITE, w))
 	if cur < mx:
-		box.add_child(_label("Ур. %d: %s" % [cur + 1, HeroSkills.effect_text(id, cur + 1)], 17, Color(0.85, 0.88, 1.0), w))
+		box.add_child(_label("Ур. %d: %s" % [cur + 1, HeroSkills.effect_text(id, cur + 1)], UiScale.FONT_BODY, Color(0.85, 0.88, 1.0), w))
 		var req := "Нужно: " + HeroSkills.requirement_text(id, cur + 1)
 		if block == "":
-			box.add_child(_label(req + " — можно изучить", 17, GOOD, w))
+			box.add_child(_label(req + " — можно изучить", UiScale.FONT_BODY, GOOD, w))
 		else:
-			box.add_child(_label(req + " — " + block, 17, BAD, w))
+			box.add_child(_label(req + " — " + block, UiScale.FONT_BODY, BAD, w))
 	var left := float(p.skill_cd.get(id, 0.0))
 	if left > 0.0:
-		box.add_child(_label("Перезарядка: %.0f с" % ceilf(left), 17, MUTED))
+		box.add_child(_label("Перезарядка: %.0f с" % ceilf(left), UiScale.FONT_BODY, MUTED))
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(spacer)
 	var btns := HBoxContainer.new()
-	btns.add_theme_constant_override("separation", 8)
+	btns.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	box.add_child(btns)
 	if cur < mx:
-		var plus := _button("+ %d JP" % HeroSkills.jp_cost(id, cur + 1), 140)
+		var plus := _button("+ %d JP" % HeroSkills.jp_cost(id, cur + 1), 120)
 		plus.disabled = block != ""
 		plus.pressed.connect(_on_learn.bind(id))
 		btns.add_child(plus)
 		buttons["learn_" + id] = plus
 	if kind == "toggle" and cur > 0:
-		var tb := _button("Выкл" if on else "Вкл", 110)
+		var tb := _button("Выкл" if on else "Вкл", 90)
 		tb.pressed.connect(_on_toggle.bind(id))
 		btns.add_child(tb)
 		buttons["toggle_" + id] = tb
 	if kind != "passive" and cur > 0:
 		var srow := HBoxContainer.new()
-		srow.add_theme_constant_override("separation", 6)
+		srow.add_theme_constant_override("separation", int(UiScale.px(6)))
 		box.add_child(srow)
-		srow.add_child(_label("На кнопку:", 18, MUTED))
+		srow.add_child(_label("На кнопку:", UiScale.FONT_BODY, MUTED))
 		var slots: Array = Game.hero.get("slots", [])
 		for i in HeroSkills.SLOTS:
-			var sbn := _button(str(i + 1), 58)
+			var sbn := _button(str(i + 1), 46)
 			sbn.toggle_mode = true
 			sbn.button_pressed = i < slots.size() and String(slots[i]) == id
 			sbn.pressed.connect(_on_slot.bind(id, i))
@@ -495,11 +498,12 @@ func _card(id: String, p: Player) -> Control:
 	return panel
 
 
+## Кнопка карточки; w — ширина для «Среднего» размера интерфейса.
 func _button(text: String, w: float) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(w, 54)
+	b.custom_minimum_size = Vector2(UiScale.px(w), UiScale.button_h())
 	return b
 
 
@@ -541,11 +545,12 @@ func _on_slot(id: String, i: int) -> void:
 	refresh()
 
 
-## Подпись; wrap_w > 0 — перенос строк по этой ширине.
+## Подпись; font_size — для «Среднего» размера интерфейса (UiScale.FONT_*); wrap_w > 0 — перенос строк
+## по этой ширине (уже с масштабом).
 func _label(text: String, font_size: int, col: Color, wrap_w: float = 0.0) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_font_size_override("font_size", UiScale.fs(font_size))
 	l.add_theme_color_override("font_color", col)
 	if wrap_w > 0.0:
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

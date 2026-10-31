@@ -489,8 +489,8 @@ func _check_window(player: Player) -> void:
 	check(hw.tab == "blades" and hw.tree != null, "вкладка «Мечи и кинжалы»: древо")
 	var ids := HeroSkills.list_tab("assassin", "blades")
 	check(hw.tree.icons.size() == ids.size(), "значков %d (умений %d)" % [hw.tree.icons.size(), ids.size()])
-	var max_rows := int(floor(CharacterWindow.TREE_SIZE.y / SkillTree.ROW_MIN))
-	check(hw.tree.rows.size() <= max_rows and hw.tree.icon_size >= SkillTree.ICON_MIN, "ярусов %d, значки %.0f px — помещаются"
+	var max_rows := int(floor(hw.tree.custom_minimum_size.y / SkillTree.row_min()))
+	check(hw.tree.rows.size() <= max_rows and hw.tree.icon_size >= SkillTree.icon_min(), "ярусов %d, значки %.0f px — помещаются"
 		% [hw.tree.rows.size(), hw.tree.icon_size])
 	check(hw.tree.row_of("blade_mastery") < hw.tree.row_of("charge_stab")
 		and hw.tree.row_of("charge_stab") < hw.tree.row_of("twin_fury"), "ярусы по требуемому уровню")

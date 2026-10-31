@@ -41,8 +41,17 @@
 - `hud.gd`: джойстик, круглые кнопки (`add_button`, `is_held`, `set_cooldown`, `set_blocked`), окна (`create_window`),
   панели игрока (HP, MP, опыт), питомца и цели, сообщения; меню «Герой / Питомцы / Сумка / Задания / Настройки»
   (кнопки меню помельче — `MENU_FONT`, панель цели сдвигается левее меню); `add_blocker` — элементы поверх мира
-  (трекер заданий), касание по ним не вращает камеру.
-- `util.gd`: материалы, поиск ближайшего, тело зверя из коробок, всплывающий текст, тема UI `Util.ui_theme()`.
+  (трекер заданий), касание по ним не вращает камеру. Размеры — из `UiScale` (числа в коде даны для «Среднего»):
+  `apply_ui_scale()` перестраивает HUD сразу (сигнал `scale_changed` — трекер), окно держится по центру и в экране.
+- `ui_scale.gd` (`UiScale`): масштаб интерфейса — единая точка настройки размеров: шрифты (`FONT` 17 темы,
+  `FONT_TITLE` 22, `FONT_NAME` 20, `FONT_HEAD` 17, `FONT_TEXT` 15, `FONT_BODY` 14, `FONT_SMALL` 13, `FONT_TINY` 12),
+  `BUTTON_H` 44, `TAB_H`, `PAD`, `GAP`, скругления, надписи в мире (`WORLD` = 0.66 прежних). Настройка «Размер
+  интерфейса» Мелкий / Средний (по умолчанию) / Крупный = ×0.87 / 1 / 1.15, `user://settings.cfg` секция `[ui]`.
+  Пользоваться: `UiScale.fs(UiScale.FONT_TEXT)`, `UiScale.px(44)`, `UiScale.v2(x, y)`, размер окна в
+  `create_window` — база «Среднего» (окна до ~1090×600, чтобы «Крупный» влезал в 1280×720). Тест `tests/test_ui_scale.gd`
+  (при каждом размере кнопки HUD не перекрываются, все окна и экран создания помещаются в 1280×720).
+- `util.gd`: материалы, поиск ближайшего, тело зверя из коробок, всплывающий текст, тема UI `Util.ui_theme()`
+  (размеры по `UiScale`, `refresh_theme()` — после смены размера).
 - `inventory.gd`: сумка (id предмета → количество) и её раскладка по ячейкам (`Inventory.CAPACITY` = 40).
 
 ### Модули
@@ -107,7 +116,7 @@
   `water.gdshader`, `island_terrain.gdshader`, `tools/extract_island_masks.py`, референсы в `reference/`.
   Подробно — `world/README.md`. Тесты `tests/test_island.gd`, `tests/test_vegetation.gd`, `tests/test_pois.gd`.
 - Качество и постобработка: `quality.gd` (`Quality`: Low/Medium/High в `user://settings.cfg`), `postfx.gd` + `postfx.gdshader`,
-  `settings_menu.gd` (окно «Настройки» в HUD).
+  `settings_menu.gd` (окно «Настройки» в HUD: размер интерфейса, качество, предел кадров).
 - Предметы и торговля: `data_items.gd` (`ItemData`: в т. ч. оружие Наёмника; редкость, тип, стопки, значки), `economy.gd`
   (добыча, покупка и продажа, зелья), `inventory_window.gd` (`InventoryWindow`: окно сумки и окно торговца),
   `item_icon.gd` (`ItemIcon`: значок предмета — картинка или процедурный силуэт),
