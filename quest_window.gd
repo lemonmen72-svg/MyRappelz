@@ -105,7 +105,7 @@ func _build() -> void:
 	card.add_theme_constant_override("separation", int(UiScale.px(5)))
 	card_panel.add_child(card)
 	if ids.is_empty():
-		var t := "Активных заданий нет. Учитель Кирк в центре города подскажет, с чего начать." if tab == "active" \
+		var t := "Активных заданий нет. Учитель Кирк и Мудрец Альдерик в центре города подскажут, с чего начать." if tab == "active" \
 			else "Вы ещё не сдали ни одного задания."
 		list.add_child(_text(t, UiScale.FONT_TEXT, MUTED))
 		card.add_child(_label("Журнал заданий", UiScale.FONT_HEAD, GOLD))

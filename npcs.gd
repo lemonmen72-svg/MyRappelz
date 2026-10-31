@@ -1,15 +1,19 @@
 class_name Npcs
 extends Node
-## Жители-NPC (NpcData) и разговор с ними. Ставит Учителя Кирка (Npc "kirk") в центре города рядом с торговцем —
-## на свободное место (find_spot: проходимая ровная земля, не на дороге, не в постройке, не у торговца и точек
-## старта). Торговца ставит Economy, здесь он только учитывается (значки заданий).
-## Кнопка «Говорить» (HUD "talk", клавиша R) видна, когда игрок ближе TALK_RANGE к NPC с разговором;
-## касание — окно диалога (HUD.create_window, тема Util.ui_theme): реплика NPC и варианты «Задания»,
-## «Торговля» (окно торговли Economy с его товарами), «До встречи». Страница «Задания» — задания NPC
-## (Quests.npc_quests): взять, посмотреть прогресс, сдать. Отошёл дальше — диалог закрывается.
+## Жители-NPC (NpcData) и разговор с ними. Ставит Учителя Кирка (Npc "kirk") в центре города рядом с торговцем
+## и остальных жителей по полю spot (NpcData.placed_ids: мудрец, кузнец и кладовщик по краям площади города,
+## старосты у центров своих деревень, охотница в Западном лагере, глава наёмников на посту у входа в пещеру) —
+## на свободное место (find_spot: проходимая ровная земля, не на дороге, не в постройке, не у других жителей
+## и точек старта; жители лагеря и пещеры — внутри своей безопасной зоны). Торговца ставит Economy, здесь
+## он только учитывается (значки заданий, отступ).
+## Кнопка «Говорить» (HUD "talk", клавиша R) видна, когда игрок ближе TALK_RANGE к NPC с разговором (ближайший);
+## касание — окно диалога (HUD.create_window, тема Util.ui_theme): реплика NPC и варианты «Задания» (если у NPC
+## есть задания), «Торговля» (окно торговли Economy с его товарами), пункты о делах NPC (NpcData talk; дела,
+## которых ещё нет, — «— скоро»: страница с рассказом, что будет), «До встречи». Страница «Задания» — задания
+## NPC (Quests.npc_quests): взять, посмотреть прогресс, сдать. Отошёл дальше — диалог закрывается.
 ## Значки над NPC («!», «?») — Quests.npc_mark, обновляются по Quests.updated и раз в MARK_PERIOD.
-## Кнопки открытого диалога для тестов (buttons): "opt_quests", "opt_trade", "opt_bye", "dq_<id>", "accept",
-## "complete", "back".
+## Кнопки открытого диалога для тестов (buttons): "opt_quests", "opt_trade", "opt_bye", "opt_<пункт talk>",
+## "dq_<id>", "accept", "complete", "back".
 
 ## Кнопка «Говорить» видна ближе этого расстояния, м; диалог закрывается дальше TALK_RANGE + 1.
 const TALK_RANGE := 4.0
@@ -18,23 +22,37 @@ const TALK_RANGE := 4.0
 const KIRK_SPOT := Vector2(-7.5, -6.0)
 ## Свободно от оси дороги (половина ширины дороги + запас), м.
 const ROAD_CLEAR := 3.2
-## Не ближе к торговцу и точкам старта, м.
+## Кирк — не ближе к торговцу и точкам старта, м.
 const KEEP_AWAY := 2.5
+## Остальные жители — не ближе друг к другу, к торговцу, Кирку и точкам старта, м (с точки старта кнопки
+## «Говорить» не видно: NPC_GAP > TALK_RANGE).
+const NPC_GAP := 5.0
+## Допустимый перепад высоты под ногами NPC (на 1.2 м от центра), м.
+const FLAT := 0.35
+## Радиусы поиска места вокруг желаемой точки, м.
+const SEARCH_RADII := [0.0, 0.7, 1.4, 2.1, 2.8, 3.5, 4.5, 5.5, 6.5]
+## Жители деревни или города стоят не дальше радиуса POI минус это, м.
+const POI_MARGIN := 4.0
+## Жители лагеря и пещеры стоят не дальше радиуса своей безопасной зоны минус это, м.
+const ZONE_MARGIN := 1.0
 ## Окно диалога — для «Среднего» размера интерфейса (умножается на UiScale.k(); было 940×610).
 const DIALOG_SIZE := Vector2(760, 520)
 const MARK_PERIOD := 0.3
 const GOLD := Color(1.0, 0.85, 0.3)
 const MUTED := Color(0.76, 0.78, 0.88)
 const GOOD := Color(0.55, 1.0, 0.6)
+const SOON := Color(0.62, 0.66, 0.78)
 
 var main: Node
-## NPC по id: Npc (Учитель Кирк, торговец).
+## NPC по id: Npc (Учитель Кирк, торговец, жители из NpcData.placed_ids).
 var nodes: Dictionary = {}
 var kirk: Npc
-## Открытый диалог: с кем, страница ("main" | "quests" | "quest"), задание на странице "quest".
+## Открытый диалог: с кем, страница ("main" | "quests" | "quest" | "info"), задание на странице "quest",
+## пункт о делах NPC на странице "info" (путь "guide" или "guide/pets").
 var dialog_npc := ""
 var page := ""
 var page_quest := ""
+var page_info := ""
 ## Реплика NPC в открытом диалоге.
 var reply := ""
 var buttons: Dictionary = {}
@@ -68,6 +86,8 @@ func setup(m: Node) -> void:
 	kirk.face_yaw = atan2(p.x, p.y)
 	main.add_child(kirk)
 	nodes["kirk"] = kirk
+	avoid.append(p)
+	place_all(w, avoid)
 	main.hud.set_button_visible("talk", false)
 	if main.get("quests") != null:
 		main.quests.updated.connect(refresh_marks)
@@ -89,26 +109,96 @@ func handle_action(id: String) -> bool:
 	return true
 
 
+## NPC по id (null — нет такого в мире).
+func npc(id: String) -> Npc:
+	var v: Variant = nodes.get(id)
+	if not is_instance_valid(v):
+		return null
+	return v as Npc
+
+
 # ---------- Место ----------
 
+## Ставит жителей из NpcData.placed_ids по их полю spot. avoid — занятые точки (торговец, Кирк, точки старта);
+## дополняется местами поставленных.
+func place_all(w: IslandWorld, avoid: Array) -> void:
+	for k in NpcData.placed_ids():
+		var id := String(k)
+		var info := spot_info(w, id)
+		var want: Vector2 = info["want"]
+		var area_c: Vector2 = info["area_c"]
+		var p := find_spot(w, want, avoid, NPC_GAP, area_c, float(info["area_r"]), float(info["flat"]))
+		var n := Npc.new()
+		n.npc_id = id
+		n.name = id.to_pascal_case()
+		n.position = Vector3(p.x, w.height_at(p.x, p.y) if w != null else 0.0, p.y)
+		var look: Vector2 = info["look"]
+		if look.distance_to(p) < 0.5:
+			look = p + Vector2(0, 1)
+		# Лицом к точке look (модель смотрит в −Z; к игроку повернётся сама)
+		n.face_yaw = atan2(p.x - look.x, p.y - look.y)
+		main.add_child(n)
+		nodes[id] = n
+		avoid.append(p)
+
+
+## Где хочется поставить жителя по его spot: {"want": Vector2, "area_c": Vector2, "area_r": float (0 — без
+## ограничения), "look": Vector2, "flat": float, "base": Vector2 (центр POI или безопасной зоны)}.
+static func spot_info(w: IslandWorld, id: String) -> Dictionary:
+	var s := NpcData.spot(id)
+	var base := Vector2.ZERO
+	var area_c := Vector2.ZERO
+	var area_r := 0.0
+	if w != null:
+		var zone := zone_cfg(w, String(s.get("zone", "")))
+		var poi: Dictionary = w.poi(String(s.get("poi", "")))
+		if not zone.is_empty():
+			base = IslandWorld.v2(zone["center"])
+			area_c = base
+			area_r = float(zone.get("radius", 5.0)) - ZONE_MARGIN
+		elif not poi.is_empty():
+			base = IslandWorld.v2(poi["center"])
+			area_c = base
+			area_r = float(poi.get("radius", 16.0)) - POI_MARGIN
+	var off: Vector2 = s.get("off", Vector2.ZERO)
+	var look: Vector2 = s.get("look", Vector2.ZERO)
+	return {"want": base + off, "area_c": area_c, "area_r": area_r, "look": base + look,
+		"flat": float(s.get("flat", FLAT)), "base": base}
+
+
+## Безопасная зона конфига острова по id ({} — нет).
+static func zone_cfg(w: IslandWorld, id: String) -> Dictionary:
+	if w == null or id == "":
+		return {}
+	for z in w.cfg.get("safe_zones", []):
+		var d: Dictionary = z
+		if String(d.get("id", "")) == id:
+			return d
+	return {}
+
+
 ## Место для NPC рядом с want: проходимая ровная суша, не на дороге, не у воды, не в постройке
-## (следы построек — poi_footprints), не ближе KEEP_AWAY к точкам avoid. Нет такого — want.
-static func find_spot(w: IslandWorld, want: Vector2, avoid: Array) -> Vector2:
+## (следы построек — poi_footprints) и не в мелочах (poi_props), не ближе keep к точкам avoid, внутри круга area_c / area_r (если area_r > 0),
+## перепад высоты под ногами не больше flat. Нет такого — want.
+static func find_spot(w: IslandWorld, want: Vector2, avoid: Array, keep: float = KEEP_AWAY,
+		area_c: Vector2 = Vector2.ZERO, area_r: float = 0.0, flat: float = FLAT) -> Vector2:
 	if w == null:
 		return want
-	for rad in [0.0, 0.7, 1.4, 2.1, 2.8, 3.5, 4.5]:
+	for rad in SEARCH_RADII:
 		var r := float(rad)
 		var steps := 1 if r == 0.0 else 12
 		for k in steps:
 			var a := TAU * float(k) / float(steps)
 			var p := want + Vector2(cos(a), sin(a)) * r
-			if spot_ok(w, p, avoid):
+			if area_r > 0.0 and p.distance_to(area_c) > area_r:
+				continue
+			if spot_ok(w, p, avoid, keep, flat):
 				return p
 	return want
 
 
 ## Можно ли поставить NPC в точку p (см. find_spot).
-static func spot_ok(w: IslandWorld, p: Vector2, avoid: Array) -> bool:
+static func spot_ok(w: IslandWorld, p: Vector2, avoid: Array, keep: float = KEEP_AWAY, flat: float = FLAT) -> bool:
 	if not w.is_walkable(p.x, p.y):
 		return false
 	if w.road_distance(p.x, p.y) < ROAD_CLEAR or w.water_distance(p.x, p.y) < 3.0:
@@ -117,7 +207,7 @@ static func spot_ok(w: IslandWorld, p: Vector2, avoid: Array) -> bool:
 	for k in 8:
 		var a := TAU * float(k) / 8.0
 		var q := p + Vector2(cos(a), sin(a)) * 1.2
-		if not w.is_walkable(q.x, q.y) or absf(w.height_at(q.x, q.y) - h0) > 0.35:
+		if not w.is_walkable(q.x, q.y) or absf(w.height_at(q.x, q.y) - h0) > flat:
 			return false
 	var fps: Array = w.get_meta("poi_footprints", [])
 	for f in fps:
@@ -125,9 +215,15 @@ static func spot_ok(w: IslandWorld, p: Vector2, avoid: Array) -> bool:
 		var c: Vector2 = fd["c"]
 		if p.distance_to(c) < float(fd["r"]) + 1.0:
 			return false
+	var props: Array = w.get_meta("poi_props", [])
+	for f in props:
+		var pd: Dictionary = f
+		var pc: Vector2 = pd["c"]
+		if p.distance_to(pc) < float(pd["r"]) + 0.6:
+			return false
 	for e in avoid:
 		var v: Vector2 = e
-		if p.distance_to(v) < KEEP_AWAY:
+		if p.distance_to(v) < keep:
 			return false
 	return true
 
@@ -186,11 +282,13 @@ func talk_to(npc_id: String) -> void:
 	open_dialog(npc_id)
 
 
-## Открыть (перестроить) диалог с NPC на странице pg ("main" | "quests" | "quest"; для "quest" — задание qid).
+## Открыть (перестроить) диалог с NPC на странице pg ("main" | "quests" | "quest" | "info"; для "quest" —
+## задание qid, для "info" — путь пункта о делах NPC в qid: "forge", "guide/pets").
 func open_dialog(npc_id: String, pg: String = "main", qid: String = "") -> void:
 	dialog_npc = npc_id
 	page = pg
-	page_quest = qid
+	page_quest = qid if pg == "quest" else ""
+	page_info = qid if pg == "info" else ""
 	_build()
 
 
@@ -212,7 +310,7 @@ func is_dialog_open() -> bool:
 	return main.hud.is_window_open()
 
 
-## Приветствие NPC по положению дел с его заданиями.
+## Приветствие NPC по положению дел с его заданиями, а если о них сказать нечего — по положению героя.
 func greeting(npc_id: String) -> String:
 	var q: Quests = main.get("quests")
 	var kind := "idle"
@@ -226,7 +324,34 @@ func greeting(npc_id: String) -> String:
 			for k in ids:
 				if q.level_locked(String(k)):
 					kind = "wait"
+	if kind == "idle":
+		kind = situation(npc_id)
 	return NpcData.greet(npc_id, kind)
+
+
+## Вид реплики по положению героя (см. NpcData greet): "young" | "veteran" | "kin" | "full_bag" | "idle" —
+## первый подходящий из тех, что есть у NPC.
+static func situation(npc_id: String) -> String:
+	var d := NpcData.npc(npc_id)
+	if NpcData.has_greet(npc_id, "young") and Game.level < int(d.get("young_below", 0)):
+		return "young"
+	if NpcData.has_greet(npc_id, "veteran") and d.has("veteran_from") and Game.level >= int(d["veteran_from"]):
+		return "veteran"
+	if NpcData.has_greet(npc_id, "kin"):
+		if (d.has("race") and String(d["race"]) == Game.race_id) or (d.has("class") and String(d["class"]) == Game.class_id):
+			return "kin"
+	if NpcData.has_greet(npc_id, "full_bag") and Game.inventory.used_cells() >= Inventory.CAPACITY - 4:
+		return "full_bag"
+	return "idle"
+
+
+## Есть ли у NPC задания (выдаёт или принимает хоть одно) — пункт «Задания» в диалоге.
+static func gives_quests(npc_id: String) -> bool:
+	for k in QuestData.all_ids():
+		var id := String(k)
+		if QuestData.giver(id) == npc_id or QuestData.turn_in(id) == npc_id:
+			return true
+	return false
 
 
 func _build() -> void:
@@ -239,9 +364,11 @@ func _build() -> void:
 		"quests":
 			reply = _say_next if _say_next != "" else "Вот чем я могу тебя занять."
 			if q == null or q.npc_quests(dialog_npc).is_empty():
-				reply = _say_next if _say_next != "" else "Пока поручений нет. Загляни позже — у старого учителя всегда найдётся дело."
+				reply = _say_next if _say_next != "" else NpcData.no_quests(dialog_npc)
 		"quest":
 			reply = _quest_reply(page_quest)
+		"info":
+			reply = String(NpcData.talk_entry(dialog_npc, page_info).get("text", ""))
 		_:
 			reply = greeting(dialog_npc)
 	_say_next = ""
@@ -251,6 +378,8 @@ func _build() -> void:
 			_page_quests()
 		"quest":
 			_page_quest()
+		"info":
+			_page_info()
 		_:
 			_page_main()
 
@@ -260,17 +389,44 @@ func _page_main() -> void:
 	var opts := VBoxContainer.new()
 	opts.add_theme_constant_override("separation", int(UiScale.px(6)))
 	_body.add_child(opts)
-	var qt := "Задания"
-	if q != null:
-		match q.npc_mark(dialog_npc):
-			"ready":
-				qt += "  (?) — можно сдать"
-			"offer":
-				qt += "  (!) — есть новое"
-	opts.add_child(_option(qt, "opt_quests", _on_quests))
+	if gives_quests(dialog_npc):
+		var qt := "Задания"
+		if q != null:
+			match q.npc_mark(dialog_npc):
+				"ready":
+					qt += "  (?) — можно сдать"
+				"offer":
+					qt += "  (!) — есть новое"
+		opts.add_child(_option(qt, "opt_quests", _on_quests))
 	if NpcData.is_trader(dialog_npc):
 		opts.add_child(_option("Торговля", "opt_trade", _on_trade))
+	for e in NpcData.talk_options(dialog_npc):
+		var d: Dictionary = e
+		var id := String(d.get("id", ""))
+		var b := _option(NpcData.talk_label(d), "opt_" + id, _on_info.bind(id))
+		if bool(d.get("soon", false)):
+			b.add_theme_color_override("font_color", SOON)
+		opts.add_child(b)
 	opts.add_child(_option("До встречи", "opt_bye", close_dialog))
+
+
+## Страница пункта о делах NPC: рассказ (реплика), вложенные пункты (справочник мудреца) и «Назад».
+func _page_info() -> void:
+	var entry := NpcData.talk_entry(dialog_npc, page_info)
+	var topics: Array = entry.get("topics", [])
+	if not topics.is_empty():
+		# Пункты справочника — в две колонки, чтобы окно не вытягивалось
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", int(UiScale.px(6)))
+		grid.add_theme_constant_override("v_separation", int(UiScale.px(6)))
+		_body.add_child(grid)
+		for t in topics:
+			var td: Dictionary = t
+			var tid := String(td.get("id", ""))
+			grid.add_child(_option(NpcData.talk_label(td), "opt_" + tid, _on_info.bind(page_info + "/" + tid)))
+	var back := page_info.get_base_dir() if page_info.contains("/") else ""
+	_body.add_child(_option("Назад", "back", _on_info_back.bind(back)))
 
 
 func _page_quests() -> void:
@@ -350,6 +506,17 @@ func _on_quests() -> void:
 
 func _on_back() -> void:
 	open_dialog(dialog_npc, "main")
+
+
+func _on_info(path: String) -> void:
+	open_dialog(dialog_npc, "info", path)
+
+
+func _on_info_back(path: String) -> void:
+	if path == "":
+		open_dialog(dialog_npc, "main")
+	else:
+		open_dialog(dialog_npc, "info", path)
 
 
 func _on_quest(id: String) -> void:

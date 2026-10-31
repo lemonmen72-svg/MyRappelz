@@ -650,7 +650,69 @@ func run_step() -> void:
 		611:
 			player.hp = player.max_hp
 			shot("69_status_icons")
+			# Жители (кадры 70–75): площадь города с мудрецом, кузнецом, кладовщиком, Кирком и торговцем,
+			# крупно — старосты, охотница, глава наёмников (HUD скрыт)
+			player._set_target(null)
+			main.pets.recall()
+			main.hud.visible = false
+			_top = Camera3D.new()
+			main.add_child(_top)
+			_top.current = true
+			player.global_position = Vector3(0, 0.1, 3.0)
+			_look_from(Vector2(1.0, 21.0), 8.5, Vector2(0.0, -2.0), 1.0)
+			wait = 40
+			step = 700
+		700:
+			shot("70_npcs_town")
+			_npc_view("elder_human")
+			wait = 40
+			step = 701
+		701:
+			shot("71_npc_elders")
+			_npc_view("elder_light")
+			wait = 40
+			step = 702
+		702:
+			shot("72_npc_elder_light")
+			_npc_view("elder_dark")
+			wait = 40
+			step = 703
+		703:
+			shot("73_npc_elder_dark")
+			_npc_view("hunter")
+			wait = 40
+			step = 704
+		704:
+			shot("74_npc_hunter")
+			_npc_view("merc_chief")
+			wait = 40
+			step = 705
+		705:
+			shot("75_npc_merc_chief")
+			_top.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
+			player.visible = true
 			ok_done()
+
+
+## Камера _top в 3.4 м перед жителем, чуть сбоку; игрок (скрыт) у камеры — житель повернётся к ней.
+func _npc_view(id: String) -> void:
+	var n: Npc = main.npcs.npc(id)
+	if n == null:
+		return
+	var player: Player = main.player
+	var c := n.global_position
+	var dir := Vector3(-sin(n.face_yaw), 0, -cos(n.face_yaw)).rotated(Vector3.UP, 0.35)
+	var from := c + dir * 3.4
+	var w := IslandWorld.current
+	if w != null:
+		from.y = maxf(w.height_at(from.x, from.z), c.y) + 1.5
+	player.visible = false
+	player.global_position = Vector3(from.x, from.y - 1.4, from.z)
+	_top.global_position = from
+	_top.look_at(c + Vector3(0, 1.15, 0))
+	print("  %s: (%.1f, %.1f)" % [id, c.x, c.z])
 
 
 ## Игрок в 3 м от Учителя Кирка (со стороны площади), камера за игроком чуть сбоку — Кирк в кадре.
