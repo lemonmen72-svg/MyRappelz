@@ -3,8 +3,10 @@ extends Control
 ## Значок предмета (ячейки сумки, слоты экипировки, товары торговца, карточка предмета).
 ## Картинка: res://assets/icons/items/<id предмета>.png (PNG 128×128 с прозрачными углами), загружается только
 ## через ResourceLoader/load() — так находится и в собранном APK. Нет картинки — процедурный значок по полю
-## "icon" предмета (ItemData.icon_shape): мягкий круг цвета типа и простой силуэт (колба, свиток, кристалл,
-## клинки, арбалет, клык, шкура, перо, пластина, осколок); неизвестный — первая буква названия.
+## "icon" предмета (ItemData.icon_shape): мягкий круг цвета типа и простой силуэт (колба, свиток, карта существа,
+## кристалл, клинки, арбалет, клык, шкура, перо, пластина, осколок); неизвестный — первая буква названия.
+## Карта существа: вертикальная карточка с рамкой цвета тира и буквой вида; с душой — яркая, с сиянием;
+## зеркальная — серебристая с бликами отражения.
 
 ## Цвет контуров силуэтов.
 const INK := Color(0.08, 0.06, 0.12, 0.95)
@@ -65,6 +67,8 @@ func _draw() -> void:
 			_flask(base)
 		"scroll":
 			_scroll(base)
+		"card":
+			_card(base)
 		"crystal":
 			_crystal(base)
 		"daggers":
@@ -149,6 +153,58 @@ func _scroll(c: Color) -> void:
 		draw_line(_p(0.33, y), _p(0.67 - 0.08 * float(i), y), ink, _s(0.025), true)
 	draw_circle(_p(0.64, 0.62), _s(0.065), Color(0.85, 0.2, 0.25))
 	draw_circle(_p(0.64, 0.62), _s(0.03), Color(1.0, 0.75, 0.4))
+
+
+## Карта существа: вертикальная карточка, рамка цвета тира, в центре буква вида. С душой — яркий фон,
+## сияние и искры; зеркальная — серебро с косыми бликами.
+func _card(c: Color) -> void:
+	var sp := ItemData.card_species(item_id)
+	var soul := ItemData.is_soul_card(item_id)
+	var frame := ItemData.frame_color(item_id)
+	var r := Rect2(_p(0.22, 0.1), _p(0.56, 0.8))
+	if soul:
+		# Сияние вокруг карты
+		draw_circle(_p(0.5, 0.5), _s(0.47), Color(frame.r, frame.g, frame.b, 0.22))
+		draw_circle(_p(0.5, 0.5), _s(0.4), Color(1.0, 0.95, 0.75, 0.18))
+	var bg := c.darkened(0.55)
+	if sp == "":
+		bg = Color(0.62, 0.68, 0.78)
+	elif soul:
+		bg = c.lerp(Color.WHITE, 0.15)
+	draw_rect(r.grow(_s(0.025)), INK)
+	draw_rect(r, frame)
+	var inner := r.grow(-_s(0.05))
+	draw_rect(inner, bg)
+	if sp == "":
+		# Зеркало: косые блики и отражение рамки
+		var hl := Color(1, 1, 1, 0.55)
+		draw_line(_p(0.3, 0.42), _p(0.52, 0.2), hl, _s(0.05), true)
+		draw_line(_p(0.36, 0.56), _p(0.66, 0.26), Color(1, 1, 1, 0.3), _s(0.03), true)
+		draw_line(_p(0.42, 0.8), _p(0.7, 0.52), Color(1, 1, 1, 0.4), _s(0.04), true)
+		draw_rect(inner.grow(-_s(0.04)), Color(0.9, 0.94, 1.0, 0.6), false, _s(0.015))
+		return
+	# Узор: ромб-печать по центру и буква вида
+	var dia := _poly([Vector2(0.5, 0.26), Vector2(0.66, 0.5), Vector2(0.5, 0.74), Vector2(0.34, 0.5)])
+	draw_colored_polygon(dia, Color(frame.r, frame.g, frame.b, 0.35 if not soul else 0.6))
+	_outline(dia, Color(frame.r, frame.g, frame.b, 0.9), _s(0.015))
+	var font := ThemeDB.fallback_font
+	var fs := maxi(6, int(_s(0.3)))
+	var t := String(MobData.get_type(sp)["name"]).substr(0, 1).to_upper()
+	var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var tc := Color.WHITE if soul else Color(0.92, 0.88, 0.8)
+	draw_string_outline(font, _p(0.5, 0.5) + Vector2(-tw * 0.5, fs * 0.35), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs,
+		maxi(1, int(_s(0.03))), INK)
+	draw_string(font, _p(0.5, 0.5) + Vector2(-tw * 0.5, fs * 0.35), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, tc)
+	if soul:
+		# Искры души в углах
+		for e in [Vector2(0.32, 0.2), Vector2(0.68, 0.8), Vector2(0.7, 0.22)]:
+			var v: Vector2 = e
+			var sp2 := _p(v.x, v.y)
+			var a := _s(0.06)
+			var b := _s(0.015)
+			draw_colored_polygon(PackedVector2Array([sp2 + Vector2(0, -a), sp2 + Vector2(b, -b), sp2 + Vector2(a, 0),
+				sp2 + Vector2(b, b), sp2 + Vector2(0, a), sp2 + Vector2(-b, b), sp2 + Vector2(-a, 0), sp2 + Vector2(-b, -b)]),
+				Color(1, 1, 0.85, 0.95))
 
 
 ## Кристалл души: ромб с гранями и искоркой.

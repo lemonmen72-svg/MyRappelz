@@ -45,12 +45,13 @@ func run_step() -> void:
 			check(game.save_game(), "игра сохранена")
 			var lvl: int = game.level
 			var gold: int = game.gold
+			var cards: int = game.inventory.count("card_boar")
 			game.level = 99
 			game.gold = 0
 			game.inventory.from_dict({})
 			check(game.load_game(), "игра загружена")
 			check(game.level == lvl and game.gold == gold, "уровень и золото восстановлены")
-			check(game.inventory.count("crystal_common") == 3, "сумка восстановлена")
+			check(cards >= 3 and game.inventory.count("card_boar") == cards, "сумка восстановлена (карт кабана: %d)" % cards)
 			check(game.char_name == "Тест", "персонаж восстановлен")
 			# Герой игрока — всегда Наёмник: сохранённый воин (класс автотеста) переведён при загрузке
 			check(game.race_id == "dark_elf" and game.class_id == "assassin" and game.load_note != "",

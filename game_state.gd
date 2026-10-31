@@ -81,7 +81,8 @@ func new_character(n: String, race: String, cls: String) -> void:
 	race_id = race
 	class_id = cls
 	gold = 50
-	inventory.add("crystal_common", 3)
+	# Подарок новичку: карты кабана (кабаны водятся у деревень; дальше карты кабана только выпадают из кабанов)
+	inventory.add("card_boar", 3)
 	inventory.add("hp_potion", 3)
 	inventory.add("revive_scroll", 1)
 	hero = HeroSkills.new_record(cls, 1)
@@ -191,7 +192,13 @@ func from_dict(d: Dictionary) -> void:
 	level = int(d.get("level", 1))
 	xp = int(d.get("xp", 0))
 	gold = int(d.get("gold", 0))
-	inventory.from_dict(migrate_items(d.get("inventory", {})))
+	# Кристаллы души старых версий заменены картами (ItemData.RENAMED), за редкий — доплата золотом
+	var old_inv: Dictionary = d.get("inventory", {})
+	gold += ItemData.legacy_gold(old_inv)
+	var legacy_note := _legacy_note(old_inv)
+	if legacy_note != "":
+		load_note = legacy_note if load_note == "" else load_note + ". " + legacy_note
+	inventory.from_dict(migrate_items(old_inv))
 	inventory.load_layout(d.get("bag", []))
 	for p in d.get("pets", []):
 		var r: Dictionary = p
@@ -262,6 +269,14 @@ static func _load_toggles(src: Variant) -> Dictionary:
 		if bool(d[k]):
 			res[String(k)] = true
 	return res
+
+
+## Сообщение о замене кристаллов души картами ("" — кристаллов не было).
+static func _legacy_note(src: Dictionary) -> String:
+	for k in src:
+		if String(k).begins_with("crystal_") and int(src[k]) > 0:
+			return "Кристаллы души заменены картами: теперь зверей приручают картами существ"
+	return ""
 
 
 ## Сумка из сохранения с прежними id предметов (bear_claw и т. п.) → новые id, количества складываются.

@@ -103,13 +103,13 @@ func run_step() -> void:
 			main._on_action("shop")
 			check(hud.is_window_open() and eco.is_shop_open(), "окно магазина открыто")
 			check(_find_button("good_boar_tusk") == null, "трофеи не продаются торговцем")
-			# Покупка кристалла: касание товара → «Купить»
+			# Покупка карты существа: касание товара → «Купить»
 			game.gold = 100
-			var crystals: int = game.inventory.count("crystal_common")
-			_press("good_crystal_common")
+			var cards: int = game.inventory.count("card_panther")
+			_press("good_card_panther")
 			_press("act_buy")
-			check(game.gold == 75 and game.inventory.count("crystal_common") == crystals + 1,
-				"куплен кристалл: золото %d, кристаллов %d" % [game.gold, game.inventory.count("crystal_common")])
+			check(game.gold == 75 and game.inventory.count("card_panther") == cards + 1,
+				"куплена карта пантеры: золото %d, карт %d" % [game.gold, game.inventory.count("card_panther")])
 			# Покупка ×5
 			game.gold = 100
 			var potions: int = game.inventory.count("hp_potion")
@@ -118,10 +118,10 @@ func run_step() -> void:
 			check(game.gold == 50 and game.inventory.count("hp_potion") == potions + 5, "куплено 5 зелий")
 			# Не хватает золота
 			game.gold = 10
-			crystals = game.inventory.count("crystal_common")
-			_press("good_crystal_common")
+			cards = game.inventory.count("card_panther")
+			_press("good_card_panther")
 			_press("act_buy")
-			check(game.gold == 10 and game.inventory.count("crystal_common") == crystals, "без золота покупка не проходит")
+			check(game.gold == 10 and game.inventory.count("card_panther") == cards, "без золота покупка не проходит")
 			check(hud.is_window_open() and eco.is_shop_open(), "окно магазина открыто после покупок")
 			# Трофеи для продажи: окно перестроится само в следующем кадре
 			game.inventory.add("boar_tusk", 3)

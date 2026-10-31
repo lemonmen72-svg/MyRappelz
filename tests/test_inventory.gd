@@ -28,7 +28,7 @@ func run_step() -> void:
 			check(inv.equipped == game.weapon, "сумка знает надетое оружие")
 			check(inv.find_cell(game.weapon) == -1, "надетое оружие не занимает ячейку")
 			check(inv.count(game.weapon) == 1, "но числится в сумке (count)")
-			check(inv.used_cells() == 5, "занято ячеек: %d (2 оружия, зелья, свиток, кристаллы)" % inv.used_cells())
+			check(inv.used_cells() == 5, "занято ячеек: %d (2 оружия, зелья, свиток, карты кабана)" % inv.used_cells())
 			check(ItemData.is_weapon(String(inv.cell(0).get("id", ""))), "новая сумка разложена по порядку: оружие первым")
 			player.global_position = Vector3(0, 0.1, 7.0)
 			wait = 3
@@ -191,7 +191,10 @@ func run_step() -> void:
 			# Окно торговца: товары, сумка и карточка
 			main._on_action("shop")
 			check(eco.is_shop_open(), "окно торговца открыто")
-			check(win.buttons.has("good_crystal_common") and win.buttons.has("good_hp_potion"), "товары: кристалл, зелье")
+			check(win.buttons.has("good_card_panther") and win.buttons.has("good_mirror_card") and win.buttons.has("good_hp_potion"),
+				"товары: карта пантеры, зеркальная карта, зелье")
+			check(not win.buttons.has("good_card_boar") and not win.buttons.has("good_card_golem"),
+				"карты кабана и стража не продаются (только добыча)")
 			check(win.buttons.has("good_daggers_steel"), "оружие Наёмника в товарах")
 			check(not win.buttons.has("good_boar_tusk"), "трофеи не продаются")
 			check(win.buttons.has("cell_0"), "сумка в окне торговца")
@@ -307,8 +310,9 @@ func _unit_move_sort() -> void:
 	check(inv.move(12, 1) and int(inv.cell(1).get("n", 0)) == 99 and int(inv.cell(12).get("n", 0)) == 3,
 		"что не влезло в стопку, остаётся на месте")
 	inv.add("daggers_steel", 1)
-	inv.add("crystal_rare", 1)
-	inv.add("crystal_common", 2)
+	inv.add("mirror_card", 1)
+	inv.add("card_boar", 2)
+	inv.add("card_golem_soul", 1)
 	inv.move(inv.find_cell("daggers_steel"), 20)
 	inv.sort()
 	var order: Array = []
@@ -316,8 +320,8 @@ func _unit_move_sort() -> void:
 		var d: Dictionary = c
 		if not d.is_empty():
 			order.append(String(d["id"]))
-	check(order == ["daggers_steel", "hp_potion", "hp_potion", "crystal_rare", "crystal_common", "boar_tusk"],
-		"сортировка: оружие, расходники, кристаллы (редкий раньше), трофеи: %s" % [order])
+	check(order == ["daggers_steel", "hp_potion", "hp_potion", "card_golem_soul", "card_boar", "mirror_card", "boar_tusk"],
+		"сортировка: оружие, расходники, карты (жёлтая раньше коричневой, зеркальная в конце), трофеи: %s" % [order])
 	check(int(inv.cell(1).get("n", 0)) == 99 and int(inv.cell(2).get("n", 0)) == 3, "стопки собраны при сортировке")
 
 

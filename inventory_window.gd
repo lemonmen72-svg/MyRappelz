@@ -6,7 +6,8 @@ extends Node
 ## «скоро»), в центре — золото, занятость «N/40», «Сортировать» и сетка ячеек (COLS столбцов; если ячеек больше
 ## вместимости — окно прокручивается), справа — карточка выбранного: значок, название цветом редкости, тип и
 ## редкость, описание, характеристики (у оружия — сравнение с надетым: лучше зелёным, хуже красным), цена продажи
-## и кнопки по типу: «Надеть», «Использовать», «Продать» / «Продать все» (только рядом с торговцем),
+## и кнопки по типу: «Надеть», «Использовать», «Сформировать» (карта существа с душой — питомец в коллекцию),
+## «Продать» / «Продать все» (только рядом с торговцем),
 ## «Переместить», «Выбросить» (с подтверждением, у стопок — сколько).
 ## Пальцем: касание ячейки — карточка; «Переместить», затем касание другой ячейки — стопки одного предмета
 ## складываются, разные предметы меняются местами; то же — перетаскиванием значка (касания эмулируют мышь),
@@ -14,7 +15,7 @@ extends Node
 ## Торговец: слева — товары (касание — карточка с «Купить» / «Купить ×5»), в центре — сумка (касание — карточка
 ## с «Продать» / «Продать все»), справа — карточка.
 ## Кнопки открытого окна для тестов (buttons): "cell_<i>", "equip_<слот>", "good_<id>", "sort", "act_equip",
-## "act_use", "act_sell", "act_sell_all", "act_move", "act_move_cancel", "act_drop", "act_drop_yes", "act_drop_no",
+## "act_use", "act_form", "act_sell", "act_sell_all", "act_move", "act_move_cancel", "act_drop", "act_drop_yes", "act_drop_no",
 ## "act_drop_minus", "act_drop_plus", "act_drop_all", "act_buy", "act_buy5".
 
 const WINDOW_SIZE := Vector2(1240, 680)
@@ -344,7 +345,7 @@ func _card_head(card: VBoxContainer, id: String, sub: String) -> void:
 		var title := _text(ItemData.item_name(id), 22, _name_color(id))
 		title.name = "card_title"
 		info.add_child(title)
-		info.add_child(_text("%s · %s" % [ItemData.type_name(id), ItemData.rarity_name(id)], 17, MUTED))
+		info.add_child(_text("%s · %s" % [ItemData.type_name(id), ItemData.grade_name(id)], 17, MUTED))
 	if sub != "":
 		info.add_child(_text(sub, 17, GOLD))
 
@@ -371,6 +372,8 @@ func _card_item(card: VBoxContainer) -> void:
 		acts.append(["Надеть", "act_equip", _on_equip, not ItemData.weapon_fits(id, Game.class_id)])
 	elif _usable(id):
 		acts.append(["Использовать", "act_use", _on_use])
+	elif ItemData.is_soul_card(id):
+		acts.append(["Сформировать", "act_form", _on_form])
 	if sell > 0 and economy.is_near_merchant():
 		acts.append(["Продать", "act_sell", _on_sell.bind(false)])
 		if n > 1:
@@ -438,8 +441,9 @@ func _card_body(card: VBoxContainer, id: String, cmp: String) -> void:
 	match ItemData.item_type(id):
 		"weapon":
 			_weapon_stats(card, id, cmp)
-		"crystal":
-			card.add_child(_text("Тратится умением «Приручить»: метка на звере, затем зверя нужно добить.", 17, MUTED))
+		"card":
+			for line in Taming.card_lines(id):
+				card.add_child(_text(String(line), 17, MUTED))
 		"trophy":
 			card.add_child(_text("Продаётся торговцу в городе.", 17, MUTED))
 	if id == "hp_potion":
@@ -503,6 +507,8 @@ func _usable(id: String) -> bool:
 
 
 func _name_color(id: String) -> Color:
+	if ItemData.is_card(id):
+		return ItemData.frame_color(id).lerp(Color.WHITE, 0.3)
 	if ItemData.rarity(id) != "common":
 		return ItemData.rarity_color(id)
 	var c: Color = ItemData.get_item(id).get("color", Color.WHITE)
@@ -612,6 +618,12 @@ func _on_use() -> void:
 			main.pets.revive_any()
 		_:
 			_msg("Этот предмет нельзя использовать")
+	refresh()
+
+
+## «Сформировать»: существо из карты с душой — в коллекцию питомцев (Taming.form).
+func _on_form() -> void:
+	main.taming.form(sel_id)
 	refresh()
 
 

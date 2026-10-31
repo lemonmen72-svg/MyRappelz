@@ -1,8 +1,8 @@
 extends "res://tests/test_base.gd"
 ## Роли питомцев: танк провоцирует, лекарь лечит, маг бьёт снарядами и по площади, боец делает рывок.
 ## Новые виды: черепаха — танк, фазан — лекарь, пантера — маг (модели из файлов или запасные).
-## Удар по площади каменного стража, выбор кристалла, старший кристалл для базового зверя,
-## полная коллекция, снятие метки со зверя, ушедшего домой.
+## Удар по площади каменного стража, карта существа своего вида, приручение при полной коллекции (карта с душой
+## ждёт в сумке, формирование — отказ), снятие метки со зверя, ушедшего домой.
 
 const SPECIES := ["turtle", "pheasant", "panther", "wolf", "golem"]
 
@@ -15,7 +15,7 @@ func before_start() -> void:
 	for sp in SPECIES:
 		game.add_pet(sp, PetData.stage_name(sp, 1), 1)
 	game.active_pet = 0
-	game.inventory.add("crystal_rare", 1)
+	game.inventory.add("card_pheasant", 1)
 
 
 func run_step() -> void:
@@ -123,12 +123,11 @@ func run_step() -> void:
 			if timer > 60 * 20:
 				fail("страж не применяет удар по площади")
 		11:
-			# Выбор кристалла: самый дешёвый подходящий
-			check(tm.pick_crystal("boar") == "crystal_common", "для кабана — базовый кристалл")
-			check(tm.pick_crystal("pheasant") == "crystal_common", "для фазана — базовый кристалл")
-			check(tm.pick_crystal("golem") == "", "для стража кристалла нет")
-			check(tm.needed_crystal("golem") == "crystal_unique", "для стража нужен древний кристалл")
-			# Полная коллекция
+			# Карта существа — своя у каждого вида
+			check(ItemData.card_for("boar") == "card_boar" and ItemData.card_for("golem") == "card_golem", "карты видов")
+			check(Taming.badge_state("boar") == Taming.BADGE_READY, "карта кабана в сумке (подарок новичку)")
+			check(Taming.badge_state("golem") == Taming.BADGE_NEED_CARD, "карты стража нет")
+			# Полная коллекция: метка ставится (душа ляжет в карту), а формировать некуда
 			game.add_pet("boar", PetData.stage_name("boar", 1), 1)
 			check(game.pets.size() == Game.MAX_PETS, "коллекция полна")
 			mob = find_mob("boar")
@@ -137,11 +136,8 @@ func run_step() -> void:
 			player.current_target = mob
 			tm.cooldown = 0.0
 			main._on_action("tame")
-			check(tm.marked == null and not mob.tame_marked, "при полной коллекции метка не ставится")
-			game.remove_pet(game.pets.size() - 1)
+			check(tm.marked == mob and mob.tame_marked, "при полной коллекции метка ставится (карта с душой подождёт)")
 			# Метка снимается, когда зверь уходит домой
-			main._on_action("tame")
-			check(tm.marked == mob and mob.tame_marked, "метка поставлена")
 			check(mob.get("_mark") != null, "метка видна на звере")
 			mob.global_position = mob.home + Vector3(8, 0, 0)
 			mob.target = null
@@ -151,23 +147,27 @@ func run_step() -> void:
 			step = 12
 		12:
 			check(tm.marked == null and not mob.tame_marked, "метка снята со зверя, ушедшего домой")
-			# Базовый зверь без базовых кристаллов: подходит старший (редкий)
-			game.inventory.remove("crystal_common", game.inventory.count("crystal_common"))
-			check(tm.pick_crystal("pheasant") == "crystal_rare", "без базового кристалла для фазана — редкий")
+			# Фазан своей картой при полной коллекции: душа в карте, формирование — «Коллекция полна»
 			mob = find_mob("pheasant")
 			check(mob != null, "найден фазан")
 			stand_near(mob, 3.0)
 			player.current_target = mob
 			tm.cooldown = 0.0
 			main._on_action("tame")
-			check(tm.marked == mob and mob.tame_marked, "фазан помечен (редким кристаллом)")
-			var used: int = tm.crystals_used
-			var pets_before: int = game.pets.size()
+			check(tm.marked == mob and mob.tame_marked, "фазан помечен (карта фазана)")
+			var used: int = tm.attempts
+			tm.force_roll = 0.0
 			mob.take_damage(mob.hp + 5, player)
-			check(tm.crystals_used == used + 1, "редкий кристалл потрачен")
-			check(not game.inventory.has("crystal_rare"), "редкого кристалла больше нет")
-			if game.pets.size() > pets_before:
-				check(String(game.pets[pets_before]["species"]) == "pheasant", "приручен фазан")
+			tm.force_roll = -1.0
+			check(tm.attempts == used + 1, "попытка засчитана")
+			check(not game.inventory.has("card_pheasant") and game.inventory.has("card_pheasant_soul"),
+				"карта фазана стала картой с душой")
+			check(not tm.form("card_pheasant_soul"), "при полной коллекции не сформировать")
+			check(main.hud._msg_label.text.contains("Коллекция полна"), "сообщение: " + main.hud._msg_label.text)
+			check(game.inventory.has("card_pheasant_soul") and game.pets.size() == Game.MAX_PETS, "карта с душой осталась")
+			game.remove_pet(game.pets.size() - 1)
+			check(tm.form("card_pheasant_soul"), "место есть — существо сформировано")
+			check(String(game.pets[game.pets.size() - 1]["species"]) == "pheasant", "сформирован фазан")
 			ok_done()
 
 

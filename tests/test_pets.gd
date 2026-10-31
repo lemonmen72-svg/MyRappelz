@@ -1,5 +1,6 @@
 extends "res://tests/test_base.gd"
-## Питомцы: приручение кабана (метка → добить), уникальный страж без древнего кристалла, призыв/отзыв
+## Питомцы: приручение кабана картой существа (метка → победить → карта с душой → «Сформировать»), уникальный
+## страж без своей карты, призыв/отзыв
 ## через окно, помощь в бою и опыт, эволюция, смерть, воскрешение свитком, отпускание, сохранение
 ## коллекции, перевод старых видов и предметов (медведь, искрожук, фея) в новые при загрузке.
 
@@ -14,7 +15,7 @@ var hp_saved := 0
 
 
 func before_start() -> void:
-	game.inventory.add("crystal_common", 20)
+	game.inventory.add("card_boar", 17)
 	game.inventory.add("revive_scroll", 1)
 
 
@@ -36,13 +37,14 @@ func run_step() -> void:
 			for id in ["panther", "turtle", "pheasant"]:
 				check(String(MobData.get_type(id)["rarity"]) == "common", "%s — базовой редкости" % id)
 				check(MobData.rarity_name(id) == "Базовый", "редкость %s видна как «Базовый»" % id)
-				check(tm.needed_crystal(id) == "crystal_common", "%s приручается базовым кристаллом" % id)
+				check(ItemData.card_tier("card_" + id) == "basic", "%s ловится базовой (коричневой) картой" % id)
+				check(int(ItemData.get_item("card_" + id)["buy"]) > 0, "карта %s продаётся у торговца" % id)
 				var names: Array = PetData.get_species(id)["stages"]
 				check(names.size() == 3, "у вида %s три стадии: %s" % [id, str(names)])
 				for e in MobData.get_type(id)["loot"]:
 					var it := String(e[0])
 					check(not ItemData.get_item(it).is_empty(), "добыча %s есть в предметах: %s" % [id, it])
-			check(ItemData.get_item("crystal_common")["desc"].contains("базовых"), "кристалл — для базовых зверей")
+			check(ItemData.card_tier("card_golem") == "unique", "карта стража — уникальная (жёлтая)")
 			check(MobData.rarity_label("unique") == "Уникальный", "редкость стража — «Уникальный»")
 			check(PetData.role("boar") == "fighter" and PetData.role("wolf") == "fighter", "кабан и волк — бойцы")
 			check(PetData.stage_for(1) == 0 and PetData.stage_for(14) == 0, "стадия 1 до 15 уровня")
@@ -53,27 +55,30 @@ func run_step() -> void:
 			check(PetData.stage_scale("boar", 30) > PetData.stage_scale("boar", 1), "старшая стадия крупнее")
 			step = 1
 		1:
-			# Уникального стража без древнего кристалла не приручить
+			# Уникального стража без его карты не приручить
 			mob = find_mob("golem")
 			check(mob != null, "найден каменный страж")
 			stand_near(mob, 3.0)
 			player.current_target = mob
 			main._on_action("tame")
-			check(tm.marked == null and not mob.tame_marked, "без древнего кристалла метка не ставится")
+			check(tm.marked == null and not mob.tame_marked, "без карты стража метка не ставится")
 			var msg: String = main.hud._msg_label.text
-			check(msg.contains(ItemData.item_name("crystal_unique")), "сообщение о нужном кристалле: " + msg)
-			check(msg.contains("Уникальный"), "в сообщении редкость зверя: " + msg)
+			check(msg.contains("Нужна карта существа: Каменный страж"), "сообщение о нужной карте: " + msg)
+			check(msg.contains("выпадает из каменного стража"), "в сообщении — где взять карту: " + msg)
 			player.current_target = null
 			player.global_position = Vector3(0, 0.1, 2)
 			mob.target = null
 			mob.returning = true
 			step = 2
 		2:
-			# Приручение кабана: метка → добить → повторять до успеха
-			if game.pets.size() > 0:
+			# Приручение кабана: метка → победить → повторять до успеха (шанс настоящий), затем «Сформировать»
+			if game.inventory.has("card_boar_soul"):
+				check(tm.attempts == tries, "каждая попытка засчитана: %d" % tries)
+				check(game.pets.is_empty(), "до формирования питомца в коллекции нет")
+				check(tm.form("card_boar_soul"), "существо сформировано из карты с душой")
+				check(not game.inventory.has("card_boar_soul"), "карта с душой израсходована")
 				check(String(game.pets[0]["species"]) == "boar", "приручен кабан за %d попыток" % tries)
 				check(String(game.pets[0]["name"]) == PetData.stage_name("boar", 1), "имя питомца = название стадии 1")
-				check(tm.crystals_used == tries, "на каждую попытку потрачен кристалл")
 				step = 3
 				return
 			if tries >= MAX_TRIES:
@@ -87,10 +92,10 @@ func run_step() -> void:
 			tm.cooldown = 0.0
 			main._on_action("tame")
 			check(tm.marked == mob and mob.tame_marked, "метка приручения на кабане")
-			var used: int = tm.crystals_used
+			var used: int = tm.attempts
 			mob.take_damage(mob.hp + 5, player)
 			tries += 1
-			check(tm.crystals_used == used + 1, "кристалл потрачен (попытка %d)" % tries)
+			check(tm.attempts == used + 1, "попытка засчитана (%d)" % tries)
 			check(tm.marked == null and not mob.tame_marked, "метка снята после смерти зверя")
 		3:
 			check(pm.active_pet != null and game.active_pet == 0, "первый питомец сразу призван")

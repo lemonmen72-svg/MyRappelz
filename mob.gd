@@ -3,7 +3,7 @@ extends CharacterBody3D
 ## Дикий зверь: бродит около дома, нападает на игрока рядом, уходит домой с лечением.
 ## Модели видов строит CreatureModels (пантера, черепаха и фазан — модели из файлов, CreatureAsset:
 ## клипы Idle/Walk/Run по скорости, Attack с моментом удара, Hit, Death; пока зверь спит, анимации стоят).
-## Метка приручения (Taming) видна кольцом и кристаллом над головой.
+## Метка приручения (Taming) видна кольцом под зверем и ромбом-печатью над головой.
 ## Уникальный каменный страж раз в несколько секунд бьёт по площади (с замахом).
 
 ## killed = true: зверя убили, false: его забрали из мира (consume)
@@ -479,7 +479,7 @@ func taunt(by: Node3D, sec: float) -> void:
 	taunt_time = sec
 
 
-## Показать или убрать метку приручения (светящееся кольцо под зверем и кристалл над головой).
+## Показать или убрать метку приручения (светящееся кольцо под зверем и ромб-печать над головой).
 func set_tame_mark(on: bool) -> void:
 	var was := tame_marked
 	tame_marked = on
@@ -491,7 +491,7 @@ func set_tame_mark(on: bool) -> void:
 		Vfx.magic_burst(get_parent(), global_position + Vector3(0, _height * 0.5, 0), Vfx.TAME, 0.9 * maxf(body_scale, 0.8), 0.35)
 
 
-## Метка приручения: светящийся круг с рунным кольцом под зверем и кристалл души над головой.
+## Метка приручения: светящийся круг с рунным кольцом под зверем и ромб-печать над головой.
 func _build_mark() -> void:
 	var c := Vfx.TAME
 	_mark = Node3D.new()
@@ -516,7 +516,7 @@ func _build_mark() -> void:
 	ring.position.y = 0.07
 	ring.material_override = Vfx.fx_mat(Color(c, 0.7), null, true)
 	_mark.add_child(ring)
-	# Кристалл души: два конуса (ромб) и мягкое сияние
+	# Печать приручения: два конуса (ромб) и мягкое сияние
 	_mark_gem = Node3D.new()
 	_mark_gem.position.y = _height + 0.9
 	_mark.add_child(_mark_gem)

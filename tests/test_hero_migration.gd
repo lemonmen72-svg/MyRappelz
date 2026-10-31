@@ -15,7 +15,7 @@ func before_start() -> void:
 	var old := {
 		"version": 1, "name": "Максим", "race": "human", "class": "warrior",
 		"level": OLD_LEVEL, "xp": OLD_XP, "gold": OLD_GOLD,
-		"inventory": {"hp_potion": 4, "crystal_common": 2, "boar_tusk": 5},
+		"inventory": {"hp_potion": 4, "crystal_common": 2, "crystal_rare": 1, "boar_tusk": 5},
 		"weapon": "",
 		"hero": {"jp": 7, "jp_part": 0.5, "skills": {"cleave": 1, "war_cry": 1}, "toggles": {},
 			"slots": ["cleave", "war_cry", "", ""]},
@@ -37,10 +37,13 @@ func run_step() -> void:
 		0:
 			check(game.has_character and game.char_name == "Максим", "старое сохранение загружено при запуске")
 			check(game.race_id == "dark_elf" and game.class_id == "assassin", "воин стал Наёмником (тёмные эльфы)")
-			check(game.level == OLD_LEVEL and game.xp == OLD_XP and game.gold == OLD_GOLD, "уровень, опыт и золото сохранены")
+			# Редкий кристалл души → зеркальная карта + 30 зол.
+			check(game.level == OLD_LEVEL and game.xp == OLD_XP and game.gold == OLD_GOLD + 30,
+				"уровень, опыт и золото сохранены (+30 зол. за редкий кристалл): %d" % game.gold)
 			var inv: Inventory = game.inventory
-			check(inv.count("hp_potion") == 4 and inv.count("crystal_common") == 2 and inv.count("boar_tusk") == 5,
-				"сумка сохранена")
+			check(inv.count("hp_potion") == 4 and inv.count("mirror_card") == 3 and inv.count("boar_tusk") == 5,
+				"сумка сохранена, кристаллы души стали зеркальными картами")
+			check(not inv.has("crystal_common") and not inv.has("crystal_rare"), "кристаллов в сумке нет")
 			for id in ItemData.STARTER_WEAPONS["assassin"]:
 				check(inv.has(String(id)), "выдано: %s" % ItemData.item_name(String(id)))
 			check(game.weapon == "dual_swords_starter" and player.weapon_kind == "dual_swords", "надеты парные мечи")

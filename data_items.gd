@@ -1,28 +1,76 @@
 class_name ItemData
 extends RefCounted
-## Предметы. type: "crystal" (приручение), "consumable" (расходник), "trophy" (на продажу), "weapon" (оружие).
+## Предметы. type: "card" (карта существа — приручение), "consumable" (расходник), "trophy" (на продажу),
+## "weapon" (оружие).
 ## buy: цена у торговца (0 = не продаётся), sell: цена продажи торговцу.
 ## Оружие (type "weapon"): weapon — вид ("daggers" парные кинжалы, "dual_swords" парные мечи, "crossbow" арбалет),
 ## atk — прибавка к атаке, cd — время между обычными атаками, с, range — дальность, м, crit — прибавка к шансу крита,
 ## class — кому подходит (id класса ClassData). Надетое оружие — Game.weapon (id предмета, лежит в сумке,
 ## но в окне сумки показано в слоте экипировки, а не в ячейке).
 ## Для окна сумки: rarity — редкость ("common" по умолчанию, "improved", "rare", "unique": цвет рамки ячейки),
-## icon — что рисовать процедурным значком, пока нет картинки (ItemIcon: "flask", "scroll", "crystal",
+## icon — что рисовать процедурным значком, пока нет картинки (ItemIcon: "flask", "scroll", "card",
 ## "daggers", "swords", "crossbow", "fang", "pelt", "feather", "plate", "shard"), stack — размер стопки в ячейке
 ## (по умолчанию 99, у оружия 1). Картинка значка: res://assets/icons/items/<id>.png (128×128, прозрачные углы).
+## Карты существ (type "card", приручение — Taming): species — вид зверя (MobData), soul = true — карта с пойманной
+## душой (из неё формируется питомец). Пустая карта вида — card_<вид> (стопка до CARD_STACK), заполненная —
+## card_<вид>_soul (по одной в ячейке), зеркальная карта mirror_card (без вида) — ломается вместо карты существа
+## при неудачном приручении. Тир и цвет карты — по виду (MobData.card_tier, CARD_TIERS).
 
 const ITEMS := {
-	"crystal_common": {
-		"name": "Кристалл души", "type": "crystal", "tier": 1, "icon": "crystal", "buy": 25, "sell": 8,
-		"color": Color(0.6, 0.8, 1.0), "desc": "Приручение базовых зверей.",
+	# ---------- Карты существ: базовые продаёт торговец, остальные выпадают из зверей своего вида ----------
+	"card_panther": {
+		"name": "Карта существа: Пантера", "type": "card", "species": "panther", "icon": "card", "stack": 20,
+		"buy": 25, "sell": 8, "color": Color(0.62, 0.52, 0.78), "desc": "Чистая карта: ловит дух пантеры.",
 	},
-	"crystal_rare": {
-		"name": "Редкий кристалл души", "type": "crystal", "tier": 2, "rarity": "rare", "icon": "crystal", "buy": 0, "sell": 30,
-		"color": Color(0.4, 0.5, 1.0), "desc": "Приручение базовых и редких зверей.",
+	"card_turtle": {
+		"name": "Карта существа: Черепаха", "type": "card", "species": "turtle", "icon": "card", "stack": 20,
+		"buy": 25, "sell": 8, "color": Color(0.5, 0.72, 0.45), "desc": "Чистая карта: ловит дух черепахи.",
 	},
-	"crystal_unique": {
-		"name": "Древний кристалл души", "type": "crystal", "tier": 3, "rarity": "unique", "icon": "crystal", "buy": 0, "sell": 100,
-		"color": Color(1.0, 0.8, 0.2), "desc": "Приручение любых зверей, даже стражей.",
+	"card_pheasant": {
+		"name": "Карта существа: Фазан", "type": "card", "species": "pheasant", "icon": "card", "stack": 20,
+		"buy": 25, "sell": 8, "color": Color(0.9, 0.58, 0.3), "desc": "Чистая карта: ловит дух фазана.",
+	},
+	"card_boar": {
+		"name": "Карта существа: Кабан", "type": "card", "species": "boar", "icon": "card", "stack": 20,
+		"buy": 0, "sell": 10, "color": Color(0.72, 0.5, 0.32), "desc": "Чистая карта: ловит дух кабана.",
+	},
+	"card_wolf": {
+		"name": "Карта существа: Волк", "type": "card", "species": "wolf", "icon": "card", "stack": 20,
+		"buy": 0, "sell": 12, "color": Color(0.66, 0.68, 0.74), "desc": "Чистая карта: ловит дух волка.",
+	},
+	"card_golem": {
+		"name": "Карта существа: Каменный страж", "type": "card", "species": "golem", "icon": "card", "stack": 20,
+		"buy": 0, "sell": 100, "color": Color(0.7, 0.7, 0.62), "desc": "Чистая карта: ловит дух каменного стража.",
+	},
+	"card_panther_soul": {
+		"name": "Карта пантеры (с душой)", "type": "card", "species": "panther", "soul": true, "icon": "card",
+		"stack": 1, "buy": 0, "sell": 15, "color": Color(0.62, 0.52, 0.78), "desc": "В карте спит пойманная душа пантеры.",
+	},
+	"card_turtle_soul": {
+		"name": "Карта черепахи (с душой)", "type": "card", "species": "turtle", "soul": true, "icon": "card",
+		"stack": 1, "buy": 0, "sell": 15, "color": Color(0.5, 0.72, 0.45), "desc": "В карте спит пойманная душа черепахи.",
+	},
+	"card_pheasant_soul": {
+		"name": "Карта фазана (с душой)", "type": "card", "species": "pheasant", "soul": true, "icon": "card",
+		"stack": 1, "buy": 0, "sell": 15, "color": Color(0.9, 0.58, 0.3), "desc": "В карте спит пойманная душа фазана.",
+	},
+	"card_boar_soul": {
+		"name": "Карта кабана (с душой)", "type": "card", "species": "boar", "soul": true, "icon": "card",
+		"stack": 1, "buy": 0, "sell": 15, "color": Color(0.72, 0.5, 0.32), "desc": "В карте спит пойманная душа кабана.",
+	},
+	"card_wolf_soul": {
+		"name": "Карта волка (с душой)", "type": "card", "species": "wolf", "soul": true, "icon": "card",
+		"stack": 1, "buy": 0, "sell": 18, "color": Color(0.66, 0.68, 0.74), "desc": "В карте спит пойманная душа волка.",
+	},
+	"card_golem_soul": {
+		"name": "Карта каменного стража (с душой)", "type": "card", "species": "golem", "soul": true, "icon": "card",
+		"stack": 1, "buy": 0, "sell": 150, "color": Color(0.7, 0.7, 0.62),
+		"desc": "В карте спит пойманная душа каменного стража.",
+	},
+	"mirror_card": {
+		"name": "Зеркальная карта", "type": "card", "icon": "card", "stack": 20, "buy": 60, "sell": 20,
+		"color": Color(0.82, 0.88, 0.98),
+		"desc": "Оберег для приручения: если попытка не удалась, ломается зеркальная карта, а карта существа остаётся цела.",
 	},
 	"hp_potion": {
 		"name": "Зелье здоровья", "type": "consumable", "icon": "flask", "buy": 10, "sell": 3,
@@ -84,8 +132,14 @@ const STARTER_WEAPONS := {
 	"assassin": ["dual_swords_starter", "daggers_starter", "crossbow_starter"],
 }
 
-## Прежние id предметов → новые (старые сохранения переводит Game.from_dict).
-const RENAMED := {"bear_claw": "panther_fang", "fairy_dust": "pheasant_feather", "spark_core": "shell_plate"}
+## Прежние id предметов → новые (старые сохранения переводит Game.from_dict). Кристаллы души заменены картами:
+## базовый и редкий кристалл — зеркальная карта (за редкий ещё LEGACY_GOLD), древний (ловил стража) — карта стража.
+const RENAMED := {
+	"bear_claw": "panther_fang", "fairy_dust": "pheasant_feather", "spark_core": "shell_plate",
+	"crystal_common": "mirror_card", "crystal_rare": "mirror_card", "crystal_unique": "card_golem",
+}
+## Доплата золотом за каждый прежний предмет при переводе (редкий кристалл дороже зеркальной карты по продаже).
+const LEGACY_GOLD := {"crystal_rare": 30}
 
 
 static func get_item(id: String) -> Dictionary:
@@ -99,6 +153,14 @@ static func item_name(id: String) -> String:
 ## Новый id предмета по прежнему (из старого сохранения); остальные — как есть.
 static func migrate_id(id: String) -> String:
 	return String(RENAMED.get(id, id))
+
+
+## Доплата золотом за прежние предметы сумки {id: количество} (LEGACY_GOLD).
+static func legacy_gold(src: Dictionary) -> int:
+	var g := 0
+	for k in src:
+		g += int(LEGACY_GOLD.get(String(k), 0)) * maxi(0, int(src[k]))
+	return g
 
 
 static func is_weapon(id: String) -> bool:
@@ -150,12 +212,12 @@ static func weapon_stats_text(id: String) -> String:
 
 # ---------- Сумка: типы, редкость, стопки, значки ----------
 
-## Типы предметов: название, порядок сортировки, цвет рамки (у обычных расходников, кристаллов, трофеев).
+## Типы предметов: название, порядок сортировки, цвет рамки (у обычных расходников и трофеев; у карт — цвет тира).
 const TYPES := {
 	"weapon": {"name": "Оружие", "order": 0, "color": Color(0.7, 0.72, 0.78)},
 	"armor": {"name": "Доспех", "order": 1, "color": Color(0.7, 0.72, 0.78)},
 	"consumable": {"name": "Расходник", "order": 2, "color": Color(0.95, 0.45, 0.5)},
-	"crystal": {"name": "Кристалл души", "order": 3, "color": Color(0.45, 0.85, 1.0)},
+	"card": {"name": "Карта существа", "order": 3, "color": Color(0.78, 0.56, 0.34)},
 	"trophy": {"name": "Трофей", "order": 4, "color": Color(0.85, 0.65, 0.4)},
 }
 ## Редкость: название, ранг (для сортировки), цвет рамки и названия.
@@ -167,6 +229,18 @@ const RARITIES := {
 }
 ## Размер стопки в ячейке сумки по умолчанию (у оружия — 1).
 const STACK := 99
+## Тиры карт существ (как в руководстве: цвет карты по группе зверя): название, цвет, ранг (сортировка).
+## Базовая (коричневая) — обычные звери; редкая (синяя) — боссы поверхности и чемпионы; особая (фиолетовая);
+## уникальная (жёлтая) — боссы. Синих и фиолетовых пока нет (нет таких зверей).
+const CARD_TIERS := {
+	"basic": {"name": "базовая", "color_name": "коричневая", "rank": 0, "color": Color(0.8, 0.56, 0.32)},
+	"rare": {"name": "редкая", "color_name": "синяя", "rank": 1, "color": Color(0.36, 0.58, 1.0)},
+	"special": {"name": "особая", "color_name": "фиолетовая", "rank": 2, "color": Color(0.72, 0.42, 1.0)},
+	"unique": {"name": "уникальная", "color_name": "жёлтая", "rank": 3, "color": Color(1.0, 0.82, 0.25)},
+}
+## Зеркальная карта: id и цвет рамки (серебро).
+const MIRROR_CARD := "mirror_card"
+const MIRROR_COLOR := Color(0.8, 0.86, 0.96)
 ## Картинки значков предметов: <ICON_DIR><id>.png (нет файла — процедурный значок ItemIcon).
 const ICON_DIR := "res://assets/icons/items/"
 
@@ -192,8 +266,11 @@ static func rarity_color(id: String) -> Color:
 	return RARITIES[rarity(id)]["color"]
 
 
-## Цвет рамки ячейки: по редкости (у оружия и необычных предметов), иначе по типу.
+## Цвет рамки ячейки: у карт — цвет тира (зеркальная — серебро), иначе по редкости (у оружия и необычных
+## предметов) или по типу.
 static func frame_color(id: String) -> Color:
+	if is_card(id):
+		return MIRROR_COLOR if card_species(id) == "" else card_tier_color(card_tier(id))
 	var r := rarity(id)
 	if r != "common" or is_weapon(id) or not TYPES.has(item_type(id)):
 		return RARITIES[r]["color"]
@@ -208,7 +285,7 @@ static func stack_size(id: String) -> int:
 	return maxi(1, int(get_item(id).get("stack", STACK)))
 
 
-## Что рисовать процедурным значком ("flask", "crystal", ...; "" — буква названия).
+## Что рисовать процедурным значком ("flask", "card", ...; "" — буква названия).
 static func icon_shape(id: String) -> String:
 	return String(get_item(id).get("icon", ""))
 
@@ -217,14 +294,15 @@ static func icon_path(id: String) -> String:
 	return ICON_DIR + id + ".png"
 
 
-## Порядок в сумке: тип, затем редкость (лучшие раньше), название, id.
+## Порядок в сумке: тип, затем редкость (лучшие раньше; у карт — тир, заполненные раньше пустых, зеркальные
+## в конце), название, id.
 static func sort_before(a: String, b: String) -> bool:
 	var ta := int(TYPES.get(item_type(a), {}).get("order", 9))
 	var tb := int(TYPES.get(item_type(b), {}).get("order", 9))
 	if ta != tb:
 		return ta < tb
-	var ra := int(RARITIES[rarity(a)]["rank"])
-	var rb := int(RARITIES[rarity(b)]["rank"])
+	var ra := _sort_rank(a)
+	var rb := _sort_rank(b)
 	if ra != rb:
 		return ra > rb
 	var na := item_name(a)
@@ -232,3 +310,74 @@ static func sort_before(a: String, b: String) -> bool:
 	if na != nb:
 		return na < nb
 	return a < b
+
+
+static func _sort_rank(id: String) -> int:
+	if is_card(id):
+		if card_species(id) == "":
+			return -1
+		return int(CARD_TIERS[card_tier(id)]["rank"]) * 2 + (1 if is_soul_card(id) else 0)
+	return int(RARITIES[rarity(id)]["rank"])
+
+
+# ---------- Карты существ ----------
+
+static func is_card(id: String) -> bool:
+	return item_type(id) == "card"
+
+
+## Вид зверя карты ("" — не карта существа или зеркальная).
+static func card_species(id: String) -> String:
+	return String(get_item(id).get("species", "")) if is_card(id) else ""
+
+
+## Карта с пойманной душой (из неё формируется существо).
+static func is_soul_card(id: String) -> bool:
+	return is_card(id) and bool(get_item(id).get("soul", false))
+
+
+## Пустая карта существа (ловит дух своего вида).
+static func is_empty_card(id: String) -> bool:
+	return card_species(id) != "" and not is_soul_card(id)
+
+
+## Пустая карта вида species ("" — у вида нет карты).
+static func card_for(species: String) -> String:
+	var id := "card_" + species
+	return id if is_empty_card(id) else ""
+
+
+## Заполненная карта вида species ("" — нет).
+static func soul_card_for(species: String) -> String:
+	var id := "card_%s_soul" % species
+	return id if is_soul_card(id) else ""
+
+
+## Тир карты: "basic" | "rare" | "special" | "unique" ("" — зеркальная или не карта).
+static func card_tier(id: String) -> String:
+	var sp := card_species(id)
+	if sp == "":
+		return ""
+	var t := MobData.card_tier(sp)
+	return t if CARD_TIERS.has(t) else "basic"
+
+
+static func card_tier_color(tier: String) -> Color:
+	return CARD_TIERS.get(tier, CARD_TIERS["basic"])["color"]
+
+
+## Тир словами: «коричневая (базовая)».
+static func card_tier_label(tier: String) -> String:
+	var t: Dictionary = CARD_TIERS.get(tier, CARD_TIERS["basic"])
+	return "%s (%s)" % [String(t["color_name"]), String(t["name"])]
+
+
+## Вторая строка в карточке предмета после типа: у карт — тир («Коричневая (базовая)»), у зеркальной —
+## «Оберег», у остальных — редкость.
+static func grade_name(id: String) -> String:
+	if is_card(id):
+		if card_species(id) == "":
+			return "Оберег"
+		var t := card_tier_label(card_tier(id))
+		return t.substr(0, 1).to_upper() + t.substr(1)
+	return rarity_name(id)

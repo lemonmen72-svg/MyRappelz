@@ -2,6 +2,9 @@ class_name HUD
 extends CanvasLayer
 ## Интерфейс: плавающий джойстик (левая нижняя часть экрана), круглые кнопки действий справа,
 ## панели игрока (HP, MP, опыт), питомца и цели, окна (герой, питомцы, сумка, торговец).
+## У зверя-цели слева от полоски HP — значок приручения (Taming.badge_state): зелёный кружок — можно приручить
+## и нужная карта существа в сумке, жёлто-серый — можно, но карты нет, фиолетовый — нельзя приручить;
+## левее — квадратик цвета тира карты (коричневый, синий, фиолетовый, жёлтый).
 ## На ПК: WASD/стрелки, Пробел = атака, 1–4 = умения, T = приручить, Q = зелье, K = окно героя,
 ## P = питомцы, C = окно существа, I или B = сумка, E = торговец, F = питомец атакует, G = питомец за мной, O = настройки.
 
@@ -49,6 +52,13 @@ var _pet_mp_bar: ProgressBar
 var _target_box: Control
 var _target_label: Label
 var _target_bar: ProgressBar
+## Значок приручения цели и квадратик тира карты.
+var _tame_badge: Panel
+var _tame_tier: Panel
+## Что сейчас показывает значок: "" (скрыт), Taming.BADGE_READY / BADGE_NEED_CARD / BADGE_NO.
+var target_tame_state := ""
+## Тир карты цели ("basic", "rare", "special", "unique"; "" — значок скрыт).
+var target_card_tier := ""
 var _msg_label: Label
 var _msg_time := 0.0
 var _menu: HBoxContainer
@@ -85,6 +95,9 @@ func _ready() -> void:
 	_target_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_target_label.size = Vector2(480, 30)
 	_target_bar = _bar(_target_box, Vector2(0, 32), Vector2(320, 16), Color(0.9, 0.35, 0.2))
+	_tame_badge = _square(_target_box, Vector2(-30, 29), 22.0, 11)
+	_tame_tier = _square(_target_box, Vector2(-47, 34), 12.0, 2)
+	_set_tame_badge("", "")
 	_target_box.visible = false
 
 	_msg_label = _label(self, Vector2(0, 190), 28)
@@ -320,6 +333,43 @@ func _circle(radius: float, fill: Color) -> Panel:
 	return p
 
 
+## Маленький значок (кружок при radius = sz/2, квадратик при малом radius) на панели цели.
+func _square(parent: Node, pos: Vector2, sz: float, radius: int) -> Panel:
+	var p := Panel.new()
+	p.position = pos
+	p.size = Vector2(sz, sz)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color.WHITE
+	sb.set_corner_radius_all(radius)
+	sb.border_color = Color(1.0, 0.95, 0.82, 0.9)
+	sb.set_border_width_all(2)
+	sb.anti_aliasing = true
+	p.add_theme_stylebox_override("panel", sb)
+	parent.add_child(p)
+	return p
+
+
+## Значок приручения цели: state — Taming.BADGE_* ("" — скрыть), tier — тир карты.
+func _set_tame_badge(state: String, tier: String) -> void:
+	if state == target_tame_state and tier == target_card_tier and _tame_badge.visible == (state != ""):
+		return
+	target_tame_state = state
+	target_card_tier = tier
+	_tame_badge.visible = state != ""
+	_tame_tier.visible = state != "" and tier != ""
+	if state == "":
+		return
+	var c := Color(0.62, 0.36, 0.95)
+	if state == Taming.BADGE_READY:
+		c = Color(0.3, 0.92, 0.42)
+	elif state == Taming.BADGE_NEED_CARD:
+		c = Color(0.74, 0.7, 0.5)
+	(_tame_badge.get_theme_stylebox("panel") as StyleBoxFlat).bg_color = c
+	if tier != "":
+		(_tame_tier.get_theme_stylebox("panel") as StyleBoxFlat).bg_color = ItemData.card_tier_color(tier)
+
+
 func _bar(parent: Node, pos: Vector2, sz: Vector2, col: Color) -> ProgressBar:
 	var b := ProgressBar.new()
 	b.show_percentage = false
@@ -499,8 +549,16 @@ func _refresh_target() -> void:
 	if _target == null or not is_instance_valid(_target) or _target.get("is_dead") == true:
 		_target = null
 		_target_box.visible = false
+		_set_tame_badge("", "")
 		return
 	_target_box.visible = true
+	var tid = _target.get("type_id")
+	if tid is String:
+		var sp := String(tid)
+		var st := Taming.badge_state(sp)
+		_set_tame_badge(st, MobData.card_tier(sp) if st != Taming.BADGE_NO else "")
+	else:
+		_set_tame_badge("", "")
 	var rarity = _target.get("rarity")
 	if rarity is String:
 		_target_label.text = "%s · %s  Ур.%d" % [_target.get("mob_name"), MobData.rarity_label(rarity), _target.get("level")]
