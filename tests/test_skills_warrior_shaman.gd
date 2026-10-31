@@ -430,7 +430,7 @@ func _w_venom_check() -> int:
 ## одного зверя обычными атаками и с умениями (урон умений — по их перезарядке, кровотечение и яд — целиком).
 func _ttk(lvl: int, edge: String = "") -> Vector2:
 	var p: Player = main.player
-	var keep := game.level
+	var keep: int = game.level
 	game.level = lvl
 	p.recalc_stats()
 	var basic := 0.0
