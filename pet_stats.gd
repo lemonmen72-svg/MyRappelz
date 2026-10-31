@@ -149,7 +149,8 @@ static func calibration(species: String) -> Dictionary:
 ## Ключи: stats (7 статов с бонусами), max_hp, max_mp, patk, matk, heal, atk (главная атака роли),
 ## def, mdef, acc (точность), avoid (избегание), eva и crit (%, 0..100), aspd (% скорости атаки), hp_regen и mp_regen (в секунду),
 ## speed, range, cd (перезарядка обычной атаки с учётом скорости), threat (шанс перехватить внимание зверя 0..1).
-static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles: Dictionary = {}) -> Dictionary:
+## extra — прибавки 7 статов от героя ({"str": 3, …}: ауры и усиления «питомцевых» профессий, PetBond.stat_extra).
+static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles: Dictionary = {}, extra: Dictionary = {}) -> Dictionary:
 	var sp := PetData.get_species(species)
 	var lv := clampi(lvl, 1, PetData.MAX_LEVEL)
 	var bon := PetSkills.bonuses(species, skills, toggles)
@@ -158,6 +159,10 @@ static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles:
 	if all_up != 0:
 		for key in STATS:
 			s[key] = int(s[key]) + all_up
+	# Статы от героя (PetBond: ауры, пассивки, усиления на время)
+	for key in extra:
+		if s.has(key):
+			s[key] = int(s[key]) + roundi(float(extra[key]))
 	var k := calibration(species)
 	var kh := float(k["hp"])
 	var ka := float(k["atk"])
