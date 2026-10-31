@@ -682,6 +682,8 @@ func try_attack() -> bool:
 	if attack_kind == "melee":
 		if hit:
 			_deal(target, dmg)
+			# Доп. урон стихией («Сияющее лезвие», «Теневая печать»: HeroSkillFx.on_basic_hit)
+			_fx.on_basic_hit(target)
 		else:
 			_miss_text(target)
 		Vfx.slash_arc(get_parent(), target.aim_point(),
@@ -689,10 +691,10 @@ func try_attack() -> bool:
 		if twice:
 			get_tree().create_timer(HIT_GAP).timeout.connect(_late_hit.bind(target, basic_mult, 0.0, false, true))
 	else:
-		var cb := Callable()
-		if mp_drain > 0.0:
-			cb = func(_hit: Mob, dealt: int) -> void:
+		var cb := func(hit_mob: Mob, dealt: int) -> void:
+			if mp_drain > 0.0:
 				_gain_mp(float(dealt) * mp_drain)
+			_fx.on_basic_hit(hit_mob)
 		_shoot(target, dmg, 1.0, cb, not hit)
 		if twice:
 			get_tree().create_timer(HIT_GAP).timeout.connect(_late_shot.bind(target, basic_mult, 0.0, false, cb, true))
@@ -1140,6 +1142,8 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 		amount = maxi(1, roundi(float(amount) * (1.0 - guard)))
 	if skill_guard > 0.0:
 		amount = maxi(1, roundi(float(amount) * (1.0 - skill_guard)))
+	# Ответный урон («Колючий щит»: HeroSkillFx.on_hurt)
+	_fx.on_hurt(attacker, amount)
 	hp -= amount
 	regen_delay = REST_DELAY
 	if _has_model():

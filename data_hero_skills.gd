@@ -289,6 +289,8 @@ const BONUS_NAMES := {
 	"def_pct": "защита", "matk_pct": "маг. атака", "mdef_flat": "маг. защита", "mp_pct": "макс. MP", "hp_flat": "макс. HP",
 	"regen": "восстановление HP", "guard": "получаемый урон", "block": "шанс блока", "cdr": "перезарядка умений",
 	"cast": "скорость каста",
+	"skill_pct": "урон умений", "fire_pct": "урон огненных умений", "reflect": "ответный урон",
+	"light_hit": "урон светом обычных атак", "dark_hit": "урон тьмой обычных атак",
 	"str": "Сила", "vit": "Выносливость", "agi": "Ловкость", "int": "Интеллект", "wis": "Мудрость", "dex": "Меткость",
 	"luck": "Удача",
 }
@@ -297,6 +299,8 @@ const STATUS_NAMES := {
 	"stun": "оглушение", "sleep": "сон (будит удар)", "fear": "страх: зверь убегает", "slow": "бег медленнее",
 	"root": "держит на месте", "blind": "морок: все удары мимо", "miss": "промахи", "vuln": "урон по зверю выше",
 	"weak": "удары зверя слабее", "taunt": "зверь бьёт героя",
+	"armor": "защита зверя ниже", "ward": "маг. защита зверя ниже", "aslow": "зверь бьёт реже",
+	"snare": "зверь не может сдвинуться с места",
 }
 
 ## Движок эффектов (данные умения; применяет HeroSkillFx, вызывает Player.use_skill):
@@ -318,7 +322,16 @@ const STATUS_NAMES := {
 ##   {"do": "knock", "dist"} — отбросить;
 ##   {"do": "buff", "who": "self" | "pet" | "both", "time", "bonus": {ключ: массив}} — усиление на время
 ##     (значок у полоски HP, Player.timed_bonus; питомцу — этап 2);
-##   {"do": "special", "handler": "<имя>"} — особая механика: метод sp_<имя>(sid, n, target, e) в HeroSkillFx.
+##   {"do": "special", "handler": "<имя>", "say": "текст с {pct:ключ} / {num:ключ}"} — особая механика: метод
+##     sp_<имя>(sid, n, target, e) в HeroSkillFx или обработчик профессии (job_fx_*.gd, HeroSkillFx.job_special;
+##     имена с префиксом профессии: sw_ — Мечник, wz_ — Волшебник, ne_ — Неофит: "ne_zone" — зона на земле,
+##     "ne_volley" — серия снарядов, "ne_corpse_hp" / "ne_corpse_mp" — тело зверя, "wz_revive_pet", "wz_renew" и др.);
+##     say — строка карточки умения (без него — desc).
+##   Статусы зверя сверх Mob: "armor" / "ward" — защита / маг. защита ниже на долю value, "aslow" — удары реже на
+##     value, "snare" — не сдвинуться с места (бить рядом может) — JobFxNeophyte.MODS.
+##   Бонусы сверх Player.recalc_stats (считает HeroSkillFx.bonuses): "skill_pct" — урон умений, "fire_pct" — урон
+##     огненных умений, "reflect" — доля урона по герою ударившему зверю, "light_hit" / "dark_hit" — доп. урон
+##     обычной атаки светом / тьмой (доля маг. атаки).
 ##   Числа эффектов — массивы по уровням умения (или одно число).
 ## Наёмник (SKILLS выше) — прежний формат активных (target, mult, flat, hits, crit, heal, sleep, fear, knock, root,
 ##   dot, buff), его применяет Player._cast_hero.
@@ -803,6 +816,12 @@ static func bonus_text(key: String, v: float) -> String:
 	match key:
 		"eva", "crit", "atk_pct", "hp_pct", "speed_pct", "aspd", "basic_pct", "def_pct", "matk_pct", "mp_pct", "block", "cast":
 			return "%s +%s" % [String(BONUS_NAMES[key]), _pct(v)]
+		"skill_pct", "fire_pct":
+			return "%s +%s" % [String(BONUS_NAMES[key]), _pct(v)]
+		"reflect":
+			return "%s урона по герою — ударившему зверю" % _pct(v)
+		"light_hit", "dark_hit":
+			return "обычные атаки + %s маг. атаки урона %s" % [_pct(v), "светом" if key == "light_hit" else "тьмой"]
 		"atk_flat", "def_flat", "mdef_flat", "hp_flat", "str", "vit", "agi", "int", "wis", "dex", "luck":
 			return "%s +%s" % [String(BONUS_NAMES[key]), _num(v)]
 		"regen":
@@ -932,8 +951,8 @@ static func fx_text(id: String, n: int) -> String:
 					t = "шанс %s: %s" % [_pct(value_at(d["chance"], n)), t]
 				parts.append(t)
 			"dot":
-				parts.append("ещё %s с по %s атаки в секунду" % [_num(value_at(d.get("time", 10.0), n)),
-					_pct(value_at(d.get("mult", 0.0), n))])
+				parts.append("ещё %s с по %s %s в секунду" % [_num(value_at(d.get("time", 10.0), n)),
+					_pct(value_at(d.get("mult", 0.0), n)), "маг. атаки" if String(d.get("power", "atk")) == "matk" else "атаки"])
 			"knock":
 				parts.append("отбрасывает на %s м" % _num(value_at(d.get("dist", 3.0), n)))
 			"buff":
@@ -943,7 +962,16 @@ static func fx_text(id: String, n: int) -> String:
 					bp.append(bonus_text(String(key), value_at(bf[key], n)))
 				parts.append("%s с: %s" % [_num(value_at(d.get("time", 10.0), n)), ", ".join(bp)])
 			"special":
-				parts.append(String(sk.get("desc", "")))
+				# say — своя строка с числами уровня: {pct:ключ} — доля в %, {num:ключ} — число ("" — без текста)
+				if d.has("say"):
+					var say := String(d["say"])
+					for key in d:
+						say = say.replace("{pct:%s}" % key, _pct(value_at(d[key], n))) \
+							.replace("{num:%s}" % key, _num(value_at(d[key], n)))
+					if say != "":
+						parts.append(say)
+				else:
+					parts.append(String(sk.get("desc", "")))
 	return ", ".join(parts)
 
 

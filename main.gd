@@ -229,6 +229,8 @@ func _on_mob_gone(mob: Mob, killed: bool) -> void:
 		taming.on_mob_killed(mob)
 		economy.on_mob_killed(mob)
 		quests.on_mob_killed(mob)
+		# Тело зверя для умений Неофита («Последний вздох», «Остаток силы»)
+		JobFxNeophyte.on_mob_killed(mob)
 	# Звери, поставленные админ-панелью (slot -1), не возрождаются
 	if mob.slot >= 0:
 		get_tree().create_timer(MobData.respawn_time(mob.type_id)).timeout.connect(_spawn_slot.bind(mob.slot))
