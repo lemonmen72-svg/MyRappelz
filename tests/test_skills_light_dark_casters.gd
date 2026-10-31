@@ -366,7 +366,7 @@ func _cast_step(sid: String) -> int:
 			"убитый зверь оставил тело рядом")
 		p.hp = p.max_hp / 2
 		p.mp = p.max_mp / 2
-	if hs.has("wz_revive_pet"):
+	if hs.has("revive_pet"):
 		p.assign_slot(sid, 0)
 		var mp_b := p.mp
 		check(not p.use_skill("skill1") and p.mp == mp_b, "«%s» без погибшего питомца не применяется" % _nm(sid))
@@ -489,7 +489,7 @@ func _unmet(sid: String) -> PackedStringArray:
 						var pet := _pet()
 						if pet == null or pet.hp <= pet_hp0 or p.hp >= php0:
 							miss.append("HP героя → питомцу")
-					"wz_revive_pet":
+					"revive_pet":
 						if bool(game.pets[0].get("dead", false)) or _pet() == null:
 							miss.append("питомец воскрешён и призван")
 	return miss
@@ -504,7 +504,7 @@ func _after(sid: String) -> void:
 		check(hot != null and p.effects.has("hot:" + sid), "«%s»: лечение со временем идёт, значок у полоски HP" % _nm(sid))
 	if hs.has("ne_corpse_hp") or hs.has("ne_corpse_mp"):
 		check(JobFxNeophyte.nearest_corpse(p.global_position, JobFxNeophyte.CORPSE_RANGE) < 0, "тело поглощено")
-	if hs.has("wz_revive_pet"):
+	if hs.has("revive_pet"):
 		var pet := _pet()
 		check(pet.hp < pet.max_hp, "питомец встал с частью HP: %d/%d" % [pet.hp, pet.max_hp])
 	if hs.has("ne_zone"):

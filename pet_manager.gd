@@ -75,8 +75,10 @@ func open_creature(i: int, which: String = "") -> bool:
 func on_mob_killed(mob: Mob) -> void:
 	if mob == null or not _has_pet():
 		return
-	# Доля питомца × разница уровней зверя и питомца × множитель админ-панели (Combat.xp_for, Game.xp_mult)
-	active_pet.gain_xp(Combat.xp_for(roundi(float(mob.xp_reward) * PetData.XP_SHARE), mob.level, active_pet.level))
+	# Доля питомца × разница уровней зверя и питомца × множитель админ-панели (Combat.xp_for, Game.xp_mult);
+	# «Наставник зверя» героя — ещё больше (PetBond.xp_mult)
+	var share := PetData.XP_SHARE * PetBond.xp_mult()
+	active_pet.gain_xp(Combat.xp_for(roundi(float(mob.xp_reward) * share), mob.level, active_pet.level))
 
 
 ## Призвать питомца из коллекции. true, если призван.
@@ -182,6 +184,8 @@ func _despawn() -> void:
 	if is_instance_valid(active_pet):
 		# Сразу «скрыт»: звери бросают его как цель, не дожидаясь удаления узла
 		active_pet.is_down = true
+		# Связь с героем (слияние, облик) рвётся сразу (PetBond)
+		PetBond.pet_gone(active_pet)
 		if active_pet.is_in_group("pets"):
 			active_pet.remove_from_group("pets")
 		active_pet.queue_free()

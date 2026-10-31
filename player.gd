@@ -191,6 +191,8 @@ func recalc_stats() -> void:
 		var tb: Dictionary = timed_bonus[id]["bonus"]
 		for k in tb:
 			b[k] = float(b.get(k, 0.0)) + float(tb[k])
+	# Связь с питомцем (PetBond: «Слияние душ» — доля статов питомца)
+	PetBond.add_hero_bonus(self, b)
 	skill_bonus = b
 	var extra: Dictionary = {}
 	for k in Stats.STATS:
@@ -258,6 +260,8 @@ func recalc_stats() -> void:
 	hp = mini(hp, max_hp)
 	mp = mini(mp, max_mp)
 	_sync_toggle_effects()
+	# Питомцу — свежие ауры героя, связь (слияние, облик) — как велят включённые умения
+	PetBond.hero_changed(self)
 
 
 ## Усиление на время от умения sid (HeroSkillFx "buff"): bonus — {ключ HeroSkills.BONUS_NAMES: число} на sec секунд,
@@ -278,6 +282,8 @@ func add_hot(sid: String, node: Node3D, total: float, sec: float) -> void:
 	hots.append({"id": sid, "node": node, "per_sec": total / sec, "left": sec, "acc": 0.0})
 	if node == self:
 		effects.add("hot:" + sid, sec, StatusEffects.effect_info("hot", StatusEffects.source_hero_skill(sid)))
+	elif node.has_method("hero_effect"):
+		node.call("hero_effect", "hot:" + sid, sec, StatusEffects.effect_info("hot", StatusEffects.source_hero_skill(sid)))
 
 
 func _tick_timed(delta: float) -> void:
@@ -607,6 +613,10 @@ func set_toggle(id: String, on: bool) -> String:
 		var wb := HeroSkills.weapon_block(id, weapon_kind, has_shield)
 		if wb != "":
 			return wb
+		# Связь с питомцем (слияние, облик) — нужен призванный питомец рядом
+		var pb := PetBond.toggle_block(self, id)
+		if pb != "":
+			return pb
 		var cost := HeroSkills.mp_cost(id, n)
 		if mp < cost:
 			return "Не хватает MP (нужно %d)" % cost
@@ -1149,6 +1159,8 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 		amount = maxi(1, roundi(float(amount) * (1.0 - guard)))
 	if skill_guard > 0.0:
 		amount = maxi(1, roundi(float(amount) * (1.0 - skill_guard)))
+	# «Общая боль»: часть урона принимает питомец (PetBond)
+	amount = PetBond.share_pain(self, amount)
 	hp -= amount
 	regen_delay = REST_DELAY
 	# Механики профессий: ответный урон («Огненная кожа» Шамана)

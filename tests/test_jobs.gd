@@ -388,11 +388,20 @@ func _check_engine(player: Player) -> void:
 	check(player.set_toggle("chord_strength", true) == "", "«Созвучие силы» включено")
 	check(HeroSkills.toggle_on(game.hero, "chord_strength") and not HeroSkills.toggle_on(game.hero, "chord_vitality"),
 		"одно созвучие за раз")
-	check(not HeroSkills.is_ready("lullaby"), "«Колыбельная» — действие на этапе 2")
-	check(HeroSkills.effect_text("lullaby", 1).contains("следующем обновлении"), "в карточке — «в разработке»")
-	player.assign_slot("lullaby", 1)
-	check(not player.use_skill("skill2") and main.hud._msg_label.text.contains("следующем обновлении"), "не готовое умение не применяется")
-	check(HeroSkills.pet_aura_bonuses(game.hero, "conjurer", player.weapon_kind).has("str"), "аура созвучия — и питомцу (этап 2)")
+	check(HeroSkills.is_ready("lullaby") and not HeroSkills.effect_text("lullaby", 1).contains("следующем обновлении"),
+		"«Колыбельная» действует (этап 2)")
+	# Не готовое умение (если у Колдуна ещё есть такое) не применяется
+	var unready := ""
+	for id in HeroSkills.list_for("conjurer"):
+		if unready == "" and HeroSkills.kind(String(id)) != "passive" and not HeroSkills.is_ready(String(id)):
+			unready = String(id)
+	if unready != "":
+		(game.hero["skills"] as Dictionary)[unready] = 1
+		player.assign_slot(unready, 1)
+		check(HeroSkills.effect_text(unready, 1).contains("следующем обновлении"), "в карточке — «в разработке»")
+		check(not player.use_skill("skill2") and main.hud._msg_label.text.contains("следующем обновлении"),
+			"не готовое умение не применяется")
+	check(HeroSkills.pet_aura_bonuses(game.hero, "conjurer", player.weapon_kind).has("str"), "аура созвучия — и питомцу")
 
 
 # ---------- Сохранения ----------

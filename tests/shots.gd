@@ -925,6 +925,36 @@ func run_step() -> void:
 			step = 819
 		819:
 			shot("99_skills_shaman")
+			# Умения Зверолова (кадр 100): ауры питомцу — значки у панели питомца, «Целебная роса» на волка
+			game.admin_set_look("light_elf", "f")
+			_job_showcase("beastmaster", ["healing_dew", "mend_beast", "second_wind", "sky_offering"],
+				["beast_might", "ward_charm", "radiant_claws"], 5.0)
+			if main.pets.active_pet == null and not game.pets.is_empty():
+				game.pets[0]["dead"] = false
+				main.pets.summon(0)
+			var bp: Pet = main.pets.active_pet
+			if bp != null:
+				bp._teleport_to_owner()
+				bp.hp = bp.max_hp / 2
+				bp.bond_hp_changed()
+			main.player.use_skill("skill1")
+			wait = 14
+			step = 820
+		820:
+			shot("100_skills_pet_jobs")
+			# Колдун (кадр 101): «Слияние душ» — питомец внутри героя, сияние цвета питомца; «Гнев стаи»
+			game.admin_set_look("human", "m")
+			_job_showcase("conjurer", ["pack_wrath", "lullaby", "wild_roar", "spirit_wrath"], ["chord_strength"], 5.0)
+			var cp: Pet = main.pets.active_pet
+			if cp != null:
+				cp._teleport_to_owner()
+			main.player.set_toggle("soul_merge", true)
+			main.player.use_skill("skill1")
+			wait = 14
+			step = 821
+		821:
+			shot("101_skills_pet_merge")
+			main.player.set_toggle("soul_merge", false)
 			# Умения Неофита (кадр 96): «Пылающая земля» и «Грозовой круг» на земле у зверя, «Сгусток пламени» летит,
 			# «Теневая печать» включена; значки зоны и горения у панели цели
 			game.admin_set_look("dark_elf", "f")
@@ -932,14 +962,14 @@ func run_step() -> void:
 			main.player.use_skill("skill1")
 			main.player.use_skill("skill2")
 			wait = 50
-			step = 820
-		820:
+			step = 822
+		822:
 			main.player.skill_cd.clear()
 			main.player.attack_cd = 0.0
 			main.player.use_skill("skill3")
 			wait = 8
-			step = 821
-		821:
+			step = 823
+		823:
 			shot("96_skills_casters")
 			for z in get_tree().get_nodes_in_group("skill_zones"):
 				z.queue_free()
@@ -950,13 +980,13 @@ func run_step() -> void:
 			main.player.use_skill("skill1")
 			main.player.use_skill("skill3")
 			wait = 8
-			step = 822
-		822:
+			step = 824
+		824:
 			shot("97_skills_guard")
 			ok_done()
 
 
-## Кадры 96–99: герой профессии job 40 ур. с изученным древом, умения slots на кнопках 1–4, включённые toggles,
+## Кадры 96–101: герой профессии job 40 ур. с изученным древом, умения slots на кнопках 1–4, включённые toggles,
 ## у волка (или фазана) на расстоянии dist м, MP полное.
 func _job_showcase(job: String, slots: Array, toggles: Array, dist: float) -> void:
 	var p: Player = main.player

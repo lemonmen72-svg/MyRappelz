@@ -1,25 +1,21 @@
 class_name JobFxWizard
 extends RefCounted
 ## Особые механики Волшебника; подключение — HeroSkillFx.JOB_FX_FILES (шесть функций, описание — шапка HeroSkillFx),
-## данные — JobSkills.SKILLS. Обработчики (префикс wz_): "wz_revive_pet" — «Возвращение души»: первый погибший
-##   питомец коллекции встаёт с долей pct HP и MP и сразу призывается к герою (как свиток воскрешения, но умением);
-##   "wz_renew" — «Живительный свет»: тот, кому хуже (герой или призванный питомец), лечится сразу на pct макс. HP
-##   (+ mult маг. атаки) и ещё на hot макс. HP за time с — узел Hot (ребёнок лечимого: раз в секунду, значок
+## данные — JobSkills.SKILLS. «Возвращение души» — общий обработчик revive_pet (PetBond, через job_fx_beastmaster.gd:
+##   погибший последним питомец встаёт с долей HP и MP и призывается). Обработчик (префикс wz_): "wz_renew" —
+##   «Живительный свет»: тот, кому хуже (герой или призванный питомец), лечится сразу на pct макс. HP (+ mult маг. атаки) и ещё на hot макс. HP за time с — узел Hot (ребёнок лечимого: раз в секунду, значок
 ##   «hot:<умение>» у полоски HP).
 ## «Сияющее лезвие» (бонус "light_hit"): попавшая обычная атака добавляет урон светом — доля маг. атаки через маг.
 ##   защиту зверя (on_basic_hit, счётчик fx.state["light_hits"]).
 ## Остальное у Волшебника — данными движка (лечение, щиты-«купола» через бонус guard, лёд и свет: замедление ударов
 ## "aslow", обездвиживание "snare", зона «Топь» — JobFxNeophyte "ne_zone").
 
-const HOLY := Color(1.0, 0.9, 0.5)
 const LIGHT := Color(1.0, 0.9, 0.5)
 
 
 ## Особая механика handler умения sid уровня n по цели t (может быть null). false — обработчик не наш.
 static func special(fx: HeroSkillFx, handler: String, sid: String, n: int, _t: Mob, e: Dictionary) -> bool:
 	match handler:
-		"wz_revive_pet":
-			_revive_pet(fx, n, e)
 		"wz_renew":
 			_renew(fx, sid, n, e)
 		_:
@@ -27,12 +23,8 @@ static func special(fx: HeroSkillFx, handler: String, sid: String, n: int, _t: M
 	return true
 
 
-## Можно ли применить ("" — можно): есть ли погибший питомец.
-static func pre_cast(_fx: HeroSkillFx, _sid: String, _n: int, sk: Dictionary) -> String:
-	for item in sk.get("fx", []):
-		var e: Dictionary = item
-		if String(e.get("handler", "")) == "wz_revive_pet" and dead_pet() < 0:
-			return "нет погибших питомцев"
+## Особых условий нет («Возвращение души» — общий обработчик revive_pet, PetBond: проверка — там).
+static func pre_cast(_fx: HeroSkillFx, _sid: String, _n: int, _sk: Dictionary) -> String:
 	return ""
 
 
@@ -63,44 +55,6 @@ static func tick(_fx: HeroSkillFx, _delta: float) -> void:
 
 static func reset(_fx: HeroSkillFx) -> void:
 	pass
-
-
-## Индекс первого погибшего питомца коллекции (-1 — все живы).
-static func dead_pet() -> int:
-	for i in Game.pets.size():
-		if bool((Game.pets[i] as Dictionary).get("dead", false)):
-			return i
-	return -1
-
-
-## «Возвращение души»: питомец встаёт с долей pct HP и MP и призывается.
-static func _revive_pet(fx: HeroSkillFx, n: int, e: Dictionary) -> void:
-	var i := dead_pet()
-	if i < 0:
-		return
-	var rec: Dictionary = Game.pets[i]
-	var pct := HeroSkills.value_at(e.get("pct", 0.3), n)
-	PetSkills.ensure_record(rec)
-	var st := PetData.stats_for(String(rec.get("species", "boar")), int(rec.get("level", 1)), rec["skills"], rec["toggles"])
-	rec["dead"] = false
-	rec["hp"] = maxi(1, roundi(float(st["max_hp"]) * pct))
-	rec["mp"] = maxi(0, roundi(float(st["max_mp"]) * pct))
-	var p := fx.p
-	var parent := p.get_parent()
-	var mgr: PetManager = null
-	if parent != null:
-		mgr = parent.get("pets") as PetManager
-	if mgr != null:
-		mgr.summon(i)
-	else:
-		Game.changed.emit()
-	var pet := p._active_pet()
-	var pos: Vector3 = p.global_position
-	if pet != null:
-		pos = pet.global_position
-	JobFxNeophyte.lightning(parent, pos, HOLY, 0.5, 4.0)
-	Vfx.heal_sparkles(parent, pos, 1.2)
-	p.message.emit("Питомец «%s» возвращён к жизни" % String(rec.get("name", "")))
 
 
 ## «Живительный свет»: лечение сразу и понемногу ещё time с тому, кому хуже.
