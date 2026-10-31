@@ -53,6 +53,6 @@ float wc_path_dist(vec2 p) {
 
 // Toon-свет: ступенька освещённости и чёткая граница тени. Использовать в light().
 vec3 wc_toon(vec3 n, vec3 l, float atten, vec3 light_color) {
-	float lit = smoothstep(0.0, 0.1, dot(n, l)) * smoothstep(0.3, 0.6, atten);
+	float lit = smoothstep(0.0, 0.1, dot(n, l)) * smoothstep(0.2, 0.75, atten);
 	return light_color * lit / PI;
 }

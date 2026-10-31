@@ -1,15 +1,18 @@
 class_name PostFx
 extends CanvasLayer
 ## Постобработка поверх 3D и под интерфейсом (layer = -1; HUD — слой 1): полноэкранный ColorRect
-## со своим canvas_item-шейдером postfx.gdshader — виньетка, насыщенность и тёплый баланс,
-## на «Высоком» ещё мягкое свечение светлых мест. Касания не перехватывает (MOUSE_FILTER_IGNORE).
-## Включается по Quality.postfx(); на «Среднем» облегчённый вариант шейдера (без свечения и mip-уровней).
-## Создание: add_child(PostFx.new()); после смены качества — Quality.apply(get_tree()).
+## со своим canvas_item-шейдером postfx.gdshader — сглаживание FXAA, цветокоррекция (насыщенность, тёплый
+## баланс, виньетка), мягкое свечение светлых мест. Касания не перехватывает (MOUSE_FILTER_IGNORE).
+## Что включено — по Quality: fxaa() (сглаживание «FXAA»), postfx() (цвет), bloom() (свечение). Ничего —
+## слой скрыт, экран не копируется (на «Низком» и «Среднем» прохода нет). Вариант шейдера собирается из одного
+## кода с #define вместо строки-метки (USE_FXAA, USE_GRADE, USE_BLOOM): лишние выборки не считаются.
+## Создание: add_child(PostFx.new()); после смены настроек — Quality.apply(get_tree()).
 
 const SHADER_PATH := "res://postfx.gdshader"
 
-static var _full: Shader = null
-static var _lite: Shader = null
+static var _base: Shader = null
+## Варианты шейдера по ключу "fxaa|grade|bloom".
+static var _variants: Dictionary = {}
 
 var _rect: ColorRect = null
 var _mat: ShaderMaterial = null
@@ -33,29 +36,45 @@ func _ready() -> void:
 	apply_quality()
 
 
-## Включает, выключает или переключает вариант шейдера по текущему Quality.
+## Включает, выключает или переключает вариант шейдера по текущим настройкам Quality.
 func apply_quality() -> void:
 	if _rect == null:
 		return
-	var on := Quality.postfx()
+	var fxaa := Quality.fxaa()
+	var grade := Quality.postfx()
+	var bloom := Quality.bloom()
+	var on := fxaa or grade
 	visible = on
 	_rect.visible = on
 	if not on:
 		return
-	var bloom := Quality.bloom()
-	var sh := _shader(bloom)
+	var sh := shader_for(fxaa, grade, bloom)
 	if _mat.shader != sh:
 		_mat.shader = sh
 	_mat.set_shader_parameter("bloom_strength", 0.16 if bloom else 0.0)
 
 
-## Полный шейдер или облегчённый (тот же код с #define POSTFX_LITE вместо строки-метки).
-static func _shader(bloom: bool) -> Shader:
-	if _full == null:
-		_full = load(SHADER_PATH)
+## Текущий шейдер (null — постобработка выключена).
+func current_shader() -> Shader:
+	return _mat.shader if _rect != null and _rect.visible else null
+
+
+## Вариант шейдера (кэш): тот же код с #define вместо строки-метки.
+static func shader_for(fxaa: bool, grade: bool, bloom: bool) -> Shader:
+	if _base == null:
+		_base = load(SHADER_PATH)
+	bloom = bloom and grade
+	var key := "%s|%s|%s" % [fxaa, grade, bloom]
+	if _variants.has(key):
+		return _variants[key]
+	var defs := ""
+	if fxaa:
+		defs += "#define USE_FXAA\n"
+	if grade:
+		defs += "#define USE_GRADE\n"
 	if bloom:
-		return _full
-	if _lite == null:
-		_lite = Shader.new()
-		_lite.code = _full.code.replace("// @VARIANT", "#define POSTFX_LITE")
-	return _lite
+		defs += "#define USE_BLOOM\n"
+	var sh := Shader.new()
+	sh.code = _base.code.replace("// @VARIANT", defs)
+	_variants[key] = sh
+	return sh

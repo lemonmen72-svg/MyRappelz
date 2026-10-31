@@ -120,8 +120,9 @@ static func toonify_mesh(mi: MeshInstance3D) -> void:
 	toon(m)
 	var solid := m.shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED \
 		and m.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED
-	if solid and Quality.outlines() and not mi.has_meta("no_outline") and m.next_pass == null:
-		m.next_pass = outline_mat(m.albedo_color)
+	if solid and not mi.has_meta("no_outline") and m.next_pass == null:
+		# Контур по настройке «Контуры» (меняется сразу — Quality.apply)
+		Quality.track_outline(m, outline_mat(m.albedo_color))
 
 
 ## Стилизует все меши в поддереве.

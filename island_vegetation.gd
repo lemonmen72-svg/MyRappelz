@@ -165,12 +165,12 @@ static func build(world: IslandWorld, rng: RandomNumberGenerator) -> void:
 	holder.set_meta("stats", c.stats)
 	holder.set_meta("solid_points", c.solids)
 	holder.set_meta("prop_bases", c.bases)
-	holder.set_meta("built_level", Quality.level())
+	holder.set_meta("built_grass", Quality.option("grass"))
 	if world.is_inside_tree():
 		apply_quality(world.get_tree())
 	Quality.apply_lights(world)
-	print("Растительность (качество «%s», %d мс): трава %d, цветы %d, деревья %d, кусты %d, камни %d, кристаллы %d" % [
-		Quality.level_name(), Time.get_ticks_msec() - t0, c.stats["grass"], c.stats["flowers"],
+	print("Растительность (трава «%s», %d мс): трава %d, цветы %d, деревья %d, кусты %d, камни %d, кристаллы %d" % [
+		Quality.option_label("grass"), Time.get_ticks_msec() - t0, c.stats["grass"], c.stats["flowers"],
 		c.stats["trees"], c.stats["bushes"], c.stats["rocks"], c.stats["crystals"]])
 
 
@@ -229,12 +229,12 @@ static func set_far_view(tree: SceneTree, on: bool) -> void:
 	apply_quality(tree)
 
 
-## Уровень качества, с которым построена трава (-1 — растительности нет).
-static func built_level(tree: SceneTree) -> int:
+## Густота травы (Quality.option("grass")), с которой построена трава (-1 — растительности нет).
+static func built_grass(tree: SceneTree) -> int:
 	if tree == null:
 		return -1
 	for h in tree.get_nodes_in_group("vegetation"):
-		return int((h as Node).get_meta("built_level", -1))
+		return int((h as Node).get_meta("built_grass", -1))
 	return -1
 
 

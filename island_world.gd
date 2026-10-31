@@ -632,8 +632,7 @@ func _build_bridges() -> void:
 	var deck_color := Color(0.62, 0.44, 0.28)
 	var deck_mat := PoiModels.toon_material(deck_color, false, 2, 0.2)
 	deck_mat.set_shader_parameter("tex_layer", WorldTextures.WOOD)
-	if Quality.outlines():
-		deck_mat.next_pass = Util.outline_mat(deck_color)
+	Quality.track_outline(deck_mat, Util.outline_mat(deck_color))
 	for b in bridges:
 		var a: Vector3 = b["a"]
 		var e: Vector3 = b["b"]

@@ -1346,8 +1346,7 @@ static func _body_mat() -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = _body_shader
 	m.set_shader_parameter("flash", 0.0)
-	if Quality.outlines():
-		m.next_pass = _outline_material()
+	Quality.track_model(m, _outline_material())
 	return m
 
 
