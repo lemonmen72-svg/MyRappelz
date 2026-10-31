@@ -2,8 +2,9 @@ class_name MobData
 extends RefCounted
 ## Звери мира: характеристики, редкость, приручение (карта существа и её тир), добыча.
 ## Где и какого уровня они появляются — mob_zones в world/training_island.json.
-## id зверя совпадает с id вида питомца (PetData). Пантера, черепаха и фазан — модели из файлов
-## (CreatureAsset, assets/creatures/), остальные — из примитивов (CreatureModels).
+## id зверя совпадает с id вида питомца (PetData; у летающих рыб вида питомца нет). Пантера, черепаха, фазан
+## и летающие рыбы — модели из файлов (CreatureAsset, assets/creatures/), остальные — из примитивов (CreatureModels).
+## flying: true — летающий зверь (парит на уровне головы героя, падает только после смерти).
 
 ## Радиус безопасной зоны города новичков в центре мира (там торговец, звери туда не заходят).
 ## Источник правды — safe_zones в world/training_island.json; здесь — для кода без острова.
@@ -54,6 +55,27 @@ const TYPES := {
 		"color": Color(0.36, 0.55, 0.32), "scale": 1.0, "rarity": "common",
 		"loot": [["shell_plate", 0.5, 1, 1], ["revive_scroll", 0.08, 1, 1], ["mirror_card", 0.04, 1, 1]],
 	},
+	# Летающие рыбы: парят на уровне головы героя (модель из файла, высота парения — hover в creatures.json),
+	# на землю падают только после смерти. Не приручаются и не бывают питомцами (вида в PetData нет).
+	"flyfish": {
+		"name": "Летучий зубан", "gen": "летучего зубана", "level": 5, "hp": 70, "atk": 12, "speed": 3.8, "xp": 50,
+		"gold": [8, 15], "color": Color(0.25, 0.4, 0.68), "scale": 1.0, "rarity": "common", "tameable": false,
+		"flying": true,
+		"loot": [["flyfish_scale", 0.55, 1, 2], ["hp_potion", 0.15, 1, 1]],
+	},
+	"flyfish_sail": {
+		"name": "Рыба-парусник", "gen": "рыбы-парусника", "level": 7, "hp": 120, "atk": 16, "speed": 4.4, "xp": 85,
+		"gold": [12, 24], "color": Color(0.22, 0.36, 0.62), "scale": 1.0, "rarity": "common", "tameable": false,
+		"flying": true,
+		"loot": [["sail_fin", 0.5, 1, 1], ["hp_potion", 0.18, 1, 1], ["revive_scroll", 0.05, 1, 1]],
+	},
+	"flyfish_drake": {
+		"name": "Змеекрыл", "gen": "змеекрыла", "level": 9, "hp": 230, "atk": 22, "speed": 4.0, "xp": 160,
+		"gold": [30, 60], "color": Color(0.2, 0.32, 0.58), "scale": 1.0, "rarity": "rare", "tameable": false,
+		"flying": true,
+		"loot": [["drake_crest", 0.6, 1, 2], ["hp_potion", 0.25, 1, 2], ["revive_scroll", 0.08, 1, 1],
+			["mirror_card", 0.08, 1, 1]],
+	},
 	"golem": {
 		"name": "Каменный страж", "gen": "каменного стража", "level": 10, "hp": 400, "atk": 24, "speed": 2.6, "xp": 250, "gold": [60, 120],
 		"color": Color(0.5, 0.5, 0.45), "scale": 2.0, "rarity": "unique", "tameable": false,
@@ -73,6 +95,11 @@ static func rarity_tier(id: String) -> int:
 ## Можно ли приручить зверя этого вида (неизвестный вид — нельзя).
 static func tameable(id: String) -> bool:
 	return TYPES.has(id) and bool(get_type(id).get("tameable", true))
+
+
+## Летающий зверь (парит над землёй, падает только после смерти).
+static func flying(id: String) -> bool:
+	return TYPES.has(id) and bool(get_type(id).get("flying", false))
 
 
 ## Тир карты существа для вида: "basic" | "rare" | "special" | "unique".

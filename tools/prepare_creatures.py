@@ -29,6 +29,10 @@
     скорости не проскальзывает (> 2 см — ошибка), где голова, морда в +Z. --preview <папка> — PNG
     («палочки» сбоку/сверху/спереди и меш по кадрам) для просмотра глазами.
 
+Летающие рыбы (стиль «fish», FISH_CREATURES): ног нет, размер — длиной, роли костей своим поиском (ось нос → хвост,
+плавники), модель парит на высоте hover уже в позе покоя и во всех клипах, Death роняет её на землю. Подробно —
+у FISH_CREATURES; проверка: в воздухе во всех клипах, кроме Death, в конце Death — лёжа на земле.
+
 Новый зверь или стадия эволюции: добавить запись в CREATURES (высота, стиль клипов «cat»/«turtle»/«bird»,
 параметры шага) и запустить скрипт с его GLB. Если скелет Meshy окажется другим и роли не найдутся,
 скрипт скажет, какие кости без роли.
@@ -376,9 +380,11 @@ def leg_roots(parent: np.ndarray, gpos: np.ndarray, ground_y: float) -> list:
 	return roots
 
 
-def to_game_space(src: dict, height: float) -> dict:
-	"""Поворот мордой в +Z, масштаб до нужной высоты, ноги на y = 0. Кости — без масштаба."""
-	yaw = facing_yaw(src)
+def to_game_space(src: dict, height: float, yaw=None) -> dict:
+	"""Поворот мордой в +Z, масштаб до нужной высоты, ноги на y = 0. Кости — без масштаба.
+	yaw — поворот, если он уже известен (у рыб — fish_yaw), иначе по позе ног (facing_yaw)."""
+	if yaw is None:
+		yaw = facing_yaw(src)
 	R = ry(yaw)
 	pos = src["pos"] @ R.T
 	s = height / float(pos[:, 1].max() - pos[:, 1].min())
@@ -1403,6 +1409,351 @@ def bird_clips(c: Ctx) -> list:
 	return out
 
 
+# ---------- Летающие рыбы (стиль «fish») ----------
+# Рыбы парят в воздухе на уровне головы героя. Высота парения зашита в саму модель: в позе покоя и во всех клипах
+# тело висит на высоте hover (ось тела над землёй, м); только Death роняет рыбу: она переворачивается набок, падает,
+# в последнем кадре лежит на земле (низ меша на y = 0). Коллизия зверя в игре — от земли до верха модели.
+# Ног нет: размер задаётся длиной (length, м, от носа до кончика хвоста), высота — по пропорциям меша.
+# Роли костей (fish_roles): ось тела нос → хвост — Root, Body*, Front*, Head, Snout*, Back*, Tail*; парные плавники
+# FinL<n>_<k> / FinR<n>_<k> (грудные «крылья» и прочие), непарные Dorsal* (спинные), Ventral* (брюшные), Mouth* (губы).
+# walk/run: T — длина цикла (с), speed — скорость полёта, под которую сделан клип (м/с; ног нет — скользить нечему,
+# игра подгоняет темп клипа под скорость зверя). idle_T — длина цикла парения.
+FISH_CREATURES = {
+	"flyfish": {"style": "fish", "length": 1.0, "hover": 1.45, "tris": 7000, "idle_T": 2.0,
+		"walk": {"T": 1.0, "speed": 1.4}, "run": {"T": 0.6, "speed": 4.0}},
+	"flyfish_sail": {"style": "fish", "length": 1.4, "hover": 1.5, "tris": 7000, "idle_T": 2.4,
+		"walk": {"T": 1.1, "speed": 1.5}, "run": {"T": 0.66, "speed": 4.4}},
+	"flyfish_drake": {"style": "fish", "length": 1.8, "hover": 1.55, "tris": 7000, "idle_T": 2.6,
+		"walk": {"T": 1.2, "speed": 1.5}, "run": {"T": 0.7, "speed": 4.2}},
+}
+CREATURES.update(FISH_CREATURES)
+
+
+def fish_yaw(src: dict) -> float:
+	"""Куда смотрит рыба: длинная ось меша; хвост — тонкий в стороны (плавник вертикальный), голова — широкая
+	(или с грудными плавниками). Возвращает поворот вокруг Y (кратный 90°), после которого нос смотрит в +Z."""
+	pos = src["pos"]
+	lo, hi = pos.min(0), pos.max(0)
+	ctr = (lo + hi) * 0.5
+	ax = 2 if (hi[2] - lo[2]) >= (hi[0] - lo[0]) else 0
+	lat = 0 if ax == 2 else 2
+	half = (hi[ax] - lo[ax]) * 0.5
+	width = {}
+	for sgn in (1.0, -1.0):
+		sel = pos[(pos[:, ax] - ctr[ax]) * sgn > 0.6 * half]
+		width[sgn] = float(sel[:, lat].max() - sel[:, lat].min()) if len(sel) else 0.0
+	sgn = 1.0 if width[1.0] >= width[-1.0] else -1.0
+	if ax == 2:
+		return 0.0 if sgn > 0 else math.pi
+	return -math.pi * 0.5 if sgn > 0 else math.pi * 0.5
+
+
+def fish_cfg(src: dict, cfg: dict, yaw: float) -> dict:
+	"""Высота модели по заданной длине и пропорциям меша."""
+	pos = src["pos"] @ ry(yaw).T
+	ln = float(pos[:, 2].max() - pos[:, 2].min())
+	h = float(pos[:, 1].max() - pos[:, 1].min())
+	out = dict(cfg)
+	out["height"] = cfg["length"] * h / ln
+	return out
+
+
+def fish_roles(names: list, parent: np.ndarray, gpos: np.ndarray, length: float) -> dict:
+	"""Роли костей рыбы (модель уже носом в +Z, X — влево): ось тела — пути от корня к самой передней (нос)
+	и самой задней (хвост) кости; голова — последнее ветвление на пути к носу; хвост — кости за последним
+	ответвлением на пути к хвосту. Ответвления от оси: парные плавники (смещены вбок), спинные, брюшные, губы."""
+	B = len(parent)
+	ch = children_of(parent)
+	roots = [b for b in range(B) if parent[b] < 0]
+	if len(roots) != 1:
+		raise ValueError("ждём один корень скелета, найдено %d" % len(roots))
+	root = roots[0]
+	nose = int(np.argmax(gpos[:, 2]))
+	tip = int(np.argmin(gpos[:, 2]))
+	hp, tp = path_to(parent, nose), path_to(parent, tip)
+	k = 0
+	while k < min(len(hp), len(tp)) and hp[k] == tp[k]:
+		k += 1
+	common, front, rear = hp[:k], hp[k:], tp[k:]
+	if not front or len(rear) < 2:
+		raise ValueError("не нашёл ось тела рыбы: к носу %s, к хвосту %s" % (front, rear))
+	head = next((b for b in reversed(front) if len(ch[b]) >= 2), front[-1])
+	ih = front.index(head)
+	axis = hp + [b for b in tp if b not in hp]
+	axis_set = set(axis)
+
+	def side(b):
+		return [c for c in ch[b] if c not in axis_set]
+
+	ib = max([i for i, b in enumerate(rear) if side(b)], default=-1)
+	ib = min(ib, len(rear) - 3)  # хвосту — хотя бы две кости
+	back, tail = rear[:ib + 1], rear[ib + 1:]
+	nm = {root: "Root"}
+	body = common[1:]
+	for i, b in enumerate(body):
+		nm[b] = "Body" if len(body) == 1 else "Body%d" % (i + 1)
+	for i, b in enumerate(front[:ih]):
+		nm[b] = "Front%d" % (i + 1)
+	nm[head] = "Head"
+	for i, b in enumerate(front[ih + 1:]):
+		nm[b] = "Snout%d" % (i + 1)
+	for i, b in enumerate(back):
+		nm[b] = "Back%d" % (i + 1)
+	for i, b in enumerate(tail):
+		nm[b] = "Tail%d" % (i + 1)
+	roles = {
+		"kind": "fish", "root": root, "legs": {}, "head": head, "body": body, "neck": front[:ih],
+		"head_extra": front[ih + 1:], "back": back, "tail": tail, "ears": {"L": [], "R": []},
+		"fins": {"L": [], "R": []}, "dorsal": [], "ventral": [], "mouth": [], "fin_amp": {}, "extra": [],
+		# для общего кода (Ctx, creatures.json)
+		"spine": body, "chest": common[-1], "hips": back[-1] if back else common[-1],
+	}
+	groups = {"L": [], "R": [], "dorsal": [], "ventral": [], "mouth": []}
+	for b in axis:
+		for c in side(b):
+			sub = subtree(ch, c)
+			mx = float(gpos[sub, 0].mean() - gpos[b, 0])
+			far = max(sub, key=lambda x: float(np.linalg.norm(gpos[x] - gpos[b])))
+			d = gpos[far] - gpos[b]
+			if abs(mx) > 0.04 * length:
+				key = "L" if mx > 0 else "R"
+			elif d[2] > 0 and abs(d[2]) > abs(d[1]):
+				key = "mouth"
+			else:
+				key = "dorsal" if d[1] >= 0 else "ventral"
+			groups[key].append(sub)
+	names_of = {"L": "FinL", "R": "FinR", "dorsal": "Dorsal", "ventral": "Ventral", "mouth": "Mouth"}
+	for key, lst in groups.items():
+		lst.sort(key=lambda s: -gpos[s[0], 2])  # спереди назад: у левых и правых плавников номера совпадают
+		for i, sub in enumerate(lst):
+			for j, b in enumerate(sub):
+				nm[b] = "%s%d_%d" % (names_of[key], i + 1, j + 1)
+			roles["extra"] += sub
+			span = max(float(np.linalg.norm(gpos[x] - gpos[sub[0]])) for x in sub)
+			roles["fin_amp"][sub[0]] = float(np.clip(span / (0.3 * length), 0.3, 1.0))
+			if key in ("L", "R"):
+				roles["fins"][key].append(sub)
+			else:
+				roles[key].append(sub)
+	roles["depth"] = {b: len(path_to(parent, b)) for b in range(B)}
+	missing = [names[b] for b in range(B) if b not in nm]
+	if missing:
+		raise ValueError("кости без роли: %s" % missing)
+	roles["names"] = [nm[b] for b in range(B)]
+	if len(set(roles["names"])) != B:
+		raise ValueError("повтор имён костей: %s" % roles["names"])
+	return roles
+
+
+def fish_lift(mesh: dict, g: dict, roles: dict, cfg: dict) -> None:
+	"""Поднять рыбу на высоту парения: ось тела (средняя высота костей головы и спины) — на cfg["hover"]."""
+	axis = [roles["head"]] + roles["body"] + roles["neck"] + roles["back"]
+	lift = float(cfg["hover"]) - float(np.mean(g["gpos"][axis, 1]))
+	dv = np.array([0.0, lift, 0.0])
+	mesh["pos"] = mesh["pos"] + dv
+	g["gpos"] = g["gpos"] + dv
+
+
+def fish_clips(c: Ctx) -> list:
+	"""Клипы парящей рыбы: волна по телу и хвосту, взмахи плавников, покачивание; рывок-укус; падение при смерти."""
+	cfg = c.cfg
+	r = c.roles
+	rig = c.rig
+	gp = rig.gpos
+	L = float(cfg["length"])
+	W, R = cfg["walk"], cfg["run"]
+	chain = r["back"] + r["tail"]
+	nb, nt = len(r["back"]), len(r["tail"])
+	gains = np.array([0.25] * nb + [0.5 + 0.7 * k / max(nt - 1, 1) for k in range(nt)])
+	gains = gains / gains.sum()
+	fins = [(1.0 if side == "L" else -1.0, sub) for side in ("L", "R") for sub in r["fins"][side]]
+	odd = r["dorsal"] + r["ventral"]
+	depth = r["depth"]
+	out = []
+
+	def wave(P, ph, amp, lag=0.55):
+		"""Волна от спины к хвосту (amp — суммарный изгиб, рад); голова чуть в противофазе, спинные плавники вслед."""
+		for k, b in enumerate(chain):
+			c.rot(P, b, ry(amp * gains[k] * math.sin(ph - lag * k)))
+		c.rot(P, c.head_b, ry(-0.12 * amp * math.sin(ph + 0.6)))
+		for sub in odd:
+			c.rot(P, sub[0], ry(0.2 * amp * math.sin(ph - 1.0)))
+
+	def flap(P, ph, amp, bias=0.0, lag=0.7):
+		"""Взмахи парных плавников вокруг оси тела: s·угол > 0 поднимает свисающий плавник; концы отстают."""
+		for s, sub in fins:
+			a0 = r["fin_amp"][sub[0]]
+			d0 = depth[sub[0]]
+			for b in sub:
+				kd = depth[b] - d0
+				w = 1.0 if kd == 0 else 0.3
+				c.rot(P, b, rz(s * a0 * w * (bias + amp * math.sin(ph - lag * kd))))
+
+	def fold(P, sub, w, target):
+		"""Прижать плавник назад вдоль тела (вес w 0..1)."""
+		if w <= 0.0:
+			return
+		far = max(sub, key=lambda x: float(np.linalg.norm(gp[x] - gp[sub[0]])))
+		d = gp[far] - gp[sub[0]]
+		if np.linalg.norm(d) < 1e-6:
+			return
+		d = d / np.linalg.norm(d)
+		t = np.asarray(target, dtype=np.float64)
+		t = t / np.linalg.norm(t)
+		ax = np.cross(d, t)
+		sn = float(np.linalg.norm(ax))
+		if sn < 1e-6:
+			return
+		c.rot(P, sub[0], rot_axis(ax / sn, math.atan2(sn, float(np.dot(d, t))) * 0.85 * w))
+
+	def lunge(P, dz):
+		P["root_off"] = P["root_off"] + np.array([0.0, 0.0, dz])
+
+	Ti = cfg.get("idle_T", 2.0)
+
+	def idle(t):
+		P = c.pose()
+		ph = TAU * t / Ti
+		c.body(P, pitch_up=0.03 * math.sin(ph), roll=0.035 * math.sin(ph + 1.3), dy=0.035 * L * math.sin(ph))
+		wave(P, 2.0 * ph, 0.32)
+		flap(P, 2.0 * ph, 0.3, bias=0.05)
+		return P
+
+	out.append({"name": "Idle", "T": Ti, "loop": True, "fn": idle})
+
+	def fly(g, pitch, wamp, famp, bob, roll):
+		T = g["T"]
+
+		def fn(t):
+			P = c.pose()
+			ph = 2.0 * TAU * t / T  # два взмаха за цикл
+			c.body(P, pitch_up=pitch + 0.02 * math.sin(ph), roll=roll * math.sin(0.5 * ph),
+				dy=-bob * L * math.sin(ph - 0.5))
+			wave(P, ph, wamp)
+			flap(P, ph, famp, bias=0.08)
+			return P
+
+		return fn
+
+	out.append({"name": "Walk", "T": W["T"], "loop": True, "fn": fly(W, -0.05, 0.5, 0.45, 0.025, 0.03),
+		"speed": float(W["speed"])})
+	out.append({"name": "Run", "T": R["T"], "loop": True, "fn": fly(R, -0.12, 0.65, 0.65, 0.03, 0.05),
+		"speed": float(R["speed"])})
+
+	def attack(t):
+		# Рывок-укус: подаётся назад, нос вверх, плавники вверх; бросок вперёд-вниз с ударом хвоста; возврат
+		P = c.pose()
+		c.body(P, pitch_up=keys(t, [(0, 0), (0.24, 0.22), (0.42, -0.16), (0.56, -0.1), (0.8, 0)]),
+			dy=keys(t, [(0, 0), (0.24, 0.06 * L), (0.42, -0.05 * L), (0.8, 0)]))
+		lunge(P, keys(t, [(0, 0), (0.24, -0.14 * L), (0.42, 0.26 * L), (0.56, 0.2 * L), (0.8, 0)]))
+		c.head(P, pitch_up=keys(t, [(0, 0), (0.24, 0.1), (0.42, -0.12), (0.8, 0)]))
+		wave(P, TAU * t / 0.4, 0.15 + 0.55 * env(t, 0.05, 0.2, 0.45, 0.8))
+		flap(P, TAU * t / 0.4, 0.4 * env(t, 0.3, 0.42, 0.6, 0.8),
+			bias=keys(t, [(0, 0), (0.24, 0.5), (0.42, -0.15), (0.8, 0)]))
+		return P
+
+	out.append({"name": "Attack", "T": 0.8, "loop": False, "fn": attack, "hit": 0.42})
+
+	def hit_fn(t):
+		P = c.pose()
+		e = keys(t, [(0, 0), (0.07, 1), (0.35, 0)])
+		c.body(P, pitch_up=0.15 * e, roll=0.18 * e, dy=0.05 * L * e)
+		lunge(P, -0.08 * L * e)
+		wave(P, TAU * t / 0.35, 0.5 * e)
+		flap(P, 0.0, 0.0, bias=0.45 * e)
+		return P
+
+	out.append({"name": "Hit", "T": 0.35, "loop": False, "fn": hit_fn})
+
+	Td = 1.4
+
+	def death(t):
+		# Судорога, переворот набок, плавники прижимаются, падение (с ускорением) и отскок; лежит на боку
+		P = c.pose()
+		x = t / Td
+		roll = keys(x, [(0, 0), (0.12, -0.15), (0.6, 1.5), (0.75, 1.62), (0.88, 1.52), (1.0, 1.55)])
+		c.body(P, pitch_up=keys(x, [(0, 0), (0.12, 0.2), (0.6, -0.12), (1.0, -0.05)]), roll=roll)
+		spasm = env(x, 0.0, 0.05, 0.25, 0.45)
+		wave(P, TAU * t / 0.3, 0.7 * spasm + 0.3 * env(x, 0.62, 0.68, 0.76, 0.95))
+		flap(P, TAU * t / 0.25, 0.5 * spasm)
+		fw = smooth((x - 0.15) / 0.45)
+		for s, sub in fins:
+			fold(P, sub, fw, (0.1 * s, 0.05, -1.0))
+		for sub in r["dorsal"]:
+			fold(P, sub, 0.7 * fw, (0.0, 0.2, -1.0))
+		for sub in r["ventral"]:
+			fold(P, sub, 0.7 * fw, (0.0, -0.2, -1.0))
+		# Падение: доля f высоты над землёй (по низу меша в этой позе); f = 1 — низ ровно на земле
+		if x < 0.15:
+			f = -0.04 * smooth(x / 0.15)
+		elif x < 0.62:
+			u = (x - 0.15) / 0.47
+			f = -0.04 + 1.04 * u * u
+		else:
+			f = 1.0 - 0.08 * math.sin(math.pi * min((x - 0.62) / 0.2, 1.0))
+		_, _, Gr, Gp, _ = evaluate(rig, P)
+		v = skin_points(rig, c.mesh["pos"], c.mesh["joints"], c.mesh["weights"], Gr, Gp)
+		P["root_off"] = P["root_off"] + np.array([0.0, -float(v[:, 1].min()) * f, 0.0])
+		return P
+
+	out.append({"name": "Death", "T": Td, "loop": False, "fn": death})
+
+	def cast(t):
+		# Частые широкие взмахи плавников, корпус приподнят, нос вверх
+		P = c.pose()
+		e = keys(t, [(0, 0), (0.15, 1), (0.62, 1), (0.8, 0)])
+		c.body(P, pitch_up=0.18 * e, dy=0.08 * L * e)
+		flap(P, TAU * (t - 0.1) / 0.25, 0.8 * env(t, 0.05, 0.15, 0.6, 0.78), bias=0.1 * e)
+		wave(P, TAU * t / 0.4, 0.35 * e)
+		return P
+
+	out.append({"name": "Cast", "T": 0.8, "loop": False, "fn": cast, "cast": 0.42})
+	return out
+
+
+def fish_meta(meta: dict, rig: Rig, roles: dict, mesh: dict, cfg: dict, clips: list) -> None:
+	"""Запись рыбы в creatures.json: height — верх модели над землёй (подпись, коллизия), hover — высота оси тела
+	(куда целиться), body_height — собственная высота рыбы; кости по ролям рыбы."""
+	nm = rig.names
+	lo, hi = mesh["pos"].min(0), mesh["pos"].max(0)
+	meta["height"] = round(float(hi[1]), 3)
+	meta["hover"] = round(float(cfg["hover"]), 3)
+	meta["body_height"] = round(float(hi[1] - lo[1]), 3)
+	meta["length"] = round(float(hi[2] - lo[2]), 3)
+	for cl in clips:
+		if cl["name"] in ("Walk", "Run"):
+			meta["clips"][cl["name"]]["speed"] = round(float(cl["speed"]), 3)
+
+	def subs(lst):
+		return [[nm[b] for b in s] for s in lst]
+
+	meta["bones"] = {
+		"root": nm[roles["root"]], "head": nm[roles["head"]], "body": [nm[b] for b in roles["body"]],
+		"front": [nm[b] for b in roles["neck"]], "snout": [nm[b] for b in roles["head_extra"]],
+		"back": [nm[b] for b in roles["back"]], "tail": [nm[b] for b in roles["tail"]],
+		"fins": {s: subs(v) for s, v in roles["fins"].items()},
+		"dorsal": subs(roles["dorsal"]), "ventral": subs(roles["ventral"]), "mouth": subs(roles["mouth"]),
+	}
+
+
+def fish_check_rest(meta: dict, lo: np.ndarray, hi: np.ndarray, head: np.ndarray) -> bool:
+	"""Поза покоя рыбы: верх модели — height, низ — на высоте парения (не у земли), голова на уровне hover."""
+	ok = abs(hi[1] - meta["height"]) < 0.01 and abs(lo[1] - meta["bounds"][0][1]) < 0.01
+	ok &= lo[1] > 0.4 * meta["hover"] and abs(head[1] - meta["hover"]) < 0.25 * meta["hover"]
+	print("   парит: ось тела %.2f м, низ %.2f, верх %.2f, голова y %.2f%s" % (
+		meta["hover"], lo[1], hi[1], head[1], "" if ok else "  ← ПЛОХО"))
+	return bool(ok)
+
+
+def fish_check_clip(meta: dict, name: str, miny: float, end_min: float) -> tuple:
+	"""Клип рыбы: всё, кроме Death, — в воздухе (низ меша не ниже половины высоты низа в покое);
+	Death заканчивается лёжа на земле (низ меша в последнем кадре на y = 0)."""
+	rest_lo = float(meta["bounds"][0][1])
+	if name == "Death":
+		return ", в конце низ меша %+.3f" % end_min, abs(end_min) > 0.01
+	return ", в воздухе", miny < 0.5 * rest_lo
+
+
 # ---------- Сборка зверя ----------
 
 FPS = 30.0
@@ -1611,9 +1962,17 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 	from PIL import Image
 	print("== %s: %s" % (cid, src_path))
 	src = load_source(src_path)
-	g = to_game_space(src, cfg["height"])
+	fish = cfg.get("style") == "fish"
+	yaw = None
+	if fish:
+		yaw = fish_yaw(src)
+		cfg = fish_cfg(src, cfg, yaw)
+	g = to_game_space(src, cfg["height"], yaw)
 	g = reorder(g, topo_order(g["parent"]))
-	roles = detect_roles(g["names"], g["parent"], g["gpos"], cfg["height"], cfg)
+	if fish:
+		roles = fish_roles(g["names"], g["parent"], g["gpos"], cfg["length"])
+	else:
+		roles = detect_roles(g["names"], g["parent"], g["gpos"], cfg["height"], cfg)
 	print("   поворот %d°, масштаб %.4f, исходный меш %d треуг." % (g["yaw_deg"], g["scale"], len(g["tris"])))
 	mesh = simplify_mesh(g, cfg["tris"])
 	st = mesh_stats(mesh["pos"], mesh["tris"])
@@ -1624,6 +1983,8 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 	shift = np.array([0.0, -float(mesh["pos"][:, 1].min()) * k, 0.0])
 	mesh["pos"] = mesh["pos"] * k + shift
 	g["gpos"] = g["gpos"] * k + shift
+	if fish:
+		fish_lift(mesh, g, roles, cfg)
 	rig = Rig(roles["names"], g["parent"], g["grot"], g["gpos"])
 	if cfg.get("wings"):
 		add_wings(rig, roles, mesh, cfg["wings"])
@@ -1637,7 +1998,11 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 			leg.l1, leg.l2, round(leg.reach * 100)))
 	c = Ctx(rig, roles, cfg)
 	c.mesh = mesh
-	clips = [bake(c, cl) for cl in (bird_clips(c) if cfg["style"] == "bird" else quad_clips(c))]
+	if fish:
+		clip_specs = fish_clips(c)
+	else:
+		clip_specs = bird_clips(c) if cfg["style"] == "bird" else quad_clips(c)
+	clips = [bake(c, cl) for cl in clip_specs]
 	for cl in clips:
 		if cl["short"] > 0.005:
 			print("   %s: нога не достаёт до цели на %.3f м (опора приподнимается)" % (cl["name"], cl["short"]))
@@ -1683,9 +2048,11 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 		"source": os.path.basename(src_path),
 	}
 	for cl in clips:
-		if cl["name"] in ("Walk", "Run"):
+		if cl["name"] in ("Walk", "Run") and "gait" in cl:
 			g2 = cl["gait"]
 			meta["clips"][cl["name"]].update({"speed": round(cl["speed"], 3), "stride": g2["stride"], "duty": g2["duty"]})
+	if fish:
+		fish_meta(meta, rig, roles, mesh, cfg, clips)
 	return meta
 
 
@@ -1783,7 +2150,8 @@ def check(out_dir: str, ids: list, meta_all: dict, preview: str = "") -> bool:
 		bn = meta["bones"]
 		idx = m["idx"]
 		head = idx[bn["head"]]
-		feet = {k: idx[v] for k, v in bn["feet"].items()}
+		feet = {k: idx[v] for k, v in bn.get("feet", {}).items()}
+		fish = "hover" in meta
 		G0 = built_pose(m, None, 0.0)
 		rest_v = built_skin(m, G0)
 		lo, hi = rest_v.min(0), rest_v.max(0)
@@ -1793,7 +2161,10 @@ def check(out_dir: str, ids: list, meta_all: dict, preview: str = "") -> bool:
 			hi[2] - lo[2], hi[0] - lo[0]))
 		face_ok = hz > 0.0 and G0[head][1, 3] > 0.3 * (hi[1] - lo[1])
 		print("   голова в покое: %s → морда в %s" % (np.round(G0[head][:3, 3], 3), "+Z" if face_ok else "НЕ +Z (!)"))
-		ok &= bool(face_ok) and abs(lo[1]) < 0.003 and abs((hi[1] - lo[1]) - meta["height"]) < 0.01
+		if fish:
+			ok &= bool(face_ok) and fish_check_rest(meta, lo, hi, G0[head][:3, 3])
+		else:
+			ok &= bool(face_ok) and abs(lo[1]) < 0.003 and abs((hi[1] - lo[1]) - meta["height"]) < 0.01
 		rest_foot = {k: G0[b][:3, 3].copy() for k, b in feet.items()}
 		for name, info in meta["clips"].items():
 			L = info["length"]
@@ -1823,7 +2194,12 @@ def check(out_dir: str, ids: list, meta_all: dict, preview: str = "") -> bool:
 			line = "   %-6s %.2f с: низ меша %+.3f (t=%.2f), опоры ниже покоя на %.3f, голова y %.2f…%.2f z %.2f…%.2f" % (
 				name, L, miny, miny_t, max(0.0, -foot_min), hp[:, 1].min(), hp[:, 1].max(), hp[:, 2].min(), hp[:, 2].max())
 			bad = miny < -0.01
-			if name in ("Walk", "Run"):
+			if fish:
+				end_min = float(built_skin(m, built_pose(m, name, L))[:, 1].min())
+				extra, fbad = fish_check_clip(meta, name, miny, end_min)
+				line += extra
+				bad |= fbad
+			if name in ("Walk", "Run") and feet:
 				v = info["speed"]
 				slide = 0.0
 				n = len(times) - 1  # последний кадр = первый
@@ -1863,9 +2239,9 @@ def write_preview(out: str, cid: str, clip: str, m: dict, sticks: list, verts_at
 	names = [m["nodes"][j].get("name", "") for j in joints]
 	marks = {}
 	for k, n in enumerate(names):
-		if n.startswith(("LegFL", "LegBL", "LegL", "ToeL", "WingL")):
+		if n.startswith(("LegFL", "LegBL", "LegL", "ToeL", "WingL", "FinL")):
 			marks[k] = (40, 90, 220)
-		elif n.startswith(("LegFR", "LegBR", "LegR", "ToeR", "WingR")):
+		elif n.startswith(("LegFR", "LegBR", "LegR", "ToeR", "WingR", "FinR")):
 			marks[k] = (220, 50, 40)
 	H = meta["height"]
 	span = max(meta["length"], H) * 1.2

@@ -71,6 +71,8 @@ func _build_models() -> void:
 		else:
 			_check_procedural(n, id)
 		for st in PetData.STAGE_LEVELS.size():
+			if not PetData.SPECIES.has(id):
+				break  # летающие рыбы питомцами не бывают
 			var lvl := int(PetData.STAGE_LEVELS[st])
 			var sc := PetData.stage_scale(id, lvl)
 			var p := _holder(id, Vector3(x, 0, 3.0 + 3.0 * float(st)))

@@ -479,7 +479,7 @@ func try_attack() -> bool:
 			_deal(target, dmg)
 		else:
 			_miss_text(target)
-		Vfx.slash_arc(get_parent(), target.global_position + Vector3(0, 0.75 * target.body_scale, 0),
+		Vfx.slash_arc(get_parent(), target.aim_point(),
 			target.global_position - global_position, _class_color())
 		if twice:
 			get_tree().create_timer(HIT_GAP).timeout.connect(_late_hit.bind(target, basic_mult, 0.0, false, true))
@@ -506,7 +506,7 @@ func _late_hit(t: Variant, mult: float, flat: float, force_crit: bool, say_doubl
 		_miss_text(m)
 		return
 	_deal(m, _roll(mult, force_crit, flat))
-	Vfx.slash_arc(get_parent(), m.global_position + Vector3(0, 0.75 * m.body_scale, 0),
+	Vfx.slash_arc(get_parent(), m.aim_point(),
 		m.global_position - global_position, _class_color().lightened(0.25))
 	if say_double:
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.6, 0), "Двойной удар!", Color(1, 0.75, 0.4))
@@ -597,7 +597,7 @@ func _shoot(t: Mob, dmg: int, size: float, on_hit: Callable, miss: bool = false)
 	p.miss = miss
 	get_parent().add_child(p)
 	p.global_position = global_position + Vector3(0, 1.25, 0) + _forward() * 0.6
-	var aim := t.global_position + Vector3(0, 0.75 * t.body_scale, 0)
+	var aim := t.aim_point()
 	if p.is_shaft() and Vector2(aim.x - p.global_position.x, aim.z - p.global_position.z).length() > 0.05:
 		p.look_at(aim, Vector3.UP)
 
@@ -774,7 +774,7 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 			_engage(t)
 			_anim_bash()
 			_deal(t, _roll(mult, false))
-			Vfx.hit_spark(fx_parent, t.global_position + Vector3(0, 0.75 * t.body_scale, 0), Color(1, 1, 0.5), 1.5)
+			Vfx.hit_spark(fx_parent, t.aim_point(), Color(1, 1, 0.5), 1.5)
 			if not t.is_dead:
 				t.stun(time)
 				Util.float_text(fx_parent, t.global_position + Vector3(0, 2.4 * t.body_scale + 0.8, 0),
@@ -870,7 +870,7 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			_anim_cast()
 			var sec := HeroSkills.field(sid, "sleep", n)
 			t.sleep(sec)
-			Projectile.burst(fx_parent, t.global_position + Vector3(0, 0.8 * t.body_scale, 0), col, 1.3, 0.4)
+			Projectile.burst(fx_parent, t.aim_point(), col, 1.3, 0.4)
 			Util.float_text(fx_parent, t.global_position + Vector3(0, 2.4 * t.body_scale + 0.8, 0), "Сон", col.lightened(0.4))
 			_announce(sname, "сон %.1f с" % sec)
 		"melee":
@@ -884,7 +884,7 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			var force := bool(sk.get("crit", false))
 			var dmg := _roll(mult, force, flat)
 			_deal(t, dmg)
-			Vfx.slash_arc(fx_parent, t.global_position + Vector3(0, 0.75 * t.body_scale, 0),
+			Vfx.slash_arc(fx_parent, t.aim_point(),
 				t.global_position - global_position, col, 1.2)
 			for i in range(1, int(sk.get("hits", 1))):
 				get_tree().create_timer(HIT_GAP * float(i)).timeout.connect(_late_hit.bind(t, mult, flat, force, false))

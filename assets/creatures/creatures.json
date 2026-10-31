@@ -454,5 +454,434 @@
 			]
 		},
 		"source": "27501d8c-Meshy_AI_Character_output_2.glb"
+	},
+	"flyfish": {
+		"height": 1.836,
+		"length": 1.001,
+		"width": 0.609,
+		"bounds": [
+			[
+				-0.304,
+				1.161,
+				-0.5
+			],
+			[
+				0.305,
+				1.836,
+				0.501
+			]
+		],
+		"walk_speed": 1.4,
+		"run_speed": 4.0,
+		"attack_hit_time": 0.42,
+		"cast_time": 0.42,
+		"clips": {
+			"Idle": {
+				"length": 2.0,
+				"loop": true
+			},
+			"Walk": {
+				"length": 1.0,
+				"loop": true,
+				"speed": 1.4
+			},
+			"Run": {
+				"length": 0.6,
+				"loop": true,
+				"speed": 4.0
+			},
+			"Attack": {
+				"length": 0.8,
+				"loop": false
+			},
+			"Hit": {
+				"length": 0.35,
+				"loop": false
+			},
+			"Death": {
+				"length": 1.4,
+				"loop": false
+			},
+			"Cast": {
+				"length": 0.8,
+				"loop": false
+			}
+		},
+		"head_rest": [
+			0.006,
+			1.45,
+			0.362
+		],
+		"tris": 6998,
+		"verts": 6879,
+		"bones": {
+			"root": "Root",
+			"head": "Head",
+			"body": [
+				"Body"
+			],
+			"front": [
+				"Front1"
+			],
+			"snout": [
+				"Snout1",
+				"Snout2"
+			],
+			"back": [
+				"Back1",
+				"Back2"
+			],
+			"tail": [
+				"Tail1",
+				"Tail2",
+				"Tail3",
+				"Tail4",
+				"Tail5",
+				"Tail6"
+			],
+			"fins": {
+				"L": [
+					[
+						"FinL1_1",
+						"FinL1_2",
+						"FinL1_3"
+					]
+				],
+				"R": [
+					[
+						"FinR1_1",
+						"FinR1_2",
+						"FinR1_3"
+					]
+				]
+			},
+			"dorsal": [
+				[
+					"Dorsal1_1",
+					"Dorsal1_2"
+				],
+				[
+					"Dorsal2_1",
+					"Dorsal2_2",
+					"Dorsal2_3"
+				],
+				[
+					"Dorsal3_1",
+					"Dorsal3_2"
+				]
+			],
+			"ventral": [],
+			"mouth": [
+				[
+					"Mouth1_1",
+					"Mouth1_2"
+				]
+			]
+		},
+		"source": "Meshy_AI_Character_output (3).glb",
+		"hover": 1.45,
+		"body_height": 0.674
+	},
+	"flyfish_sail": {
+		"height": 1.996,
+		"length": 1.4,
+		"width": 0.323,
+		"bounds": [
+			[
+				-0.161,
+				1.113,
+				-0.701
+			],
+			[
+				0.162,
+				1.996,
+				0.699
+			]
+		],
+		"walk_speed": 1.5,
+		"run_speed": 4.4,
+		"attack_hit_time": 0.42,
+		"cast_time": 0.42,
+		"clips": {
+			"Idle": {
+				"length": 2.4,
+				"loop": true
+			},
+			"Walk": {
+				"length": 1.1,
+				"loop": true,
+				"speed": 1.5
+			},
+			"Run": {
+				"length": 0.66,
+				"loop": true,
+				"speed": 4.4
+			},
+			"Attack": {
+				"length": 0.8,
+				"loop": false
+			},
+			"Hit": {
+				"length": 0.35,
+				"loop": false
+			},
+			"Death": {
+				"length": 1.4,
+				"loop": false
+			},
+			"Cast": {
+				"length": 0.8,
+				"loop": false
+			}
+		},
+		"head_rest": [
+			0.003,
+			1.502,
+			0.599
+		],
+		"tris": 6954,
+		"verts": 7740,
+		"bones": {
+			"root": "Root",
+			"head": "Head",
+			"body": [
+				"Body"
+			],
+			"front": [
+				"Front1",
+				"Front2",
+				"Front3",
+				"Front4"
+			],
+			"snout": [
+				"Snout1",
+				"Snout2"
+			],
+			"back": [
+				"Back1",
+				"Back2"
+			],
+			"tail": [
+				"Tail1",
+				"Tail2",
+				"Tail3",
+				"Tail4"
+			],
+			"fins": {
+				"L": [
+					[
+						"FinL1_1",
+						"FinL1_2"
+					],
+					[
+						"FinL2_1",
+						"FinL2_2",
+						"FinL2_3",
+						"FinL2_4",
+						"FinL2_5"
+					],
+					[
+						"FinL3_1",
+						"FinL3_2",
+						"FinL3_3",
+						"FinL3_4",
+						"FinL3_5"
+					]
+				],
+				"R": [
+					[
+						"FinR1_1",
+						"FinR1_2"
+					],
+					[
+						"FinR2_1",
+						"FinR2_2",
+						"FinR2_3",
+						"FinR2_4",
+						"FinR2_5"
+					],
+					[
+						"FinR3_1",
+						"FinR3_2",
+						"FinR3_3",
+						"FinR3_4",
+						"FinR3_5"
+					]
+				]
+			},
+			"dorsal": [
+				[
+					"Dorsal1_1",
+					"Dorsal1_2"
+				],
+				[
+					"Dorsal2_1",
+					"Dorsal2_2",
+					"Dorsal2_3"
+				],
+				[
+					"Dorsal3_1",
+					"Dorsal3_2"
+				]
+			],
+			"ventral": [
+				[
+					"Ventral1_1",
+					"Ventral1_2",
+					"Ventral1_3",
+					"Ventral1_4"
+				],
+				[
+					"Ventral2_1",
+					"Ventral2_2",
+					"Ventral2_3"
+				],
+				[
+					"Ventral3_1",
+					"Ventral3_2"
+				]
+			],
+			"mouth": []
+		},
+		"source": "Meshy_AI_Character_output (4).glb",
+		"hover": 1.5,
+		"body_height": 0.882
+	},
+	"flyfish_drake": {
+		"height": 2.173,
+		"length": 1.804,
+		"width": 1.249,
+		"bounds": [
+			[
+				-0.625,
+				1.135,
+				-0.902
+			],
+			[
+				0.624,
+				2.173,
+				0.901
+			]
+		],
+		"walk_speed": 1.5,
+		"run_speed": 4.2,
+		"attack_hit_time": 0.42,
+		"cast_time": 0.42,
+		"clips": {
+			"Idle": {
+				"length": 2.6,
+				"loop": true
+			},
+			"Walk": {
+				"length": 1.2,
+				"loop": true,
+				"speed": 1.5
+			},
+			"Run": {
+				"length": 0.7,
+				"loop": true,
+				"speed": 4.2
+			},
+			"Attack": {
+				"length": 0.8,
+				"loop": false
+			},
+			"Hit": {
+				"length": 0.35,
+				"loop": false
+			},
+			"Death": {
+				"length": 1.4,
+				"loop": false
+			},
+			"Cast": {
+				"length": 0.8,
+				"loop": false
+			}
+		},
+		"head_rest": [
+			0.004,
+			1.539,
+			0.61
+		],
+		"tris": 6936,
+		"verts": 9160,
+		"bones": {
+			"root": "Root",
+			"head": "Head",
+			"body": [
+				"Body"
+			],
+			"front": [
+				"Front1",
+				"Front2",
+				"Front3"
+			],
+			"snout": [
+				"Snout1",
+				"Snout2",
+				"Snout3",
+				"Snout4"
+			],
+			"back": [
+				"Back1",
+				"Back2"
+			],
+			"tail": [
+				"Tail1",
+				"Tail2",
+				"Tail3",
+				"Tail4"
+			],
+			"fins": {
+				"L": [
+					[
+						"FinL1_1",
+						"FinL1_2",
+						"FinL1_3"
+					]
+				],
+				"R": [
+					[
+						"FinR1_1",
+						"FinR1_2",
+						"FinR1_3"
+					]
+				]
+			},
+			"dorsal": [
+				[
+					"Dorsal1_1",
+					"Dorsal1_2",
+					"Dorsal1_3",
+					"Dorsal1_4"
+				],
+				[
+					"Dorsal2_1",
+					"Dorsal2_2",
+					"Dorsal2_3"
+				],
+				[
+					"Dorsal3_1",
+					"Dorsal3_2",
+					"Dorsal3_3"
+				],
+				[
+					"Dorsal4_1",
+					"Dorsal4_2"
+				]
+			],
+			"ventral": [
+				[
+					"Ventral1_1",
+					"Ventral1_2",
+					"Ventral1_3"
+				]
+			],
+			"mouth": []
+		},
+		"source": "Meshy_AI_Character_output (5).glb",
+		"hover": 1.55,
+		"body_height": 1.038
 	}
 }

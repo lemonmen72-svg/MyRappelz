@@ -63,13 +63,13 @@ func _physics_process(delta: float) -> void:
 
 
 func _aim_point() -> Vector3:
-	return target.global_position + Vector3(0, 0.75 * target.body_scale, 0)
+	return target.aim_point()
 
 
 func _hit() -> void:
 	var t := target
 	var by: Node3D = shooter if is_instance_valid(shooter) else null
-	var hit_pos := t.global_position + Vector3(0, 0.75 * t.body_scale, 0)
+	var hit_pos := t.aim_point()
 	if miss:
 		Util.float_text(get_parent(), t.global_position + Vector3(0, 2.6 * t.body_scale + 0.4, 0), "Промах",
 			Color(0.8, 0.85, 1.0))

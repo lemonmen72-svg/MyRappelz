@@ -5,6 +5,9 @@ extends CharacterBody3D
 ## клипы Idle/Walk/Run по скорости, Attack с моментом удара, Hit, Death; пока зверь спит, анимации стоят).
 ## Метка приручения (Taming) видна кольцом под зверем и ромбом-печатью над головой.
 ## Уникальный каменный страж раз в несколько секунд бьёт по площади (с замахом).
+## Летающие рыбы (MobData flying) парят: высота парения зашита в модель (CreatureAsset hover), коллизия и узел
+## зверя — на земле; целиться (снаряды, дуги ударов, вспышки) — в aim_point() / mid_point() на высоте тела.
+## После смерти клип Death роняет рыбу на землю.
 
 ## killed = true: зверя убили, false: его забрали из мира (consume)
 signal gone(mob: Mob, killed: bool)
@@ -74,6 +77,8 @@ var _hit_target: Node3D = null
 var _hit_left := 0.0
 var _hit_dmg := 0
 var _height := 1.4
+## Высота центра тела парящего зверя над землёй (0 — ходит по земле).
+var hover_y := 0.0
 var _anim_t := 0.0
 var _mark: Node3D = null
 var _mark_gem: Node3D = null
@@ -119,6 +124,8 @@ func _ready() -> void:
 	_asset = CreatureModels.asset_of(_model)
 	CreatureModels.add_collision(self, type_id, body_scale)
 	_height = CreatureModels.height(type_id, body_scale)
+	if MobData.flying(type_id):
+		hover_y = CreatureAsset.hover_for(type_id, body_scale)
 	_anim_t = randf() * 10.0
 
 	_label = Label3D.new()
@@ -580,7 +587,7 @@ func take_damage(amount: int, attacker: Node3D, crit: bool = false, periodic: bo
 		num_c = Color(0.9, 0.45, 0.85)
 	Util.float_text(parent, global_position + Vector3(0, _height + 0.6, 0), str(amount), num_c, 1.5 if crit else 1.0)
 	if not periodic:
-		Vfx.hit_spark(parent, global_position + Vector3(0, _height * 0.55, 0),
+		Vfx.hit_spark(parent, global_position + Vector3(0, hover_y if hover_y > 0.0 else _height * 0.55, 0),
 			Color(1.0, 0.75, 0.25) if crit else Color(1.0, 0.92, 0.6), (1.4 if crit else 0.9) * clampf(body_scale, 0.7, 1.6))
 		_flash()
 	_update_label()
@@ -622,7 +629,9 @@ func _die() -> void:
 
 func _death_puff() -> void:
 	if is_inside_tree():
-		Vfx.death_puff(get_parent(), global_position + Vector3(0, _height * 0.3, 0), clampf(body_scale, 0.7, 2.0))
+		# Парящий зверь к этому моменту уже упал на землю
+		var py := 0.3 if hover_y > 0.0 else _height * 0.3
+		Vfx.death_puff(get_parent(), global_position + Vector3(0, py, 0), clampf(body_scale, 0.7, 2.0))
 
 
 ## Убрать зверя из мира без убийства.
@@ -640,8 +649,20 @@ func _flash() -> void:
 	# Модель «сплющивается» от удара и пружинит обратно
 	if _model != null:
 		var sq := create_tween()
-		sq.tween_property(_model, "scale", Vector3(1.12, 0.86, 1.12), 0.05)
+		# Парящего не сплющиваем по высоте: иначе модель на миг проседает к земле
+		var sy := 0.97 if hover_y > 0.0 else 0.86
+		sq.tween_property(_model, "scale", Vector3(1.12, sy, 1.12), 0.05)
 		sq.tween_property(_model, "scale", Vector3.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Куда целиться (снаряды, дуги ударов героя): центр тела; у парящего — на высоте парения.
+func aim_point() -> Vector3:
+	return global_position + Vector3(0, hover_y if hover_y > 0.0 else 0.75 * body_scale, 0)
+
+
+## Середина тела для эффектов умений питомцев; у парящего — на высоте парения.
+func mid_point() -> Vector3:
+	return global_position + Vector3(0, hover_y if hover_y > 0.0 else maxf(0.5, _height * 0.5), 0)
 
 
 func _update_label() -> void:

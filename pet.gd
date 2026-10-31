@@ -820,7 +820,7 @@ func _skill_color(sk: Dictionary) -> Color:
 func _skill_fx(m: Mob, c: Color, big: bool) -> void:
 	if not is_inside_tree() or not is_instance_valid(m):
 		return
-	var pos := m.global_position + Vector3(0, maxf(0.5, m._height * 0.5), 0)
+	var pos := m.mid_point()
 	if PetStats.is_magic(species):
 		Vfx.magic_burst(get_parent(), pos, c, 1.3 if big else 0.9, 0.3)
 		Vfx.magic_burst(get_parent(), pos, c.darkened(0.55), 0.7 if big else 0.5, 0.25)
@@ -1065,7 +1065,7 @@ func _slash(t: Mob, size: float) -> void:
 	if not is_inside_tree() or not is_instance_valid(t):
 		return
 	var dir := t.global_position - global_position
-	Vfx.slash_arc(get_parent(), t.global_position + Vector3(0, maxf(0.5, t._height * 0.5), 0), dir,
+	Vfx.slash_arc(get_parent(), t.mid_point(), dir,
 		CreatureModels.role_color(role).lightened(0.3), size * clampf(t.body_scale, 0.8, 1.6))
 
 
@@ -1128,7 +1128,9 @@ class Bolt extends Node3D:
 		if life <= 0.0 or not is_instance_valid(target) or target.get("is_dead") == true:
 			queue_free()
 			return
-		var aim := target.global_position + Vector3(0, 0.8, 0)
+		# По зверю — в центр тела (летающая рыба парит высоко), иначе — на 0.8 м над землёй
+		var tm := target as Mob
+		var aim := tm.aim_point() if tm != null and tm.hover_y > 0.0 else target.global_position + Vector3(0, 0.8, 0)
 		var to := aim - global_position
 		var step := speed * delta
 		if to.length() <= step + 0.25:

@@ -4,7 +4,7 @@ extends Control
 ## Картинка: res://assets/icons/items/<id предмета>.png (PNG 128×128 с прозрачными углами), загружается только
 ## через ResourceLoader/load() — так находится и в собранном APK. Нет картинки — процедурный значок по полю
 ## "icon" предмета (ItemData.icon_shape): мягкий круг цвета типа и простой силуэт (колба, свиток, карта существа,
-## кристалл, клинки, арбалет, клык, шкура, перо, пластина, осколок); неизвестный — первая буква названия.
+## кристалл, клинки, арбалет, клык, шкура, перо, пластина, осколок, чешуя, плавник); неизвестный — первая буква названия.
 ## Карта существа: вертикальная карточка с рамкой цвета тира и буквой вида; с душой — яркая, с сиянием;
 ## зеркальная — серебристая с бликами отражения.
 
@@ -89,6 +89,10 @@ func _draw() -> void:
 			_plate(base)
 		"shard":
 			_shard(base)
+		"scale":
+			_fish_scale(base)
+		"fin":
+			_fin(base)
 		_:
 			_letter(base)
 
@@ -369,6 +373,48 @@ func _shard(c: Color) -> void:
 	var pts := _poly([Vector2(0.44, 0.36), Vector2(0.56, 0.52), Vector2(0.46, 0.62), Vector2(0.56, 0.76)])
 	draw_polyline(pts, Color(rune.r, rune.g, rune.b, 0.35), _s(0.07), true)
 	draw_polyline(pts, rune, _s(0.03), true)
+
+
+## Чешуйка: округлый щиток с острым краем, полосками роста и бликом.
+func _fish_scale(c: Color) -> void:
+	var shape := PackedVector2Array()
+	for i in 17:
+		var ang := PI * float(i) / 16.0
+		shape.append(_p(0.5 + cos(ang) * 0.32, 0.42 + sin(ang) * 0.4))
+	shape.append(_p(0.5, 0.22))
+	draw_colored_polygon(shape, c)
+	var dark := c.darkened(0.3)
+	for k in 3:
+		var r := 0.12 + 0.07 * float(k)
+		var arc := PackedVector2Array()
+		for i in 9:
+			var ang := PI * (0.15 + 0.7 * float(i) / 8.0)
+			arc.append(_p(0.5 + cos(ang) * r, 0.42 + sin(ang) * r * 1.2))
+		draw_polyline(arc, dark, _s(0.02), true)
+	draw_line(_p(0.36, 0.42), _p(0.44, 0.3), c.lightened(0.5), _s(0.035), true)
+	_outline(shape, INK, _s(0.028))
+
+
+## Плавник: веер с лучами и рваным краем.
+func _fin(c: Color) -> void:
+	var base := Vector2(0.24, 0.8)
+	var shape := PackedVector2Array([_p(base.x, base.y)])
+	var tips: Array[Vector2] = []
+	for i in 6:
+		var ang := -PI * 0.5 + 0.22 * float(i) - 0.1
+		var ln := 0.62 - 0.05 * absf(float(i) - 2.0)
+		var tip := base + Vector2(cos(ang + 0.55), sin(ang + 0.55)) * ln
+		tips.append(tip)
+		shape.append(_p(tip.x, tip.y))
+		if i < 5:
+			var mid_a := ang + 0.11 + 0.55
+			var notch := base + Vector2(cos(mid_a), sin(mid_a)) * (ln * 0.86)
+			shape.append(_p(notch.x, notch.y))
+	draw_colored_polygon(shape, c)
+	var ray := c.darkened(0.35)
+	for tip in tips:
+		draw_line(_p(base.x, base.y), _p(tip.x, tip.y), ray, _s(0.025), true)
+	_outline(shape, INK, _s(0.025))
 
 
 ## Неизвестный предмет: первая буква названия.

@@ -2,7 +2,7 @@ class_name CreatureModels
 extends RefCounted
 ## Модели зверей и питомцев в аниме-стиле (чиби): округлые формы из сфер и капсул, большие глаза
 ## с бликами, румянец, характерные детали вида. Всё своё, из примитивов.
-## Пантера, черепаха и фазан — модели из файлов (CreatureAsset, assets/creatures/<id>.glb): build() берёт
+## Пантера, черепаха, фазан и летающие рыбы — модели из файлов (CreatureAsset, assets/creatures/<id>.glb): build() берёт
 ## файл, если он есть, иначе строит их запасную модель из примитивов (размеры — CreatureAsset.info_for).
 ## Для модели из файла: asset_of(корень) — узел CreatureAsset (анимации вызывают Mob и Pet).
 ## build() строит только меши в отдельном узле, коллизию добавляет add_collision().
@@ -186,6 +186,8 @@ static func build(root: Node3D, species: String, color: Color, s: float, tint: C
 			_pheasant(root, rig, color, s)
 		"golem":
 			_golem(root, rig, color, s)
+		"flyfish", "flyfish_sail", "flyfish_drake":
+			_fish(root, rig, species, color, s)
 		_:
 			_beast(root, rig, species, color, s)
 	var a: Dictionary = root.get_meta("anim", {})
@@ -312,6 +314,18 @@ static func animate(root: Node3D, _species: String, t: float, moving: float = 0.
 				runes.position.y = float(a.get("runes_y", 0.0)) + sin(t * 2.0) * 0.06 * s
 			if head != null:
 				head.rotation.z = sin(t * 1.2) * 0.05
+		"fish":
+			# Парит: покачивание, хвост виляет, грудные плавники машут (на ходу чаще и шире)
+			if body != null:
+				body.position.y = float(a.get("body_y", 0.0)) + sin(t * 2.0) * 0.04 * s
+				body.rotation.x = -0.1 * mv
+			var fish_tail: Node3D = a.get("tail")
+			if fish_tail != null:
+				fish_tail.rotation.y = sin(t * (5.0 + 6.0 * mv)) * (0.3 + 0.2 * mv)
+			var fins: Array = a.get("fins", [])
+			for i in fins.size():
+				var fin := fins[i] as Node3D
+				fin.rotation.z = (1.0 if i == 0 else -1.0) * sin(t * (6.0 + 6.0 * mv)) * (0.35 + 0.25 * mv)
 	# Общие детали: пульсирующее свечение (узел glow) и нимб питомца 3-й стадии
 	var glow: Node3D = a.get("glow")
 	if glow != null:
@@ -802,6 +816,49 @@ static func _pheasant(root: Node3D, rig: Rig, color: Color, s: float) -> void:
 	_pivot(head, "Top", Vector3(0, hr * 0.95 + 0.04 * s, 0))
 	var back := _pivot(body, "Back", Vector3(0, 0.46, 0.02) * s)
 	back.set_meta("radii", Vector3(0.26 * body_sc.x, 0.26 * body_sc.y, 0.26 * body_sc.z) * s)
+	root.set_meta("anim", anim)
+
+
+## Летающая рыба (запасная модель, если нет assets/creatures/<вид>.glb): тело-капля на высоте парения,
+## светлое брюхо, глаза, хвостовой и спинной плавники, грудные плавники-крылья.
+## Размеры — CreatureAsset.info_for: длина и высота парения (hover).
+static func _fish(root: Node3D, rig: Rig, species: String, color: Color, s: float) -> void:
+	var inf := CreatureAsset.info_for(species)
+	var ln := float(inf["length"]) * s
+	var hy := float(inf["hover"]) * s
+	var m := _lit(color)
+	var belly := _lit(color.lerp(Color(1.0, 0.55, 0.2), 0.7))
+	var fin_m := _lit(color.lerp(Color(1.0, 0.6, 0.25), 0.35))
+	var anim := {"kind": "fish", "s": s, "body_y": hy}
+
+	var body := _joint(rig, root, "Body", Vector3(0, hy, 0))
+	anim["body"] = body
+	var r := 0.17 * ln
+	_ball(rig, body, r, Vector3(0, 0, -0.05 * ln), m, Vector3(0.8, 1.0, 2.1), false, 16)
+	_ball(rig, body, r * 0.8, Vector3(0, -0.07 * ln, -0.1 * ln), belly, Vector3(0.75, 0.6, 1.8))
+	var hr := r * 0.75
+	var head := _joint(rig, body, "Head", Vector3(0, 0.02 * ln, -0.3 * ln))
+	anim["head"] = head
+	_ball(rig, head, hr, Vector3.ZERO, m, Vector3(0.85, 0.9, 1.0), false, 14)
+	_eyes(rig, head, hr, 0.045 * ln, Color(0.1, 0.08, 0.05), 0.9, 0.25, true)
+
+	var tail := _joint(rig, body, "Tail", Vector3(0, 0, 0.3 * ln))
+	anim["tail"] = tail
+	_ball(rig, tail, r * 0.55, Vector3(0, 0, 0.05 * ln), m, Vector3(0.6, 0.8, 1.6))
+	for i in 2:
+		var side := float(i * 2 - 1)
+		var lobe := _ball(rig, tail, 0.13 * ln, Vector3(0, 0.08 * side * ln, 0.2 * ln), fin_m, Vector3(0.12, 0.45, 1.0))
+		lobe.rotation.x = 0.6 * side
+	var dor := _ball(rig, body, 0.12 * ln, Vector3(0, r * 0.95, 0.02 * ln), fin_m, Vector3(0.1, 0.8, 1.1))
+	dor.rotation.x = 0.4
+	var fins: Array = []
+	for i in 2:
+		var side := 1.0 - 2.0 * float(i)
+		var fj := _joint(rig, body, "Fin", Vector3(0.12 * side * ln, -0.02 * ln, -0.12 * ln))
+		var f := _ball(rig, fj, 0.17 * ln, Vector3(0.14 * side * ln, -0.03 * ln, 0.04 * ln), fin_m, Vector3(1.0, 0.1, 0.55))
+		f.rotation.z = -0.35 * side
+		fins.append(fj)
+	anim["fins"] = fins
 	root.set_meta("anim", anim)
 
 
