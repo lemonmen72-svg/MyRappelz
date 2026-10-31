@@ -134,8 +134,8 @@ func run_step() -> void:
 			step = 5
 		5:
 			timer += 1
-			if timer > 60 * 30:
-				fail("питомец не добил зверя за 30 с")
+			if timer > 60 * 60:
+				fail("питомец не добил зверя за 60 с")
 				return
 			if mob.is_dead:
 				var pet: Pet = pm.active_pet

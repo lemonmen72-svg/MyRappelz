@@ -169,6 +169,14 @@ const ITEMS := {
 	"lizard_scale": {"name": "Чешуя ящера", "type": "trophy", "icon": "scale", "buy": 0, "sell": 12, "color": Color(0.3, 0.45, 0.25), "desc": "Жёсткая тёмно-зелёная чешуя анатемы. Трофей для торговца."},
 	"bone_blade": {"name": "Костяной клинок", "type": "trophy", "icon": "fang", "buy": 0, "sell": 22, "color": Color(0.92, 0.88, 0.78), "desc": "Изогнутый костяной серп с предплечья анатемы-рубаки, острый как сталь. Ценный трофей."},
 	"chief_spike": {"name": "Шип вожака", "type": "trophy", "icon": "spike", "rarity": "rare", "buy": 0, "sell": 40, "color": Color(0.85, 0.8, 0.68), "desc": "Костяной шип с плеча вожака анатем, весь в зазубринах. Ценный трофей."},
+	# Трофеи боссов (MobData boss_*): выпадают всегда
+	"golden_plume": {"name": "Пламенное перо", "type": "trophy", "icon": "feather", "rarity": "rare", "buy": 0, "sell": 70, "color": Color(1.0, 0.72, 0.25), "desc": "Перо Пламенного Златохвоста, тёплое, будто из костра. Трофей босса."},
+	"storm_fang": {"name": "Клык бури", "type": "trophy", "icon": "fang", "rarity": "rare", "buy": 0, "sell": 85, "color": Color(0.78, 0.84, 1.0), "desc": "Клык Седого Вожака бури, по нему пробегают искры. Трофей босса."},
+	"bastion_shard": {"name": "Осколок бастиона", "type": "trophy", "icon": "plate", "rarity": "rare", "buy": 0, "sell": 100, "color": Color(0.35, 0.68, 0.62), "desc": "Обломок панциря Тысячелетнего Бастиона, тяжёлый, как камень. Трофей босса."},
+	"current_pearl": {"name": "Жемчужина течений", "type": "trophy", "icon": "shard", "rarity": "rare", "buy": 0, "sell": 105, "color": Color(0.55, 0.78, 1.0), "desc": "Жемчужина из гребня Владыки течений, внутри словно плещется вода. Трофей босса."},
+	"midnight_claw": {"name": "Коготь полуночи", "type": "trophy", "icon": "fang", "rarity": "rare", "buy": 0, "sell": 115, "color": Color(0.62, 0.42, 0.95), "desc": "Чёрный коготь Владычицы полуночи с фиолетовым отливом. Трофей босса."},
+	"thunder_spear": {"name": "Громовой наконечник", "type": "trophy", "icon": "spike", "rarity": "rare", "buy": 0, "sell": 130, "color": Color(1.0, 0.85, 0.45), "desc": "Наконечник копья Громового хана, звенит от прикосновения. Трофей босса."},
+	"bone_crown": {"name": "Костяной венец", "type": "trophy", "icon": "spike", "rarity": "unique", "buy": 0, "sell": 160, "color": Color(0.95, 0.9, 0.72), "desc": "Венец из костяных шипов Костяного владыки. Трофей босса."},
 }
 
 

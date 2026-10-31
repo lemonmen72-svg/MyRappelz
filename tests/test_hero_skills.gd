@@ -364,11 +364,12 @@ func _check_stats(player: Player) -> void:
 	check(player.atk == int(d1["ratk"]) + int(cb["atk"]), "атака арбалета от Меткости: %d" % player.atk)
 	check(is_equal_approx(player.aspd, float(d1["aspd"]) / 100.0 - 0.2), "арбалет: скорость атаки −20%")
 	check(_daggers(player), "снова кинжалы")
-	# Точность: по зверям своего уровня без промахов, по сильным — изредка
+	# Точность (Combat): по зверям своего уровня почти без промахов, по зверю намного выше — редко
 	var weak := find_mob("pheasant")
-	check(weak != null and player.hit_chance(weak) >= 1.0, "по фазану 1-го ур. без промахов")
-	var hc10 := Stats.hit_chance(player.accuracy, 10)
-	check(hc10 >= 0.75 and hc10 < 1.0, "по зверю 10-го ур. попадание %d%%" % roundi(hc10 * 100.0))
+	check(weak != null and player.hit_chance(weak) >= 0.85, "по фазану %d ур. попадание %d%%"
+		% [weak.level if weak != null else 0, roundi(player.hit_chance(weak) * 100.0) if weak != null else 0])
+	var hc10 := Combat.hit_chance(float(player.accuracy), float(player.avoid), game.level, 10)
+	check(hc10 > 0.0 and hc10 < 0.4, "по зверю 10-го ур. (герой %d ур.) попадание %d%%" % [game.level, roundi(hc10 * 100.0)])
 	var acc0 := player.accuracy
 	player.accuracy = 0
 	var miss := 0
@@ -377,8 +378,8 @@ func _check_stats(player: Player) -> void:
 			miss += 1
 	player.accuracy = acc0
 	check(miss > 0 and miss < 100, "при низкой точности промахи: %d из 200" % miss)
-	check(PetStats.hit_chance(30, 5) == Stats.hit_chance(30, 5) and PetStats.STATS == Stats.STATS,
-		"формулы питомцев и героя общие (Stats)")
+	check(PetStats.STATS == Stats.STATS and absf(Combat.hit_chance(30.0, 30.0, 5, 5) - Combat.HIT_BASE) < 0.001,
+		"формулы питомцев и героя общие (Stats), попадание — Combat")
 
 
 ## Модель игрока: нужные узлы оружия (модель из файла — ещё метки кистей GripR/GripL).

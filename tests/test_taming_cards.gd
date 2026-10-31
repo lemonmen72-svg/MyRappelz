@@ -298,7 +298,7 @@ func _unit_items() -> void:
 ## Описание карты: вид, где водится и уровни, тир, где взять, что делать.
 func _unit_lines() -> void:
 	var t := "\n".join(PackedStringArray(Taming.card_lines("card_panther")))
-	check(t.contains("Пантера") and t.contains("Пещера (ур. 6–8)"), "где водится пантера: " + t)
+	check(t.contains("Пантера") and t.contains("Пещера (ур. 10–13)"), "где водится пантера: " + t)
 	check(t.contains("коричневая (базовая)") and t.contains("70%"), "тир и шанс: " + t)
 	check(t.contains("продаётся у Учителя Кирка в центре города"), "где взять карту пантеры: " + t)
 	check(t.contains("Примените «Приручить» к зверю, затем победите его"), "что делать с картой")
@@ -306,13 +306,13 @@ func _unit_lines() -> void:
 	check(t.contains("Восточный лагерь") and t.contains("выпадает из волка"), "карта волка: " + t)
 	check(t.contains("синяя (обычная)") and t.contains("45%"), "карта волка — синяя, 45%: " + t)
 	t = "\n".join(PackedStringArray(Taming.card_lines("card_turtle")))
-	check(t.contains("Мёртвая роща (ур. 5–6)") and t.contains("коричневая (базовая)"), "карта черепахи: " + t)
+	check(t.contains("Мёртвая роща (ур. 3–6)") and t.contains("коричневая (базовая)"), "карта черепахи: " + t)
 	check(Taming.card_lines("card_golem").is_empty() and Taming.card_lines("card_boar").is_empty(), "карт стража и кабана нет")
 	t = "\n".join(PackedStringArray(Taming.card_lines("card_wolf_soul")))
 	check(t.contains("Сформируйте существо в окне «Питомцы» или кнопкой «Сформировать»"), "карта с душой: " + t)
 	t = "\n".join(PackedStringArray(Taming.card_lines(ItemData.MIRROR_CARD)))
 	check(t.contains("зеркальная карта") and t.contains("продаётся у Учителя Кирка"), "зеркальная карта: " + t)
-	check(Taming.where_to_get("card_wolf") == "выпадает из волка", "карта волка — из волка")
+	check(Taming.where_to_get("card_wolf").begins_with("выпадает из волка"), "карта волка — из волка: " + Taming.where_to_get("card_wolf"))
 
 
 ## Карта с душой при полной сумке: заменяет пустую в той же ячейке; если пустых в стопке больше — ничего не теряется.

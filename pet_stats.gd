@@ -135,7 +135,7 @@ static func calibration(species: String) -> Dictionary:
 ## Все характеристики питомца вида species на уровне lvl с изученными умениями skills {id: уровень}
 ## и включёнными переключаемыми умениями toggles {id: true}.
 ## Ключи: stats (7 статов с бонусами), max_hp, max_mp, patk, matk, heal, atk (главная атака роли),
-## def, mdef, acc (точность), eva и crit (%, 0..100), aspd (% скорости атаки), hp_regen и mp_regen (в секунду),
+## def, mdef, acc (точность), avoid (избегание), eva и crit (%, 0..100), aspd (% скорости атаки), hp_regen и mp_regen (в секунду),
 ## speed, range, cd (перезарядка обычной атаки с учётом скорости), threat (шанс перехватить внимание зверя 0..1).
 static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles: Dictionary = {}) -> Dictionary:
 	var sp := PetData.get_species(species)
@@ -167,10 +167,11 @@ static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles:
 	r["heal"] = maxi(1, roundi(ka * Stats.raw_heal(s, lf)))
 	r["atk"] = int(r["matk"]) if is_magic(species) else int(r["patk"])
 	r["def"] = roundi(kd * Stats.raw_pdef(s, lf) * def_mult) + int(bon.get("def_flat", 0))
-	# Звери пока бьют только физически: маг. защита показана на будущее
+	# Маг. защита — от ударов пантеры и фазана (их атака магическая, MobStats)
 	r["mdef"] = roundi(kd * Stats.raw_mdef(s, lf) * def_mult)
-	# Точность: шанс попасть по зверю — hit_chance()
+	# Точность против избегания зверя и уровни — Combat.hit_chance
 	r["acc"] = Stats.accuracy(s, lf, float(bon.get("acc", 0.0)))
+	r["avoid"] = Stats.avoidance(s, lf)
 	r["eva"] = snappedf(Stats.evasion(s, lf) + float(bon.get("eva", 0.0)), 0.1)
 	r["crit"] = snappedf(Stats.crit_chance(s) + float(bon.get("crit", 0.0)), 0.1)
 	r["aspd"] = Stats.attack_speed(s)
@@ -181,12 +182,6 @@ static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles:
 	r["range"] = float(sp["range"])
 	r["cd"] = float(sp["cd"]) * 100.0 / float(r["aspd"])
 	return r
-
-
-## Шанс попасть обычной атакой по зверю уровня mob_level при точности acc (0.75..1.0):
-## 95% против зверя «своего» уровня, ±1% за единицу точности.
-static func hit_chance(acc: int, mob_level: int) -> float:
-	return Stats.hit_chance(acc, mob_level)
 
 
 ## Очки умений (JP) по умолчанию для питомца уровня lvl (старые сохранения, новые питомцы).

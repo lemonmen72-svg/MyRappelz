@@ -91,7 +91,7 @@ static func calibration(class_id: String) -> Dictionary:
 
 ## Характеристики героя класса class_id на уровне lvl без оружия и умений.
 ## Ключи: stats (7 статов), max_hp, max_mp, patk (ближний бой), ratk (дальний), matk, def, mdef,
-## acc (точность), eva и crit (%, 0..100), aspd (% скорости атаки), hp_regen (HP в секунду, и в бою).
+## acc (точность), avoid (избегание), eva и crit (%, 0..100), aspd (% скорости атаки), hp_regen (HP в секунду, и в бою).
 ## extra — прибавки к статам от умений ({"str": 4, …}: пассивные, переключаемые, усиления на время).
 static func derived(class_id: String, lvl: int, extra: Dictionary = {}) -> Dictionary:
 	var lv := maxi(lvl, 1)
@@ -114,6 +114,7 @@ static func derived(class_id: String, lvl: int, extra: Dictionary = {}) -> Dicti
 		"def": roundi(kd * Stats.raw_pdef(s, lf)),
 		"mdef": roundi(kd * Stats.raw_mdef(s, lf)),
 		"acc": Stats.accuracy(s, float(lv)),
+		"avoid": Stats.avoidance(s, float(lv)),
 		"eva": maxf(0.0, Stats.evasion(s, float(lv)) + float(k["eva"])),
 		"crit": maxf(0.0, Stats.crit_chance(s) + float(k["crit"])),
 		"aspd": Stats.attack_speed(s),

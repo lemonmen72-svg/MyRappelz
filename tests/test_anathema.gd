@@ -3,7 +3,7 @@ extends "res://tests/test_base.gd"
 ## анатема-рубака, вожак анатем), звери мира, не питомцы и не приручаются (карт нет, «Приручить» отказывает);
 ## модели из файлов со всеми 7 клипами (двуногие, клипы Quaternius UAL): в Idle голова на высоте роста, после клипа
 ## Death тело лежит на земле; запасная модель из примитивов собирается; физический ближний бой — частые удары
-## и низкая защита: урон по анатеме больше, чем по пантере того же уровня; вожак анатем — в пещере (10 ур.);
+## и низкая защита: урон по анатеме больше, чем по пантере того же уровня; вожак анатем — в пещере (25 ур.);
 ## спауны анатем — на суше, вне безопасных зон и вне зон летающих рыб.
 ## На острове только существа Максима: кабанов и каменных стражей в зонах нет, овец в загоне нет; питомцы-кабаны
 ## и стражи из старого сохранения становятся волками и черепахами (уровень, опыт; JP за недоступные умения — назад).
@@ -58,8 +58,8 @@ func run_step() -> void:
 			check(mob != null, "анатема есть в мире")
 			if mob == null:
 				return
-			check(mob.attack_every < 1.3 and mob.damage_taken > 1.0, "анатема: удар раз в %.1f с, получает урон ×%.2f"
-				% [mob.attack_every, mob.damage_taken])
+			check(mob.attack_every < 1.3 and MobData.defense(mob.type_id) < 1.0, "анатема: удар раз в %.1f с, защита ×%.2f"
+				% [mob.attack_every, MobData.defense(mob.type_id)])
 			stand_near(mob, 4.0)
 			player._set_target(mob)
 			check(hud.target_tame_state == Taming.BADGE_NO and hud.target_card_tier == "",
@@ -85,7 +85,7 @@ func _unit_data() -> void:
 		check(not MobData.tameable(id) and Taming.badge_state(id) == Taming.BADGE_NO, "%s нельзя приручить" % id)
 		check(ItemData.card_for(id) == "" and ItemData.soul_card_for(id) == "", "у %s нет карт" % id)
 		check(not PetData.SPECIES.has(id), "%s не бывает питомцем" % id)
-		check(MobData.defense(id) < 1.0 and MobData.damage_taken(id) > 1.0, "%s: низкая защита (%.2f)" % [id, MobData.defense(id)])
+		check(MobData.defense(id) < 1.0, "%s: низкая защита (%.2f)" % [id, MobData.defense(id)])
 		check(MobData.attack_cd(id) < 1.3, "%s бьёт чаще обычного зверя: раз в %.1f с" % [id, MobData.attack_cd(id)])
 		for e in d["loot"]:
 			check(not ItemData.get_item(String(e[0])).is_empty(), "добыча %s есть в предметах: %s" % [id, e[0]])
@@ -100,12 +100,17 @@ func _unit_data() -> void:
 			check(clips.has(k), "у %s в creatures.json есть клип %s" % [id, k])
 		check(float(inf["attack_hit_time"]) > 0.0 and float(inf["attack_hit_time"]) < float((clips["Attack"] as Dictionary)["length"]),
 			"%s: момент удара %.2f с внутри клипа Attack" % [id, inf["attack_hit_time"]])
-	# Растущая сила: уровень и HP; вожак — «Редкий», крепче всех, роняет зеркальную карту
+	# Растущая сила: уровень и HP (статы по уровню — MobStats); вожак — «Редкий», крепче всех, роняет зеркальную карту
 	var a := MobData.get_type("anathema")
 	var b := MobData.get_type("anathema_blade")
 	var c := MobData.get_type("anathema_chief")
 	check(int(a["level"]) < int(b["level"]) and int(b["level"]) < int(c["level"]), "уровни анатем растут")
-	check(int(a["hp"]) < int(b["hp"]) and int(b["hp"]) < int(c["hp"]), "HP анатем растёт")
+	var ha := int(MobStats.derived("anathema", int(a["level"]))["max_hp"])
+	var hb := int(MobStats.derived("anathema_blade", int(b["level"]))["max_hp"])
+	var hc := int(MobStats.derived("anathema_chief", int(c["level"]))["max_hp"])
+	check(ha < hb and hb < hc, "HP анатем растёт: %d < %d < %d" % [ha, hb, hc])
+	var st := MobStats.stats("anathema", 10)
+	check(int(st["str"]) > int(st["vit"]) and int(st["agi"]) > int(st["vit"]), "анатема: Сила и Ловкость выше Выносливости")
 	check(String(c["rarity"]) == "rare" and MobData.rarity_name("anathema_chief") == "Редкий", "вожак — «Редкий»")
 	var mirror := false
 	for e in c["loot"]:
@@ -119,7 +124,7 @@ func _unit_data() -> void:
 		ic.free()
 	# Описания карт: кабана и стража среди источников больше нет (их нет на острове)
 	var src := Taming.where_to_get("card_wolf")
-	check(src == "выпадает из волка", "карта волка — из волка: " + src)
+	check(src.begins_with("выпадает из волка") and src.contains("Седого Вожака бури"), "карта волка — из волка (и босса волков): " + src)
 	check(not Taming.lives_in_world("golem") and not Taming.lives_in_world("boar"), "кабан и страж на острове не водятся")
 	check(Taming.lives_in_world("anathema_chief"), "вожак анатем водится на острове")
 
@@ -128,6 +133,7 @@ func _unit_data() -> void:
 ## нет; овец нет; новички (луга 1–2 ур.) — существа Максима и не сильнее прежних кабанов.
 func _unit_world() -> void:
 	var w := IslandWorld.current
+	var c_lvl := int(MobData.get_type("anathema_chief")["level"])
 	var fish_zones: Array = []
 	var bad_zone: Array = []
 	for z in w.cfg.get("mob_zones", []):
@@ -136,7 +142,7 @@ func _unit_world() -> void:
 			fish_zones.append(zone)
 		for m in zone.get("mobs", []):
 			var mid := String((m as Array)[0])
-			if mid == "boar" or mid == "golem" or not CreatureAsset.has_asset(mid):
+			if mid == "boar" or mid == "golem" or not CreatureAsset.has_asset(MobData.species_of(mid)):
 				bad_zone.append("%s: %s" % [zone.get("id", ""), mid])
 	check(bad_zone.is_empty(), "в зонах острова только существа Максима (модели из файлов), лишние: %s" % [bad_zone])
 	var counts := {}
@@ -159,27 +165,32 @@ func _unit_world() -> void:
 		if id == "anathema_chief":
 			var cave := IslandWorld.v2(w.poi("cave")["center"])
 			check(Vector2(p.x, p.z).distance_to(cave) < 14.0, "вожак анатем — в логове у пещеры: %s" % p)
-			check(int(sl["level"]) == 10, "вожак анатем 10 ур.")
+			check(int(sl["level"]) == int(c_lvl), "вожак анатем %d ур." % c_lvl)
 	check(bad.is_empty(), "спауны: кабанов и стражей нет, анатемы на суше, вне безопасных зон и зон рыб (%s)" % [bad])
 	check(int(counts.get("anathema", 0)) >= 4 and int(counts.get("anathema_blade", 0)) >= 3
 		and int(counts.get("anathema_chief", 0)) == 1, "анатем на острове: %s" % [counts])
 	var chief := find_mob("anathema_chief")
-	check(chief != null and chief.level == 10 and chief.rarity == "rare", "вожак анатем в мире, 10 ур.")
+	check(chief != null and chief.level == c_lvl and chief.rarity == "rare" and not chief.is_boss,
+		"вожак анатем в мире, %d ур., «Редкий», не босс" % c_lvl)
 	check(find_mob("boar") == null and find_mob("golem") == null, "кабанов и стражей в мире нет")
 	check(Taming.habitat_text("anathema").contains("Западные скалы"), "где водится анатема: " + Taming.habitat_text("anathema"))
 	var pois := w.get_node("Pois")
 	# Овцы из примитивов не ставятся (в загоне — только овцы-модели Максима из файла, PenSheep)
 	var sheep := pois.find_child("Sheep", true, false)
 	check(pois.find_child("Bodies", true, false) == null and (sheep == null or sheep is PenSheep), "овец из примитивов нет")
-	# Новички: на лугах 1–2 ур. — фазаны и волки, не сильнее прежних кабанов (кабан 2-го ур.: 38 HP, атака 6)
+	# Новички: на лугах фазаны и волки; зверь своего уровня по силам герою (Combat.power_ratio < 1)
+	# («Обычный» волк сильнее базовых — бой тяжелее, но без питомца тоже возможен)
+	var hprof := Combat.profile_of(main.player)
 	for id in ["pheasant", "wolf"]:
 		var m := Mob.new()
-		m.setup(id, -1, Vector3.ZERO, 2)
-		check(m.max_hp <= 45 and m.atk <= 7, "%s 2-го ур. по силам новичку: HP %d, атака %d" % [id, m.max_hp, m.atk])
+		m.setup(id, -1, Vector3.ZERO, game.level)
+		var r := Combat.power_ratio(hprof, Combat.profile_of(m))
+		var lim := 1.0 if id == "pheasant" else 1.4
+		check(r < lim, "%s %d-го ур. по силам новичку: сила %.2f героя (HP %d, атака %d)" % [id, game.level, r, m.max_hp, m.atk])
 		m.free()
 
 
-## Низкая защита: одинаковый удар по анатеме проходит сильнее, чем по пантере того же уровня.
+## Низкая защита: одинаковый удар героя по анатеме проходит сильнее, чем по пантере того же уровня (Combat).
 func _unit_defense() -> void:
 	var base: Vector3 = main.player.global_position + Vector3(0, 0, -30)
 	var an := Mob.new()
@@ -188,13 +199,12 @@ func _unit_defense() -> void:
 	pa.setup("panther", -1, base + Vector3(4, 0, 0), 6)
 	main.add_child(an)
 	main.add_child(pa)
-	var hp_a := an.hp
-	var hp_p := pa.hp
-	an.take_damage(20, null)
-	pa.take_damage(20, null)
-	var da := hp_a - an.hp
-	var dp := hp_p - pa.hp
-	check(dp == 20 and da > dp, "удар 20: по анатеме %d, по пантере %d" % [da, dp])
+	var pl: Player = main.player
+	pl._last_magic = false
+	var da := pl.mitigate(an, 100)
+	var dp := pl.mitigate(pa, 100)
+	check(an.pdef < pa.pdef and da > dp, "удар 100: по анатеме %d (защита %d), по пантере %d (защита %d)"
+		% [da, an.pdef, dp, pa.pdef])
 	check(an.attack_every < pa.attack_every, "анатема бьёт чаще пантеры: %.1f < %.1f с" % [an.attack_every, pa.attack_every])
 	an.consume()
 	pa.consume()

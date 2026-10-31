@@ -65,7 +65,7 @@ func run_step() -> void:
 			check(npcs.page == "quest" and npcs.buttons.has("accept"), "страница задания: «Взять задание»")
 			check(npcs.reply == String(QuestData.get_quest("kirk_first_card")["offer"]), "реплика при выдаче")
 			check(_has_text("Купить карту существа у Учителя Кирка") and _has_text("0/1"), "цель с прогрессом")
-			check(_find_live(hud._window, "reward_mirror_card") == null and _has_text("Опыт: 15"), "награда показана")
+			check(_find_live(hud._window, "reward_mirror_card") == null and _has_text("Опыт: 35"), "награда показана")
 			_press_dialog("accept")
 			check(q.state("kirk_first_card") == "active" and game.quests_active.has("kirk_first_card"), "задание взято")
 			check(game.quest_tracked == "kirk_first_card", "взятое задание отслеживается")
@@ -118,7 +118,7 @@ func run_step() -> void:
 			var g0: int = game.gold
 			_press_dialog("complete")
 			check(q.state("kirk_first_card") == "done" and q.times_done("kirk_first_card") == 1, "задание сдано")
-			check(_total_xp() == xp0 + 15 and game.gold == g0 + 10, "награда: 15 оп., 10 зол. (опыт %d → %d)"
+			check(_total_xp() == xp0 + 35 and game.gold == g0 + 10, "награда: 35 оп., 10 зол. (опыт %d → %d)"
 				% [xp0, _total_xp()])
 			check(npcs.reply == String(QuestData.get_quest("kirk_first_card")["done"]), "слова Кирка при сдаче")
 			check(last_hud_text().contains("«Первая карта» выполнено"), "сообщение о сдаче: " + last_hud_text())
@@ -178,7 +178,7 @@ func run_step() -> void:
 			var xp0 := _total_xp()
 			check(q.complete("kirk_new_friend"), "«Новый друг» сдано")
 			check(int(game.hero["jp"]) >= jp0 + 5, "JP героя +5: %d → %d" % [jp0, int(game.hero["jp"])])
-			check(inv.count("hp_potion") == potions + 3 and _total_xp() == xp0 + 30, "награда: 3 зелья и 30 оп.")
+			check(inv.count("hp_potion") == potions + 3 and _total_xp() == xp0 + 70, "награда: 3 зелья и 70 оп.")
 			# «Испытание связи» — с 3 уровня (за фазана и награды герой мог уже подрасти)
 			if game.level < 3:
 				check(kirk.mark_text() == "" and q.level_locked("kirk_bond_trial"), "«Испытание связи» — с 3 уровня")
@@ -240,7 +240,7 @@ func run_step() -> void:
 			check(_has_text("Победить зверей вместе с питомцем") and _has_text("5/5"), "цель с прогрессом")
 			check(_has_text("Все цели выполнены — вернитесь к Учителю Кирку"), "подсказка, кому сдавать")
 			check(_find_live(hud._window, "reward_revive_scroll") != null, "награда-предмет со значком")
-			check(_has_text("Золото: 40") and _has_text("Опыт: 40"), "награда: опыт и золото")
+			check(_has_text("Золото: 40") and _has_text("Опыт: 100"), "награда: опыт и золото")
 			_press_journal("tab_done")
 			check(w.tab == "done" and w.buttons.has("q_kirk_first_card") and w.buttons.has("q_kirk_new_friend"),
 				"вкладка «Выполненные»")

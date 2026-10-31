@@ -1,9 +1,10 @@
 class_name Stats
 extends RefCounted
-## Общие формулы характеристик героя (HeroStats) и питомцев (PetStats), по образцу Rappelz
+## Общие формулы характеристик героя (HeroStats), питомцев (PetStats) и зверей мира (MobStats), по образцу Rappelz
 ## (механика и числа — из вики, оформление своё). 7 статов: Сила, Выносливость, Ловкость, Интеллект,
 ## Мудрость, Меткость, Удача. Из них — производные значения нашего масштаба: здесь «сырые» формулы,
-## а HeroStats и PetStats калибруют их так, чтобы на 1 уровне получались прежние HP, атака и защита.
+## а HeroStats и PetStats калибруют их так, чтобы на 1 уровне получались прежние HP, атака и защита (MobStats —
+## от калибровки героя). Попадание, урон через защиту и крит в бою — Combat.
 ## Опорные точки статов по уровню и линейная интерполяция между ними — тоже здесь.
 ## Справка: tools/rappelz_pet_reference.md (питомцы), tools/rappelz_strider_reference.md (герой).
 
@@ -101,9 +102,14 @@ static func mp_regen(s: Dictionary, lvl: float) -> float:
 	return 0.5 + 0.05 * float(s["wis"]) + 0.02 * lvl
 
 
-## Точность (шанс попасть — hit_chance), bonus — от умений.
+## Точность (шанс попасть — Combat.hit_chance: против избегания цели), bonus — от умений.
 static func accuracy(s: Dictionary, lvl: float, bonus: float = 0.0) -> int:
 	return roundi(0.5 * float(s["dex"]) + 1.5 * lvl + 5.0 + bonus)
+
+
+## Избегание (против точности атакующего, Combat.hit_chance): от Ловкости и уровня — пара к accuracy.
+static func avoidance(s: Dictionary, lvl: float) -> int:
+	return roundi(0.5 * float(s["agi"]) + 1.5 * lvl + 5.0)
 
 
 ## Уклонение, % (без бонусов умений).
@@ -119,9 +125,3 @@ static func crit_chance(s: Dictionary) -> float:
 ## Скорость атаки, % (100 — обычная; перезарядка атаки делится на неё / 100).
 static func attack_speed(s: Dictionary) -> int:
 	return roundi(100.0 * (1.0 + 0.002 * float(s["agi"])))
-
-
-## Шанс попасть обычной атакой по зверю уровня mob_level при точности acc (0.75..1.0):
-## 95% против зверя «своего» уровня, ±1% за единицу точности.
-static func hit_chance(acc: int, mob_level: int) -> float:
-	return clampf(0.95 + 0.01 * float(acc - (8 + 2 * mob_level)), 0.75, 1.0)

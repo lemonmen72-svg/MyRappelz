@@ -7,7 +7,8 @@ extends Node3D
 ## Жители-NPC (Npcs): Учитель Кирк (задания, карты существ), мудрец, кузнец и кладовщик в центре города рядом
 ## с торговцем, старосты в деревнях рас, охотница в Западном лагере, глава наёмников у входа в пещеру.
 
-const RESPAWN_TIME := 20.0
+## Возрождение зверя — MobData.respawn_time (обычные 20 с, боссы 6–10 мин).
+const RESPAWN_TIME := MobData.RESPAWN_TIME
 const AUTOSAVE_TIME := 30.0
 ## Камера от третьего лица: вращается вокруг игрока (перетаскивание по правой части экрана).
 const CAM_DIST := 12.4
@@ -204,16 +205,24 @@ func _spawn_slot(i: int) -> void:
 		if o != null and o.slot == i:
 			return
 	var s: Dictionary = _slots[i]
+	spawn_mob(String(s["type"]), int(s.get("level", -1)), s["pos"], i)
+
+
+## Поставить зверя (или босса) вида type_id уровня lvl (≤ 0 — базовый уровень вида) в точку pos. slot — слот
+## зверей острова (после смерти возрождается через MobData.respawn_time), −1 — поставлен вручную (админ-панель,
+## тесты): не возрождается. Убийство — как обычно (опыт, добыча, задания).
+func spawn_mob(type_id: String, lvl: int, pos: Vector3, slot: int = -1) -> Mob:
 	var m := Mob.new()
-	m.setup(s["type"], i, s["pos"], int(s.get("level", -1)))
+	m.setup(type_id, slot, pos, lvl)
 	m.gone.connect(_on_mob_gone)
 	add_child(m)
+	return m
 
 
 func _on_mob_gone(mob: Mob, killed: bool) -> void:
 	if killed:
-		# Множитель опыта админ-панели (Game.xp_mult; ×1 — обычная игра)
-		var gained: int = mob.xp_reward * Game.xp_mult
+		# Опыт: награда зверя × разница уровней (Combat.xp_for) × множитель админ-панели (Game.xp_mult; ×1 — обычно)
+		var gained := Combat.xp_for(mob.xp_reward, mob.level, Game.level)
 		player.gain_xp(gained)
 		Util.float_text(self, mob.global_position + Vector3(0, 3.4, 0), "+%d оп." % gained, Color(0.6, 0.9, 1))
 		pets.on_mob_killed(mob)
@@ -222,7 +231,7 @@ func _on_mob_gone(mob: Mob, killed: bool) -> void:
 		quests.on_mob_killed(mob)
 	# Звери, поставленные админ-панелью (slot -1), не возрождаются
 	if mob.slot >= 0:
-		get_tree().create_timer(RESPAWN_TIME).timeout.connect(_spawn_slot.bind(mob.slot))
+		get_tree().create_timer(MobData.respawn_time(mob.type_id)).timeout.connect(_spawn_slot.bind(mob.slot))
 
 
 func _on_action(id: String) -> void:

@@ -64,6 +64,8 @@ func race_class() -> Array:
 func before_start() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SHOTS_DIR))
 	Quality.set_level(Quality.HIGH, false)
+	# Звери острова до 30 ур. сильнее героя-новичка: на кадрах рядом со зверями герой не должен погибать
+	AdminPanel.god = true
 	game.add_pet("wolf", "Серохвост", 5)
 	game.active_pet = 0
 	var i: int = game.add_pet("panther", PetData.stage_name("panther", 20), 20)
@@ -853,14 +855,26 @@ func run_step() -> void:
 				paths.append(String((e as Array)[0]))
 			_heroes_row(paths, 1.0, 5.6, WEAPON_ROW)
 			wait = 60
-			step = 813
-		813:
+			step = 814
+		814:
 			shot("91_weapons")
 			_heroes.queue_free()
 			_top.queue_free()
 			main.cam.current = true
 			main.hud.visible = true
 			main.player.visible = true
+			# Босс у своего логова (модель 3-й эволюции, крупнее, подпись «Босс»); герой под «бессмертием»
+			AdminPanel.god = true
+			var boss := find_mob("boss_panther")
+			if boss != null:
+				stand_near(boss, 9.0)
+				main.player.select_target(boss)
+				main.cam_yaw = atan2(main.player.global_position.x - boss.global_position.x,
+					main.player.global_position.z - boss.global_position.z)
+			wait = 90
+			step = 815
+		815:
+			shot("90_boss")
 			ok_done()
 
 

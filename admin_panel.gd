@@ -721,11 +721,14 @@ static func spawn_mob(main: Node, type_id: String, lvl: int) -> Mob:
 			if w.is_walkable(q.x, q.z):
 				pos = w.ground(q.x, q.z)
 				break
-	var m := Mob.new()
-	m.setup(type_id, -1, pos, clampi(lvl, 1, MOB_MAX_LEVEL))
-	if main.has_method("_on_mob_gone"):
-		m.gone.connect(Callable(main, "_on_mob_gone"))
-	main.add_child(m)
+	# Общая функция спауна главной сцены (main.spawn_mob: звери и боссы; slot −1 — не возрождается)
+	var m: Mob = null
+	if main.has_method("spawn_mob"):
+		m = main.call("spawn_mob", type_id, clampi(lvl, 1, MOB_MAX_LEVEL), pos, -1) as Mob
+	else:
+		m = Mob.new()
+		m.setup(type_id, -1, pos, clampi(lvl, 1, MOB_MAX_LEVEL))
+		main.add_child(m)
 	_done(main, "Зверь: %s, ур. %d" % [m.mob_name, m.level])
 	return m
 

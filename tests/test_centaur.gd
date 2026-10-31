@@ -35,8 +35,11 @@ func run_step() -> void:
 			check(mob != null, "кентавр есть в мире")
 			if mob == null:
 				return
-			check(mob._asset != null and mob._asset.species == "centaur", "дикий кентавр — модель centaur (1-я стадия)")
-			check(mob.rarity == "rare" and mob.level >= 9 and mob.level <= 10, "дикий кентавр «Редкий», ур. %d" % mob.level)
+			var want := CreatureAsset.model_for("centaur", MobStats.stage_for("centaur", mob.level))
+			check(mob._asset != null and mob._asset.species == want, "дикий кентавр %d ур. — модель %s" % [mob.level, want])
+			check(mob.rarity == "rare" and mob.level >= 13 and mob.level <= 27, "дикий кентавр «Редкий», ур. %d" % mob.level)
+			# Дикий кентавр (13+ ур.) убивает героя 1-го ур. за пару ударов — на время приручения «бессмертие»
+			AdminPanel.god = true
 			stand_near(mob, 3.0)
 			player._set_target(mob)
 			check(hud.target_tame_state == Taming.BADGE_NEED_CARD and hud.target_card_tier == "special",
@@ -63,6 +66,7 @@ func run_step() -> void:
 			tm.force_roll = 0.0
 			mob.take_damage(mob.hp + 5, player)
 			tm.force_roll = -1.0
+			AdminPanel.god = false
 			check(not inv.has("card_centaur") and inv.count("card_centaur_soul") == 1, "карта кентавра стала картой с душой")
 			player.global_position = Vector3(0, 0.1, 2)
 			wait = 2
@@ -157,7 +161,7 @@ func _unit_kind() -> void:
 	ic.free()
 	var t := "\n".join(PackedStringArray(Taming.card_lines("card_centaur")))
 	check(t.contains("Кентавр") and t.contains("Боец"), "в описании карты — вид и роль: " + t)
-	check(t.contains("Восточные равнины (ур. 9–10)"), "где водится кентавр: " + t)
+	check(t.contains("Восточные равнины (ур. 13–16)"), "где водится кентавр: " + t)
 	check(t.contains("фиолетовая") and t.contains("35%"), "тир и шанс: " + t)
 	check(t.contains("выпадает из кентавра"), "где взять карту: " + t)
 
@@ -260,15 +264,18 @@ func _unit_skills() -> void:
 
 ## Дикий кентавр сильнее волка того же уровня.
 func _unit_wild() -> void:
-	for lvl in [9, 10]:
+	for lvl in [13, 16, 25]:
 		var c := Mob.new()
 		c.setup("centaur", -1, Vector3.ZERO, lvl)
 		var w := Mob.new()
 		w.setup("wolf", -1, Vector3.ZERO, lvl)
 		check(c.rarity == "rare" and c.level == lvl, "дикий кентавр ур.%d «Редкий»" % lvl)
-		check(c.max_hp > w.max_hp and c.atk > w.atk and c.xp_reward > w.xp_reward,
-			"ур.%d: кентавр сильнее волка — HP %d/%d, атака %d/%d, опыт %d/%d" % [lvl, c.max_hp, w.max_hp, c.atk, w.atk,
-			c.xp_reward, w.xp_reward])
+		var hprof := Combat.profile_of(main.player)
+		var rc := Combat.power_ratio(hprof, Combat.profile_of(c))
+		var rw := Combat.power_ratio(hprof, Combat.profile_of(w))
+		check(rc > rw and c.max_hp > w.max_hp and c.xp_reward > w.xp_reward,
+			"ур.%d: кентавр сильнее волка — сила %.2f / %.2f, HP %d/%d, атака %d/%d, опыт %d/%d" % [lvl, rc, rw, c.max_hp,
+			w.max_hp, c.atk, w.atk, c.xp_reward, w.xp_reward])
 		c.free()
 		w.free()
 
@@ -296,7 +303,7 @@ func _unit_world() -> void:
 		if w.in_safe_zone(p) or not w.is_walkable(p.x, p.z):
 			bad.append("в безопасной зоне или в воде: %s" % p)
 		var lv := int(sl["level"])
-		if lv < 9 or lv > 10:
+		if lv < 13 or lv > 27:
 			bad.append("уровень %d" % lv)
 		for oz in other:
 			var zd: Dictionary = oz

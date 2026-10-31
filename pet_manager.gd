@@ -75,8 +75,8 @@ func open_creature(i: int, which: String = "") -> bool:
 func on_mob_killed(mob: Mob) -> void:
 	if mob == null or not _has_pet():
 		return
-	# Множитель опыта админ-панели (Game.xp_mult; ×1 — обычная игра)
-	active_pet.gain_xp(maxi(1, roundi(mob.xp_reward * PetData.XP_SHARE)) * Game.xp_mult)
+	# Доля питомца × разница уровней зверя и питомца × множитель админ-панели (Combat.xp_for, Game.xp_mult)
+	active_pet.gain_xp(Combat.xp_for(roundi(float(mob.xp_reward) * PetData.XP_SHARE), mob.level, active_pet.level))
 
 
 ## Призвать питомца из коллекции. true, если призван.

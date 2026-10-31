@@ -5,7 +5,12 @@ extends CharacterBody3D
 ## клипы Idle/Walk/Run по скорости, Attack с моментом удара, Hit, Death; пока зверь спит, анимации стоят).
 ## Метка приручения (Taming) видна кольцом под зверем и ромбом-печатью над головой.
 ## Уникальный каменный страж раз в несколько секунд бьёт по площади (с замахом); в мире его больше нет (данные — для
-## совместимости). Анатемы (двуногие ящеры) бьют чаще (attack_every), но получают больше урона (damage_taken).
+## совместимости). Анатемы (двуногие ящеры) бьют чаще (attack_every), защита у них ниже (MobData.defense).
+## Характеристики — из 7 статов по уровню (MobStats.derived: HP, атака — у пантеры и фазана магическая, защиты,
+## точность, избегание, крит, скорость атаки, опыт), бой — Combat: удар зверя попадает по точности против избегания
+## цели и уровням, урон проходит через защиту цели (take_damage героя и питомца получает готовый урон), и наоборот —
+## take_damage зверя получает уже посчитанный атакующим урон. На высоких уровнях дикий зверь — модель 2-й или 3-й
+## стадии эволюции (MobStats.stage_for), босс (MobData boss) — своя модель, крупнее, своя подпись.
 ## Летающие рыбы (MobData flying) парят: высота парения зашита в модель (CreatureAsset hover), коллизия и узел
 ## зверя — на земле; целиться (снаряды, дуги ударов, вспышки) — в aim_point() / mid_point() на высоте тела.
 ## После смерти клип Death роняет рыбу на землю.
@@ -28,19 +33,33 @@ var mob_name := "Зверь"
 var level := 1
 var max_hp := 30
 var hp := 30
+## Главная атака (у пантеры и фазана — магическая: magic) и защиты, точность, избегание, уклонение и крит (%).
 var atk := 5
+var magic := false
+var pdef := 0
+var mdef := 0
+var acc := 10
+var avoid := 10
+var eva := 0.0
+var crit := 3.0
+## Все характеристики (MobStats.derived: 7 статов и производные) — для подсказок и тестов.
+var stats: Dictionary = {}
 var speed := 3.0
+## Опыт за зверя до разницы уровней (Combat.xp_for) и множителя Game.xp_mult.
 var xp_reward := 10
+## Босс (MobData boss); модель: вид и стадия эволюции (MobStats.stage_for), id модели (CreatureAsset.model_for).
+var is_boss := false
+var model_species := "boar"
+var model_stage := 0
+var model_id := "boar"
 var color := Color(0.5, 0.4, 0.3)
 var body_scale := 1.0
 var home := Vector3.ZERO
 var aggro_range := 7.0
 var leash := 22.0
 var attack_cd := 0.0
-## Пауза между ударами (MobData.attack_cd: у анатем удары чаще).
+## Пауза между ударами (MobData.attack_cd с учётом скорости атаки от Ловкости: у анатем удары чаще).
 var attack_every := 1.3
-## Множитель получаемого урона (MobData.damage_taken: низкая защита анатем — больше 1).
-var damage_taken := 1.0
 var is_dead := false
 ## Оглушение: зверь не двигается и не атакует, пока > 0.
 var stun_time := 0.0
@@ -90,6 +109,7 @@ var _asset: CreatureAsset = null
 var _hit_target: Node3D = null
 var _hit_left := 0.0
 var _hit_dmg := 0
+var _last_crit := false
 var _height := 1.4
 ## Высота центра тела парящего зверя над землёй (0 — ходит по земле).
 var hover_y := 0.0
@@ -102,37 +122,34 @@ var _asleep := false
 var _sleep_check := 0.0
 
 
-## lvl > 0: уровень из зоны острова (характеристики и опыт масштабируются от базового уровня вида).
+## lvl > 0: уровень из зоны острова (иначе — базовый уровень вида). Характеристики — MobStats.derived.
 func setup(id: String, spawn_slot: int, pos: Vector3, lvl: int = -1) -> void:
-	var d := MobData.get_type(id)
 	type_id = id if MobData.TYPES.has(id) else "boar"
+	var d := MobData.get_type(type_id)
 	rarity = d["rarity"]
 	slot = spawn_slot
 	mob_name = d["name"]
-	level = d["level"]
-	max_hp = d["hp"]
-	hp = max_hp
-	atk = d["atk"]
+	level = lvl if lvl > 0 else int(d["level"])
 	speed = d["speed"]
-	xp_reward = d["xp"]
 	color = d["color"]
-	body_scale = d["scale"]
-	attack_every = MobData.attack_cd(type_id)
-	damage_taken = MobData.damage_taken(type_id)
-	if lvl > 0 and lvl != level:
-		var f := maxf(0.5, 1.0 + 0.25 * float(lvl - level))
-		max_hp = maxi(1, roundi(float(max_hp) * f))
-		hp = max_hp
-		atk = maxi(1, roundi(float(atk) * f))
-		xp_reward = maxi(1, roundi(float(xp_reward) * f))
-		level = lvl
-	# Сила редкости («Обычный» волк сильнее базовых зверей того же уровня): MobData.power
-	var pw := MobData.power(type_id)
-	if not is_equal_approx(pw, 1.0):
-		max_hp = maxi(1, roundi(float(max_hp) * pw))
-		hp = max_hp
-		atk = maxi(1, roundi(float(atk) * pw))
-		xp_reward = maxi(1, roundi(float(xp_reward) * pw))
+	is_boss = MobData.is_boss(type_id)
+	model_species = MobData.species_of(type_id)
+	model_stage = MobStats.stage_for(type_id, level)
+	model_id = MobStats.model_id(type_id, level)
+	body_scale = MobStats.body_scale(type_id, level)
+	stats = MobStats.derived(type_id, level)
+	max_hp = int(stats["max_hp"])
+	hp = max_hp
+	atk = int(stats["atk"])
+	magic = bool(stats["magic"])
+	pdef = int(stats["def"])
+	mdef = int(stats["mdef"])
+	acc = int(stats["acc"])
+	avoid = int(stats["avoid"])
+	eva = float(stats["eva"])
+	crit = float(stats["crit"])
+	attack_every = float(stats["attack_cd"])
+	xp_reward = int(stats["xp"])
 	home = pos
 	position = pos
 
@@ -143,12 +160,12 @@ func _ready() -> void:
 	collision_mask = 1
 	_model = Node3D.new()
 	add_child(_model)
-	_mat = CreatureModels.build(_model, type_id, color, body_scale)
+	_mat = CreatureModels.build(_model, model_species, color, body_scale, Color.WHITE, model_stage)
 	_asset = CreatureModels.asset_of(_model)
-	CreatureModels.add_collision(self, type_id, body_scale)
-	_height = CreatureModels.height(type_id, body_scale)
+	CreatureModels.add_collision(self, model_id, body_scale)
+	_height = CreatureModels.height(model_id, body_scale)
 	if MobData.flying(type_id):
-		hover_y = CreatureAsset.hover_for(type_id, body_scale)
+		hover_y = CreatureAsset.hover_for(model_id, body_scale)
 	_anim_t = randf() * 10.0
 
 	_label = Label3D.new()
@@ -158,8 +175,10 @@ func _ready() -> void:
 	_label.font_size = 40
 	_label.outline_size = 10
 	_label.position = Vector3(0, _height + 0.35, 0)
-	if rarity != "common":
-		_label.modulate = MobData.rarity_color(rarity)
+	if rarity != "common" or is_boss:
+		_label.modulate = MobData.label_color(type_id)
+	if is_boss:
+		_label.font_size = 48
 	add_child(_label)
 	_wander_to = home
 	_update_label()
@@ -282,7 +301,7 @@ func _physics_process(delta: float) -> void:
 			dir = _route.dir_to(global_position, target.global_position, delta)
 		elif attack_cd <= 0.0:
 			attack_cd = attack_every
-			var dmg := _weakened(atk + randi_range(-1, 2))
+			var dmg := _hit_damage(target, 1.0)
 			var delay := _asset.play_attack(attack_cd) if _asset != null else 0.0
 			if delay > 0.0:
 				# Удар попадёт в момент удара клипа Attack
@@ -342,6 +361,16 @@ func _land_hit() -> void:
 		t.call("take_damage", _hit_dmg, self)
 
 
+## Готовый урон удара по цели t (Combat): атака × mult с разбросом, крит, ослабление, защита цели и уровни.
+func _hit_damage(t: Node3D, mult: float) -> int:
+	var raw := float(atk) * mult * randf_range(0.92, 1.08)
+	_last_crit = randf() < Combat.crit_chance(crit / 100.0, level, Combat.level_of(t))
+	if _last_crit:
+		raw *= Combat.MOB_CRIT_MULT
+	raw = float(_weakened(maxi(1, roundi(raw))))
+	return Combat.damage(raw, float(atk), Combat.defense_of(t, magic), level, Combat.level_of(t))
+
+
 ## Дальность ближней атаки: крупные звери достают дальше.
 func _reach() -> float:
 	return maxf(1.9, 1.0 + 0.7 * body_scale)
@@ -350,7 +379,6 @@ func _reach() -> float:
 ## Удар по площади каменного стража: урон игроку и питомцам вокруг.
 func _slam() -> void:
 	skill_uses += 1
-	var dmg := _weakened(int(atk * SLAM_POWER))
 	var parent := get_parent()
 	CreatureModels.spawn_ring(parent, global_position, SLAM_RADIUS, Color(0.9, 0.75, 0.5), 0.35)
 	Vfx.death_puff(parent, global_position + Vector3(0, 0.3, 0), 1.6)
@@ -362,7 +390,7 @@ func _slam() -> void:
 			if node == null or not is_instance_valid(node) or node.get("is_down") == true:
 				continue
 			if node.global_position.distance_to(global_position) <= SLAM_RADIUS:
-				node.call("take_damage", dmg, self)
+				node.call("take_damage", _hit_damage(node, SLAM_POWER), self)
 
 
 ## Оглушить на sec секунд.
@@ -472,11 +500,11 @@ func knock_back(from: Vector3, dist: float) -> void:
 func add_dot(id: String, dps: float, sec: float, by: Node3D, no_regen: bool = false, src: Dictionary = {}) -> void:
 	if is_dead or dps <= 0.0 or sec <= 0.0:
 		return
-	var acc := 0.0
+	var carried := 0.0
 	if dots.has(id):
-		acc = float(dots[id]["acc"])
+		carried = float(dots[id]["acc"])
 	var fx := "dot:" + id
-	dots[id] = {"dps": dps, "left": sec, "acc": acc, "by": by, "fx": fx}
+	dots[id] = {"dps": dps, "left": sec, "acc": carried, "by": by, "fx": fx}
 	if no_regen:
 		no_regen_time = maxf(no_regen_time, sec)
 	var info := StatusEffects.effect_info("dot", src)
@@ -544,9 +572,12 @@ func _tick_debuffs(delta: float) -> void:
 	weak_time = maxf(0.0, weak_time - delta)
 
 
-## Удар мимо (морок или сбитый прицел): над целью «Промах», урона нет.
+## Удар мимо (морок, сбитый прицел или промах по точности против избегания цели и уровням — Combat):
+## над целью «Промах», урона нет.
 func _missed(t: Node3D) -> bool:
 	var miss := blind_time > 0.0 or (miss_time > 0.0 and randf() < miss_frac)
+	if not miss and is_instance_valid(t):
+		miss = randf() >= Combat.hit_chance(float(acc), Combat.avoid_of(t), level, Combat.level_of(t))
 	if miss and is_inside_tree() and is_instance_valid(t):
 		Util.float_text(get_parent(), t.global_position + Vector3(0, 2.2, 0), "Промах", Color(0.8, 0.85, 1.0))
 	return miss
@@ -644,14 +675,12 @@ func _heal(delta: float, frac_per_sec: float) -> void:
 		_update_label()
 
 
-## crit: критический удар (крупные цифры и яркая вспышка), только для вида.
+## amount — готовый урон (защиту зверя и уровни уже учёл атакующий: Combat.damage).
+## crit_hit: критический удар (крупные цифры и яркая вспышка), только для вида.
 ## periodic: урон со временем (кровотечение и т. п.) — без вспышки и отшатывания.
-func take_damage(amount: int, attacker: Node3D, crit: bool = false, periodic: bool = false) -> void:
+func take_damage(amount: int, attacker: Node3D, crit_hit: bool = false, periodic: bool = false) -> void:
 	if is_dead:
 		return
-	# Защита вида: у анатем (низкая защита) урон по ним больше
-	if not is_equal_approx(damage_taken, 1.0):
-		amount = maxi(1, roundi(float(amount) * damage_taken))
 	if vuln_time > 0.0:
 		amount = roundi(float(amount) * (1.0 + vuln_frac))
 	hp -= amount
@@ -660,13 +689,13 @@ func take_damage(amount: int, attacker: Node3D, crit: bool = false, periodic: bo
 	if not returning and attacker != null and taunt_time <= 0.0 and not _keeps_target(attacker):
 		target = attacker
 	var parent := get_parent()
-	var num_c := Color(1.0, 0.85, 0.25) if crit else Color(1, 1, 1)
+	var num_c := Color(1.0, 0.85, 0.25) if crit_hit else Color(1, 1, 1)
 	if periodic:
 		num_c = Color(0.9, 0.45, 0.85)
-	Util.float_text(parent, global_position + Vector3(0, _height + 0.6, 0), str(amount), num_c, 1.5 if crit else 1.0)
+	Util.float_text(parent, global_position + Vector3(0, _height + 0.6, 0), str(amount), num_c, 1.5 if crit_hit else 1.0)
 	if not periodic:
 		Vfx.hit_spark(parent, global_position + Vector3(0, hover_y if hover_y > 0.0 else _height * 0.55, 0),
-			Color(1.0, 0.75, 0.25) if crit else Color(1.0, 0.92, 0.6), (1.4 if crit else 0.9) * clampf(body_scale, 0.7, 1.6))
+			Color(1.0, 0.75, 0.25) if crit_hit else Color(1.0, 0.92, 0.6), (1.4 if crit_hit else 0.9) * clampf(body_scale, 0.7, 1.6))
 		_flash()
 	_update_label()
 	if hp <= 0:
@@ -745,4 +774,4 @@ func mid_point() -> Vector3:
 
 
 func _update_label() -> void:
-	_label.text = "%s  Ур.%d\n%d/%d" % [mob_name, level, hp, max_hp]
+	_label.text = "%s%s  Ур.%d\n%d/%d" % ["Босс · " if is_boss else "", mob_name, level, hp, max_hp]

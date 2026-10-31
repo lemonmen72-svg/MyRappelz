@@ -4,8 +4,9 @@ extends CharacterBody3D
 ## MP, атака, маг. атака, защита, точность, уклонение, крит, скорость атаки, восстановление HP); поверх — надетое
 ## оружие обеих рук (Game.weapon, Game.offhand — щит или пара; бонусы вида ItemData.grip_bonus: физ. и маг. атака,
 ## защита, блок, скорость атаки и каста) и умения героя (Game.hero, HeroSkills: пассивные, включённые
-## переключаемые и усиления на время). Обычная атака может промахнуться (точность против уровня зверя,
-## Stats.hit_chance), умения бьют без промаха.
+## переключаемые и усиления на время). Бой — Combat: обычная атака может промахнуться (точность против избегания
+## зверя и разница уровней), умения не промахиваются по зверю до +2 ур. выше героя (выше — кривая уровней);
+## урон проходит через защиту зверя (физ. или маг.) и множитель разницы уровней, крит — с поправкой на уровни.
 ## Атака по виду оружия: ближний бой (melee), лук или арбалет (ranged), посох — магия (magic: сгусток Projectile,
 ## сила — маг. атака).
 ## Умения на кнопках "skill1"…"skill4" (Game.hero.slots): умения Наёмника — _cast_hero, умения с полем fx — движок
@@ -26,6 +27,10 @@ const SLOT_IDS := ["skill1", "skill2", "skill3", "skill4"]
 const MP_REGEN_COMBAT := 0.012
 const MP_REGEN_REST := 0.04
 const MP_COMBAT_TIME := 4.0
+## Восстановление HP вне боя (доля макс. HP в секунду) и через сколько секунд после удара оно начинается:
+## бой со зверем своего уровня забирает большую часть HP (Combat), отдых — около 20 с.
+const REST_REGEN := 0.04
+const REST_DELAY := 5.0
 ## Анимация умений героя ближнего боя (по умолчанию — обычный удар).
 const SKILL_ANIM := {"backstab": "bash", "charge_stab": "dash", "dark_strike": "bash", "head_breaker": "spin",
 	"bloody_blade": "attack", "sleeping_dust": "cast"}
@@ -41,8 +46,10 @@ var max_mp := 0
 var mp := 0
 ## Шанс уклониться от удара зверя (0..1, без «Танца теней»: cur_eva()).
 var eva := 0.0
-## Точность (шанс попасть обычной атакой — Stats.hit_chance); -1 — без промахов (классы без статов).
+## Точность (шанс попасть обычной атакой — Combat.hit_chance); -1 — без промахов (классы без статов).
 var accuracy := -1
+## Избегание (против точности зверя, Combat.hit_chance).
+var avoid := 0
 ## Восстановление HP в секунду (и в бою) от статов.
 var hp_regen := 0.0
 ## Характеристики героя из статов (HeroStats.derived: stats, max_hp, patk, ratk, matk, def, mdef, acc, eva, crit,
@@ -124,6 +131,8 @@ var _weapon_kind := ""
 var _guard_fx: MeshInstance3D
 var _regen_acc := 0.0
 var _last_crit := false
+## Последний «сырой» удар — магический (против маг. защиты зверя).
+var _last_magic := false
 var _mp_acc := 0.0
 var _mp_delay := 0.0
 var _upkeep_acc := 0.0
@@ -169,6 +178,7 @@ func recalc_stats() -> void:
 	eva = s["eva"]
 	attack_kind = s["attack"]
 	accuracy = -1
+	avoid = roundi(1.5 * float(Game.level) + 5.0)
 	hp_regen = 0.0
 	hero_stats = {}
 	weapon_kind = Game.weapon_kind()
@@ -195,6 +205,7 @@ func recalc_stats() -> void:
 		crit = float(h["crit"]) / 100.0
 		eva = float(h["eva"]) / 100.0
 		accuracy = int(h["acc"])
+		avoid = int(h["avoid"])
 		hp_regen = float(h["hp_regen"])
 		stat_aspd = float(h["aspd"]) / 100.0
 	# Бонусы оружия обеих рук (ItemData.grip_bonus — по видам, решение Максима): физ. и маг. атака, защита и блок
@@ -402,11 +413,35 @@ func mp_regen_rate(in_combat: bool) -> float:
 	return float(max_mp) * (MP_REGEN_COMBAT if in_combat else MP_REGEN_REST)
 
 
-## Шанс попасть обычной атакой по зверю t (1.0 — без промахов).
+## Шанс попасть обычной атакой по зверю t (Combat: точность против избегания, уровни; 1.0 — без промахов).
 func hit_chance(t: Mob) -> float:
 	if accuracy < 0 or t == null:
 		return 1.0
-	return Stats.hit_chance(accuracy, t.level)
+	return Combat.hit_chance(float(accuracy), float(t.avoid), Game.level, t.level)
+
+
+## Достанет ли умение зверя t (Combat.skill_hit_chance: по зверю намного выше уровнем умения тоже мажут).
+func skill_hits(t: Mob) -> bool:
+	if t == null:
+		return true
+	var c := Combat.skill_hit_chance(Game.level, t.level)
+	return c >= 1.0 or randf() < c
+
+
+## Доля «сырого» урона, что пройдёт по зверю t: защита (физ. или маг.) и разница уровней (Combat).
+func damage_factor(t: Mob, magic: bool) -> float:
+	if t == null:
+		return 1.0
+	var power := float(cur_matk() if magic else cur_atk())
+	return Combat.damage_factor(power, float(t.mdef if magic else t.pdef), Game.level, t.level)
+
+
+## Шанс крита по текущей цели: с поправкой на разницу уровней (Combat.crit_chance).
+func crit_rate() -> float:
+	var c := cur_crit()
+	if current_target != null and is_instance_valid(current_target):
+		return Combat.crit_chance(c, Game.level, current_target.level)
+	return c
 
 
 ## Попала ли обычная атака по зверю t (бросок по hit_chance).
@@ -444,7 +479,7 @@ func _physics_process(delta: float) -> void:
 
 	# Регенерация вне боя
 	if regen_delay <= 0.0 and hp < max_hp:
-		_regen_acc += delta * max_hp * 0.02
+		_regen_acc += delta * max_hp * REST_REGEN
 		if _regen_acc >= 1.0:
 			var h := int(_regen_acc)
 			hp = mini(max_hp, hp + h)
@@ -672,7 +707,7 @@ func _late_hit(t: Variant, mult: float, flat: float, force_crit: bool, say_doubl
 	var m := t as Mob
 	if m == null or m.is_dead:
 		return
-	if say_double and not _basic_hits(m):
+	if (say_double and not _basic_hits(m)) or (not say_double and not skill_hits(m)):
 		_miss_text(m)
 		return
 	_deal(m, _roll(mult, force_crit, flat))
@@ -690,7 +725,7 @@ func _late_shot(t: Variant, mult: float, flat: float, force_crit: bool, on_hit: 
 	if m == null or m.is_dead:
 		return
 	var dmg := _roll(mult, force_crit, flat)
-	_shoot(m, dmg, 1.0, on_hit, say_double and not _basic_hits(m))
+	_shoot(m, dmg, 1.0, on_hit, not _basic_hits(m) if say_double else not skill_hits(m))
 	if say_double:
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.6, 0), "Второй болт!", Color(1, 0.75, 0.4))
 
@@ -736,21 +771,31 @@ func _forward() -> Vector3:
 	return -global_transform.basis.z
 
 
-## Урон с разбросом и критом. mult: множитель атаки, flat: прибавка. Результат крита — в _last_crit.
+## «Сырой» урон с разбросом и критом (до защиты зверя). mult: множитель атаки, flat: прибавка. Результат крита —
+## в _last_crit; урон магический (посох) — _last_magic.
 func _roll(mult: float, force_crit: bool, flat: float = 0.0) -> int:
 	var base := float(cur_atk()) * mult + flat + float(randi_range(-2, 3))
-	_last_crit = force_crit or randf() < cur_crit()
+	_last_crit = force_crit or randf() < crit_rate()
+	_last_magic = attack_kind == "magic"
 	if _last_crit:
 		base *= CRIT_MULT
 	return maxi(1, int(base))
 
 
-func _deal(t: Mob, dmg: int) -> void:
+## Готовый урон по зверю t из «сырого» dmg: защита зверя и разница уровней (Combat).
+func mitigate(t: Mob, dmg: int) -> int:
+	return maxi(1, roundi(float(dmg) * damage_factor(t, _last_magic)))
+
+
+## Нанести зверю t удар из «сырого» dmg (защита и уровни — mitigate). Возвращает нанесённый урон.
+func _deal(t: Mob, dmg: int) -> int:
 	var crit_hit := _last_crit
-	t.take_damage(dmg, self, crit_hit)
+	var dealt := mitigate(t, dmg)
+	t.take_damage(dealt, self, crit_hit)
 	if crit_hit:
 		Util.float_text(get_parent(), t.global_position + Vector3(0, 2.6 * t.body_scale + 0.4, 0),
 			"Крит!", Color(1, 0.85, 0.2), 1.4)
+	return dealt
 
 
 ## Выпустить снаряд (стрела у лучника, болт у арбалета, шар у мага). on_hit: func(target: Mob, damage: int).
@@ -762,7 +807,7 @@ func _shoot(t: Mob, dmg: int, size: float, on_hit: Callable, miss: bool = false)
 		k = "bolt"
 	elif attack_kind == "ranged":
 		k = "arrow"
-	p.setup(t, self, dmg, _last_crit and not miss, k, _class_color(), size)
+	p.setup(t, self, mitigate(t, dmg), _last_crit and not miss, k, _class_color(), size)
 	p.on_hit = on_hit
 	p.miss = miss
 	get_parent().add_child(p)
@@ -954,12 +999,16 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			var flat := HeroSkills.field(sid, "flat", n)
 			var force := bool(sk.get("crit", false))
 			var dmg := _roll(mult, force, flat)
-			_deal(t, dmg)
+			if skill_hits(t):
+				dmg = _deal(t, dmg)
+			else:
+				dmg = 0
+				_miss_text(t)
 			Vfx.slash_arc(fx_parent, t.aim_point(),
 				t.global_position - global_position, col, 1.2)
 			for i in range(1, int(sk.get("hits", 1))):
 				get_tree().create_timer(HIT_GAP * float(i)).timeout.connect(_late_hit.bind(t, mult, flat, force, false))
-			if sk.has("heal"):
+			if sk.has("heal") and dmg > 0:
 				heal(maxi(1, roundi(float(dmg) * float(sk["heal"]))))
 			if sk.has("fear") and not t.is_dead:
 				t.frighten(HeroSkills.field(sid, "fear", n), global_position, StatusEffects.source_hero_skill(sid))
@@ -977,7 +1026,7 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			var force := bool(sk.get("crit", false))
 			var cb := func(hit: Mob, _dealt: int) -> void:
 				_bolt_effects(hit, sid, n)
-			_shoot(t, _roll(mult, force, flat), 1.3, cb)
+			_shoot(t, _roll(mult, force, flat), 1.3, cb, not skill_hits(t))
 			for i in range(1, int(sk.get("hits", 1))):
 				get_tree().create_timer(HIT_GAP * float(i)).timeout.connect(
 					_late_shot.bind(t, mult, flat, force, Callable(), false))
@@ -999,7 +1048,8 @@ func _bolt_effects(hit: Mob, sid: String, n: int) -> void:
 		Util.float_text(fx_parent, hit.global_position + Vector3(0, 2.4 * hit.body_scale + 0.8, 0), "Отброшен!",
 			Color(1, 0.85, 0.5))
 	if sk.has("dot"):
-		var dps := float(cur_atk()) * HeroSkills.field(sid, "dot", n) + HeroSkills.field(sid, "dot_flat", n)
+		var dps := (float(cur_atk()) * HeroSkills.field(sid, "dot", n) + HeroSkills.field(sid, "dot_flat", n)) \
+			* damage_factor(hit, false)
 		hit.add_dot(sid, dps, float(sk.get("dot_time", 10.0)), self, bool(sk.get("no_regen", false)),
 			StatusEffects.source_hero_skill(sid))
 
@@ -1083,13 +1133,15 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 	if attacker is Mob and block > 0.0 and randf() < block:
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "Блок", Color(0.75, 0.85, 1.0))
 		return
-	amount = maxi(1, amount - int((defense + aura_def) * 0.5))
+	# Удар зверя уже прошёл через защиту героя (Combat.damage у зверя); прочий урон — по-старому
+	if not (attacker is Mob):
+		amount = maxi(1, amount - int((defense + aura_def) * 0.5))
 	if guard_time > 0.0:
 		amount = maxi(1, roundi(float(amount) * (1.0 - guard)))
 	if skill_guard > 0.0:
 		amount = maxi(1, roundi(float(amount) * (1.0 - skill_guard)))
 	hp -= amount
-	regen_delay = 6.0
+	regen_delay = REST_DELAY
 	if _has_model():
 		_model.play_hit()
 	Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), str(amount), Color(1, 0.3, 0.3))

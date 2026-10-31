@@ -962,7 +962,9 @@ func _refresh_target() -> void:
 	else:
 		_set_tame_badge("", "")
 	var rarity = _target.get("rarity")
-	if rarity is String:
+	if _target.get("is_boss") == true:
+		_target_label.text = "%s · Босс  Ур.%d" % [_target.get("mob_name"), _target.get("level")]
+	elif rarity is String:
 		_target_label.text = "%s · %s  Ур.%d" % [_target.get("mob_name"), MobData.rarity_label(rarity), _target.get("level")]
 	else:
 		_target_label.text = "%s  Ур.%d" % [_target.get("mob_name"), _target.get("level")]
