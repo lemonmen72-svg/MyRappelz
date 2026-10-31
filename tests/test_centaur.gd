@@ -198,7 +198,9 @@ func _unit_pet_data() -> void:
 	check(names.size() == 3 and String(names[0]) != String(names[1]) and String(names[1]) != String(names[2]),
 		"три своих названия стадий: %s" % [names])
 	var s1 := PetStats.base_stats("centaur", 1)
-	check(int(s1["str"]) == 23 and int(s1["vit"]) == 17, "ур. 1 — статы вики (Сила 23, Выносливость 17): %s" % [s1])
+	# Наш 1-й ур. = ур. вики 1/0.3 ≈ 3.3: чуть выше опорной точки вики 1-го ур. (Сила 23, Выносливость 17)
+	check(int(s1["str"]) >= 23 and int(s1["str"]) <= 25 and int(s1["vit"]) >= 17 and int(s1["vit"]) <= 19,
+		"ур. 1 — статы вики (Сила ≈ 23, Выносливость ≈ 17): %s" % [s1])
 	check(int(PetStats.base_stats("centaur", 45)["str"]) == 168, "ур. 45 (вики 150): Сила 168")
 	for lvl in [1, 15, 30, 50]:
 		var st := PetStats.base_stats("centaur", lvl)

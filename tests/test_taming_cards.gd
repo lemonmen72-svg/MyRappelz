@@ -257,7 +257,10 @@ func _unit_items() -> void:
 		check(not InventoryWindow.goods("assassin").has(c), "%s не продаётся" % c)
 		check(not ResourceLoader.exists(ItemData.icon_path(c)) and not ResourceLoader.exists(ItemData.icon_path(c + "_soul")),
 			"значков %s нет" % c)
-		check(PetData.SPECIES.has(sp), "вид питомца %s остался (для уже прирученных)" % sp)
+		if sp in ["boar", "golem"]:
+			check(PetData.SPECIES.has(sp), "вид питомца %s остался (для уже прирученных)" % sp)
+		else:
+			check(not PetData.SPECIES.has(sp), "%s не бывает питомцем" % sp)
 	for k in MobData.TYPES:
 		var id := String(k)
 		check(MobData.tameable(id) == (ItemData.card_for(id) != ""), "у приручаемого %s есть карта, у прочих нет" % id)
