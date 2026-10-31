@@ -155,8 +155,9 @@ func _check_weapons_data() -> void:
 		check(NpcData.shop("merchant").has(id), "%s: продаёт торговец" % id)
 	check(ItemData.weapon_attack("staff_2h") == "magic" and ItemData.weapon_attack("axe_2h") == "melee"
 		and ItemData.weapon_attack("crossbow") == "ranged", "посох — магия, топор — ближний бой, арбалет — стрельба")
-	check(not ItemData.weapon_fits("crossbow_starter", ClassData.WANDERER) and not ItemData.weapon_fits("daggers_steel", ClassData.WANDERER),
-		"Бродяге — не стрелковое и не оружие профессий")
+	check(ItemData.weapon_fits("crossbow_starter", ClassData.WANDERER) and ItemData.weapon_fits("weapon_bow_r1", ClassData.WANDERER)
+		and ItemData.weapon_fits("dagger_steel", ClassData.WANDERER), "Бродяге — любое оружие (и лук, и арбалет)")
+	check(ItemData.is_weapon("weapon_bow_r1") and NpcData.shop("merchant").has("weapon_bow_r1"), "лук новичка у торговца")
 	for jid in ClassData.CLASSES:
 		var job := String(jid)
 		var st := ItemData.starter_weapons(job)
@@ -314,7 +315,7 @@ func _run_job(race: String, lvl: int, job: String, over: int) -> void:
 	check(main.hud._msg_label.text.contains(ClassData.job_name(job)), "сообщение о новой профессии")
 	check(ItemData.weapon_fits(game.weapon, job) and game.weapon == ItemData.default_weapon(job),
 		"в руках стартовое оружие профессии: %s" % ItemData.item_name(game.weapon))
-	check(player.weapon_kind == ItemData.weapon_kind(game.weapon), "игрок пересчитан под оружие")
+	check(player.weapon_kind == game.weapon_kind(), "игрок пересчитан под оружие")
 	if player._model.spec.has("asset"):
 		check(String(player._model.spec["asset"]) == CharacterModel.hero_asset(race, game.gender, job),
 			"модель профессии: %s" % String(player._model.spec["asset"]).get_file())
@@ -349,13 +350,17 @@ func _check_weapons(player: Player) -> void:
 	check(player.equip("weapon_sword_2h_r1") == "" and game.shield == "", "двуручный меч снимает щит")
 	check(player.equip("weapon_shield_r1") != "", "к двуручному щит не надеть")
 	become_job("assassin")
-	check(game.weapon == "dual_swords_starter" and not player.has_shield, "Наёмник: парные мечи, щита нет")
-	check(player.equip("weapon_sword_1h_r1") != "", "Наёмнику учебный меч не надеть")
+	check(game.weapon == "weapon_dagger_r1" and player.weapon_kind == "daggers" and not player.has_shield,
+		"Наёмник: два кинжала, щита нет")
+	check(player.equip("weapon_shield_r1") != "", "Наёмнику щит не надеть")
 	become_job("warrior")
 	check(player.weapon_kind == "axe_2h", "Воин: двуручный топор")
 	become_job("neophyte")
 	check(player.weapon_kind == "staff_2h" and player.attack_kind == "magic", "Неофит: посох, магия")
-	check(player.equip("weapon_dagger_r1") == "" and player.attack_kind == "melee", "Неофит: кинжал — ближний бой")
+	game.inventory.add("weapon_dagger_r1")
+	check(player.equip("weapon_dagger_r1") != "", "Неофиту кинжал не надеть")
+	check(player.equip("weapon_staff_1h_r1") == "" and player.attack_kind == "magic" and player.cast_speed > 0.0,
+		"Неофит: одноручный посох — магия, каст быстрее")
 	for j in ClassData.CLASSES:
 		for k in ClassData.weapons(String(j)):
 			check(ItemData.WEAPON_KINDS.has(String(k)), "%s: вид оружия %s известен" % [j, k])

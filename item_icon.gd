@@ -77,8 +77,14 @@ func _draw() -> void:
 		"swords":
 			_blade(_p(0.24, 0.80), Vector2(1.0, -1.1), 0.62, 0.075, base)
 			_blade(_p(0.76, 0.80), Vector2(-1.0, -1.1), 0.62, 0.075, base)
+		"dagger":
+			_blade(_p(0.34, 0.74), Vector2(1.0, -1.25), 0.46, 0.09, base)
+		"sword":
+			_blade(_p(0.28, 0.80), Vector2(1.0, -1.1), 0.66, 0.08, base)
 		"crossbow":
 			_crossbow(base)
+		"bow":
+			_bow(base)
 		"fang":
 			_fang(base)
 		"pelt":
@@ -257,6 +263,24 @@ func _blade(base: Vector2, dir: Vector2, len_k: float, w: float, c: Color) -> vo
 
 
 ## Арбалет: дуга плеч, тетива, ложе и болт.
+## Лук: изогнутая дуга слева, прямая тетива справа и стрела поперёк.
+func _bow(c: Color) -> void:
+	var pts := PackedVector2Array()
+	for i in 13:
+		var t := float(i) / 12.0
+		var y := lerpf(0.14, 0.86, t)
+		var x := 0.62 - 0.3 * sin(t * PI)
+		pts.append(_p(x, y))
+	draw_polyline(pts, INK, _s(0.1), true)
+	draw_polyline(pts, c, _s(0.065), true)
+	draw_line(_p(0.62, 0.14), _p(0.62, 0.86), Color(0.95, 0.93, 0.85), _s(0.018), true)
+	draw_line(_p(0.2, 0.5), _p(0.8, 0.5), INK, _s(0.045), true)
+	draw_line(_p(0.2, 0.5), _p(0.8, 0.5), Color(0.6, 0.45, 0.3), _s(0.025), true)
+	draw_colored_polygon(_poly([Vector2(0.14, 0.5), Vector2(0.24, 0.45), Vector2(0.24, 0.55)]), Color(0.78, 0.8, 0.86))
+	draw_colored_polygon(_poly([Vector2(0.8, 0.5), Vector2(0.88, 0.44), Vector2(0.86, 0.5), Vector2(0.88, 0.56)]),
+		Color(0.9, 0.3, 0.25))
+
+
 func _crossbow(c: Color) -> void:
 	var center := _p(0.5, 0.6)
 	var r := _s(0.36)

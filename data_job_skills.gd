@@ -329,8 +329,8 @@ const TREES := {
 		["dull_strike", "light", 30, "dawn_cross"],
 	],
 	"wizard": [
-		["armor_mastery", "common", 1, ""], ["faith_staff", "common", 1, ""], ["magic_training", "common", 1, ""],
-		["mind_ward", "common", 1, ""], ["ringing_blow", "common", 15, "faith_staff"], ["radiant_edge", "common", 15, "magic_training"],
+		["armor_mastery", "common", 1, ""], ["faith_staff", "common", 1, "", "staff"], ["magic_training", "common", 1, ""],
+		["mind_ward", "common", 1, ""], ["ringing_blow", "common", 15, "faith_staff", "staff"], ["radiant_edge", "common", 15, "magic_training"],
 		["radiant_veil", "common", 20, "mind_ward"],
 		["first_aid", "heal", 1, ""], ["healing_touch", "heal", 5, "first_aid"], ["gift_vitality", "heal", 10, "healing_touch"],
 		["gift_wisdom", "heal", 10, "healing_touch"], ["soul_return", "heal", 10, "healing_touch"],
@@ -355,7 +355,7 @@ const TREES := {
 		["dawn_cross", "light", 20, "holy_strike"], ["frost_thorn", "light", 30, "blinding_flash"], ["acid_mist", "light", 40, "frost_thorn"],
 	],
 	"neophyte": [
-		["dark_rod", "common", 1, ""], ["mind_ward", "common", 1, ""], ["magic_training", "common", 1, ""],
+		["dark_rod", "common", 1, "", "staff"], ["mind_ward", "common", 1, ""], ["magic_training", "common", 1, ""],
 		["evasion_expert", "common", 5, "mind_ward"], ["dusk_veil", "common", 20, "evasion_expert"], ["impatience", "common", 30, "magic_training"],
 		["wind_wings", "common", 30, "dark_rod"], ["evasive_resilience", "common", 35, "evasion_expert"],
 		["deep_evasion", "common", 35, "dusk_veil"],
@@ -382,10 +382,10 @@ const TREES := {
 		["decay", "dark", 40, "bad_dream"],
 	],
 	"warrior": [
-		["defense_drill", "common", 1, ""], ["combat_drill", "common", 1, ""], ["challenge", "common", 1, ""],
+		["defense_drill", "common", 1, ""], ["combat_drill", "common", 1, "", "axe"], ["challenge", "common", 1, ""],
 		["spark_reserve", "common", 1, ""], ["focus_moment", "common", 5, "combat_drill"], ["kindle_spark", "common", 5, "spark_reserve"],
 		["power_breath", "common", 10, "kindle_spark"], ["spark_vigor", "common", 20, "power_breath"],
-		["spin_strike", "axe", 5, ""], ["armor_split", "axe", 10, "spin_strike"], ["wind_slash", "axe", 15, "spin_strike"],
+		["spin_strike", "axe", 5, "", "axe"], ["armor_split", "axe", 10, "spin_strike"], ["wind_slash", "axe", 15, "spin_strike", "axe"],
 		["dual_axes", "axe", 20, "armor_split"], ["greataxe_drill", "axe", 20, "armor_split"], ["stonebreaker", "axe", 30, "greataxe_drill"],
 		["axe_storm", "axe", 35, "dual_axes"], ["savage_fury", "axe", 40, "stonebreaker"],
 		["bow_mastery", "bow", 1, ""], ["sticky_arrow", "bow", 5, "bow_mastery"], ["pin_down", "bow", 10, "sticky_arrow"],
@@ -405,7 +405,7 @@ const TREES := {
 		["thunder_frenzy", "support", 40, "gust"], ["earth_frenzy", "support", 40, "rock_strength"], ["water_frenzy", "support", 40, "pure_spring"],
 	],
 	"conjurer": [
-		["combat_drill", "common", 1, ""], ["armor_mastery", "common", 1, ""], ["mind_ward", "common", 1, ""],
+		["combat_drill", "common", 1, "", "axe"], ["armor_mastery", "common", 1, ""], ["mind_ward", "common", 1, ""],
 		["nature_lore", "common", 1, ""], ["focus_moment", "common", 30, "nature_lore"], ["dual_axes", "common", 40, "combat_drill"],
 		["beast_kinship", "beast", 1, ""], ["chord_vitality", "beast", 5, "beast_kinship"], ["chord_wisdom", "beast", 5, "beast_kinship"],
 		["pet_mentor", "beast", 5, "beast_kinship"], ["chord_strength", "beast", 10, "chord_vitality"], ["chord_mind", "beast", 10, "chord_wisdom"],
@@ -413,7 +413,7 @@ const TREES := {
 		["lullaby", "beast", 15, "pet_vigor"], ["pet_recovery", "beast", 25, "pet_spirit"], ["pack_wrath", "beast", 30, "chord_strength"],
 		["spirit_wrath", "beast", 30, "lullaby"], ["soul_merge", "beast", 40, "pack_wrath"], ["beast_form", "beast", 40, "spirit_wrath"],
 		["shared_pain", "beast", 40, "pet_recovery"],
-		["spin_strike", "axe", 5, ""], ["armor_split", "axe", 10, "spin_strike"], ["wind_sickle", "axe", 15, "spin_strike"],
+		["spin_strike", "axe", 5, "", "axe"], ["armor_split", "axe", 10, "spin_strike"], ["wind_sickle", "axe", 15, "spin_strike"],
 		["stonebreaker", "axe", 20, "armor_split"], ["wild_roar", "axe", 20, "spin_strike"], ["scorching_heat", "axe", 25, "wind_sickle"],
 	],
 }

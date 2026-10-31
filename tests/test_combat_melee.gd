@@ -93,8 +93,8 @@ func run_step() -> void:
 		4:
 			game.race_id = "dark_elf"
 			become_job("assassin")
-			check(player.attack_kind == "melee" and player._weapon_kind == "dual_swords", "Наёмник: парные мечи")
-			check(game.weapon == "dual_swords_starter" and game.inventory.has("crossbow_starter"),
+			check(player.attack_kind == "melee" and player._weapon_kind == "daggers", "Наёмник: два кинжала")
+			check(game.weapon == "weapon_dagger_r1" and game.offhand == "weapon_dagger_r1" and game.inventory.has("crossbow_starter"),
 				"при смене профессии на Наёмника выдан стартовый набор оружия")
 			check(player.skill_id("skill1") == "backstab" and player.skill_id("skill2") == "shadow_step",
 				"стартовые умения Наёмника на кнопках")

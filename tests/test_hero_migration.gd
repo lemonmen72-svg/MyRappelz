@@ -47,7 +47,8 @@ func run_step() -> void:
 			check(not inv.has("crystal_common") and not inv.has("crystal_rare"), "кристаллов в сумке нет")
 			for id in ItemData.STARTER_WEAPONS["assassin"]:
 				check(inv.has(String(id)), "выдано: %s" % ItemData.item_name(String(id)))
-			check(game.weapon == "dual_swords_starter" and player.weapon_kind == "dual_swords", "надеты парные мечи")
+			check(game.weapon == "weapon_dagger_r1" and game.offhand == "weapon_dagger_r1" and player.weapon_kind == "daggers",
+				"в руках два кинжала (стартовый набор Наёмника)")
 			check(game.pets.size() == 2 and String(game.pets[0]["name"]) == "Серохвост"
 				and String(game.pets[1]["species"]) == "panther", "питомцы сохранены (старый вид переведён)")
 			var rec: Dictionary = game.hero

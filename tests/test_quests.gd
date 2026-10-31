@@ -83,7 +83,7 @@ func run_step() -> void:
 			var win: InventoryWindow = eco.window
 			for id in ["card_panther", "card_pheasant", "card_turtle", "mirror_card"]:
 				check(win.buttons.has("good_" + id), "Кирк продаёт: %s" % id)
-			for id in ["hp_potion", "revive_scroll", "daggers_steel"]:
+			for id in ["hp_potion", "revive_scroll", "dagger_steel"]:
 				check(not win.buttons.has("good_" + id), "Кирк не продаёт: %s" % id)
 			check(_has_text("Лавка Учителя Кирка"), "заголовок окна торговли")
 			# Продажа из сумки — и у Кирка
@@ -256,13 +256,13 @@ func run_step() -> void:
 			hud.close_window()
 			# Сумка полна — награду не выдать
 			inv.remove("revive_scroll", inv.count("revive_scroll"))
-			inv.add("dual_swords_steel", Inventory.CAPACITY - inv.used_cells())
+			inv.add("sword_steel", Inventory.CAPACITY - inv.used_cells())
 			check(inv.is_full(), "сумка полна")
 			var g0: int = game.gold
 			check(not q.complete("kirk_bond_trial"), "в полную сумку награду не выдать")
 			check(last_hud_text().contains("Освободите место в сумке") and q.is_active("kirk_bond_trial")
 				and game.gold == g0, "сообщение, задание осталось взятым")
-			inv.remove("dual_swords_steel", inv.count("dual_swords_steel"))
+			inv.remove("sword_steel", inv.count("sword_steel"))
 			check(q.complete("kirk_bond_trial"), "«Испытание связи» сдано")
 			check(inv.count("revive_scroll") == 1 and game.gold == g0 + 40, "награда: свиток и 40 зол.")
 			for id in CHAIN:
@@ -346,13 +346,13 @@ func _unit_data() -> void:
 	var mg := InventoryWindow.goods("assassin", "merchant")
 	for id in mg:
 		check(ItemData.item_type(String(id)) != "card", "у торговца нет карт: %s" % id)
-	check(mg.has("hp_potion") and mg.has("revive_scroll") and mg.has("daggers_steel"), "у торговца зелья, свиток, оружие")
+	check(mg.has("hp_potion") and mg.has("revive_scroll") and mg.has("dagger_steel"), "у торговца зелья, свиток, оружие")
 	check(NpcData.sellers_of("card_turtle") == ["kirk"], "карту черепахи продаёт только Кирк")
 	check(Taming.where_to_get("card_turtle") == "продаётся у Учителя Кирка в центре города", "где взять: "
 		+ Taming.where_to_get("card_turtle"))
 	# Место в сумке для нескольких наград сразу
 	var a := Inventory.new()
-	a.add("dual_swords_steel", Inventory.CAPACITY - 1)
+	a.add("sword_steel", Inventory.CAPACITY - 1)
 	check(a.room_for_all({"hp_potion": 3}) and not a.room_for_all({"hp_potion": 3, "mirror_card": 1}),
 		"одна свободная ячейка — одна стопка награды")
 	a.add("hp_potion", 1)

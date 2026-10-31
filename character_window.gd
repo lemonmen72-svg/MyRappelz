@@ -2,9 +2,9 @@ class_name CharacterWindow
 extends Node
 ## Окно героя (кнопка «Герой» в HUD, клавиша K). Вкладки сверху (не прокручиваются):
 ## «Герой» — 3D-превью с оружием в руках, уровень и опыт, HP/MP, очки умений, 7 характеристик (HeroStats, как
-## у питомцев) и боевые показатели (HP, MP, физ./маг. атака и защита, точность, уклонение, крит, скорость атаки,
-## восстановление HP/MP, дальность, бег — с оружием и умениями), выбор оружия из сумки (подходящее профессии,
-## щит — во вторую руку, «Снять щит»);
+## у питомцев) и боевые показатели (HP, MP, физ./маг. атака и защита, точность, уклонение, крит, скорость атаки и каста,
+## восстановление HP/MP, блок, дальность, бег — с оружием и умениями), выбор оружия из сумки (подходящее профессии,
+## щит — во вторую руку, «Во 2-ю руку» — второй такой же клинок или топор, «Снять щит» / «Освободить 2-ю руку»);
 ## древо умений — вкладки профессии (у Наёмника «Общие» / «Мечи и кинжалы» / «Арбалет», у других — JobSkills.TABS);
 ## у Бродяги одна вкладка «Умения» с подсказкой: умения появятся после выбора профессии на 10 уровне.
 ## Древо — SkillTree (ярусы по уровню героя, линии пререквизитов), справа карточка выбранного умения:
@@ -209,7 +209,7 @@ func _build_hero(body: VBoxContainer) -> void:
 		g.add_child(_label(String(r[0]), UiScale.FONT_TEXT, MUTED))
 		g.add_child(_label(String(r[1]), UiScale.FONT_TEXT, Color.WHITE))
 
-	# Оружие (и щит во второй руке)
+	# Оружие: основная рука, вторая рука (щит или второе такое же одноручное — пара)
 	var wrow := HFlowContainer.new()
 	wrow.add_theme_constant_override("h_separation", int(UiScale.px(UiScale.GAP)))
 	wrow.add_theme_constant_override("v_separation", int(UiScale.px(4)))
@@ -219,19 +219,21 @@ func _build_hero(body: VBoxContainer) -> void:
 		var wid := String(id)
 		if not ItemData.weapon_fits(wid, Game.class_id):
 			continue
-		var b := Button.new()
-		b.text = "%s\n%s" % [ItemData.item_name(wid), _weapon_line(wid)]
-		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(0, UiScale.px(50))
-		b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_SMALL))
-		b.toggle_mode = true
-		b.button_pressed = wid == Game.weapon or wid == Game.shield
+		var b := _weapon_button(wid, "%s\n%s" % [ItemData.item_name(wid), _weapon_line(wid)],
+			wid == Game.weapon or (wid == Game.offhand and ItemData.is_shield(wid)))
 		b.pressed.connect(_on_weapon.bind(wid))
 		wrow.add_child(b)
 		buttons["weapon_" + wid] = b
-	if Game.has_shield():
+		# Второй такой же клинок во вторую руку (пара)
+		if not ItemData.is_shield(wid) and ItemData.offhand_block(wid, Game.weapon, Game.class_id) == "":
+			var b2 := _weapon_button(wid, "Во 2-ю руку\n%s" % ItemData.item_name(wid), wid == Game.offhand)
+			b2.disabled = Game.offhand_block(wid) != "" and wid != Game.offhand
+			b2.pressed.connect(_on_offhand.bind(wid))
+			wrow.add_child(b2)
+			buttons["offhand_" + wid] = b2
+	if Game.offhand != "":
 		var off := Button.new()
-		off.text = "Снять щит"
+		off.text = "Снять щит" if Game.has_shield() else "Освободить 2-ю руку"
 		off.focus_mode = Control.FOCUS_NONE
 		off.custom_minimum_size = Vector2(0, UiScale.px(50))
 		off.pressed.connect(_on_unshield)
@@ -239,12 +241,41 @@ func _build_hero(body: VBoxContainer) -> void:
 		buttons["unequip_shield"] = off
 
 
-## Кратко об оружии на кнопке: «атака +3 · 0.75 с · 2.6 м», у щита — «защита +2».
+func _weapon_button(_id: String, text: String, on: bool) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(0, UiScale.px(50))
+	b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_SMALL))
+	b.toggle_mode = true
+	b.button_pressed = on
+	return b
+
+
+## Кратко об оружии на кнопке: «атака +4 · −5% · 2.6 м», у щита — «защита +3 · блок 10%».
 func _weapon_line(id: String) -> String:
 	var it := ItemData.get_item(id)
+	var wb := ItemData.weapon_bonus(id)
 	if ItemData.is_shield(id):
-		return "защита +%d" % int(it.get("def", 0))
-	return "атака +%d · %.2f с · %.1f м" % [int(it.get("atk", 0)), float(it.get("cd", 1.0)), float(it.get("range", 2.0))]
+		return "защита +%d · блок %d%%" % [int(wb["def"]), roundi(float(wb["block"]) * 100.0)]
+	var parts: PackedStringArray = []
+	if int(wb["atk"]) > 0:
+		parts.append("атака +%d" % int(wb["atk"]))
+	if int(wb["matk"]) > 0:
+		parts.append("маг. +%d" % int(wb["matk"]))
+	if int(wb["aspd"]) != 0:
+		parts.append("%s%d%%" % ["+" if int(wb["aspd"]) > 0 else "−", absi(int(wb["aspd"]))])
+	if int(wb["cast"]) != 0:
+		parts.append("каст +%d%%" % int(wb["cast"]))
+	parts.append("%.1f м" % float(it.get("range", 2.0)))
+	return " · ".join(parts)
+
+
+func _on_offhand(id: String) -> void:
+	var err: String = "" if id == Game.offhand else _player().equip(id, true)
+	if err != "":
+		_msg(err)
+	refresh()
 
 
 func _on_unshield() -> void:
@@ -279,6 +310,8 @@ func _combat_rows(p: Player) -> Array:
 		rows.append(["Скорость атаки", "%d%% · %.2f уд./с" % [roundi(p.aspd * 100.0), aps]])
 		rows.append(["Восст. HP", "%.1f/с" % (p.hp_regen + p.aura_regen)])
 		rows.append(["Восст. MP", "%.1f/с" % p.mp_regen_rate(true)])
+	if p.cast_speed != 0.0:
+		rows.append(["Скорость каста", "+%d%% · %.2f с" % [roundi(p.cast_speed * 100.0), p.cast_time()]])
 	if p.block > 0.0:
 		rows.append(["Блок", "%.1f%%" % (p.block * 100.0)])
 	rows.append(["Дальность", "%.1f м" % p.attack_range])
@@ -292,8 +325,12 @@ func _attack_text(p: Player) -> String:
 	match p.weapon_kind:
 		"crossbow":
 			return "болтами"
+		"bow":
+			return "стрелами"
 		"daggers", "dual_swords":
 			return "клинками"
+		"dual_axes":
+			return "двумя топорами"
 		"":
 			return ClassData.attack_name(p.attack_kind)
 	return ItemData.weapon_kind_name(p.weapon_kind)

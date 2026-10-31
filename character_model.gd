@@ -14,9 +14,10 @@ extends Node3D
 ##   var m := CharacterModel.new()
 ##   m.setup(CharacterModel.spec_for(race_id, class_id))   # или npc_spec("merchant"), kirk_spec()
 ##   add_child(m)
-## Оружие (spec "weapon"): у модели из файла — меч в правой руке ("sword"), парные мечи или кинжалы в обеих
-## руках ("dual_swords", "daggers", левый клинок — зеркально) или арбалет в руках ("crossbow": стойка
-## на изготовку Crossbow_Idle и выстрел Crossbow_Shoot); у модели из примитивов — по классу (ClassData weapon).
+## Оружие (spec "weapon"): у модели из файла — одноручное в правой руке ("sword", "dagger", "axe", "mace", "staff"),
+## пары в обеих руках ("dual_swords", "daggers", "dual_axes": левое — зеркально), лук в левой руке ("bow"), арбалет
+## в руках ("crossbow": стойка на изготовку Crossbow_Idle и выстрел Crossbow_Shoot), щит в левой (spec "shield");
+## у модели из примитивов — по классу (ClassData weapon). Модели оружия процедурные (пока нет файлов).
 ## Анимации кодом: дыхание и моргание в покое, ходьба (set_move_speed), play_attack() (по оружию),
 ## play_shoot(), play_cast(), play_buff(), play_bash(), play_spin(), play_hit(), play_wave();
 ## волосы, плащ и шарф покачиваются сами.
@@ -112,7 +113,7 @@ const GRIP_DIR_L := Vector3(-0.76, 0.12, 0.64)
 ## прямой кинематикой, как в tools/retarget_animations.py). Ось арбалета −Z (вперёд), +Y — вверх.
 const CROSSBOW_ROT := Quaternion(0.566, 0.311, -0.256, 0.719)
 ## Виды оружия, которые умеет модель из файла (остальные держат меч); щит — отдельно (spec "shield").
-const ASSET_WEAPONS := ["sword", "dual_swords", "daggers", "crossbow", "dagger", "axe", "mace", "staff"]
+const ASSET_WEAPONS := ["sword", "dual_swords", "daggers", "crossbow", "dagger", "axe", "dual_axes", "mace", "staff", "bow"]
 ## Модели героя из файлов: hero_<профессия>_<пол>.glb (пол m / f), у Бродяги — hero_<раса>_<пол>_starter.glb
 ## (раса dark_elf / light_elf / human); откат — hero_asset.
 const HERO_ASSET_DIR := "res://assets/characters/"
@@ -362,6 +363,7 @@ static var _staff: ArrayMesh
 static var _axe: ArrayMesh
 static var _mace: ArrayMesh
 static var _shield: ArrayMesh
+static var _bow: ArrayMesh
 static var _sword_material: StandardMaterial3D
 
 
@@ -392,7 +394,7 @@ static func model_weapon(weapon: String, asset: bool, shield: bool = false) -> S
 	match mk:
 		"dagger":
 			mk = "sword"
-		"mace":
+		"mace", "dual_axes":
 			mk = "axe"
 	if shield and mk == "sword":
 		mk = "sword_shield"
@@ -1541,11 +1543,11 @@ func _process(delta: float) -> void:
 func play_attack() -> void:
 	if _asset != null:
 		match weapon_kind:
-			"crossbow":
+			"crossbow", "bow":
 				_asset_act("shoot")
 			"staff":
 				_asset_act("cast")
-			"dual_swords", "daggers":
+			"dual_swords", "daggers", "dual_axes":
 				# Парные клинки: удары справа, слева и выпад по очереди
 				_swing = (_swing + 1) % 3
 				_asset_act(["slash", "slash_b", "slash_c"][_swing])
@@ -1596,7 +1598,7 @@ func _play_stabs() -> void:
 ## Выстрел из лука: лук вперёд, правая рука натягивает тетиву (из арбалета — выстрел из стойки).
 func play_shoot() -> void:
 	if _asset != null:
-		_asset_act("shoot" if weapon_kind == "crossbow" else "slash")
+		_asset_act("shoot" if weapon_kind == "crossbow" or weapon_kind == "bow" else "slash")
 		return
 	var t := _new_action(0.42, 0.45)
 	if t == null:
@@ -1814,7 +1816,7 @@ func _setup_asset(path: String) -> bool:
 		var hand := _attach(skel, String(bones.get("hand_r", "RightHand")), "GripR")
 		var hand_l: BoneAttachment3D = null
 		var with_shield := bool(spec.get("shield", false)) and weapon_kind != ""
-		if weapon_kind == "dual_swords" or weapon_kind == "daggers" or with_shield:
+		if ["dual_swords", "daggers", "dual_axes", "bow"].has(weapon_kind) or with_shield:
 			hand_l = _attach(skel, String(bones.get("hand_l", "LeftHand")), "GripL")
 		var grip_r: Dictionary = rig.get("grip_r", {})
 		var grip_l: Dictionary = rig.get("grip_l", {})
@@ -1826,7 +1828,7 @@ func _setup_asset(path: String) -> bool:
 		var cbv: Array = rig.get("crossbow_rot", [])
 		if cbv.size() == 4:
 			cb = Quaternion(float(cbv[0]), float(cbv[1]), float(cbv[2]), float(cbv[3]))
-		if hand != null and weapon_kind != "":
+		if hand != null and weapon_kind != "" and weapon_kind != "bow":
 			match weapon_kind:
 				"crossbow":
 					_hold(hand, "Crossbow", _crossbow_mesh(), Transform3D(Basis(cb.normalized()), pos_r))
@@ -1834,7 +1836,7 @@ func _setup_asset(path: String) -> bool:
 					_hold(hand, "DaggerR", _dagger_mesh(), _grip_xf(dir_r, pos_r))
 				"staff":
 					_hold(hand, "Staff", _staff_mesh(), _grip_xf(dir_r, pos_r))
-				"axe":
+				"axe", "dual_axes":
 					_hold(hand, "Axe", _axe_mesh(), _grip_xf(dir_r, pos_r))
 				"mace":
 					_hold(hand, "Mace", _mace_mesh(), _grip_xf(dir_r, pos_r))
@@ -1845,6 +1847,11 @@ func _setup_asset(path: String) -> bool:
 				_hold(hand_l, "Shield", _shield_mesh(), _grip_xf(dir_l, pos_l))
 			elif weapon_kind == "daggers":
 				_hold(hand_l, "DaggerL", _dagger_mesh(), _grip_xf(dir_l, pos_l))
+			elif weapon_kind == "dual_axes":
+				_hold(hand_l, "AxeL", _axe_mesh(), _grip_xf(dir_l, pos_l))
+			elif weapon_kind == "bow":
+				# Лук в левой кисти: древко вдоль клинка хвата (вертикально в стойке), тетива к герою
+				_hold(hand_l, "Bow", _bow_mesh(), _grip_xf(dir_l, pos_l))
 			else:
 				_hold(hand_l, "SwordL", _sword_mesh(), _grip_xf(dir_l, pos_l))
 
@@ -2167,6 +2174,27 @@ static func _mace_mesh() -> ArrayMesh:
 			Color(0.75, 0.75, 0.8), 0)
 	_mace = _buf_mesh(b)
 	return _mace
+
+
+## Лук в левой кисти: рукоять в нуле, плечи изогнуты вдоль ±Y и отогнуты к +Z, тетива по +Z.
+static func _bow_mesh() -> ArrayMesh:
+	if _bow != null:
+		return _bow
+	var b := GeoBuf.new()
+	var wood := Color(0.5, 0.32, 0.17)
+	var dark := Color(0.28, 0.19, 0.12)
+	b.add(_cyl(0.024, 0.024, 0.18, 8), Transform3D(Basis(), Vector3.ZERO), dark, 0)
+	for sd in [-1.0, 1.0]:
+		var y: float = sd
+		var pts := [Vector3(0, 0.08 * y, 0), Vector3(0, 0.34 * y, 0.05), Vector3(0, 0.56 * y, 0.14)]
+		for i in 2:
+			var a: Vector3 = pts[i]
+			var c: Vector3 = pts[i + 1]
+			var bas := Basis(Quaternion(Vector3.UP, (c - a).normalized()))
+			b.add(_box(Vector3(0.03 - 0.008 * i, a.distance_to(c), 0.026)), Transform3D(bas, (a + c) * 0.5), wood, 0)
+	b.add(_box(Vector3(0.006, 1.12, 0.006)), Transform3D(Basis(), Vector3(0, 0, 0.14)), Color(0.95, 0.93, 0.85), 0)
+	_bow = _buf_mesh(b)
+	return _bow
 
 
 ## Щит в левой кисти: круглый, лицевой стороной наружу (ось диска поперёк клинка).

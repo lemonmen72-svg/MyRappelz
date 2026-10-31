@@ -54,7 +54,8 @@ const RACES := {
 
 ## Профессии. race — чья профессия ("" — Бродяга, у всех рас); role — роль одной строкой; desc — 2–3 строки
 ## для экрана выбора; weapon_text — каким оружием владеет; weapons — виды оружия (ItemData.WEAPON_KINDS),
-## которые можно надеть (Бродяга — любое оружие 1-го ранга, кроме стрелкового); key_skills — 3–4 ключевых
+## которые можно надеть (пары "daggers", "dual_swords", "dual_axes" — второе такое же во вторую руку; Бродяга — любое
+## оружие, решение Максима); key_skills — 3–4 ключевых
 ## умения для карточки выбора; skills — умения на кнопках 1…4 у новой записи (стартовые, start = true).
 ## attack / range / cd — обычная атака без оружия (у всех героев оружие есть, атаку задаёт оно).
 ## hp, mp, atk, def, eva, crit — числа 1-го уровня для калибровки статов (HeroStats.calibration), рост по уровню —
@@ -64,8 +65,9 @@ const CLASSES := {
 	"wanderer": {
 		"name": "Бродяга", "race": "", "role": "новичок",
 		"desc": "Путник без ремесла: бьётся простым оружием, приручает зверей и копит опыт. С 10 уровня Мудрец Альдерик поможет выбрать профессию.",
-		"weapon_text": "любое оружие 1-го ранга (кроме лука и арбалета)",
-		"weapons": ["sword_1h", "sword_2h", "dagger", "mace_1h", "mace_2h", "axe_1h", "axe_2h", "staff_1h", "staff_2h", "shield"],
+		"weapon_text": "любое оружие",
+		"weapons": ["sword_1h", "dual_swords", "sword_2h", "dagger", "daggers", "mace_1h", "mace_2h", "axe_1h", "dual_axes", "axe_2h",
+			"staff_1h", "staff_2h", "crossbow", "bow", "shield"],
 		"key_skills": [], "skills": [],
 		"attack": "melee", "range": 2.6, "cd": 0.8, "weapon": "sword",
 		"hp": 100, "hp_lvl": 18, "atk": 8, "atk_lvl": 2.5, "def": 3, "def_lvl": 0.8, "mp": 25, "mp_lvl": 5,
@@ -76,8 +78,8 @@ const CLASSES := {
 	"swordsman": {
 		"name": "Мечник", "race": "light_elf", "role": "защитник",
 		"desc": "Щит и меч: держит зверя на себе, оглушает и ослабляет его, немного лечится светом. Рядом с ним питомцу ничего не грозит.",
-		"weapon_text": "меч или булава со щитом, двуручный меч, парные мечи",
-		"weapons": ["sword_1h", "mace_1h", "shield", "sword_2h", "dual_swords"],
+		"weapon_text": "двуручный меч, один или два одноручных меча, двуручная или одноручная булава, щит",
+		"weapons": ["sword_2h", "sword_1h", "dual_swords", "mace_2h", "mace_1h", "shield"],
 		"key_skills": ["challenge", "shield_hammer", "holy_strike", "grace"], "skills": [],
 		"attack": "melee", "range": 2.6, "cd": 0.85, "weapon": "sword_shield",
 		"hp": 125, "hp_lvl": 24, "atk": 8, "atk_lvl": 2.2, "def": 4, "def_lvl": 1.3, "mp": 28, "mp_lvl": 5,
@@ -87,8 +89,8 @@ const CLASSES := {
 	"wizard": {
 		"name": "Волшебник", "race": "light_elf", "role": "лекарь и заклинатель",
 		"desc": "Лечит себя и питомца, дарит усиления, бьёт светом, водой и землёй издалека. Без него отряд долго не продержится.",
-		"weapon_text": "посох или булава",
-		"weapons": ["staff_1h", "staff_2h", "mace_1h", "mace_2h", "shield"],
+		"weapon_text": "одноручный или двуручный посох",
+		"weapons": ["staff_1h", "staff_2h"],
 		"key_skills": ["healing_touch", "light_pulse", "gift_strength", "soul_return"], "skills": [],
 		"attack": "magic", "range": 10.0, "cd": 1.0, "weapon": "staff",
 		"hp": 90, "hp_lvl": 15, "atk": 9, "atk_lvl": 2.8, "def": 2, "def_lvl": 0.6, "mp": 45, "mp_lvl": 8,
@@ -98,8 +100,8 @@ const CLASSES := {
 	"beastmaster": {
 		"name": "Зверолов", "race": "light_elf", "role": "сила через питомца",
 		"desc": "Всё через зверя: усиливает, лечит и воскрешает питомца, сам помогает светом. Чем сильнее связь — тем страшнее питомец.",
-		"weapon_text": "посох или булава",
-		"weapons": ["staff_1h", "staff_2h", "mace_1h", "mace_2h", "shield"],
+		"weapon_text": "двуручная булава, одноручный или двуручный посох",
+		"weapons": ["mace_2h", "staff_1h", "staff_2h"],
 		"key_skills": ["beast_kinship", "beast_might", "mend_beast", "second_wind"], "skills": [],
 		"attack": "magic", "range": 9.5, "cd": 1.0, "weapon": "staff",
 		"hp": 95, "hp_lvl": 16, "atk": 8, "atk_lvl": 2.5, "def": 2, "def_lvl": 0.7, "mp": 40, "mp_lvl": 7,
@@ -110,10 +112,10 @@ const CLASSES := {
 	"assassin": {
 		"name": "Наёмник", "race": "dark_elf", "role": "клинки или арбалет, уклонение",
 		"desc": "Странница, что пробует любое оружие: парные кинжалы, парные мечи или арбалет. Уклоняется и часто бьёт критом.",
-		"weapon_text": "парные кинжалы, парные мечи, арбалет",
-		"weapons": ["daggers", "dual_swords", "crossbow"],
+		"weapon_text": "один или два кинжала, один или два одноручных меча, арбалет",
+		"weapons": ["dagger", "daggers", "sword_1h", "dual_swords", "crossbow"],
 		"key_skills": ["backstab", "shadow_step", "charge_stab", "dual_shot"], "skills": ["backstab", "shadow_step"],
-		"attack": "melee", "range": 2.4, "cd": 0.55, "weapon": "dual_swords",
+		"attack": "melee", "range": 2.4, "cd": 0.55, "weapon": "daggers",
 		"hp": 95, "hp_lvl": 17, "atk": 7, "atk_lvl": 2.5, "def": 2, "def_lvl": 0.7, "mp": 30, "mp_lvl": 6,
 		"eva": 0.05, "crit": 0.2, "speed": 7.2,
 		"color": Color(0.35, 0.2, 0.45), "accent": Color(0.82, 0.16, 0.26),
@@ -121,8 +123,8 @@ const CLASSES := {
 	"neophyte": {
 		"name": "Неофит", "race": "dark_elf", "role": "маг урона",
 		"desc": "Огонь, молния и тьма: самый большой урон издалека, проклятия и поглощение жизни. Хрупок вблизи — держите зверя подальше.",
-		"weapon_text": "посох или кинжал",
-		"weapons": ["staff_1h", "staff_2h", "dagger"],
+		"weapon_text": "одноручный или двуручный посох",
+		"weapons": ["staff_1h", "staff_2h"],
 		"key_skills": ["fire_spark", "zap", "life_sip", "flame_orb"], "skills": [],
 		"attack": "magic", "range": 11.0, "cd": 1.05, "weapon": "staff",
 		"hp": 85, "hp_lvl": 14, "atk": 10, "atk_lvl": 3.2, "def": 1, "def_lvl": 0.5, "mp": 45, "mp_lvl": 8,
@@ -132,8 +134,8 @@ const CLASSES := {
 	"adept": {
 		"name": "Адепт", "race": "dark_elf", "role": "тёмная связь с питомцем",
 		"desc": "Подпитывает питомца тьмой, берёт у него жизнь и жертвует им ради силы. Немного огня и ритуального клинка.",
-		"weapon_text": "посох или кинжал",
-		"weapons": ["staff_1h", "staff_2h", "dagger"],
+		"weapon_text": "кинжал, одноручный или двуручный посох; щит — к кинжалу и одноручному посоху",
+		"weapons": ["dagger", "staff_1h", "staff_2h", "shield"],
 		"key_skills": ["fire_feed", "blood_gift", "borrowed_life", "abyss_blood"], "skills": [],
 		"attack": "magic", "range": 10.0, "cd": 1.0, "weapon": "staff",
 		"hp": 90, "hp_lvl": 15, "atk": 8, "atk_lvl": 2.6, "def": 2, "def_lvl": 0.6, "mp": 40, "mp_lvl": 7,
@@ -144,8 +146,8 @@ const CLASSES := {
 	"warrior": {
 		"name": "Воин", "race": "human", "role": "боец ближнего и дальнего боя",
 		"desc": "Двуручный или парные топоры, а то и лук: высокий урон. Копит искры духа и тратит их на лечение, оглушение и заморозку.",
-		"weapon_text": "двуручный топор, парные топоры, лук (общие умения — меч или топор)",
-		"weapons": ["axe_2h", "axe_1h", "dual_axes", "bow", "sword_1h", "sword_2h"],
+		"weapon_text": "лук, двуручный топор, один или два одноручных топора",
+		"weapons": ["bow", "axe_2h", "axe_1h", "dual_axes"],
 		"key_skills": ["combat_drill", "spin_strike", "kindle_spark", "power_breath"], "skills": [],
 		"attack": "melee", "range": 2.8, "cd": 0.9, "weapon": "axe",
 		"hp": 120, "hp_lvl": 22, "atk": 9, "atk_lvl": 2.8, "def": 3, "def_lvl": 1.0, "mp": 25, "mp_lvl": 4,
@@ -155,8 +157,8 @@ const CLASSES := {
 	"shaman": {
 		"name": "Шаман", "race": "human", "role": "заклинатель четырёх стихий",
 		"desc": "Зачаровывает оружие огнём, молнией, камнем и водой, усиливает себя и питомца, держит и усыпляет зверей.",
-		"weapon_text": "посох или топор",
-		"weapons": ["staff_1h", "staff_2h", "axe_1h", "axe_2h"],
+		"weapon_text": "двуручный посох, двуручный топор",
+		"weapons": ["staff_2h", "axe_2h"],
 		"key_skills": ["fire_edge", "pure_spring", "earth_grip", "wind_sickle"], "skills": [],
 		"attack": "magic", "range": 10.0, "cd": 1.0, "weapon": "staff",
 		"hp": 100, "hp_lvl": 17, "atk": 9, "atk_lvl": 2.7, "def": 3, "def_lvl": 0.8, "mp": 40, "mp_lvl": 7,
@@ -166,10 +168,10 @@ const CLASSES := {
 	"conjurer": {
 		"name": "Колдун", "race": "human", "role": "един с питомцем",
 		"desc": "Песни-созвучия усиливают и героя, и питомца; лечит и защищает зверя, а в конце пути может слиться с ним.",
-		"weapon_text": "меч или топор (умения топора — топор, парные топоры)",
-		"weapons": ["sword_1h", "sword_2h", "axe_1h", "axe_2h", "dual_axes"],
+		"weapon_text": "двуручный топор, один или два одноручных топора",
+		"weapons": ["axe_2h", "axe_1h", "dual_axes"],
 		"key_skills": ["chord_vitality", "chord_strength", "lullaby", "armor_split"], "skills": [],
-		"attack": "melee", "range": 2.6, "cd": 0.85, "weapon": "sword",
+		"attack": "melee", "range": 2.6, "cd": 0.85, "weapon": "axe",
 		"hp": 110, "hp_lvl": 19, "atk": 8, "atk_lvl": 2.5, "def": 3, "def_lvl": 0.9, "mp": 35, "mp_lvl": 6,
 		"eva": 0.02, "crit": 0.05, "speed": 6.9,
 		"color": Color(0.35, 0.55, 0.3), "accent": Color(0.85, 0.75, 0.35),
