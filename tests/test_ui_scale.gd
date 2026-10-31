@@ -338,7 +338,8 @@ func _close_screen() -> void:
 
 
 func _check_screen(what: String) -> void:
-	var view: Vector2 = main.hud._view
+	# Экран телефона в альбомной ориентации — не меньше 1280×720 (окно автотеста бывает выше — не в счёт)
+	var view := Vector2(1280, 720)
 	var margin := MenuKit.margin_of(_screen)
 	check(margin != null, "%s: экран построен" % what)
 	if margin == null:

@@ -11,7 +11,7 @@ signal create(slot: int)
 signal switch_account
 
 ## Карточка слота для «Среднего» размера интерфейса.
-const CARD_SIZE := Vector2(250, 280)
+const CARD_SIZE := Vector2(225, 220)
 
 ## Сообщение над карточками (перенос старого сохранения и т. п.).
 var note := ""
@@ -23,6 +23,8 @@ var _cards_row: HBoxContainer
 var _info: Label
 var _confirm_box: VBoxContainer
 var _confirm_edit: LineEdit
+## Нижний ряд «Удалить» / «Играть» — на время подтверждения удаления скрыт (место под строку ввода ника).
+var _bottom: HBoxContainer
 
 
 func _ready() -> void:
@@ -61,6 +63,7 @@ func _ready() -> void:
 	bottom.add_theme_constant_override("separation", int(UiScale.px(12)))
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	root.add_child(bottom)
+	_bottom = bottom
 	var del := MenuKit.button("Удалить", UiScale.BUTTON_H + 4)
 	del.pressed.connect(_on_delete)
 	bottom.add_child(del)
@@ -155,11 +158,11 @@ func _card(i: int) -> PanelContainer:
 	v.add_child(nick)
 	v.add_child(_pass(MenuKit.label("Уровень %d" % int(s.get("level", 1)), UiScale.FONT_HEAD, Color.WHITE)))
 	v.add_child(_pass(MenuKit.label(ClassData.job_name(cls), UiScale.FONT_HEAD, col)))
-	v.add_child(_pass(MenuKit.label(String(ClassData.race(String(s.get("race", ""))).get("name", "")), UiScale.FONT_TEXT,
-		MenuKit.TEXT)))
-	v.add_child(_pass(MenuKit.label(ClassData.gender_name(String(s.get("gender", "f"))), UiScale.FONT_TEXT, MenuKit.MUTED)))
-	var role := _pass(MenuKit.label(String(ClassData.cls(cls).get("role", "")), UiScale.FONT_SMALL, MenuKit.MUTED, true))
-	v.add_child(role)
+	# Раса и пол — одной строкой (карточка невысокая: экран с подтверждением удаления влезает в 720 px на «Крупном»)
+	var race_name := String(ClassData.race(String(s.get("race", ""))).get("name", ""))
+	var who := _pass(MenuKit.label("%s · %s" % [race_name, ClassData.gender_name(String(s.get("gender", "f")))],
+		UiScale.FONT_TEXT, MenuKit.TEXT, true))
+	v.add_child(who)
 	return panel
 
 
@@ -212,11 +215,14 @@ func _on_delete() -> void:
 	row.add_child(no)
 	buttons["delete_no"] = no
 	_confirm_box.visible = true
+	_bottom.visible = false
 
 
 func _hide_confirm() -> void:
 	if _confirm_box != null:
 		_confirm_box.visible = false
+	if _bottom != null:
+		_bottom.visible = true
 
 
 ## Удалить выбранного персонажа, если text совпал с его ником (без учёта регистра). true — удалён.
