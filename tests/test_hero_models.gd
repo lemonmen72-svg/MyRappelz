@@ -3,6 +3,8 @@ extends "res://tests/test_base.gd"
 ## asset, есть все клипы героя (каждое действие — свой основной клип, как у героини), кости кистей и головы по
 ## ролям из <модель>.json, оружие в руках, рост (мужчины ~1.8 м, женщины ~1.7 м), меш в бюджете, клипы на месте,
 ## шаг и бег включаются по скорости, поза покоя по костям — голова наверху, стопы у земли, кисти не выше головы.
+## Женская пластика (tools/prepare_hero.py, FEM_STYLES): у героинь таз в шаге и беге вращается вокруг вертикали
+## заметно сильнее, чем у героев, — по трекам анимации, без графики.
 
 const HEROES := [
 	"res://assets/characters/hero_assassin_m.glb",
@@ -17,6 +19,18 @@ const HEROES := [
 	"res://assets/characters/hero_dark_elf_f_starter.glb",
 	"res://assets/characters/hero_light_elf_m_starter.glb",
 	"res://assets/characters/hero_light_elf_f_starter.glb",
+	"res://assets/characters/hero_neophyte_m.glb",
+	"res://assets/characters/hero_neophyte_f.glb",
+	"res://assets/characters/hero_adept_m.glb",
+	"res://assets/characters/hero_adept_f.glb",
+	"res://assets/characters/hero_wizard_m.glb",
+	"res://assets/characters/hero_wizard_f.glb",
+	"res://assets/characters/hero_beastmaster_m.glb",
+	"res://assets/characters/hero_beastmaster_f.glb",
+	"res://assets/characters/hero_shaman_m.glb",
+	"res://assets/characters/hero_shaman_f.glb",
+	"res://assets/characters/hero_conjurer_m.glb",
+	"res://assets/characters/hero_conjurer_f.glb",
 ]
 ## Клипы героя (имена в нижнем регистре): перенесённые из Quaternius UAL — как у героини, плюс шаг, бег и взмах рукой.
 const CLIPS := ["idle", "walking", "running", "wave", "sword_idle", "sword_slash", "sword_attack", "sword_combo",
@@ -63,6 +77,7 @@ func run_step() -> void:
 				models.append(_spawn(p, w, -5.0 + 2.0 * float(i)))
 			for i in models.size():
 				_check_model(models[i], String(HEROES[i]))
+			_check_gait()
 			for m in models:
 				m.set_move_speed(1.4)
 			wait = 30
@@ -226,3 +241,83 @@ func _on_bone(n: Node, top: Node) -> bool:
 			return true
 		p = p.get_parent()
 	return false
+
+
+func _female(path: String) -> bool:
+	return path.get_file().get_basename().trim_suffix("_starter").ends_with("_f")
+
+
+## Размах вращения таза (°) в клипе: вокруг вертикали (x) и наклона в сторону (y) — мировой поворот кости таза
+## (произведение треков от корня скелета) относительно позы покоя, 48 точек за клип.
+func _hips_swing(m: CharacterModel, who: String, clip: String) -> Vector2:
+	var skel := _skel(m)
+	if skel == null or m._anim == null:
+		return Vector2.ZERO
+	var hips := skel.find_bone(String(CharacterModel.asset_rig(who).get("bones", {}).get("hips", "")))
+	if hips < 0:
+		return Vector2.ZERO
+	var a := m._anim.get_animation(m._clip(clip))
+	var chain: Array[int] = []
+	var b := hips
+	while b >= 0:
+		chain.push_front(b)
+		b = skel.get_bone_parent(b)
+	var tracks := {}
+	for t in a.get_track_count():
+		if a.track_get_type(t) == Animation.TYPE_ROTATION_3D:
+			tracks[String(a.track_get_path(t).get_concatenated_subnames())] = t
+	var rest := Quaternion.IDENTITY
+	for c in chain:
+		rest = rest * skel.get_bone_rest(c).basis.get_rotation_quaternion()
+	var yaw := Vector2(INF, -INF)
+	var roll := Vector2(INF, -INF)
+	for k in 48:
+		var tm := a.length * float(k) / 48.0
+		var q := Quaternion.IDENTITY
+		for c in chain:
+			var nm := skel.get_bone_name(c)
+			if tracks.has(nm):
+				q = q * a.rotation_track_interpolate(int(tracks[nm]), tm)
+			else:
+				q = q * skel.get_bone_rest(c).basis.get_rotation_quaternion()
+		var rel := q * rest.inverse()
+		var f := rel * Vector3(0, 0, 1)
+		var sx := rel * Vector3(1, 0, 0)
+		var y := rad_to_deg(atan2(f.x, f.z))
+		var r := rad_to_deg(atan2(sx.y, sx.x))
+		yaw = Vector2(minf(yaw.x, y), maxf(yaw.y, y))
+		roll = Vector2(minf(roll.x, r), maxf(roll.y, r))
+	return Vector2(yaw.y - yaw.x, roll.y - roll.x)
+
+
+## Женская пластика: у каждой героини таз в шаге вращается вокруг вертикали в 1.6+ раза сильнее, чем в среднем у
+## героев, и качается в сторону сильнее; в беге — вокруг вертикали заметно (у героев бег UAL почти без вращения).
+func _check_gait() -> void:
+	var male_walk := 0.0
+	var male_roll := 0.0
+	var male_run := 0.0
+	var n := 0
+	for i in models.size():
+		if not _female(String(HEROES[i])):
+			var w := _hips_swing(models[i], String(HEROES[i]), "walking")
+			male_walk += w.x
+			male_roll += w.y
+			male_run += _hips_swing(models[i], String(HEROES[i]), "running").x
+			n += 1
+	check(n > 0, "есть мужские герои для сравнения пластики")
+	if n == 0:
+		return
+	male_walk /= float(n)
+	male_roll /= float(n)
+	male_run /= float(n)
+	print("  пластика героев: таз в шаге %.1f° вокруг вертикали, %.1f° в сторону, в беге %.1f°" % [
+		male_walk, male_roll, male_run])
+	for i in models.size():
+		var who := String(HEROES[i])
+		if not _female(who):
+			continue
+		var w := _hips_swing(models[i], who, "walking")
+		var r := _hips_swing(models[i], who, "running")
+		check(w.x > male_walk * 1.6, "%s: шаг — таз вокруг вертикали %.1f° (у героев %.1f°)" % [who, w.x, male_walk])
+		check(w.y > male_roll * 1.4, "%s: шаг — таз в сторону %.1f° (у героев %.1f°)" % [who, w.y, male_roll])
+		check(r.x > male_run + 3.0, "%s: бег — таз вокруг вертикали %.1f° (у героев %.1f°)" % [who, r.x, male_run])

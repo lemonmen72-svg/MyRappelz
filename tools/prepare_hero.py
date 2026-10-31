@@ -33,6 +33,10 @@
   * Шаг и бег (Walking, Running) растянуты по времени так, чтобы скорость опорной стопы была ровно WALK_NATIVE /
     RUN_NATIVE из character_model.gd (игра ускоряет клип пропорционально скорости — без проскальзывания).
   * Wave (машет рукой: жители, приветствие) — процедурный: поверх Idle правая рука поднимается и машет, ладонь вперёд.
+  * Женская пластика (пол f в id): женственных клипов шага и бега в UAL нет, поэтому у героинь Idle, Wave, Walking,
+    Running, Sword_Idle, Crossbow_Idle — с процедурными поправками поверх переноса (FEM_STYLES, feminize): покачивание
+    таза в такт шагу, колея почти по линии, мягкие руки ближе к телу, ровная голова, лёгкий бег (короче вынос — выше
+    частота, меньше наклон), контрапост в покое. Мужские клипы не меняются. --plain — без неё (сравнение).
   * Хват оружия: центр кулака — у основания пальцев со стороны ладони, клинок — по линии «мизинец → указательный»
     (как GRIP_POS/GRIP_DIR у прежней героини со скелетом Mixamo). Арбалет — поворот в правой кисти, при котором в
     первом кадре Crossbow_Idle ложе смотрит вперёд, а дуги горизонтальны (как CROSSBOW_ROT).
@@ -42,7 +46,8 @@
       hero_assassin_f=<файл.glb> [hero_warrior_f=<…> …] [--preview <папка>] [--height 1.75]
   Слева от «=» — имя выходного файла (без расширения): hero_<профессия>_<пол> (модель в экипировке воинской профессии
   своей расы), hero_<раса>_<пол>_starter (Бродяга), npc_<id> для жителей; пол m/f в конце имени задаёт рост.
-  Повторный запуск перезаписывает GLB, PNG и JSON. --preview — картинки-проверки (поза покоя и кадры клипов, оружие линиями) для просмотра глазами.
+  Повторный запуск перезаписывает GLB, PNG и JSON. --preview — картинки-проверки (поза покоя и кадры клипов, оружие линиями) для просмотра глазами;
+  рядом <id>_gait.png — покой, шаг и бег крупно (спереди и сбоку).
 UAL: https://quaternius.itch.io/universal-animation-library и …-library-2 → «…[Standard].zip»,
   файлы Unreal-Godot/UAL1_Standard.glb и UAL2_Standard.glb (без _RM).
 Зависимости: numpy, Pillow, meshoptimizer (как у prepare_creatures.py). Входные GLB — чужие данные: Python с -I.
@@ -102,6 +107,8 @@ for _name, (_lib, _src, _rng) in ra.CLIPS.items():
 	if _name not in HERO_CLIPS:
 		HERO_CLIPS[_name] = ("death" if _name == "Death" else "act", [(_lib, _src)])
 UAL = {"ual1": "", "ual2": ""}
+## --plain: без женской пластики (для сравнения картинок-проверок)
+PLAIN = [False]
 
 FINGERS = ("index", "middle", "ring", "pinky")
 
@@ -304,8 +311,217 @@ def wave_pose(rt, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray) -> None:
 			turn(f, fore, ra.q_axis_angle(axis, a * e), Gq)
 
 
-def make_clip(rt, mesh: dict, name: str, kind: str, variants: list, libs_rt: dict) -> dict:
+# ---------- Женская пластика ----------
+
+## Женские герои (пол f в id, в т. ч. Бродяги hero_<раса>_f_starter): в UAL 1/2 женственных клипов шага и бега нет
+## (есть только Walk_Formal_Loop — строгий шаг), поэтому поверх переноса UAL — процедурные поправки по стилю клипа.
+## Углы — градусы, сдвиги — метры. Фаза шага — по первой гармонике разности «левая стопа − правая» по Z
+## (0 — левая стопа впереди, 90° — середина опоры на левую).
+##   yaw / roll / shift — вращение таза вокруг вертикали (сторона шагающей ноги вперёд), наклон в сторону (бедро
+##     опорной ноги выше) и сдвиг таза к опорной ноге; у покоя — постоянные (опора на правую ногу, контрапост);
+##   counter_yaw / counter_roll — доля, на которую нижний позвонок возвращает корпус (>1 — плечи навстречу тазу);
+##   width — ширина колеи (доля прежней; стопа в переносе чуть шире — swing_width); stride — длина выноса стопы
+##     (доля; короче вынос — выше частота при той же скорости RUN_NATIVE); fwd — свободная стопа покоя вперёд;
+##   lean — доля наклона корпуса вперёд, которая убирается; bounce — упругость груди (наклон с двойной частотой шага);
+##   arm_swing — амплитуда маха плеча (доля), arm_in — плечо к телу, elbow — локоть мягче (предплечье вперёд),
+##     flare — предплечье наружу, hand_flare — кисть наружу (кисти чуть разведены от бёдер);
+##   head — доля, на которую голова успокаивается к своему среднему повороту за цикл.
+FEM_STYLES = {
+	"walk": {"yaw": 7.0, "roll": 4.5, "shift": 0.022, "counter_yaw": 1.35, "counter_roll": 0.75, "width": 0.4,
+		"swing_width": 0.65, "stride": 1.0, "lean": 0.0, "bounce": 1.5, "arm_swing": 0.6, "arm_in": 3.0, "elbow": 9.0,
+		"flare": 8.0, "hand_flare": 16.0, "head": 0.55},
+	"run": {"yaw": 4.0, "roll": 3.0, "shift": 0.012, "counter_yaw": 1.2, "counter_roll": 0.7, "width": 0.55,
+		"swing_width": 0.75, "stride": 0.82, "lean": 0.45, "bounce": 2.0, "arm_swing": 0.7, "arm_in": 7.0, "elbow": 6.0,
+		"flare": 0.0, "hand_flare": 12.0, "head": 0.5},
+	"idle": {"yaw": -6.0, "roll": -4.5, "shift": -0.03, "counter_yaw": 1.0, "counter_roll": 1.5, "width": 0.6,
+		"swing_width": 0.6, "stride": 1.0, "fwd": 0.06, "lean": 0.0, "bounce": 0.0, "arm_swing": 1.0, "arm_in": 3.0,
+		"elbow": 10.0, "flare": 8.0, "hand_flare": 16.0, "head": 0.0, "head_tilt": 3.0},
+	"stance": {"yaw": -3.0, "roll": -3.0, "shift": -0.015, "counter_yaw": 1.0, "counter_roll": 1.0, "width": 0.82,
+		"swing_width": 0.82, "stride": 1.0, "fwd": 0.03, "lean": 0.0, "bounce": 0.0, "arm_swing": 1.0, "arm_in": 0.0,
+		"elbow": 0.0, "flare": 0.0, "hand_flare": 0.0, "head": 0.0},
+}
+## Клип героя → стиль женской пластики (остальные клипы — как у мужских героев).
+FEM_CLIPS = {"Idle": "idle", "Wave": "idle", "Walking": "walk", "Running": "run", "Sword_Idle": "stance",
+	"Crossbow_Idle": "stance"}
+
+_X = np.array([1.0, 0.0, 0.0])
+_Y = np.array([0.0, 1.0, 0.0])
+_Z = np.array([0.0, 0.0, 1.0])
+
+
+def _qa(axis: np.ndarray, ang) -> np.ndarray:
+	"""Поворот вокруг оси на углы (радианы, массив по кадрам) → (F, 4)."""
+	ang = np.asarray(ang, dtype=np.float64)
+	s = np.sin(ang * 0.5)[..., None]
+	return np.concatenate([axis[None] * s, np.cos(ang * 0.5)[..., None]], axis=-1)
+
+
+def _set_global(rt, Lq: np.ndarray, Lt: np.ndarray, b: int, G: np.ndarray) -> None:
+	"""Мировой поворот кости b по кадрам (дети следуют за ней)."""
+	p = rt.rig.parent[b]
+	if p < 0:
+		Lq[:, b] = ra.qnorm(G)
+		return
+	Gq, _Gp = rt.fk(Lq, Lt)
+	Lq[:, b] = ra.qnorm(ra.qmul(ra.qconj(Gq[:, p]), G))
+
+
+def _turn(rt, Lq: np.ndarray, Lt: np.ndarray, b: int, R: np.ndarray) -> None:
+	"""Повернуть кость b на мировой поворот R (по кадрам) вокруг её сустава."""
+	Gq, _Gp = rt.fk(Lq, Lt)
+	_set_global(rt, Lq, Lt, b, ra.qmul(R, Gq[:, b]))
+
+
+def _qmean(q: np.ndarray) -> np.ndarray:
+	q = ra.continuous(q[:, None])[:, 0]
+	m = q.mean(0)
+	return m / np.linalg.norm(m)
+
+
+def step_phase(rt, times: np.ndarray, Gp: np.ndarray) -> np.ndarray:
+	"""Фаза шага цикла по первой гармонике разности «левая стопа − правая» по Z: 0 — левая впереди."""
+	d = Gp[:, rt.contact["L"], 2] - Gp[:, rt.contact["R"], 2]
+	n = len(times) - 1
+	w = 2.0 * math.pi / float(times[-1])
+	c = np.sum(d[:n] * np.exp(-1j * w * times[:n]))
+	return w * times + float(np.angle(c))
+
+
+def feminize(rt, style: str, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray) -> float:
+	"""Женская пластика поверх перенесённого клипа (стиль FEM_STYLES): таз, корпус, руки, голова, стопы (IK, мировой
+	поворот стоп сохраняется). Клип ещё не закреплён по опорам — biped_plant идёт после. Возвращает недостачу IK, м."""
+	P = FEM_STYLES[style]
+	rig, roles = rt.rig, rt.roles
+	F = len(times)
+	rad = math.pi / 180.0
+	Gq0, Gp0 = rt.fk(Lq, Lt)
+	loco = style in ("walk", "run")
+	if loco:
+		phi = step_phase(rt, times, Gp0)
+		c, s = np.cos(phi), np.sin(phi)
+		c2 = np.sin(2.0 * phi)
+	else:
+		c, s, c2 = np.zeros(F), np.ones(F), np.zeros(F)
+	yaw = (-P["yaw"] * c if loco else P["yaw"] * np.ones(F)) * rad
+	roll = P["roll"] * s * rad
+	shift = P["shift"] * s
+	root, hips = roles["root"], roles["hips"]
+	legs = roles["legs"]
+	# 1. Таз: вращение вокруг вертикали и наклон вокруг центра тазобедренных суставов (ноги потом — по IK)
+	piv = 0.5 * (Gp0[:, legs["L"][0]] + Gp0[:, legs["R"][0]])
+	R = ra.qmul(_qa(_Y, yaw), _qa(_Z, roll))
+	Lq[:, root] = ra.qnorm(ra.qmul(R, Lq[:, root]))
+	Lt[:, root] = piv + ra.qrot(R, Lt[:, root] - piv)
+	# Сдвиг таза к опорной ноге — на кость таза (корень по X/Z игра и pin_xz держат на месте)
+	if hips != root:
+		Gq, _Gp = rt.fk(Lq, Lt)
+		pq = Gq[:, rig.parent[hips]]
+		Lt[:, hips] += ra.qrot(ra.qconj(pq), shift[:, None] * _X[None])
+	# 2. Корпус: нижний позвонок возвращает (и чуть перекручивает навстречу) плечи; меньше наклон вперёд; упругость
+	sp = roles["spine"]
+	chest = roles["chest"]
+	Rc = ra.qmul(_qa(_Y, -yaw * P["counter_yaw"]), _qa(_Z, -roll * P["counter_roll"]))
+	if P["lean"] > 0.0:
+		lean = float(np.mean(rest_lean(rt, Gp0)))
+		Rc = ra.qmul(_qa(_X, np.full(F, -lean * P["lean"])), Rc)
+	_turn(rt, Lq, Lt, sp[0], Rc)
+	if P["bounce"] > 0.0 and len(sp) > 1:
+		_turn(rt, Lq, Lt, sp[-1], _qa(_X, P["bounce"] * rad * c2))
+	# 3. Руки: мах меньше, плечо ближе к телу, локоть мягче, предплечье и кисть чуть наружу
+	for side, ch in roles["arms"].items():
+		sg = 1.0 if side == "L" else -1.0
+		up, fore, hand = ch[1], ch[2], ch[3]
+		Gq, _Gp = rt.fk(Lq, Lt)
+		G = Gq[:, up]
+		if P["arm_swing"] != 1.0:
+			M = _qmean(G)
+			D = ra.continuous(ra.qmul(G, ra.qconj(M)[None])[:, None])[:, 0]
+			D = ra.slerp(np.repeat(np.array([[0.0, 0.0, 0.0, 1.0]]), F, axis=0), D, np.full(F, P["arm_swing"]))
+			G = ra.qmul(D, M[None])
+		G = ra.qmul(_qa(_Z, np.full(F, -sg * P["arm_in"] * rad)), G)
+		_set_global(rt, Lq, Lt, up, G)
+		if P["elbow"] or P["flare"]:
+			_turn(rt, Lq, Lt, fore, ra.qmul(_qa(_Z, np.full(F, sg * P["flare"] * rad)),
+				_qa(_X, np.full(F, -P["elbow"] * rad))))
+		if P["hand_flare"]:
+			_turn(rt, Lq, Lt, hand, _qa(_Z, np.full(F, sg * P["hand_flare"] * rad)))
+	# 4. Голова: ровнее (к среднему повороту за цикл, без наклона корпуса), в покое — лёгкий наклон к опорной ноге
+	head = roles["head"]
+	H0 = Gq0[:, head]
+	if P["head"] > 0.0:
+		H = ra.slerp(H0, np.repeat(_qmean(H0)[None], F, axis=0), np.full(F, P["head"]))
+	else:
+		Gq, _Gp = rt.fk(Lq, Lt)
+		H = Gq[:, head]
+	if P.get("head_tilt"):
+		H = ra.qmul(_qa(_Z, np.full(F, P["head_tilt"] * rad)), H)
+	_set_global(rt, Lq, Lt, head, H)
+	# 5. Стопы: колея уже (почти по линии), вынос короче, свободная стопа покоя чуть вперёд; мировой поворот стоп
+	# и высота — как были
+	x0 = float(rig.gpos[root, 0])
+	H_all = float(rig.gpos[:, 1].max())
+	want, ank = {}, {}
+	for side, lc in legs.items():
+		ct = rt.contact[side]
+		p = Gp0[:, ct].copy()
+		lift = np.clip((p[:, 1] - p[:, 1].min()) / (0.05 * H_all), 0.0, 1.0)
+		k = P["width"] + (P["swing_width"] - P["width"]) * lift
+		p[:, 0] = x0 + (p[:, 0] - x0) * k
+		if P["stride"] != 1.0:
+			zc = float(p[:-1, 2].mean())
+			p[:, 2] = zc + (p[:, 2] - zc) * P["stride"]
+		if P.get("fwd") and side == "L":
+			p[:, 2] += P["fwd"]
+		want[side] = p
+		ank[side] = Gq0[:, lc[2]]
+	short = 0.0
+	for f in range(F):
+		for side, lc in sorted(legs.items()):
+			an = lc[2]
+			Gq1, _Gp1 = rt.fk(Lq[f:f + 1], Lt[f:f + 1])
+			Lq[f, an] = ra.qnorm(ra.qmul(ra.qconj(Gq1[0, rig.parent[an]]), ank[side][f]))
+			Gq1, Gp1 = rt.fk(Lq[f:f + 1], Lt[f:f + 1])
+			short = max(short, rt.two_bone(Gq1[0], Gp1[0], Lq[f], side, want[side][f]))
+	Lq[:] = ra.continuous(Lq)
+	return short
+
+
+def rest_lean(rt, Gp: np.ndarray) -> np.ndarray:
+	"""Наклон корпуса вперёд по кадрам (рад): «центр тазобедренных суставов → грудь» относительно позы покоя рига."""
+	roles, gp = rt.roles, rt.rig.gpos
+	lg = [roles["legs"]["L"][0], roles["legs"]["R"][0]]
+	top0 = gp[roles["chest"]] - 0.5 * (gp[lg[0]] + gp[lg[1]])
+	top = Gp[:, roles["chest"]] - 0.5 * (Gp[:, lg[0]] + Gp[:, lg[1]])
+	return np.arctan2(top[:, 2], top[:, 1]) - math.atan2(top0[2], top0[1])
+
+
+def gait_stats(rt, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray) -> dict:
+	"""Числа пластики клипа: размах вращения таза вокруг вертикали и наклона в сторону (°), ширина колеи (м, среднее
+	|xL − xR| опорных стоп у земли), размах маха кистей вперёд-назад (м), наклон корпуса вперёд (°), шагов в секунду."""
+	roles = rt.roles
+	Gq, Gp = rt.fk(Lq, Lt)
+	rel = ra.qmul(Gq[:, roles["hips"]], ra.qconj(rt.rest_q[roles["hips"]])[None])
+	f = ra.qrot(rel, np.repeat(_Z[None], len(times), axis=0))
+	sx = ra.qrot(rel, np.repeat(_X[None], len(times), axis=0))
+	yaw = np.degrees(np.arctan2(f[:, 0], f[:, 2]))
+	roll = np.degrees(np.arctan2(sx[:, 1], sx[:, 0]))
+	cl, cr = rt.contact["L"], rt.contact["R"]
+	H = float(rt.rig.gpos[:, 1].max())
+	low = (Gp[:, cl, 1] < Gp[:, cl, 1].min() + 0.03 * H) | (Gp[:, cr, 1] < Gp[:, cr, 1].min() + 0.03 * H)
+	width = float(np.mean(np.abs(Gp[low, cl, 0] - Gp[low, cr, 0]))) if low.any() else 0.0
+	piv = 0.5 * (Gp[:, roles["legs"]["L"][0]] + Gp[:, roles["legs"]["R"][0]])
+	hands = [Gp[:, c[3], 2] - piv[:, 2] for c in roles["arms"].values()]
+	swing = float(np.mean([h.max() - h.min() for h in hands]))
+	lean = float(np.degrees(np.mean(rest_lean(rt, Gp))))
+	return {"yaw": float(yaw.max() - yaw.min()), "roll": float(roll.max() - roll.min()), "width": width,
+		"swing": swing, "lean": lean, "steps": 2.0 / float(times[-1])}
+
+
+def make_clip(rt, mesh: dict, name: str, kind: str, variants: list, libs_rt: dict, female: bool = False) -> dict:
 	best = None
+	if female and name in FEM_CLIPS:
+		# Лёгкий бег героини — всегда из бега трусцой (Jog): спринт UAL с сильным наклоном не подходит
+		variants = variants[:1]
 	for lib, names in variants:
 		r = libs_rt[lib]
 		times, Lq, Lt = r.clip(names, False)
@@ -313,13 +529,19 @@ def make_clip(rt, mesh: dict, name: str, kind: str, variants: list, libs_rt: dic
 		travel = float(np.max(np.hypot(root[:, 0] - root[0, 0], root[:, 2] - root[0, 2])))
 		if kind in ("walk", "run"):
 			pin_xz(r, Lt)
+		fem = 0.0
+		if female and name in FEM_CLIPS:
+			fem = feminize(r, FEM_CLIPS[name], times, Lq, Lt)
 		v = stance_speed(r, times, Lq, Lt) if kind in ("walk", "run") else 0.0
 		native = WALK_NATIVE if kind == "walk" else RUN_NATIVE
 		score = abs(math.log(max(v, 1e-3) / native)) if kind in ("walk", "run") else 0.0
 		if best is None or score < best[0]:
-			best = (score, lib, names, r, times, Lq, Lt, v, travel)
-	_score, lib, names, r, times, Lq, Lt, v, travel = best
+			best = (score, lib, names, r, times, Lq, Lt, v, travel, fem)
+	_score, lib, names, r, times, Lq, Lt, v, travel, fem = best
 	cl = {"name": name, "lib": "%s:%s" % (lib, "+".join(names)), "loop": kind in ("loop", "walk", "run")}
+	if female and name in FEM_CLIPS:
+		cl["lib"] += " + женская пластика (%s)" % FEM_CLIPS[name]
+		cl["fem_short"] = fem
 	speed, short = 0.0, 0.0
 	if kind in ("walk", "run"):
 		native = WALK_NATIVE if kind == "walk" else RUN_NATIVE
@@ -452,17 +674,23 @@ def build(cid: str, src_path: str, height: float, out_dir: str, preview: str = "
 			" ".join(nm[b] for b in roles["arms"][s]),
 			", ".join("%s %s" % (f, "/".join(nm[b] for b in ch)) for f, ch in fingers[s].items())))
 	rts = {k2: HeroRetarget(s2, rig, roles, fingers) for k2, s2 in libs.items()}
+	# Пол — в конце id (у Бродяги перед «_starter»): женским героям — женская пластика шага, бега и покоя
+	female = cid.replace("_starter", "").endswith("_f") and not PLAIN[0]
 	print("   масштаб смещения таза %.3f, подъём таза под опорную позу %.3f м" % (rts["ual1"].k, rts["ual1"].lift))
 	clips = []
 	for name, (kind, variants) in HERO_CLIPS.items():
-		cl = make_clip(rts[variants[0][0]], mesh, name, kind, variants, rts)
+		cl = make_clip(rts[variants[0][0]], mesh, name, kind, variants, rts, female)
 		extra = ""
 		if "speed" in cl:
 			extra = ", скорость %.2f м/с (темп ×%.2f)" % (cl["speed"], 1.0 / cl["stretch"])
 		elif cl["travel"] >= TRAVEL_PLANT:
 			extra = ", таз уходит на %.2f м — опоры не закреплены" % cl["travel"]
 		print("   %-15s %.2f с ← %s%s; опора не достала %.3f м, подъём %.3f м" % (
-			name, cl["T"], cl["lib"], extra, cl["short"], cl["lift"]))
+			name, cl["T"], cl["lib"], extra, max(cl["short"], cl.get("fem_short", 0.0)), cl["lift"]))
+		if name in ("Idle", "Walking", "Running"):
+			gs = gait_stats(rts["ual1"], cl["times"], cl["rot"], cl["trans"])
+			print("      пластика: таз вокруг вертикали %.1f°, в сторону %.1f°, колея %.3f м, мах кистей %.2f м, "
+				"наклон %.1f°, шагов %.2f/с" % (gs["yaw"], gs["roll"], gs["width"], gs["swing"], gs["lean"], gs["steps"]))
 		clips.append(cl)
 	gr = grips(rig, roles, fingers)
 	# Арбалет: в первом кадре Crossbow_Idle ложе (ось −Z арбалета) — вперёд модели (+Z), дуги горизонтально
@@ -622,6 +850,40 @@ def write_preview(out: str, cid: str, rt, rig, mesh: dict, tex, clips: list, gr:
 	p = os.path.join(out, cid + "_preview.png")
 	sheet.save(p)
 	print("   картинка: %s" % p)
+	write_gait(out, cid, rt, rig, mesh, tex, by)
+
+
+GAIT_BOX = (np.array([-0.7, -0.05, -0.7]), np.array([0.7, 1.85, 0.7]))
+
+
+def write_gait(out: str, cid: str, rt, rig, mesh: dict, tex, by: dict) -> None:
+	"""Пластика крупно: Idle, Walking, Running по 6 кадров за цикл — спереди и сбоку (<id>_gait.png)."""
+	from PIL import Image, ImageDraw
+	size = 260
+	rows = []
+	for name in ("Idle", "Walking", "Running"):
+		cl = by[name]
+		F = len(cl["times"])
+		Gq, Gp = rt.fk(cl["rot"], cl["trans"])
+		fr = np.linspace(0, F - 1, 7).astype(int)[:-1]
+		for views in (("front",), ("side",)):
+			row = Image.new("RGB", (size * len(fr), size + 14), (255, 255, 255))
+			d = ImageDraw.Draw(row)
+			d.text((4, size), "%s %s %s" % (cid, name, views[0]), fill=(0, 0, 0))
+			for i, f in enumerate(fr):
+				v = pc.skin_points(rig, mesh["pos"], mesh["joints"], mesh["weights"], pc.qm_batch(Gq[f]), Gp[f])
+				im = pc.render_mesh(v, mesh["tris"], mesh["uv"], tex, views=views, size=size, samples=160000, box=GAIT_BOX)
+				row.paste(im, (i * size, 0))
+				d.text((i * size + 4, 2), "%.2f" % cl["times"][f], fill=(0, 0, 0))
+			rows.append(row)
+	sheet = Image.new("RGB", (rows[0].size[0], sum(r.size[1] for r in rows)), (255, 255, 255))
+	y = 0
+	for r in rows:
+		sheet.paste(r, (0, y))
+		y += r.size[1]
+	p = os.path.join(out, cid + "_gait.png")
+	sheet.save(p)
+	print("   картинка: %s" % p)
 
 
 def main() -> None:
@@ -632,7 +894,9 @@ def main() -> None:
 	ap.add_argument("--out", default=os.path.join(ROOT, "assets", "characters"), help="куда писать")
 	ap.add_argument("--height", type=float, default=0.0, help="рост, м (по умолчанию по полу в id: m 1.8, f 1.7)")
 	ap.add_argument("--preview", default="", help="папка для картинок-проверок")
+	ap.add_argument("--plain", action="store_true", help="без женской пластики (сравнение)")
 	args = ap.parse_args()
+	PLAIN[0] = args.plain
 	UAL.update({"ual1": args.ual1, "ual2": args.ual2})
 	ok = True
 	for s in args.sources:

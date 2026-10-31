@@ -155,10 +155,10 @@
 		]
 	},
 	"crossbow_rot": [
-		-0.4531,
-		0.6228,
-		-0.4801,
-		-0.42
+		-0.4537,
+		0.6221,
+		-0.4809,
+		-0.4194
 	],
 	"face": [
 		0.0149,
@@ -171,32 +171,32 @@
 		"Idle": {
 			"length": 2.5,
 			"loop": true,
-			"source": "ual1:Idle_Loop"
+			"source": "ual1:Idle_Loop + женская пластика (idle)"
 		},
 		"Walking": {
 			"length": 1.088,
 			"loop": true,
-			"source": "ual1:Walk_Loop"
+			"source": "ual1:Walk_Loop + женская пластика (walk)"
 		},
 		"Running": {
-			"length": 1.511,
+			"length": 1.239,
 			"loop": true,
-			"source": "ual1:Jog_Fwd_Loop"
+			"source": "ual1:Jog_Fwd_Loop + женская пластика (run)"
 		},
 		"Sword_Idle": {
 			"length": 1.667,
 			"loop": true,
-			"source": "ual1:Sword_Idle"
+			"source": "ual1:Sword_Idle + женская пластика (stance)"
 		},
 		"Crossbow_Idle": {
 			"length": 1.667,
 			"loop": true,
-			"source": "ual1:Pistol_Idle_Loop"
+			"source": "ual1:Pistol_Idle_Loop + женская пластика (stance)"
 		},
 		"Wave": {
 			"length": 2.2,
 			"loop": false,
-			"source": "процедурный (поверх ual1:Idle_Loop)"
+			"source": "процедурный (поверх ual1:Idle_Loop + женская пластика (idle))"
 		},
 		"Sword_Slash": {
 			"length": 1.4,
