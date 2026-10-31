@@ -124,6 +124,7 @@ static var _level := -1
 static var _opts: Dictionary = {}
 static var _fps := -1
 static var _menu_open := false
+static var _resize_hooked := false
 ## Материалы моделей (персонажи, звери, питомцы): тени на модели по model_shadows — WeakRef.
 static var _model_mats: Array[WeakRef] = []
 ## Материалы с контуром (next_pass по outlines; контур — meta "outline") — WeakRef.
@@ -457,6 +458,13 @@ static func apply_resolution(tree: SceneTree) -> void:
 	win.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
 	win.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
 	win.scaling_3d_scale = render_scale_for(float(win.size.y))
+	# Окно сменило размер (поворот, выход из полноэкранного режима) — масштаб 3D по новой высоте
+	if not _resize_hooked:
+		_resize_hooked = true
+		var on_resize := func() -> void:
+			if is_instance_valid(win):
+				win.scaling_3d_scale = Quality.render_scale_for(float(win.size.y))
+		win.size_changed.connect(on_resize)
 
 
 ## Тени направленных источников света (солнце) в поддереве root.
