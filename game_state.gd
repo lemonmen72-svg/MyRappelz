@@ -1,13 +1,16 @@
 extends Node
 ## Автозагрузка Game: персонаж, сумка, оружие и умения героя, питомцы, сохранение в user://.
-## Герой игрока всегда тёмная эльфийка-Наёмник (ClassData.HERO_RACE / HERO_CLASS): старые сохранения с другой
-## расой или классом переводятся при загрузке (from_dict) — уровень, опыт, золото, сумка и питомцы сохраняются,
-## выдаётся оружие Наёмника, JP — как будто копились с 1 уровня. Новый персонаж другого класса создаётся
-## только автотестами (проверка механики классов).
+## Новый герой любой расы и пола — Бродяга (ClassData.WANDERER); с 10 ур. — задание на профессию у мудреца, смена —
+## change_job (одна из трёх профессий своей расы, сверх-эволюция ClassData.over_jp, стартовое оружие профессии).
+## Сохранения версии 1 (до профессий): герой-Наёмник остаётся Наёмником (профессия уже получена, без бонуса),
+## другие раса и класс переводятся в тёмную эльфийку-Наёмника (как раньше) — уровень, опыт, золото, сумка и питомцы
+## сохраняются, выдаётся оружие Наёмника, JP — как будто копились с 1 уровня. new_character принимает и профессию
+## сразу (автотесты, админ-панель).
 
 signal changed
 
-const SAVE_VERSION := 1
+## 2 — профессии (Бродяга, смена профессии, пол, щит).
+const SAVE_VERSION := 2
 const MAX_PETS := 6
 ## Виды питомцев, ушедшие с острова (модели из примитивов), → вид, которым становится питомец при загрузке.
 const RETIRED_PETS := {"boar": "wolf", "golem": "turtle"}
@@ -18,7 +21,17 @@ var save_path := "user://save.json"
 var has_character := false
 var char_name := ""
 var race_id := ""
-var class_id := ""
+## Профессия (ClassData.CLASSES; "wanderer" — Бродяга). Данные общих умений берутся для неё (HeroSkills.job).
+var class_id := "":
+	set(v):
+		class_id = v
+		HeroSkills.job = v
+## Пол героя: "f" | "m" (модель — CharacterModel.hero_asset).
+var gender := "f"
+## Профессия получена (сменой у мудреца, админ-панелью; у сохранений версии 1 — Наёмник) и уровень, на котором
+## это случилось (0 — неизвестно: старое сохранение).
+var job_changed := false
+var job_level_at_change := 0
 var level := 1
 var xp := 0
 var gold := 0
@@ -30,6 +43,11 @@ var weapon := "":
 	set(v):
 		weapon = v
 		inventory.equipped = v
+## Щит во второй руке (id предмета из сумки, "" — нет): только к одноручному оружию и у профессий со щитом.
+var shield := "":
+	set(v):
+		shield = v
+		inventory.equipped_off = v
 ## Умения героя (HeroSkills): {"jp": int, "jp_part": float, "skills": {id: ур.}, "toggles": {id: true},
 ## "slots": [id умения на кнопке skill1…skill4 или ""]}.
 var hero: Dictionary = {}
@@ -70,11 +88,15 @@ func reset() -> void:
 	char_name = ""
 	race_id = ""
 	class_id = ""
+	gender = "f"
+	job_changed = false
+	job_level_at_change = 0
 	level = 1
 	xp = 0
 	gold = 0
 	inventory.from_dict({})
 	weapon = ""
+	shield = ""
 	hero = {}
 	load_note = ""
 	pets.clear()
@@ -84,66 +106,180 @@ func reset() -> void:
 	quest_tracked = ""
 
 
-func new_character(n: String, race: String, cls: String) -> void:
+## Новый герой: обычно Бродяга (экран создания); профессия cls сразу — автотесты и админ-панель
+## (герой как будто уже сменил профессию, без бонуса сверх-эволюции).
+func new_character(n: String, race: String, cls: String = ClassData.WANDERER, sex: String = "f") -> void:
 	reset()
 	has_character = true
 	char_name = n
 	race_id = race
-	class_id = cls
+	gender = sex
+	class_id = ClassData.migrate_id(cls)
+	if not ClassData.has_class(class_id):
+		class_id = ClassData.WANDERER
+	job_changed = ClassData.is_job(class_id)
+	job_level_at_change = 1 if job_changed else 0
 	gold = 50
 	inventory.add("hp_potion", 3)
 	inventory.add("revive_scroll", 1)
-	hero = HeroSkills.new_record(cls, 1)
+	hero = HeroSkills.new_record(class_id, 1)
+	_give_starters(class_id)
 	ensure_hero()
 	changed.emit()
 
 
-## Приводит умения и оружие героя к текущему классу: запись умений (HeroSkills.ensure_record),
-## стартовый набор оружия в сумке у Наёмника (если оружия нет совсем) и надетое оружие (по умолчанию — первое
-## из набора, у старых сохранений — парные мечи). Вызывается при создании, загрузке и смене класса.
+## Приводит умения и оружие героя к текущей профессии: запись умений (HeroSkills.ensure_record),
+## стартовый набор оружия в сумке (если подходящего оружия нет совсем), надетое оружие (по умолчанию — первое
+## из набора, у старых сохранений Наёмника — парные мечи) и щит (только к одноручному оружию).
+## Вызывается при создании, загрузке и смене профессии.
 func ensure_hero() -> void:
+	if not ClassData.has_class(class_id):
+		class_id = ClassData.WANDERER
 	if hero.is_empty():
 		hero = HeroSkills.new_record(class_id, level)
 	HeroSkills.ensure_record(hero, class_id)
-	if not ItemData.class_uses_weapons(class_id):
-		weapon = ""
-		return
 	var has_any := false
 	for id in inventory.ids():
-		if ItemData.weapon_fits(String(id), class_id):
+		if ItemData.weapon_fits(String(id), class_id) and not ItemData.is_shield(String(id)):
 			has_any = true
 	if not has_any:
-		for id in ItemData.STARTER_WEAPONS[class_id]:
-			inventory.add(String(id))
-	if not (ItemData.weapon_fits(weapon, class_id) and inventory.has(weapon)):
+		for id in ItemData.starter_weapons(class_id):
+			if not inventory.has(String(id)):
+				inventory.add(String(id))
+	if not (ItemData.weapon_fits(weapon, class_id) and not ItemData.is_shield(weapon) and inventory.has(weapon)):
 		weapon = ItemData.default_weapon(class_id)
 		if not inventory.has(weapon):
+			weapon = ""
 			for id in inventory.ids():
-				if ItemData.weapon_fits(String(id), class_id):
+				if ItemData.weapon_fits(String(id), class_id) and not ItemData.is_shield(String(id)):
 					weapon = String(id)
 					break
-	HeroSkills.drop_unfit_toggles(hero, weapon_kind())
+	if shield != "" and not (ItemData.is_shield(shield) and ItemData.weapon_fits(shield, class_id)
+			and inventory.has(shield) and ItemData.is_one_handed(weapon_kind())):
+		shield = ""
+	HeroSkills.drop_unfit_toggles(hero, weapon_kind(), has_shield())
 
 
-## Вид надетого оружия ("daggers" | "dual_swords" | "crossbow"); у классов без сменного оружия — "".
+## Стартовое оружие профессии в сумку (чего нет) и надеть: первое — в руку, щит из набора — во вторую руку.
+func _give_starters(job: String) -> void:
+	var first := ""
+	var sh := ""
+	for k in ItemData.starter_weapons(job):
+		var id := String(k)
+		if not inventory.has(id):
+			inventory.add(id)
+		if ItemData.is_shield(id):
+			sh = id
+		elif first == "":
+			first = id
+	if first != "":
+		weapon = first
+	shield = sh if ItemData.is_one_handed(weapon_kind()) else ""
+
+
+## Вид надетого оружия (ItemData.WEAPON_KINDS: "sword_1h", "daggers", "crossbow" …; "" — без оружия).
 func weapon_kind() -> String:
 	return ItemData.weapon_kind(weapon)
 
 
-## Надеть оружие id из сумки. "" — получилось, иначе причина. Переключаемые умения, которым новое оружие
-## не подходит, выключаются (их id — в last_dropped_toggles).
+## Щит во второй руке.
+func has_shield() -> bool:
+	return shield != ""
+
+
+## Надеть оружие id из сумки (щит — во вторую руку). "" — получилось, иначе причина. Двуручное или парное оружие
+## снимает щит. Переключаемые умения, которым новое оружие не подходит, выключаются (их id — в last_dropped_toggles).
 func equip_weapon(id: String) -> String:
 	last_dropped_toggles = []
 	if not ItemData.is_weapon(id):
 		return "Это не оружие"
 	if not ItemData.weapon_fits(id, class_id):
-		return "Это оружие не для класса «%s»" % String(ClassData.cls(class_id)["name"])
+		if ClassData.is_wanderer(class_id) and ItemData.rank(id) > 1:
+			return "Бродяге доступно только оружие 1-го ранга"
+		return "Это оружие не для профессии «%s»" % ClassData.job_name(class_id)
 	if not inventory.has(id):
 		return "Этого оружия нет в сумке"
-	weapon = id
-	last_dropped_toggles = HeroSkills.drop_unfit_toggles(hero, weapon_kind())
+	if ItemData.is_shield(id):
+		if not ItemData.is_one_handed(weapon_kind()):
+			return "Щит — только к одноручному оружию"
+		shield = id
+	else:
+		weapon = id
+		if shield != "" and not ItemData.is_one_handed(weapon_kind()):
+			shield = ""
+	last_dropped_toggles = HeroSkills.drop_unfit_toggles(hero, weapon_kind(), has_shield())
 	changed.emit()
 	return ""
+
+
+## Снять щит (остаётся в сумке).
+func unequip_shield() -> void:
+	if shield == "":
+		return
+	shield = ""
+	last_dropped_toggles = HeroSkills.drop_unfit_toggles(hero, weapon_kind(), false)
+	changed.emit()
+
+
+# ---------- Профессия ----------
+
+## Можно ли сейчас сменить профессию на job ("" — можно): только Бродяга, с ClassData.JOB_LEVEL, профессия своей расы.
+func job_change_block(job: String) -> String:
+	if not ClassData.is_wanderer(class_id):
+		return "Профессия уже выбрана: %s" % ClassData.job_name(class_id)
+	if level < ClassData.JOB_LEVEL:
+		return "Профессию можно выбрать с %d уровня" % ClassData.JOB_LEVEL
+	if not ClassData.is_job(job) or not ClassData.jobs_of(race_id).has(job):
+		return "Эта профессия не для вашей расы"
+	return ""
+
+
+## Сменить профессию Бродяги на job (задание мудреца): сверх-эволюция (+5 JP за уровень выше 10, до 20 ур.),
+## стартовое оружие профессии в сумку и в руки, древо профессии. Возвращает бонус JP или -1 (нельзя).
+func change_job(job: String) -> int:
+	if job_change_block(job) != "":
+		return -1
+	var over := ClassData.over_jp(level)
+	_set_job(job)
+	job_level_at_change = level
+	hero["jp"] = int(hero.get("jp", 0)) + over
+	changed.emit()
+	return over
+
+
+## Админ-панель: профессия сразу (любая из 9 или Бродяга), без задания и бонуса. Изученные умения прежней
+## профессии сбрасываются с возвратом JP. Возвращает возвращённые JP.
+func admin_set_job(job: String) -> int:
+	if not ClassData.has_class(job):
+		return 0
+	var back := HeroSkills.refund_all(hero, class_id)
+	if ClassData.is_wanderer(job):
+		class_id = job
+		job_changed = false
+		job_level_at_change = 0
+		_give_starters(job)
+		ensure_hero()
+	else:
+		_set_job(job)
+		job_level_at_change = level
+	changed.emit()
+	return back
+
+
+func _set_job(job: String) -> void:
+	class_id = job
+	job_changed = true
+	_give_starters(job)
+	ensure_hero()
+
+
+## Админ-панель: раса и пол на лету (модель героя, деревня старта и возрождения). Профессия остаётся.
+func admin_set_look(race: String, sex: String) -> void:
+	if ClassData.RACES.has(race):
+		race_id = race
+	if sex == "f" or sex == "m":
+		gender = sex
+	changed.emit()
 
 
 ## Добавляет питомца в коллекцию. Возвращает индекс или -1, если места нет.
@@ -172,12 +308,14 @@ func remove_pet(i: int) -> void:
 func to_dict() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
-		"name": char_name, "race": race_id, "class": class_id,
+		"name": char_name, "race": race_id, "class": class_id, "gender": gender,
+		"job_changed": job_changed, "job_level": job_level_at_change,
 		"level": level, "xp": xp, "gold": gold,
 		"inventory": inventory.to_dict(),
 		# Раскладка сумки по ячейкам (у старых сохранений нет — предметы ложатся по порядку сортировки)
 		"bag": inventory.layout_to_array(),
 		"weapon": weapon,
+		"shield": shield,
 		"hero": hero.duplicate(true),
 		"pets": pets.duplicate(true),
 		"active_pet": active_pet,
@@ -189,15 +327,31 @@ func from_dict(d: Dictionary) -> void:
 	reset()
 	has_character = true
 	char_name = String(d.get("name", "Герой"))
+	var version := int(d.get("version", 1))
 	race_id = String(d.get("race", ClassData.HERO_RACE))
 	class_id = String(d.get("class", ClassData.HERO_CLASS))
-	# Герой — всегда Наёмник: другие раса и класс (старые сохранения) переводятся, прежние умения класса
-	# не переносятся (у Наёмника своё древо)
-	var converted := race_id != ClassData.HERO_RACE or class_id != ClassData.HERO_CLASS
-	if converted:
-		race_id = ClassData.HERO_RACE
-		class_id = ClassData.HERO_CLASS
-		load_note = "Ваш герой стал Наёмником: остальные профессии появятся позже"
+	gender = String(d.get("gender", "f"))
+	if gender != "m":
+		gender = "f"
+	var converted := false
+	if version < 2:
+		# Сохранения до профессий: герой — всегда Наёмник (профессия уже получена, без сверх-эволюции);
+		# другие раса и класс переводятся, прежние умения класса не переносятся (у Наёмника своё древо)
+		converted = race_id != ClassData.HERO_RACE or class_id != ClassData.HERO_CLASS
+		if converted:
+			race_id = ClassData.HERO_RACE
+			class_id = ClassData.HERO_CLASS
+			load_note = "Ваш герой стал Наёмником: остальные профессии появятся позже"
+		job_changed = true
+		job_level_at_change = 0
+	else:
+		if not ClassData.RACES.has(race_id):
+			race_id = ClassData.HERO_RACE
+		class_id = ClassData.migrate_id(class_id)
+		if not ClassData.has_class(class_id):
+			class_id = ClassData.WANDERER
+		job_changed = bool(d.get("job_changed", ClassData.is_job(class_id))) and ClassData.is_job(class_id)
+		job_level_at_change = int(d.get("job_level", 0))
 	level = int(d.get("level", 1))
 	xp = int(d.get("xp", 0))
 	gold = int(d.get("gold", 0))
@@ -253,6 +407,7 @@ func from_dict(d: Dictionary) -> void:
 	# Оружие (старые сохранения Наёмника и переведённые герои — парные мечи и стартовый набор в сумку,
 	# см. ensure_hero)
 	weapon = "" if converted else String(d.get("weapon", ""))
+	shield = "" if converted else String(d.get("shield", ""))
 	# Умения героя: старые сохранения — JP, как будто копились с 1 уровня, стартовые умения
 	var h: Variant = d.get("hero", null)
 	if converted:

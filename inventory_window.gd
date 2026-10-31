@@ -2,7 +2,7 @@ class_name InventoryWindow
 extends Node
 ## Окно сумки как в MMORPG (кнопка «Сумка», клавиши I и B) и окно торговца в том же стиле. Живёт в Economy
 ## (main.economy.window); данные — Game.inventory (ячейки Inventory), Game.weapon, Game.gold.
-## Сумка: слева — экипировка героя (слот «Оружие» рабочий, Голова / Тело / Руки / Ноги / Аксессуар — заглушки
+## Сумка: слева — экипировка героя (слоты «Оружие» и «Щит» рабочие, Голова / Тело / Руки / Ноги — заглушки
 ## «скоро»), в центре — золото, занятость «N/40», «Сортировать» и сетка ячеек (COLS столбцов; если ячеек больше
 ## вместимости — окно прокручивается), справа — карточка выбранного: значок, название цветом редкости, тип и
 ## редкость, описание, характеристики (у оружия — сравнение с надетым: лучше зелёным, хуже красным), цена продажи
@@ -44,10 +44,11 @@ const SEL_COLOR := Color(1.0, 0.96, 0.62)
 const EMPTY_FRAME := Color(0.42, 0.44, 0.58, 0.75)
 const CELL_BG := Color(0.05, 0.06, 0.13, 0.92)
 
-## Слоты экипировки: [id, название]. Рабочий пока только «Оружие» (Game.weapon), остальные — заглушки.
+## Слоты экипировки: [id, название]. Рабочие — «Оружие» (Game.weapon) и «Щит» (вторая рука, Game.shield),
+## остальные — заглушки (аксессуар вернётся вместе с экипировкой).
 const EQUIP_SLOTS := [
-	["weapon", "Оружие"], ["head", "Голова"], ["body", "Тело"],
-	["hands", "Руки"], ["feet", "Ноги"], ["accessory", "Аксессуар"],
+	["weapon", "Оружие"], ["offhand", "Щит"], ["head", "Голова"], ["body", "Тело"],
+	["hands", "Руки"], ["feet", "Ноги"],
 ]
 
 var main: Node
@@ -195,7 +196,7 @@ func _validate_selection() -> void:
 func _build_equipment(parent: VBoxContainer) -> void:
 	for i in EQUIP_SLOTS.size():
 		var slot_id := String(EQUIP_SLOTS[i][0])
-		var id: String = Game.weapon if slot_id == "weapon" else ""
+		var id: String = Game.weapon if slot_id == "weapon" else (Game.shield if slot_id == "offhand" else "")
 		var b := _make_cell("equip", i, id, "", UiScale.px(EQUIP_CELL), sel_kind == "equip" and sel_index == i,
 			String(EQUIP_SLOTS[i][1]))
 		parent.add_child(b)
@@ -284,7 +285,7 @@ func _make_cell(kind: String, index: int, id: String, corner: String, sz: float,
 		ic.position = Vector2((sz - icon_sz) * 0.5, icon_y)
 		b.add_child(ic)
 	if caption != "":
-		var cap := _label(caption if id != "" or index == 0 else caption + "\nскоро", UiScale.FONT_TINY, MUTED if id != "" else EMPTY_FRAME.lightened(0.3))
+		var cap := _label(caption if id != "" or index <= 1 else caption + "\nскоро", UiScale.FONT_TINY, MUTED if id != "" else EMPTY_FRAME.lightened(0.3))
 		cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		cap.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM if id != "" else VERTICAL_ALIGNMENT_CENTER
 		cap.position = Vector2(0, 0)
@@ -423,10 +424,18 @@ func _card_equip(card: VBoxContainer) -> void:
 		_card_body(card, Game.weapon, "")
 		card.add_child(_text("Сменить: коснитесь другого оружия в сумке и «Надеть» или перетащите его сюда.", UiScale.FONT_BODY, MUTED))
 		return
+	if slot_id == "offhand" and Game.shield != "":
+		_card_head(card, Game.shield, "Надето · слот «%s»" % slot_name)
+		_card_body(card, Game.shield, "")
+		card.add_child(_action_grid([["Снять щит", "act_unshield", _on_unshield]]))
+		return
 	_card_head(card, "", "")
 	card.add_child(_label(slot_name, UiScale.FONT_HEAD, GOLD))
 	if slot_id == "weapon":
-		card.add_child(_text("Оружие героя задано классом.", UiScale.FONT_TEXT, MUTED))
+		card.add_child(_text("Оружия в руках нет: коснитесь оружия в сумке и «Надеть».", UiScale.FONT_TEXT, MUTED))
+	elif slot_id == "offhand":
+		card.add_child(_text("Щит надевается к одноручному оружию (меч, булава, топор, жезл, кинжал), если профессия им владеет.",
+			UiScale.FONT_TEXT, MUTED))
 	else:
 		card.add_child(_text("Скоро: доспехи и украшения появятся вместе с экипировкой.", UiScale.FONT_TEXT, MUTED))
 
@@ -469,7 +478,7 @@ func _weapon_stats(card: VBoxContainer, id: String, cmp: String) -> void:
 	var kind := ItemData.weapon_kind_name(ItemData.weapon_kind(id))
 	card.add_child(_text("Вид: %s" % kind, UiScale.FONT_BODY, MUTED))
 	if not ItemData.weapon_fits(id, Game.class_id):
-		card.add_child(_text("Не подходит вашему классу", UiScale.FONT_BODY, BAD))
+		card.add_child(_text("Не подходит вашей профессии", UiScale.FONT_BODY, BAD))
 	var g := GridContainer.new()
 	g.columns = 2
 	g.add_theme_constant_override("h_separation", int(UiScale.px(12)))
@@ -535,7 +544,7 @@ func _on_cell(kind: String, index: int) -> void:
 		moving = false
 		if kind == "bag":
 			_move_to(index)
-		elif kind == "equip" and index == 0:
+		elif kind == "equip" and index <= 1:
 			_equip_cell(sel_index)
 		refresh()
 		return
@@ -582,7 +591,7 @@ func _on_drop(kind: String, index: int, from: int) -> void:
 		sel_index = from
 		sel_id = String(Game.inventory.cell(from).get("id", ""))
 		_move_to(index)
-	elif kind == "equip" and index == 0:
+	elif kind == "equip" and index <= 1:
 		_equip_cell(from)
 	refresh()
 
@@ -590,8 +599,9 @@ func _on_drop(kind: String, index: int, from: int) -> void:
 func _can_drop(kind: String, index: int, from: int) -> bool:
 	if kind == "bag":
 		return index != from
-	if kind == "equip" and index == 0:
-		return ItemData.is_weapon(String(Game.inventory.cell(from).get("id", "")))
+	if kind == "equip" and index <= 1:
+		var id := String(Game.inventory.cell(from).get("id", ""))
+		return ItemData.is_weapon(id) and ItemData.is_shield(id) == (index == 1)
 	return false
 
 
@@ -602,7 +612,8 @@ func _equip_cell(i: int) -> void:
 	if not ItemData.is_weapon(id):
 		_msg("Это нельзя надеть")
 		return
-	var old: String = Game.weapon
+	var shield := ItemData.is_shield(id)
+	var old: String = Game.shield if shield else Game.weapon
 	var err: String = main.player.equip(id)
 	if err != "":
 		_msg(err)
@@ -613,8 +624,15 @@ func _equip_cell(i: int) -> void:
 		if j >= 0 and j != i and (here == "" or here == id):
 			inv.move(j, i)
 	sel_kind = "equip"
-	sel_index = 0
-	sel_id = "weapon"
+	sel_index = 1 if shield else 0
+	sel_id = "offhand" if shield else "weapon"
+
+
+func _on_unshield() -> void:
+	Game.unequip_shield()
+	main.player.refresh_skills()
+	main.player._build_model()
+	refresh()
 
 
 func _on_equip() -> void:

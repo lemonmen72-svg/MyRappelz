@@ -8,7 +8,7 @@ extends RefCounted
 ## Калибровка: на 1 уровне HP, MP, атака, защита, уклонение и крит равны прежним числам класса
 ## (ClassData.CLASSES: hp, mp, atk, def, eva, crit), дальше растут по статам и уровню.
 ## Оружие (атака, скорость, дальность, крит) и умения древа (HeroSkills.bonuses) накладывает Player поверх.
-## Остальные классы (не доступны игроку) — по-прежнему ClassData.stats_for.
+## Остальные профессии и Бродяга — таблица Наёмника с профилем профессии (PROFILES) и своей калибровкой.
 ## Таблицы и расчёт баланса — tools/rappelz_strider_reference.md.
 
 ## Вес уровня в формулах HP, MP, атак и защит героя. В Rappelz основную прибавку за уровень герою дают
@@ -30,22 +30,39 @@ const TABLES := {
 		[50, [40, 42, 48, 34, 34, 48, 20]],
 	],
 }
-## Главный стат атаки: ближний бой — Сила, арбалет — Меткость (в окне героя помечен звёздочкой).
-const MAIN_STAT := {"melee": "str", "ranged": "dex"}
+## Профили статов остальных профессий и Бродяги: множители к таблице Наёмника по статам
+## [Сила, Выносливость, Ловкость, Интеллект, Мудрость, Меткость, Удача] — главные статы профессии выше
+## (по смыслу профессий вики: Holy Warrior — Сила и Выносливость, Cleric — Мудрость, Dark Magician — Интеллект…).
+## Абсолютные числа 1-го уровня всё равно задаёт калибровка (ClassData hp, mp, atk, def, eva, crit).
+const PROFILES := {
+	"wanderer": [1.0, 1.0, 0.95, 0.95, 0.95, 0.95, 1.0],
+	"swordsman": [1.25, 1.3, 0.8, 0.85, 0.95, 0.85, 1.0],
+	"wizard": [0.8, 0.95, 0.8, 1.2, 1.4, 0.85, 1.0],
+	"beastmaster": [0.85, 1.0, 0.8, 1.15, 1.3, 0.85, 1.05],
+	"neophyte": [0.75, 0.85, 0.9, 1.45, 1.15, 0.9, 1.0],
+	"adept": [0.8, 0.95, 0.9, 1.3, 1.2, 0.9, 1.05],
+	"warrior": [1.35, 1.2, 0.85, 0.75, 0.8, 1.0, 1.0],
+	"shaman": [1.0, 1.05, 0.8, 1.25, 1.2, 0.85, 1.0],
+	"conjurer": [1.15, 1.15, 0.85, 1.0, 1.05, 0.9, 1.05],
+}
+## Главный стат атаки: ближний бой — Сила, стрельба — Меткость, магия — Интеллект (в окне героя помечен звёздочкой).
+const MAIN_STAT := {"melee": "str", "ranged": "dex", "magic": "int"}
 
 
-## Есть ли у класса таблица статов (иначе характеристики — ClassData.stats_for).
+## Есть ли у класса статы (у всех профессий и Бродяги; иначе характеристики — ClassData.stats_for).
 static func has_stats(class_id: String) -> bool:
-	return TABLES.has(class_id)
+	return TABLES.has(class_id) or PROFILES.has(class_id)
 
 
-## 7 статов героя класса class_id на нашем уровне lvl: {"str": int, ...}.
+## 7 статов героя класса class_id на нашем уровне lvl: {"str": int, ...}. Профессии без своей таблицы —
+## таблица Наёмника × профиль PROFILES.
 static func base_stats(class_id: String, lvl: int) -> Dictionary:
 	var pts: Array = TABLES.get(class_id, TABLES["assassin"])
+	var prof: Array = PROFILES.get(class_id, [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]) if not TABLES.has(class_id) else [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 	var w := Stats.wiki_level(maxi(lvl, 1))
 	var res: Dictionary = {}
 	for i in Stats.STATS.size():
-		res[Stats.STATS[i]] = roundi(Stats.interp(pts, i, w))
+		res[Stats.STATS[i]] = roundi(Stats.interp(pts, i, w) * float(prof[i]))
 	return res
 
 
@@ -75,9 +92,13 @@ static func calibration(class_id: String) -> Dictionary:
 ## Характеристики героя класса class_id на уровне lvl без оружия и умений.
 ## Ключи: stats (7 статов), max_hp, max_mp, patk (ближний бой), ratk (дальний), matk, def, mdef,
 ## acc (точность), eva и crit (%, 0..100), aspd (% скорости атаки), hp_regen (HP в секунду, и в бою).
-static func derived(class_id: String, lvl: int) -> Dictionary:
+## extra — прибавки к статам от умений ({"str": 4, …}: пассивные, переключаемые, усиления на время).
+static func derived(class_id: String, lvl: int, extra: Dictionary = {}) -> Dictionary:
 	var lv := maxi(lvl, 1)
 	var s := base_stats(class_id, lv)
+	for sk in extra:
+		if s.has(sk):
+			s[sk] = int(s[sk]) + roundi(float(extra[sk]))
 	var k := calibration(class_id)
 	var lf := formula_level(lv)
 	var kh := float(k["hp"])

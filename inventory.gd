@@ -22,6 +22,12 @@ var equipped := "":
 		if v != equipped:
 			equipped = v
 			_dirty = true
+## Щит во второй руке (id предмета): тоже не лежит в ячейках.
+var equipped_off := "":
+	set(v):
+		if v != equipped_off:
+			equipped_off = v
+			_dirty = true
 
 var _cells: Array = []
 var _dirty := true
@@ -310,7 +316,7 @@ func _sync() -> void:
 	var want: Dictionary = {}
 	for key in items:
 		var id := String(key)
-		var n := count(id) - (1 if id == equipped else 0)
+		var n := count(id) - (1 if id == equipped else 0) - (1 if id == equipped_off else 0)
 		if n > 0:
 			want[id] = n
 	# Лишнее и чужое снимается с последних стопок (ранние стопки сохраняются)

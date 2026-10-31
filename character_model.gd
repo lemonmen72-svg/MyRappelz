@@ -111,8 +111,17 @@ const GRIP_DIR_L := Vector3(-0.76, 0.12, 0.64)
 ## (первый кадр) ложе смотрит вперёд персонажа, а дуги — горизонтально (рассчитано по скелету героя
 ## прямой кинематикой, как в tools/retarget_animations.py). Ось арбалета −Z (вперёд), +Y — вверх.
 const CROSSBOW_ROT := Quaternion(0.566, 0.311, -0.256, 0.719)
-## Виды оружия, которые умеет модель из файла (остальные классы держат меч).
-const ASSET_WEAPONS := ["sword", "dual_swords", "daggers", "crossbow"]
+## Виды оружия, которые умеет модель из файла (остальные держат меч); щит — отдельно (spec "shield").
+const ASSET_WEAPONS := ["sword", "dual_swords", "daggers", "crossbow", "dagger", "axe", "mace", "staff"]
+## Модели героя из файлов: hero_<профессия>_<пол>.glb (пол m / f), у Бродяги — hero_<раса>_<пол>_starter.glb
+## (раса dark_elf / light_elf / human); откат — hero_asset.
+const HERO_ASSET_DIR := "res://assets/characters/"
+## Одежда модели из примитивов (запасной вид) по профессии.
+const OUTFITS := {
+	"wanderer": "ranger", "swordsman": "guardian", "wizard": "cleric", "beastmaster": "ranger",
+	"assassin": "assassin", "neophyte": "warlock", "adept": "warlock", "warrior": "warrior", "shaman": "cleric",
+	"conjurer": "ranger",
+}
 
 ## Контур модели из файла: оболочка по нормалям, один тёмный цвет.
 const ASSET_OUTLINE_SHADER := """shader_type spatial;
@@ -349,16 +358,56 @@ static var _rig_info: Dictionary = {}
 static var _sword: ArrayMesh
 static var _dagger: ArrayMesh
 static var _crossbow: ArrayMesh
+static var _staff: ArrayMesh
+static var _axe: ArrayMesh
+static var _mace: ArrayMesh
+static var _shield: ArrayMesh
 static var _sword_material: StandardMaterial3D
 
 
 # ---------- Параметры внешности ----------
 
-## Внешность персонажа по расе и классу (ClassData). weapon — вид надетого оружия ("" — по классу).
-static func spec_for(race_id: String, class_id: String, weapon: String = "") -> Dictionary:
+## Файл модели героя: у каждой профессии своя одежда, лицо расы и пола одно. Порядок: hero_<профессия>_<пол>.glb →
+## hero_<раса>_<пол>_starter.glb (Бродяга) → любая модель профессии той же расы и пола → героиня MAIN_ASSET.
+static func hero_asset(race_id: String, gender: String, class_id: String = "") -> String:
+	var g := "m" if gender == "m" else "f"
+	var tries: Array = []
+	if ClassData.is_job(class_id):
+		tries.append(HERO_ASSET_DIR + "hero_%s_%s.glb" % [class_id, g])
+	tries.append(HERO_ASSET_DIR + "hero_%s_%s_starter.glb" % [race_id, g])
+	for j in ClassData.jobs_of(race_id):
+		tries.append(HERO_ASSET_DIR + "hero_%s_%s.glb" % [String(j), g])
+	for path in tries:
+		if ResourceLoader.exists(String(path)):
+			return String(path)
+	return MAIN_ASSET
+
+
+## Что держит модель: вид оружия ItemData (sword_1h, mace_2h …) → вид модели (sword, mace, staff …); уже вид
+## модели или "" — как есть. asset — модель из файла (умеет ASSET_WEAPONS), иначе из примитивов.
+static func model_weapon(weapon: String, asset: bool, shield: bool = false) -> String:
+	var mk := ItemData.model_kind(weapon) if ItemData.WEAPON_KINDS.has(weapon) else weapon
+	if asset:
+		return mk if ASSET_WEAPONS.has(mk) else "sword"
+	match mk:
+		"dagger":
+			mk = "sword"
+		"mace":
+			mk = "axe"
+	if shield and mk == "sword":
+		mk = "sword_shield"
+	return mk
+
+
+## Внешность героя по расе, профессии и полу (ClassData). weapon — вид надетого оружия ItemData или модели
+## ("" — по профессии), shield — щит во второй руке.
+static func spec_for(race_id: String, class_id: String, weapon: String = "", gender: String = "f", shield: bool = false) -> Dictionary:
 	var r := ClassData.race(race_id)
 	var c := ClassData.cls(class_id)
 	var main_c: Color = c.get("color", Color(0.6, 0.3, 0.2))
+	var asset := hero_asset(race_id, gender, class_id)
+	var use_file := use_assets and asset != "" and ResourceLoader.exists(asset)
+	var w := weapon if weapon != "" else String(c.get("weapon", "sword"))
 	var s := {
 		"skin": r.get("skin", Color(0.95, 0.8, 0.65)),
 		"hair": r.get("hair", Color(0.4, 0.25, 0.12)),
@@ -366,16 +415,15 @@ static func spec_for(race_id: String, class_id: String, weapon: String = "") -> 
 		"eyes": r.get("eyes", Color(0.3, 0.5, 0.85)),
 		"eye_style": "normal",
 		"ears": bool(r.get("ears", false)),
-		"outfit": String(c.get("outfit", class_id)),
+		"outfit": String(OUTFITS.get(class_id, class_id)),
 		"main": main_c,
 		"accent": c.get("accent", main_c.lightened(0.4)),
-		"weapon": weapon if weapon != "" else String(c.get("weapon", "sword")),
+		"weapon": model_weapon(w, use_file, shield),
+		"shield": shield,
+		"gender": gender,
 	}
-	var asset := String(c.get("model", r.get("model", MAIN_ASSET)))
-	if use_assets and asset != "" and ResourceLoader.exists(asset):
+	if use_file:
 		s["asset"] = asset
-		if not ASSET_WEAPONS.has(String(s["weapon"])):
-			s["weapon"] = "sword"
 		s["ears"] = true
 	return s
 
@@ -1495,6 +1543,8 @@ func play_attack() -> void:
 		match weapon_kind:
 			"crossbow":
 				_asset_act("shoot")
+			"staff":
+				_asset_act("cast")
 			"dual_swords", "daggers":
 				# Парные клинки: удары справа, слева и выпад по очереди
 				_swing = (_swing + 1) % 3
@@ -1763,7 +1813,8 @@ func _setup_asset(path: String) -> bool:
 			_node(head, "Face", _rig_vec(rig, "face", Vector3(0, 0.08, 0.1)))
 		var hand := _attach(skel, String(bones.get("hand_r", "RightHand")), "GripR")
 		var hand_l: BoneAttachment3D = null
-		if weapon_kind == "dual_swords" or weapon_kind == "daggers":
+		var with_shield := bool(spec.get("shield", false)) and weapon_kind != ""
+		if weapon_kind == "dual_swords" or weapon_kind == "daggers" or with_shield:
 			hand_l = _attach(skel, String(bones.get("hand_l", "LeftHand")), "GripL")
 		var grip_r: Dictionary = rig.get("grip_r", {})
 		var grip_l: Dictionary = rig.get("grip_l", {})
@@ -1779,12 +1830,20 @@ func _setup_asset(path: String) -> bool:
 			match weapon_kind:
 				"crossbow":
 					_hold(hand, "Crossbow", _crossbow_mesh(), Transform3D(Basis(cb.normalized()), pos_r))
-				"daggers":
+				"daggers", "dagger":
 					_hold(hand, "DaggerR", _dagger_mesh(), _grip_xf(dir_r, pos_r))
+				"staff":
+					_hold(hand, "Staff", _staff_mesh(), _grip_xf(dir_r, pos_r))
+				"axe":
+					_hold(hand, "Axe", _axe_mesh(), _grip_xf(dir_r, pos_r))
+				"mace":
+					_hold(hand, "Mace", _mace_mesh(), _grip_xf(dir_r, pos_r))
 				_:
 					_hold(hand, "Sword", _sword_mesh(), _grip_xf(dir_r, pos_r))
 		if hand_l != null:
-			if weapon_kind == "daggers":
+			if with_shield:
+				_hold(hand_l, "Shield", _shield_mesh(), _grip_xf(dir_l, pos_l))
+			elif weapon_kind == "daggers":
 				_hold(hand_l, "DaggerL", _dagger_mesh(), _grip_xf(dir_l, pos_l))
 			else:
 				_hold(hand_l, "SwordL", _sword_mesh(), _grip_xf(dir_l, pos_l))
@@ -2067,6 +2126,60 @@ static func _crossbow_mesh() -> ArrayMesh:
 		steel, 0)
 	_crossbow = _buf_mesh(b)
 	return _crossbow
+
+
+## Посох: древко вдоль +Y (рукоять в нуле, нижний конец ниже кулака), навершие с камнем.
+static func _staff_mesh() -> ArrayMesh:
+	if _staff != null:
+		return _staff
+	var b := GeoBuf.new()
+	var wood := Color(0.55, 0.38, 0.22)
+	var brass := Color(0.78, 0.6, 0.3)
+	b.add(_cyl(0.018, 0.022, 1.5, 8), Transform3D(Basis(), Vector3(0, 0.3, 0)), wood, 0)
+	b.add(_cyl(0.035, 0.035, 0.06, 8), Transform3D(Basis(), Vector3(0, 1.04, 0)), brass, 0)
+	b.add(_sphere(0.06, 0.12, 10, 5), Transform3D(Basis(), Vector3(0, 1.13, 0)), Color(0.55, 0.85, 1.0), 0)
+	_staff = _buf_mesh(b)
+	return _staff
+
+
+## Топор: рукоять вдоль +Y, лезвие сбоку у верхнего конца.
+static func _axe_mesh() -> ArrayMesh:
+	if _axe != null:
+		return _axe
+	var b := GeoBuf.new()
+	b.add(_cyl(0.017, 0.02, 0.7, 8), Transform3D(Basis(), Vector3(0, 0.22, 0)), Color(0.45, 0.3, 0.18), 0)
+	b.add(_box(Vector3(0.05, 0.12, 0.05)), Transform3D(Basis(), Vector3(0, 0.52, 0)), Color(0.4, 0.4, 0.46), 0)
+	b.add(_box(Vector3(0.012, 0.2, 0.17)), Transform3D(Basis(), Vector3(0, 0.52, 0.1)), Color(0.82, 0.85, 0.92), 0)
+	_axe = _buf_mesh(b)
+	return _axe
+
+
+## Булава: рукоять вдоль +Y, тяжёлое окованное навершие.
+static func _mace_mesh() -> ArrayMesh:
+	if _mace != null:
+		return _mace
+	var b := GeoBuf.new()
+	b.add(_cyl(0.017, 0.02, 0.6, 8), Transform3D(Basis(), Vector3(0, 0.18, 0)), Color(0.42, 0.3, 0.2), 0)
+	b.add(_sphere(0.07, 0.14, 10, 5), Transform3D(Basis(), Vector3(0, 0.52, 0)), Color(0.62, 0.62, 0.68), 0)
+	for i in 4:
+		var bas := Basis(Vector3.UP, float(i) * PI * 0.5)
+		b.add(_box(Vector3(0.02, 0.1, 0.05)), Transform3D(bas, Vector3(0, 0.52, 0) + bas * Vector3(0, 0, 0.07)),
+			Color(0.75, 0.75, 0.8), 0)
+	_mace = _buf_mesh(b)
+	return _mace
+
+
+## Щит в левой кисти: круглый, лицевой стороной наружу (ось диска поперёк клинка).
+static func _shield_mesh() -> ArrayMesh:
+	if _shield != null:
+		return _shield
+	var b := GeoBuf.new()
+	var bas := Basis(Vector3.RIGHT, PI * 0.5)
+	b.add(_cyl(0.24, 0.24, 0.04, 16), Transform3D(bas, Vector3(0, 0.05, -0.05)), Color(0.55, 0.38, 0.22), 0)
+	b.add(_cyl(0.26, 0.26, 0.02, 16), Transform3D(bas, Vector3(0, 0.05, -0.04)), Color(0.7, 0.72, 0.78), 0)
+	b.add(_sphere(0.06, 0.12, 10, 5), Transform3D(Basis(), Vector3(0, 0.05, -0.08)), Color(0.85, 0.7, 0.35), 0)
+	_shield = _buf_mesh(b)
+	return _shield
 
 
 static func _buf_mesh(b: GeoBuf) -> ArrayMesh:

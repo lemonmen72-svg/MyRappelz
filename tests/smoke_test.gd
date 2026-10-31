@@ -55,12 +55,13 @@ func run_step() -> void:
 			check(potions >= 1 and scrolls >= 1 and game.inventory.count("hp_potion") == potions
 				and game.inventory.count("revive_scroll") == scrolls, "сумка восстановлена (зелий: %d)" % potions)
 			check(game.char_name == "Тест", "персонаж восстановлен")
-			# Герой игрока — всегда Наёмник: сохранённый воин (класс автотеста) переведён при загрузке
-			check(game.race_id == "dark_elf" and game.class_id == "assassin" and game.load_note != "",
-				"воин из сохранения стал Наёмником: %s" % game.load_note)
-			check(game.weapon == "dual_swords_starter", "переведённому герою надеты парные мечи")
+			# Сохранение с профессиями (версия 2): Воин людей (класс автотеста) остаётся Воином, без перевода
+			check(game.race_id == "human" and game.class_id == "warrior" and game.load_note == "",
+				"Воин из сохранения остался Воином: %s / %s" % [game.race_id, game.class_id])
+			check(game.job_changed and game.weapon == ItemData.default_weapon("warrior"),
+				"профессия получена, в руках %s" % game.weapon)
 			player.apply_class()
-			check(player.max_mp > 0 and not player.hero_stats.is_empty(), "у переведённого героя MP и 7 статов")
+			check(player.max_mp > 0 and not player.hero_stats.is_empty(), "у Воина MP и 7 статов")
 			wait = 60 * 21
 			step = 6
 		6:

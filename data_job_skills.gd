@@ -1,0 +1,447 @@
+class_name JobSkills
+extends RefCounted
+## Умения восьми профессий 1-й смены (кроме Наёмника — его древо в HeroSkills.SKILLS): данные по справочнику
+## tools/rappelz_jobs_reference.md (механика — вики Rappelz, названия и тексты свои). Общие умения разных профессий —
+## один id и один значок (assets/icons/skills/<id>.png); 6 умений Наёмника (armor_mastery, evasion_expert, charge_stab,
+## dark_strike, deep_evasion, evasive_resilience) берутся из HeroSkills.SKILLS.
+##
+## SKILLS — данные умения, не зависящие от профессии:
+##   name, kind ("active" | "passive" | "toggle"), desc — короткий текст;
+##   weapon — какое оружие нужно: "" — любое, группа HeroSkills.WEAPON_GROUPS ("sword", "staff", "shield" …)
+##     или массив групп (подходит любая);
+##   c — цвет кружка-заглушки (COLORS), glyph — буква (по умолчанию первая буква названия);
+##   lv — число уровней (по умолчанию 5, у умений с JLv ≥ 35 — 3), jp — цена уровней (по умолчанию:
+##     пассивные 1, 2, 3, 4, 5; остальные 1, 1, 2, 3, 4);
+##   aura — у переключаемых «аур»: "both" (герой и питомец) или "pet" (только питомец; герою бонуса нет);
+##   group — взаимоисключающие переключаемые («одно лезвие / одна подпитка / одно созвучие за раз»);
+##   эффект — поля движка умений (HeroSkills, раздел «Движок эффектов»: bonus у пассивных и переключаемых,
+##     use / fx / mp / cd у активных). Умение без эффекта можно изучить, но действие появится на этапе 2
+##     (HeroSkills.is_ready, в карточке — «в разработке»).
+## TREES — древо профессии: [id, вкладка, JLv 1-го уровня в этой профессии, пререквизит ("" — нет), оружие (необяз.,
+##   переопределяет weapon умения в этой профессии)]. Уровни умения — JLv по шагам 10/20/30/40 (HeroSkills.jlv_levels),
+##   требуемый уровень героя = 10 + JLv × 0.75. Пререквизиты — цепочки внутри ветки (вики не сверялась по каждому
+##   умению: где не ясно — предыдущее умение той же ветки).
+## TABS — вкладки древа профессии: [[id, название], ...].
+
+const COLORS := {
+	"light": Color(1.0, 0.86, 0.45), "shield": Color(0.45, 0.6, 0.88), "steel": Color(0.72, 0.74, 0.82),
+	"heal": Color(0.45, 0.92, 0.55), "fire": Color(0.95, 0.42, 0.2), "storm": Color(0.55, 0.62, 1.0),
+	"earth": Color(0.62, 0.5, 0.3), "water": Color(0.35, 0.65, 0.95), "wind": Color(0.35, 0.75, 0.6),
+	"dark": Color(0.5, 0.3, 0.75), "blood": Color(0.82, 0.15, 0.25), "beast": Color(0.55, 0.75, 0.35),
+	"spirit": Color(0.95, 0.72, 0.3), "mind": Color(0.45, 0.65, 0.95),
+}
+
+## Прибавки владения оружием (как «Школа клинка» Наёмника): атака и скорость атаки по уровням.
+const DRILL_ATK := [0.03, 0.06, 0.09, 0.12, 0.15]
+const DRILL_ASPD := [0.01, 0.02, 0.03, 0.04, 0.05]
+
+const SKILLS := {
+	# ---------- Общие пассивные ----------
+	"magic_training": {"name": "Сила знаний", "kind": "passive", "c": "mind", "desc": "Упорная учёба: магическая атака выше.",
+		"bonus": {"matk_pct": [0.04, 0.08, 0.12, 0.16, 0.20]}},
+	"mind_ward": {"name": "Ясный разум", "kind": "passive", "c": "mind", "desc": "Чистые мысли — крепкая защита от магии.",
+		"bonus": {"mdef_flat": [1, 2, 3, 4, 5]}},
+	"defense_drill": {"name": "Крепкая выучка", "kind": "passive", "c": "steel", "desc": "Привычка держать удар: защита выше.",
+		"bonus": {"def_flat": [1, 1, 2, 2, 3]}},
+	"nature_lore": {"name": "Дыхание земли", "kind": "passive", "c": "earth", "desc": "Сила природы питает чары: магическая атака выше.",
+		"bonus": {"matk_pct": [0.04, 0.08, 0.12, 0.16, 0.20]}},
+	"combat_drill": {"name": "Боевая выучка", "kind": "passive", "weapon": ["sword", "axe"], "c": "steel",
+		"desc": "С мечом или топором атака и скорость атаки выше.", "bonus": {"atk_pct": DRILL_ATK, "aspd": DRILL_ASPD}},
+	"beast_kinship": {"name": "Родство со зверем", "kind": "passive", "c": "beast", "desc": "Характеристики питомца выше."},
+	"pet_mentor": {"name": "Наставник зверя", "kind": "passive", "c": "beast", "desc": "Питомец получает больше опыта."},
+	"pet_vigor": {"name": "Звериная крепость", "kind": "passive", "c": "beast", "desc": "Макс. HP питомца выше."},
+	"pet_spirit": {"name": "Звериный дух", "kind": "passive", "c": "beast", "desc": "Макс. MP питомца выше."},
+	"pet_recovery": {"name": "Живучесть стаи", "kind": "passive", "c": "beast", "desc": "Питомец быстрее восстанавливает HP и MP."},
+	"greataxe_drill": {"name": "Тяжёлая рука", "kind": "passive", "weapon": "axe_2h", "c": "steel",
+		"desc": "С двуручным топором скорость атаки выше.", "bonus": {"aspd": [0.02, 0.04, 0.06, 0.08, 0.10]}},
+	"dual_axes": {"name": "Два топора", "kind": "passive", "weapon": "dual_axes", "c": "steel",
+		"desc": "Парные топоры в руках: обычные удары сильнее и чаще.",
+		"bonus": {"basic_pct": [0.06, 0.12, 0.18, 0.24, 0.30], "aspd": [0.02, 0.04, 0.06, 0.08, 0.10]}},
+	# ---------- Общие активные и переключаемые ----------
+	"challenge": {"name": "Вызов", "kind": "active", "c": "spirit", "desc": "Громкий вызов: зверь бросает свою цель и бьёт героя.",
+		"use": "near", "radius": 10.0, "anim": "buff", "mp": [4, 5, 6, 7, 8], "cd": 12.0,
+		"fx": [{"do": "status", "status": "taunt", "time": [4.0, 5.0, 6.0, 7.0, 8.0]}]},
+	"first_aid": {"name": "Свет в ладонях", "kind": "active", "c": "heal", "desc": "Тёплый свет залечивает раны героя.",
+		"use": "self", "anim": "buff", "mp": [8, 10, 12, 14, 16], "cd": 15.0,
+		"fx": [{"do": "heal", "who": "self", "pct": [0.15, 0.18, 0.21, 0.24, 0.27]}]},
+	"holy_strike": {"name": "Карающий удар", "kind": "active", "c": "light", "desc": "Удар оружием, усиленный светом.",
+		"use": "melee", "anim": "bash", "mp": [5, 7, 9, 11, 13], "cd": 6.0,
+		"fx": [{"do": "damage", "mult": [1.8, 2.1, 2.4, 2.7, 3.0], "flat": [3, 6, 9, 12, 15]}]},
+	"dawn_cross": {"name": "Крест рассвета", "kind": "active", "c": "light", "desc": "Два удара крест-накрест разом."},
+	"blessed_blade": {"name": "Благословенный клинок", "kind": "toggle", "c": "light",
+		"desc": "Пока включено, умения бьют сильнее и жгут светом."},
+	"light_pulse": {"name": "Световой толчок", "kind": "active", "c": "light", "desc": "Быстрое заклинание: сгусток света летит в зверя.",
+		"use": "magic", "proj": true, "range": 10.0, "anim": "cast", "mp": [6, 8, 10, 12, 14], "cd": 3.0,
+		"fx": [{"do": "damage", "power": "matk", "mult": [1.6, 1.9, 2.2, 2.5, 2.8], "flat": [3, 6, 9, 12, 15]}]},
+	"blinding_flash": {"name": "Ослепляющая вспышка", "kind": "active", "c": "light", "desc": "Урон светом, зверь чаще промахивается."},
+	"radiant_edge": {"name": "Сияющее лезвие", "kind": "toggle", "c": "light", "desc": "Пока включено, обычные атаки добавляют урон светом."},
+	"ringing_blow": {"name": "Гулкий удар", "kind": "active", "weapon": "mace", "c": "steel", "desc": "Удар булавой, может оглушить."},
+	"frost_thorn": {"name": "Морозный шип", "kind": "active", "c": "water", "desc": "Урон холодом, зверь бьёт медленнее."},
+	"acid_mist": {"name": "Едкая роса", "kind": "active", "c": "earth", "desc": "Яд на 18 с, защита зверя ниже."},
+	"life_sip": {"name": "Глоток жизни", "kind": "active", "c": "dark", "desc": "Урон тьмой; герой лечится на треть нанесённого урона.",
+		"use": "magic", "proj": true, "range": 10.0, "anim": "cast", "mp": [6, 8, 10, 12, 14], "cd": 8.0,
+		"fx": [{"do": "damage", "power": "matk", "mult": [1.4, 1.65, 1.9, 2.15, 2.4], "flat": [2, 4, 6, 8, 10],
+			"leech": 0.33}]},
+	"fire_spark": {"name": "Огненная искра", "kind": "active", "c": "fire", "desc": "Быстрый огненный снаряд.",
+		"use": "magic", "proj": true, "range": 11.0, "anim": "cast", "mp": [5, 7, 9, 11, 13], "cd": 2.5,
+		"fx": [{"do": "damage", "power": "matk", "mult": [1.5, 1.8, 2.1, 2.4, 2.7], "flat": [3, 5, 7, 9, 11]}]},
+	"flame_orb": {"name": "Сгусток пламени", "kind": "active", "c": "fire", "desc": "Огненный шар и горение 9 с."},
+	"blood_gift": {"name": "Кровный дар", "kind": "active", "c": "blood", "desc": "Лечит питомца ценой части HP героя."},
+	"bad_dream": {"name": "Дурной сон", "kind": "active", "c": "dark", "desc": "Сон 4.4 с (будит удар), магическая защита зверя ниже."},
+	"decay": {"name": "Тлен", "kind": "active", "c": "dark", "desc": "Урон тьмой каждую секунду 13 с.", "lv": 3},
+	"shared_pain": {"name": "Общая боль", "kind": "toggle", "c": "blood", "desc": "Часть урона по герою (17…25%) достаётся питомцу.", "lv": 3},
+	"spin_strike": {"name": "Удар с разворота", "kind": "active", "weapon": ["sword", "axe"], "c": "steel",
+		"desc": "Сильный удар с разворота.",
+		"use": "melee", "anim": "spin", "mp": [5, 7, 9, 11, 13], "cd": 8.0,
+		"fx": [{"do": "damage", "mult": [2.0, 2.3, 2.6, 2.9, 3.2], "flat": [4, 7, 10, 13, 16]}]},
+	"focus_moment": {"name": "Миг сосредоточения", "kind": "active", "c": "mind", "desc": "На 25 с шанс крита выше.",
+		"use": "self", "anim": "buff", "mp": [10, 12, 14, 16, 18], "cd": 60.0,
+		"fx": [{"do": "buff", "who": "self", "time": 25.0, "bonus": {"crit": [0.14, 0.155, 0.17, 0.185, 0.20]}}]},
+	"armor_split": {"name": "Раскол брони", "kind": "active", "weapon": "axe", "c": "steel", "desc": "Удар топором, защита зверя ниже 10 с."},
+	"stonebreaker": {"name": "Камнелом", "kind": "active", "weapon": "axe", "c": "earth",
+		"desc": "Удар топором раскалывает землю, оглушение 4 с."},
+	"wind_sickle": {"name": "Серп ветра", "kind": "active", "c": "wind", "desc": "Урон воздухом, зверь медленнее бегает и бьёт."},
+	"scorching_heat": {"name": "Палящий жар", "kind": "active", "c": "fire", "desc": "Огонь жжёт зверя 16 с."},
+
+	# ---------- Мечник ----------
+	"guardian_drill": {"name": "Выучка стража", "kind": "passive", "weapon": ["sword", "mace"], "c": "steel",
+		"desc": "С мечом или булавой атака и скорость атаки выше.", "bonus": {"atk_pct": DRILL_ATK, "aspd": DRILL_ASPD}},
+	"shield_wall": {"name": "Стена щита", "kind": "passive", "weapon": "shield", "c": "shield",
+		"desc": "Со щитом удары зверей чаще приходятся в щит (блок — без урона).",
+		"bonus": {"block": [0.05, 0.07, 0.09, 0.11, 0.13]}},
+	"disarm_blow": {"name": "Выбить оружие", "kind": "active", "weapon": "shield", "c": "shield", "desc": "Удар щитом: атака зверя ниже на 5 с."},
+	"beacon_ray": {"name": "Сигнальный луч", "kind": "active", "c": "light", "desc": "Удар светом издалека: зверь идёт к стражу."},
+	"shield_thunder": {"name": "Гром щита", "kind": "active", "weapon": "shield", "c": "shield",
+		"desc": "Удар щитом и сильная угроза: зверь бьёт стража."},
+	"shield_hammer": {"name": "Щит-молот", "kind": "active", "weapon": "shield", "c": "shield", "desc": "Удар щитом, оглушение 3 с."},
+	"alert_guard": {"name": "Чуткая защита", "kind": "toggle", "weapon": "shield", "c": "shield", "desc": "Пока включено, шанс блока выше."},
+	"grace": {"name": "Благодать", "kind": "toggle", "c": "light", "desc": "Пока включено, макс. HP и защита выше."},
+	"twin_blades_drill": {"name": "Два светлых клинка", "kind": "passive", "weapon": "dual_swords", "c": "light",
+		"desc": "С парными мечами обычные удары сильнее и чаще.",
+		"bonus": {"basic_pct": [0.06, 0.12, 0.18, 0.24, 0.30], "aspd": [0.02, 0.04, 0.06, 0.08, 0.10]}},
+	"binding_strike": {"name": "Сковывающий удар", "kind": "active", "c": "steel", "desc": "Удар: зверь бежит медленнее на 32…40% 3–5 с.",
+		"use": "melee", "mp": [4, 5, 6, 7, 8], "cd": 10.0,
+		"fx": [{"do": "damage", "mult": [1.3, 1.5, 1.7, 1.9, 2.1], "flat": [2, 4, 6, 8, 10]},
+			{"do": "status", "status": "slow", "value": [0.32, 0.34, 0.36, 0.38, 0.40], "time": [3.0, 3.5, 4.0, 4.5, 5.0]}]},
+	"greatsword_drill": {"name": "Двуручная школа", "kind": "passive", "weapon": "sword_2h", "c": "steel",
+		"desc": "С двуручным мечом скорость атаки выше.", "bonus": {"aspd": [0.02, 0.04, 0.06, 0.08, 0.10]}},
+	"shield_rush": {"name": "Натиск щита", "kind": "active", "weapon": "shield", "c": "shield",
+		"desc": "Рывок к зверю: отбросить на 5 м и оглушить 3 с."},
+	"armor_breach": {"name": "Пролом брони", "kind": "active", "c": "light", "desc": "Удар светом, защита зверя ниже 10 с."},
+	"will_breaker": {"name": "Разбитая воля", "kind": "active", "c": "mind",
+		"desc": "Удар: магическая защита зверя ниже, страж получает MP из урона."},
+	"dull_strike": {"name": "Притупление", "kind": "active", "c": "light", "desc": "Удар светом, атака зверя ниже 10 с."},
+	"bulwark": {"name": "Непробиваемый заслон", "kind": "active", "weapon": "shield", "c": "shield", "desc": "6 с: урон по стражу −70…74%."},
+	"thorn_shield": {"name": "Колючий щит", "kind": "active", "weapon": "shield", "c": "shield",
+		"desc": "30 с: часть урона (31…35%) возвращается зверю."},
+	"crushing_toll": {"name": "Сокрушающий звон", "kind": "active", "weapon": "mace", "c": "steel",
+		"desc": "Тяжёлый удар булавой, оглушение 4 с почти наверняка."},
+
+	# ---------- Волшебник ----------
+	"faith_staff": {"name": "Посох веры", "kind": "passive", "weapon": ["staff", "mace"], "c": "light",
+		"desc": "С посохом или булавой атака и скорость атаки выше.", "bonus": {"atk_pct": DRILL_ATK, "aspd": DRILL_ASPD}},
+	"healing_touch": {"name": "Целительное касание", "kind": "active", "c": "heal",
+		"desc": "Лечит того, кому хуже: героя или призванного питомца.",
+		"use": "self", "anim": "cast", "mp": [8, 10, 12, 14, 16], "cd": 6.0,
+		"fx": [{"do": "heal", "who": "ally", "pct": [0.20, 0.23, 0.26, 0.29, 0.32]}]},
+	"gift_vitality": {"name": "Дар крепости", "kind": "toggle", "aura": "both", "c": "heal",
+		"desc": "Герою и питомцу: Выносливость и защита выше."},
+	"gift_wisdom": {"name": "Дар мудрости", "kind": "toggle", "aura": "both", "c": "mind",
+		"desc": "Герою и питомцу: Мудрость и магическая защита выше."},
+	"soul_return": {"name": "Возвращение души", "kind": "active", "c": "light", "desc": "Воскрешает питомца с частью HP и MP."},
+	"gift_intellect": {"name": "Дар ясности", "kind": "toggle", "aura": "both", "c": "mind",
+		"desc": "Герою и питомцу: Интеллект и магическая атака выше."},
+	"gift_strength": {"name": "Дар силы", "kind": "toggle", "aura": "both", "c": "spirit",
+		"desc": "Герою и питомцу: Сила и атака выше (питомцу — на этапе 2).",
+		"mp": [6, 7, 8, 9, 10], "upkeep": [1, 1, 2, 2, 2],
+		"bonus": {"str": [2, 3, 4, 5, 6], "atk_pct": [0.03, 0.04, 0.05, 0.06, 0.07]}},
+	"radiant_veil": {"name": "Сияющий покров", "kind": "toggle", "c": "light", "desc": "Пока включено, урон по герою ниже."},
+	"renewal": {"name": "Живительный свет", "kind": "active", "c": "heal", "desc": "Лечит сразу и понемногу ещё 31 с."},
+	"stone_fang": {"name": "Каменный клык", "kind": "active", "c": "earth", "desc": "Урон землёй, оглушение 4 с."},
+	"heaven_smite": {"name": "Небесная кара", "kind": "active", "c": "light", "desc": "Сильный удар светом с небес."},
+	"mire": {"name": "Топь", "kind": "active", "c": "earth", "desc": "Зона яда: урон, и зверь бежит медленнее 5 с."},
+	"ice_shackles": {"name": "Ледяные путы", "kind": "active", "c": "water", "desc": "Держит зверя на месте 6 с, урон холодом."},
+	"quick_heal": {"name": "Скорое исцеление", "kind": "active", "c": "heal", "desc": "Быстрое сильное лечение, дороже по MP."},
+	"radiant_circle": {"name": "Сияющий круг", "kind": "active", "c": "light", "desc": "Урон светом всем зверям вокруг цели."},
+	"light_dome": {"name": "Купол света", "kind": "active", "c": "light", "desc": "6 с: урон по герою −13…25%."},
+	"light_barrage": {"name": "Шквал света", "kind": "active", "c": "light", "desc": "Шесть ударов светом подряд."},
+
+	# ---------- Зверолов ----------
+	"tamer_staff": {"name": "Жезл укротителя", "kind": "passive", "weapon": ["staff", "mace"], "c": "beast",
+		"desc": "С посохом или булавой атака и скорость атаки выше.", "bonus": {"atk_pct": DRILL_ATK, "aspd": DRILL_ASPD}},
+	"beast_might": {"name": "Звериная мощь", "kind": "toggle", "aura": "pet", "group": "support", "c": "beast",
+		"desc": "Питомцу: Сила и атака выше (одна поддержка за раз)."},
+	"beast_hide": {"name": "Звериная шкура", "kind": "toggle", "aura": "pet", "group": "support", "c": "beast",
+		"desc": "Питомцу: Выносливость и защита выше."},
+	"beast_wit": {"name": "Звериная смекалка", "kind": "toggle", "aura": "pet", "group": "support", "c": "beast",
+		"desc": "Питомцу: Интеллект и магическая атака выше."},
+	"beast_calm": {"name": "Звериное спокойствие", "kind": "toggle", "aura": "pet", "group": "support", "c": "beast",
+		"desc": "Питомцу: Мудрость и магическая защита выше."},
+	"mend_beast": {"name": "Лечение зверя", "kind": "active", "c": "heal", "desc": "Лечит призванного питомца.",
+		"use": "pet", "anim": "cast", "mp": [6, 8, 10, 12, 14], "cd": 5.0,
+		"fx": [{"do": "heal", "who": "pet", "pct": [0.25, 0.29, 0.33, 0.37, 0.41]}]},
+	"ward_charm": {"name": "Оберег", "kind": "toggle", "aura": "both", "c": "mind", "desc": "Герою и питомцу: получаемый урон ниже."},
+	"healing_dew": {"name": "Целебная роса", "kind": "active", "c": "heal", "desc": "Питомцу: лечение сразу и понемногу 12 с."},
+	"radiant_claws": {"name": "Светлые когти", "kind": "toggle", "aura": "pet", "c": "light",
+		"desc": "Обычные атаки питомца добавляют урон светом."},
+	"second_wind": {"name": "Второе дыхание", "kind": "active", "c": "heal", "desc": "Воскрешает питомца с частью HP и MP."},
+	"sky_offering": {"name": "Небесный обмен", "kind": "active", "c": "light",
+		"desc": "Питомец отдаёт силы: герою +41…47% HP и MP, питомец падает (нужно воскрешение)."},
+	"life_thread": {"name": "Нить жизни", "kind": "toggle", "c": "heal",
+		"desc": "Питомец при гибели сразу встаёт с 12…20% HP (затем перезарядка)."},
+
+	# ---------- Неофит ----------
+	"dark_rod": {"name": "Тёмный жезл", "kind": "passive", "weapon": ["staff", "dagger"], "c": "dark",
+		"desc": "С посохом или кинжалом атака выше.", "bonus": {"atk_pct": [0.04, 0.08, 0.12, 0.16, 0.20]}},
+	"zap": {"name": "Разряд", "kind": "active", "c": "storm", "desc": "Мгновенный удар молнией, иногда оглушает.",
+		"use": "magic", "range": 10.0, "anim": "cast", "mp": [6, 8, 10, 12, 14], "cd": 4.0,
+		"fx": [{"do": "damage", "power": "matk", "mult": [1.7, 2.0, 2.3, 2.6, 2.9], "flat": [3, 5, 7, 9, 11]},
+			{"do": "status", "status": "stun", "time": 1.5, "chance": [0.15, 0.17, 0.19, 0.21, 0.23]}]},
+	"shadow_hail": {"name": "Град тьмы", "kind": "active", "c": "dark", "desc": "Пять ударов тьмой подряд."},
+	"thunderclap": {"name": "Громовой удар", "kind": "active", "c": "storm", "desc": "Молния с неба, может оглушить."},
+	"wildfire": {"name": "Пожар", "kind": "active", "c": "fire", "desc": "Огонь и сильное горение 13 с."},
+	"wind_fetters": {"name": "Ветряные оковы", "kind": "active", "c": "wind", "desc": "Скорость атаки зверя −52…56% на 12 с."},
+	"dusk_veil": {"name": "Покров сумрака", "kind": "toggle", "c": "dark", "desc": "Звери меньше злятся на героя (угроза ниже)."},
+	"brittle_hide": {"name": "Хрупкая чешуя", "kind": "active", "c": "dark", "desc": "Защита зверя ниже на 20 с."},
+	"last_breath": {"name": "Последний вздох", "kind": "active", "c": "dark", "desc": "Поглотить тело убитого зверя: HP героя выше."},
+	"burning_ground": {"name": "Пылающая земля", "kind": "active", "c": "fire", "desc": "Зона огня 20 с: жжёт всех зверей в ней."},
+	"storm_circle": {"name": "Грозовой круг", "kind": "active", "c": "storm", "desc": "Зона молний 20 с, звери в ней бьют медленнее."},
+	"impatience": {"name": "Нетерпение", "kind": "passive", "c": "mind", "desc": "Перезарядка умений короче на 2…6%.",
+		"bonus": {"cdr": [0.02, 0.03, 0.04, 0.05, 0.06]}},
+	"shadow_seal": {"name": "Теневая печать", "kind": "toggle", "aura": "both", "c": "dark",
+		"desc": "Обычные атаки героя и питомца добавляют урон тьмой."},
+	"fire_heart": {"name": "Огненное сердце", "kind": "active", "c": "fire", "desc": "35–45 с: огненные заклинания сильнее."},
+	"wind_wings": {"name": "Крылья ветра", "kind": "toggle", "aura": "both", "c": "wind", "desc": "Скорость атаки героя и питомца +1…3%."},
+	"soul_remnant": {"name": "Остаток силы", "kind": "active", "c": "dark", "desc": "Поглотить тело убитого зверя: MP героя выше."},
+	"fire_tornado": {"name": "Огненный смерч", "kind": "active", "c": "fire", "desc": "Огонь по всем зверям вокруг цели и горение."},
+	"thunder_roll": {"name": "Раскат грома", "kind": "active", "c": "storm", "desc": "Молнии по всем зверям вокруг цели, оглушение."},
+
+	# ---------- Адепт ----------
+	"ritual_blade": {"name": "Ритуальный клинок", "kind": "passive", "weapon": ["staff", "dagger"], "c": "blood",
+		"desc": "С посохом или кинжалом атака и скорость атаки выше.", "bonus": {"atk_pct": DRILL_ATK, "aspd": DRILL_ASPD}},
+	"beast_roar": {"name": "Звериный рык", "kind": "toggle", "c": "beast", "desc": "Питомец сильнее притягивает зверей (угроза +19…27%)."},
+	"fire_feed": {"name": "Огненная подпитка", "kind": "toggle", "aura": "pet", "group": "feed", "c": "fire",
+		"desc": "Питомцу: атака и макс. HP выше (одна подпитка за раз)."},
+	"wind_feed": {"name": "Ветряная подпитка", "kind": "toggle", "aura": "pet", "group": "feed", "c": "wind",
+		"desc": "Питомцу: магическая атака и макс. MP выше."},
+	"battle_fervor": {"name": "Боевой задор", "kind": "toggle", "aura": "pet", "c": "spirit", "desc": "Питомцу: скорость атаки +7…9%."},
+	"predator_claws": {"name": "Когти хищника", "kind": "active", "c": "beast", "desc": "20 с: шанс крита питомца +11…15%."},
+	"blood_rain": {"name": "Кровавый ливень", "kind": "active", "c": "blood",
+		"desc": "Питомец отдаёт часть HP — четыре кровавых удара по зверю."},
+	"borrowed_life": {"name": "Жизнь взаймы", "kind": "active", "c": "blood", "desc": "Герой лечится, забирая HP у питомца."},
+	"abyss_howl": {"name": "Вопль бездны", "kind": "active", "c": "dark", "desc": "Урон всем зверям вокруг питомца (доля HP питомца)."},
+	"abyss_blood": {"name": "Кровь бездны", "kind": "active", "c": "blood",
+		"desc": "Питомец жертвует собой: HP героя полное, урон по герою −65…85% 6–10 с."},
+
+	# ---------- Воин ----------
+	"bow_mastery": {"name": "Школа лука", "kind": "passive", "weapon": "bow", "c": "steel",
+		"desc": "С луком атака и скорость атаки выше.", "bonus": {"atk_pct": DRILL_ATK, "aspd": DRILL_ASPD}},
+	"spark_reserve": {"name": "Запас искр", "kind": "passive", "c": "spirit", "desc": "Можно копить до 1…3 искр духа.", "lv": 3},
+	"sticky_arrow": {"name": "Вязкая стрела", "kind": "active", "weapon": "bow", "c": "earth", "desc": "Выстрел: зверь бежит медленнее на 15…23% 10 с."},
+	"kindle_spark": {"name": "Разжечь искру", "kind": "active", "c": "spirit", "desc": "Создаёт одну искру духа."},
+	"power_breath": {"name": "Вдох силы", "kind": "active", "c": "spirit", "desc": "Тратит 1…3 искры: HP и MP героя выше."},
+	"pin_down": {"name": "Пригвоздить", "kind": "active", "weapon": "bow", "c": "steel", "desc": "Выстрел держит зверя на месте 3 с."},
+	"burning_arrow": {"name": "Горящая стрела", "kind": "active", "weapon": "bow", "c": "fire", "desc": "Огненная стрела, горение 10 с."},
+	"wind_slash": {"name": "Рассекающий ветер", "kind": "active", "weapon": ["sword", "axe"], "c": "wind", "desc": "Удар и рана от ветра 16 с."},
+	"spark_vigor": {"name": "Искра крепости", "kind": "active", "c": "spirit", "desc": "Тратит искры: Выносливость +4…12 на время."},
+	"swift_string": {"name": "Лёгкая тетива", "kind": "passive", "weapon": "bow", "c": "steel",
+		"desc": "С луком скорость атаки выше.", "bonus": {"aspd": [0.02, 0.04, 0.06, 0.08, 0.10]}},
+	"spark_shot": {"name": "Ударная искра", "kind": "active", "weapon": "bow", "c": "spirit", "desc": "Тратит искру: отбросить на 2 м и оглушить 3 с."},
+	"axe_storm": {"name": "Буря топоров", "kind": "active", "weapon": "dual_axes", "c": "steel",
+		"desc": "Серия ударов парными топорами, оглушение 5 с."},
+	"frost_arrow": {"name": "Стрела стужи", "kind": "active", "weapon": "bow", "c": "water", "desc": "Тратит искру: зверь замерзает на месте 5 с."},
+	"venom_tip": {"name": "Ядовитый наконечник", "kind": "toggle", "weapon": "bow", "c": "earth", "desc": "Пока включено, выстрелы могут отравить."},
+	"savage_fury": {"name": "Ярость дикаря", "kind": "toggle", "weapon": "axe", "c": "blood", "desc": "Шанс двойного удара топором 11…18%."},
+
+	# ---------- Шаман ----------
+	"shaman_drill": {"name": "Выучка шамана", "kind": "passive", "weapon": ["staff", "axe"], "c": "earth",
+		"desc": "С посохом или топором атака и скорость атаки выше.", "bonus": {"atk_pct": DRILL_ATK, "aspd": DRILL_ASPD}},
+	"fire_edge": {"name": "Огненное лезвие", "kind": "toggle", "group": "edge", "c": "fire",
+		"desc": "Обычные атаки добавляют урон огнём (одно лезвие за раз)."},
+	"storm_edge": {"name": "Грозовое лезвие", "kind": "toggle", "group": "edge", "c": "storm",
+		"desc": "Обычные атаки добавляют урон молнией, шанс оглушить 10%."},
+	"stone_edge": {"name": "Каменное лезвие", "kind": "toggle", "group": "edge", "c": "earth",
+		"desc": "Обычные атаки добавляют урон землёй, шанс отравить."},
+	"water_edge": {"name": "Водное лезвие", "kind": "toggle", "group": "edge", "c": "water",
+		"desc": "Обычные атаки добавляют урон водой, шанс вернуть MP."},
+	"pure_spring": {"name": "Чистый родник", "kind": "active", "c": "water", "desc": "Лечение понемногу 16 с (герою или питомцу)."},
+	"earth_grip": {"name": "Хватка земли", "kind": "active", "c": "earth", "desc": "Держит зверя на месте 7 с, урон землёй."},
+	"wind_step": {"name": "Шаг ветра", "kind": "toggle", "aura": "both", "c": "wind", "desc": "Герою и питомцу: бег быстрее."},
+	"slumber_pool": {"name": "Омут сна", "kind": "active", "c": "water", "desc": "Усыпляет зверя на 9…15 с."},
+	"sacred_fire": {"name": "Священный огонь", "kind": "toggle", "aura": "both", "c": "fire", "desc": "Герою и питомцу: атака выше."},
+	"rock_strength": {"name": "Сила скалы", "kind": "toggle", "aura": "both", "c": "earth", "desc": "Герою и питомцу: защита выше."},
+	"gust": {"name": "Порыв", "kind": "active", "c": "wind", "desc": "15 с: скорость атаки героя или питомца +16…20%."},
+	"ice_orbs": {"name": "Ледяные сферы", "kind": "active", "c": "water", "desc": "Урон водой, может оглушить."},
+	"fire_skin": {"name": "Огненная кожа", "kind": "toggle", "c": "fire", "desc": "Кто бьёт шамана вблизи, получает огненный ответ."},
+	"rockslide": {"name": "Обвал", "kind": "active", "c": "earth", "desc": "Урон землёй всем зверям вокруг цели."},
+	"fire_frenzy": {"name": "Неистовство огня", "kind": "active", "c": "fire", "desc": "15 с: атака +31…35%, защита ниже, огонь жжёт шамана."},
+	"thunder_frenzy": {"name": "Неистовство грома", "kind": "active", "c": "storm", "desc": "18 с: скорость атаки +21…25%, тратит HP и MP."},
+	"earth_frenzy": {"name": "Неистовство земли", "kind": "active", "c": "earth", "desc": "15 с: урон по шаману −50…58%."},
+	"water_frenzy": {"name": "Неистовство воды", "kind": "active", "c": "water", "desc": "18 с: магическая атака выше, защиты ниже."},
+
+	# ---------- Колдун ----------
+	"chord_vitality": {"name": "Созвучие крепости", "kind": "toggle", "aura": "both", "group": "chord", "c": "heal",
+		"desc": "Герою и питомцу: Выносливость выше (одно созвучие за раз; питомцу — на этапе 2).",
+		"mp": [5, 6, 7, 8, 9], "upkeep": [1, 1, 1, 2, 2], "bonus": {"vit": [4, 8, 12, 16, 20]}},
+	"chord_wisdom": {"name": "Созвучие покоя", "kind": "toggle", "aura": "both", "group": "chord", "c": "mind",
+		"desc": "Герою и питомцу: Мудрость выше."},
+	"chord_strength": {"name": "Созвучие силы", "kind": "toggle", "aura": "both", "group": "chord", "c": "spirit",
+		"desc": "Герою и питомцу: Сила выше (одно созвучие за раз; питомцу — на этапе 2).",
+		"mp": [5, 6, 7, 8, 9], "upkeep": [1, 1, 1, 2, 2], "bonus": {"str": [3, 6, 9, 12, 15]}},
+	"chord_mind": {"name": "Созвучие разума", "kind": "toggle", "aura": "both", "group": "chord", "c": "mind",
+		"desc": "Герою и питомцу: Интеллект выше."},
+	"cleanse_beast": {"name": "Очищение зверя", "kind": "active", "c": "heal", "desc": "Шанс снять с питомца ослабление."},
+	"lullaby": {"name": "Колыбельная", "kind": "active", "c": "heal", "desc": "Питомец восстанавливает HP 16 с."},
+	"wild_roar": {"name": "Дикий рёв", "kind": "active", "c": "beast", "desc": "Зверь в страхе убегает 9…10 с."},
+	"pack_wrath": {"name": "Гнев стаи", "kind": "active", "c": "blood", "desc": "18 с: атака героя и питомца +26…30%, урон по ним ниже."},
+	"spirit_wrath": {"name": "Гнев духов", "kind": "active", "c": "spirit",
+		"desc": "15 с: зверей вокруг питомца жжёт сила духов (питомец стоит)."},
+	"soul_merge": {"name": "Слияние душ", "kind": "toggle", "c": "beast",
+		"desc": "Герой сливается с питомцем: Сила и Интеллект выше, HP и MP выше (питомец «внутри»)."},
+	"beast_form": {"name": "Звериный облик", "kind": "toggle", "c": "beast", "desc": "Герой принимает облик питомца и бегает быстрее."},
+}
+
+## Вкладки древа профессии.
+const TABS := {
+	"swordsman": [["common", "Общие"], ["shield", "Щит и булава"], ["light", "Свет"]],
+	"wizard": [["common", "Общие"], ["heal", "Исцеление и дары"], ["magic", "Магия"]],
+	"beastmaster": [["common", "Общие"], ["beast", "Питомец"], ["light", "Свет"]],
+	"neophyte": [["common", "Общие"], ["fire", "Огонь и молния"], ["dark", "Тьма"]],
+	"adept": [["common", "Общие"], ["beast", "Питомец"], ["dark", "Тьма и клинок"]],
+	"warrior": [["common", "Общие"], ["axe", "Топоры"], ["bow", "Лук"]],
+	"shaman": [["common", "Общие"], ["elements", "Стихии"], ["support", "Поддержка"]],
+	"conjurer": [["common", "Общие"], ["beast", "Питомец и созвучия"], ["axe", "Бой"]],
+}
+
+## Древа профессий: [id, вкладка, JLv 1-го уровня, пререквизит, оружие (необяз.)].
+const TREES := {
+	"swordsman": [
+		["armor_mastery", "common", 1, ""], ["guardian_drill", "common", 1, ""], ["challenge", "common", 1, ""],
+		["grace", "common", 20, "armor_mastery"], ["twin_blades_drill", "common", 20, "guardian_drill"],
+		["greatsword_drill", "common", 20, "guardian_drill"], ["binding_strike", "common", 20, "challenge"],
+		["first_aid", "common", 25, "grace"],
+		["shield_wall", "shield", 1, ""], ["disarm_blow", "shield", 5, "shield_wall"], ["shield_thunder", "shield", 10, "disarm_blow"],
+		["shield_hammer", "shield", 15, "shield_thunder"], ["ringing_blow", "shield", 15, ""], ["alert_guard", "shield", 20, "shield_wall"],
+		["shield_rush", "shield", 25, "shield_hammer"], ["bulwark", "shield", 35, "alert_guard"], ["thorn_shield", "shield", 40, "bulwark"],
+		["crushing_toll", "shield", 40, "ringing_blow"],
+		["beacon_ray", "light", 5, ""], ["holy_strike", "light", 5, ""], ["blessed_blade", "light", 10, "holy_strike"],
+		["dawn_cross", "light", 10, "holy_strike"], ["armor_breach", "light", 30, "dawn_cross"], ["will_breaker", "light", 30, "beacon_ray"],
+		["dull_strike", "light", 30, "dawn_cross"],
+	],
+	"wizard": [
+		["armor_mastery", "common", 1, ""], ["faith_staff", "common", 1, ""], ["magic_training", "common", 1, ""],
+		["mind_ward", "common", 1, ""], ["ringing_blow", "common", 15, "faith_staff"], ["radiant_edge", "common", 15, "magic_training"],
+		["radiant_veil", "common", 20, "mind_ward"],
+		["first_aid", "heal", 1, ""], ["healing_touch", "heal", 5, "first_aid"], ["gift_vitality", "heal", 10, "healing_touch"],
+		["gift_wisdom", "heal", 10, "healing_touch"], ["soul_return", "heal", 10, "healing_touch"],
+		["gift_intellect", "heal", 15, "gift_wisdom"], ["gift_strength", "heal", 15, "gift_vitality"], ["renewal", "heal", 20, "healing_touch"],
+		["quick_heal", "heal", 30, "renewal"], ["light_dome", "heal", 40, "quick_heal"],
+		["light_pulse", "magic", 5, ""], ["blinding_flash", "magic", 10, "light_pulse"], ["stone_fang", "magic", 25, "light_pulse"],
+		["frost_thorn", "magic", 25, "light_pulse"], ["heaven_smite", "magic", 25, "blinding_flash"], ["mire", "magic", 30, "stone_fang"],
+		["ice_shackles", "magic", 30, "frost_thorn"], ["radiant_circle", "magic", 30, "heaven_smite"], ["acid_mist", "magic", 35, "mire"],
+		["light_barrage", "magic", 40, "radiant_circle"],
+	],
+	"beastmaster": [
+		["armor_mastery", "common", 1, ""], ["magic_training", "common", 1, ""], ["mind_ward", "common", 1, ""],
+		["tamer_staff", "common", 1, ""], ["blessed_blade", "common", 15, "tamer_staff"], ["first_aid", "common", 15, "mind_ward"],
+		["radiant_edge", "common", 20, "magic_training"],
+		["beast_kinship", "beast", 1, ""], ["pet_mentor", "beast", 5, "beast_kinship"], ["beast_might", "beast", 5, "beast_kinship"],
+		["beast_hide", "beast", 5, "beast_kinship"], ["pet_vigor", "beast", 10, "pet_mentor"], ["beast_wit", "beast", 10, "beast_might"],
+		["beast_calm", "beast", 10, "beast_hide"], ["mend_beast", "beast", 15, "pet_vigor"], ["pet_spirit", "beast", 15, "pet_vigor"],
+		["ward_charm", "beast", 15, "beast_calm"], ["healing_dew", "beast", 20, "mend_beast"], ["pet_recovery", "beast", 25, "pet_spirit"],
+		["radiant_claws", "beast", 25, "beast_might"], ["second_wind", "beast", 30, "healing_dew"], ["sky_offering", "beast", 40, "second_wind"],
+		["life_thread", "beast", 40, "second_wind"], ["shared_pain", "beast", 40, "pet_recovery"],
+		["light_pulse", "light", 5, ""], ["holy_strike", "light", 10, "light_pulse"], ["blinding_flash", "light", 10, "light_pulse"],
+		["dawn_cross", "light", 20, "holy_strike"], ["frost_thorn", "light", 30, "blinding_flash"], ["acid_mist", "light", 40, "frost_thorn"],
+	],
+	"neophyte": [
+		["dark_rod", "common", 1, ""], ["mind_ward", "common", 1, ""], ["magic_training", "common", 1, ""],
+		["evasion_expert", "common", 5, "mind_ward"], ["dusk_veil", "common", 20, "evasion_expert"], ["impatience", "common", 30, "magic_training"],
+		["wind_wings", "common", 30, "dark_rod"], ["evasive_resilience", "common", 35, "evasion_expert"],
+		["deep_evasion", "common", 35, "dusk_veil"],
+		["fire_spark", "fire", 5, ""], ["zap", "fire", 5, ""], ["flame_orb", "fire", 10, "fire_spark"], ["thunderclap", "fire", 10, "zap"],
+		["wildfire", "fire", 15, "flame_orb"], ["wind_fetters", "fire", 15, "zap"], ["burning_ground", "fire", 25, "wildfire"],
+		["storm_circle", "fire", 25, "thunderclap"], ["fire_heart", "fire", 30, "flame_orb"], ["fire_tornado", "fire", 40, "burning_ground"],
+		["thunder_roll", "fire", 40, "storm_circle"],
+		["life_sip", "dark", 5, ""], ["shadow_hail", "dark", 10, "life_sip"], ["blood_gift", "dark", 15, "life_sip"],
+		["bad_dream", "dark", 15, "shadow_hail"], ["brittle_hide", "dark", 20, "bad_dream"], ["last_breath", "dark", 25, "life_sip"],
+		["shadow_seal", "dark", 30, "shadow_hail"], ["soul_remnant", "dark", 35, "last_breath"], ["decay", "dark", 40, "brittle_hide"],
+	],
+	"adept": [
+		["ritual_blade", "common", 1, ""], ["armor_mastery", "common", 1, ""], ["mind_ward", "common", 1, ""],
+		["magic_training", "common", 1, ""], ["evasion_expert", "common", 5, "armor_mastery"],
+		["evasive_resilience", "common", 35, "evasion_expert"], ["deep_evasion", "common", 35, "evasion_expert"],
+		["beast_kinship", "beast", 1, ""], ["beast_roar", "beast", 5, "beast_kinship"], ["pet_mentor", "beast", 5, "beast_kinship"],
+		["fire_feed", "beast", 10, "beast_kinship"], ["wind_feed", "beast", 10, "beast_kinship"], ["pet_vigor", "beast", 10, "pet_mentor"],
+		["blood_gift", "beast", 15, "pet_vigor"], ["pet_spirit", "beast", 15, "pet_vigor"], ["battle_fervor", "beast", 20, "fire_feed"],
+		["predator_claws", "beast", 25, "battle_fervor"], ["blood_rain", "beast", 25, "blood_gift"], ["pet_recovery", "beast", 25, "pet_spirit"],
+		["borrowed_life", "beast", 30, "blood_gift"], ["abyss_howl", "beast", 40, "blood_rain"], ["abyss_blood", "beast", 40, "borrowed_life"],
+		["shared_pain", "beast", 40, "pet_recovery"],
+		["fire_spark", "dark", 5, ""], ["charge_stab", "dark", 10, "", "dagger"], ["life_sip", "dark", 10, "fire_spark"],
+		["dark_strike", "dark", 20, "charge_stab", "dagger"], ["flame_orb", "dark", 20, "fire_spark"], ["bad_dream", "dark", 30, "life_sip"],
+		["decay", "dark", 40, "bad_dream"],
+	],
+	"warrior": [
+		["defense_drill", "common", 1, ""], ["combat_drill", "common", 1, ""], ["challenge", "common", 1, ""],
+		["spark_reserve", "common", 1, ""], ["focus_moment", "common", 5, "combat_drill"], ["kindle_spark", "common", 5, "spark_reserve"],
+		["power_breath", "common", 10, "kindle_spark"], ["spark_vigor", "common", 20, "power_breath"],
+		["spin_strike", "axe", 5, ""], ["armor_split", "axe", 10, "spin_strike"], ["wind_slash", "axe", 15, "spin_strike"],
+		["dual_axes", "axe", 20, "armor_split"], ["greataxe_drill", "axe", 20, "armor_split"], ["stonebreaker", "axe", 30, "greataxe_drill"],
+		["axe_storm", "axe", 35, "dual_axes"], ["savage_fury", "axe", 40, "stonebreaker"],
+		["bow_mastery", "bow", 1, ""], ["sticky_arrow", "bow", 5, "bow_mastery"], ["pin_down", "bow", 10, "sticky_arrow"],
+		["burning_arrow", "bow", 15, "pin_down"], ["swift_string", "bow", 20, "bow_mastery"], ["spark_shot", "bow", 30, "burning_arrow"],
+		["frost_arrow", "bow", 35, "spark_shot"], ["venom_tip", "bow", 40, "swift_string"],
+	],
+	"shaman": [
+		["nature_lore", "common", 1, ""], ["mind_ward", "common", 1, ""], ["defense_drill", "common", 1, ""],
+		["shaman_drill", "common", 1, ""], ["spin_strike", "common", 10, "shaman_drill", ""], ["focus_moment", "common", 15, "nature_lore"],
+		["greataxe_drill", "common", 20, "shaman_drill"], ["stonebreaker", "common", 35, "greataxe_drill"],
+		["fire_edge", "elements", 5, ""], ["storm_edge", "elements", 5, ""], ["stone_edge", "elements", 5, ""],
+		["water_edge", "elements", 5, ""], ["wind_sickle", "elements", 10, "storm_edge"], ["scorching_heat", "elements", 15, "fire_edge"],
+		["earth_grip", "elements", 15, "stone_edge"], ["slumber_pool", "elements", 20, "water_edge"], ["ice_orbs", "elements", 30, "slumber_pool"],
+		["rockslide", "elements", 35, "earth_grip"], ["fire_skin", "elements", 35, "scorching_heat"],
+		["pure_spring", "support", 10, ""], ["wind_step", "support", 20, "pure_spring"], ["sacred_fire", "support", 25, "wind_step"],
+		["rock_strength", "support", 25, "wind_step"], ["gust", "support", 30, "sacred_fire"], ["fire_frenzy", "support", 40, "sacred_fire"],
+		["thunder_frenzy", "support", 40, "gust"], ["earth_frenzy", "support", 40, "rock_strength"], ["water_frenzy", "support", 40, "pure_spring"],
+	],
+	"conjurer": [
+		["combat_drill", "common", 1, ""], ["armor_mastery", "common", 1, ""], ["mind_ward", "common", 1, ""],
+		["nature_lore", "common", 1, ""], ["focus_moment", "common", 30, "nature_lore"], ["dual_axes", "common", 40, "combat_drill"],
+		["beast_kinship", "beast", 1, ""], ["chord_vitality", "beast", 5, "beast_kinship"], ["chord_wisdom", "beast", 5, "beast_kinship"],
+		["pet_mentor", "beast", 5, "beast_kinship"], ["chord_strength", "beast", 10, "chord_vitality"], ["chord_mind", "beast", 10, "chord_wisdom"],
+		["pet_vigor", "beast", 10, "pet_mentor"], ["pet_spirit", "beast", 15, "pet_vigor"], ["cleanse_beast", "beast", 15, "chord_wisdom"],
+		["lullaby", "beast", 15, "pet_vigor"], ["pet_recovery", "beast", 25, "pet_spirit"], ["pack_wrath", "beast", 30, "chord_strength"],
+		["spirit_wrath", "beast", 30, "lullaby"], ["soul_merge", "beast", 40, "pack_wrath"], ["beast_form", "beast", 40, "spirit_wrath"],
+		["shared_pain", "beast", 40, "pet_recovery"],
+		["spin_strike", "axe", 5, ""], ["armor_split", "axe", 10, "spin_strike"], ["wind_sickle", "axe", 15, "spin_strike"],
+		["stonebreaker", "axe", 20, "armor_split"], ["wild_roar", "axe", 20, "spin_strike"], ["scorching_heat", "axe", 25, "wind_sickle"],
+	],
+}
+
+
+static func has_tree(job: String) -> bool:
+	return TREES.has(job)
+
+
+## Запись древа профессии для умения id ([] — у профессии такого нет).
+static func entry(job: String, id: String) -> Array:
+	for e in TREES.get(job, []):
+		var a: Array = e
+		if String(a[0]) == id:
+			return a
+	return []
+
+
+## Первая профессия, в древе которой есть умение id ("" — ни в одной).
+static func first_job_with(id: String) -> String:
+	for job in TREES:
+		if not entry(String(job), id).is_empty():
+			return String(job)
+	return ""
+
+
+static func ids(job: String) -> Array:
+	var res: Array = []
+	for e in TREES.get(job, []):
+		res.append(String((e as Array)[0]))
+	return res

@@ -1,23 +1,25 @@
 class_name HeroSkills
 extends RefCounted
-## Умения героя и их древо. У Наёмника (id класса "assassin") — полное древо по образцу профессии Strider
-## из Rappelz (механика и числа — из вики, названия, описания и значки свои; справка —
-## tools/rappelz_strider_reference.md). У остальных классов в древе их два умения из ClassData (один ярус,
-## изучены сразу, без JP). Умение изучается и повышается за очки умений героя (JP) в окне героя
-## (CharacterWindow, вкладки древа). Применение — Player (кнопки умений skill1…skill4, назначение в древе).
+## Умения героя и их древа по профессиям. Бродяга (ClassData.WANDERER) умений не имеет. У Наёмника (id "assassin") —
+## древо по образцу профессии Strider из Rappelz (SKILLS ниже, справка — tools/rappelz_strider_reference.md), у
+## остальных восьми профессий — данные JobSkills (справка — tools/rappelz_jobs_reference.md); механика и числа — из
+## вики, названия, описания и значки свои. Требуемый уровень героя = 10 + JLv вики × 0.75 (req_level: умения
+## профессии открываются с 11 по 40 ур.; стартовые умения Наёмника — с получения профессии, req 10).
+## Умение изучается и повышается за очки умений героя (JP) в окне героя (CharacterWindow, вкладки древа).
+## Применение — Player (кнопки skill1…skill4): умения Наёмника — Player._cast_hero, умения с полем fx —
+## движок HeroSkillFx (формат — раздел «Движок эффектов» ниже).
 ##
 ## Поля умения:
 ##   kind — "active" (кнопка), "passive" (действует всегда), "toggle" (включается в древе или кнопкой,
 ##     тратит MP при включении и раз в 10 с);
-##   tab — вкладка древа: "common" (общие), "blades" (мечи и кинжалы), "crossbow" (арбалет);
-##   weapon — какое оружие нужно: "" — любое, "blades" — кинжалы или мечи, "crossbow" — арбалет
-##     (активное без него не применить, бонусы пассивных и переключаемых действуют только с ним);
-##   jlv — уровень профессии в вики для каждого уровня умения (наш уровень героя = × 0.3, не меньше 1),
-##     req — наш уровень героя напрямую (свои умения без вики);
-##   jp — стоимость каждого уровня в JP; start — 1-й уровень дан сразу (стартовое умение класса);
+##   tab — вкладка древа (у Наёмника "common" / "blades" / "crossbow", у других профессий — из JobSkills.TREES);
+##   weapon — какое оружие нужно: "" — любое, группа WEAPON_GROUPS ("blades", "crossbow", "shield", "staff" …) или
+##     массив групп (активное без него не применить, бонусы пассивных и переключаемых действуют только с ним);
+##   jlv — уровень профессии в вики для каждого уровня умения (наш уровень = req_level), req — наш уровень напрямую;
+##   jp — стоимость каждого уровня в JP; start — 1-й уровень дан сразу (стартовое умение профессии);
 ##   pre — [умение, уровень]: что нужно изучить раньше (линия в древе);
 ##   числа по уровням умения — массивы (n-й элемент — уровень n).
-## Активные: mp, cd (с; число или массив), target ("melee" — клинками рядом, "ranged" — болтом из арбалета,
+## Активные Наёмника: mp, cd (с; число или массив), target ("melee" — клинками рядом, "ranged" — болтом из арбалета,
 ##   "self" — на себя, "dash" — рывок к цели, "near" — цель рядом в radius м), mult — доля атаки за удар,
 ##   flat — прибавка к урону за удар (база вики × FLAT_SCALE), hits — ударов, crit — всегда крит, heal — лечение
 ##   долей урона, sleep — сон (с, будит удар), fear — страх (с: зверь убегает, не бьёт), knock — отбросить на м,
@@ -36,7 +38,6 @@ const SLOTS := 4
 ## Базовый урон умений вики (сотни единиц) → наш масштаб атаки.
 const FLAT_SCALE := 0.06
 const KIND_NAMES := {"active": "активное", "passive": "пассивное", "toggle": "переключаемое"}
-const WEAPON_NAMES := {"blades": "кинжалы или мечи", "crossbow": "арбалет"}
 ## Вкладки древа Наёмника.
 const TABS := [["common", "Общие"], ["blades", "Мечи и кинжалы"], ["crossbow", "Арбалет"]]
 ## Значки: картинка 128×128 (прозрачные углы) — res://assets/icons/skills/<id>.png; нет файла — кружок с буквой.
@@ -52,7 +53,7 @@ const SKILLS := {
 	"shadow_step": {  # стартовое умение Наёмника (своё, без вики)
 		"name": "Шаг тени", "kind": "active", "tab": "common", "weapon": "", "glyph": "Ш", "color": SHADE,
 		"desc": "Мгновенный рывок сквозь тень к выбранному зверю.",
-		"req": [1, 4, 8], "jp": [0, 2, 3], "start": true,
+		"req": [10, 20, 30], "jp": [0, 2, 3], "start": true,
 		"target": "dash", "mp": [3, 4, 5], "cd": [12.0, 10.0, 8.0], "dash": [12.0, 14.0, 16.0],
 	},
 	"evasion_expert": {  # ← Avoidance Expert
@@ -109,7 +110,7 @@ const SKILLS := {
 	"backstab": {  # стартовое умение Наёмника (своё, без вики)
 		"name": "Удар в спину", "kind": "active", "tab": "blades", "weapon": "blades", "glyph": "У", "color": BLADE,
 		"desc": "Удар клинком в незащищённое место — всегда крит.",
-		"req": [1, 4, 8], "jp": [0, 2, 3], "start": true,
+		"req": [10, 20, 30], "jp": [0, 2, 3], "start": true,
 		"target": "melee", "mp": [3, 4, 5], "cd": 7.0, "mult": [1.3, 1.5, 1.7], "crit": true,
 	},
 	"blade_mastery": {  # ← Assassin Weapon Mastery (10 ур. вики → 5: наш ур. = два ур. вики)
@@ -240,7 +241,8 @@ const SKILLS := {
 	},
 }
 
-## Древо класса (порядок — порядок значков в ярусе). Классов без древа — их умения из ClassData.
+## Древо Наёмника (порядок — порядок значков в ярусе). Древа остальных профессий — JobSkills.TREES,
+## у Бродяги древа нет.
 const CLASS_TREES := {
 	"assassin": [
 		"shadow_step", "evasion_expert", "armor_mastery", "oblivion", "concentration", "quick_pace",
@@ -252,60 +254,180 @@ const CLASS_TREES := {
 	],
 }
 
+## Группы оружия для поля weapon умения: kinds — виды оружия (ItemData.WEAPON_KINDS), shield — нужен щит во второй
+## руке, name — для карточки, need — сообщение, когда оружие не подходит (по умолчанию «Нужно оружие: …»).
+const WEAPON_GROUPS := {
+	"blades": {"kinds": ["daggers", "dual_swords"], "name": "кинжалы или мечи", "need": "Нужны клинки"},
+	"crossbow": {"kinds": ["crossbow"], "name": "арбалет", "need": "Нужен арбалет"},
+	"bow": {"kinds": ["bow"], "name": "лук", "need": "Нужен лук"},
+	"shield": {"kinds": [], "shield": true, "name": "щит", "need": "Нужен щит"},
+	"sword": {"kinds": ["sword_1h", "sword_2h", "dual_swords"], "name": "меч"},
+	"mace": {"kinds": ["mace_1h", "mace_2h"], "name": "булава"},
+	"axe": {"kinds": ["axe_1h", "axe_2h", "dual_axes"], "name": "топор"},
+	"staff": {"kinds": ["staff_1h", "staff_2h"], "name": "посох"},
+	"dagger": {"kinds": ["dagger", "daggers"], "name": "кинжал"},
+	"dual_swords": {"kinds": ["dual_swords"], "name": "парные мечи"},
+	"dual_axes": {"kinds": ["dual_axes"], "name": "парные топоры"},
+	"sword_2h": {"kinds": ["sword_2h"], "name": "двуручный меч"},
+	"axe_2h": {"kinds": ["axe_2h"], "name": "двуручный топор"},
+}
+## Требуемый уровень героя = JOB_REQ_BASE + JLv вики × JOB_REQ_K (JLv 1 → 11, 40 → 40).
+const JOB_REQ_BASE := 10.0
+const JOB_REQ_K := 0.75
+## Уровни умения по JLv вики: n-й уровень — не раньше этих JLv (последний — 40).
+const JLV_STEPS := [0, 10, 20, 30]
+## Пусто у Бродяги (вкладки древа, кнопка умения).
+const WANDERER_NOTE := "Умения появятся после выбора профессии на 10 уровне"
+
 ## Названия бонусов (тексты окна героя).
 const BONUS_NAMES := {
 	"eva": "уклонение", "atk_pct": "атака", "atk_flat": "атака", "hp_pct": "макс. HP", "def_flat": "защита",
 	"crit": "шанс крита", "speed_pct": "скорость бега", "aspd": "скорость атаки", "basic_pct": "урон обычных атак",
 	"double": "шанс двойной атаки", "mp_drain": "MP с выстрела", "stealth": "незаметность",
 	"hp_from_eva": "HP от уклонения", "mp_from_eva": "MP от уклонения",
+	"def_pct": "защита", "matk_pct": "маг. атака", "mdef_flat": "маг. защита", "mp_pct": "макс. MP", "hp_flat": "макс. HP",
+	"regen": "восстановление HP", "guard": "получаемый урон", "block": "шанс блока", "cdr": "перезарядка умений",
+	"str": "Сила", "vit": "Выносливость", "agi": "Ловкость", "int": "Интеллект", "wis": "Мудрость", "dex": "Меткость",
+	"luck": "Удача",
 }
+## Статусы зверя для эффекта "status" движка (тексты).
+const STATUS_NAMES := {
+	"stun": "оглушение", "sleep": "сон (будит удар)", "fear": "страх: зверь убегает", "slow": "бег медленнее",
+	"root": "держит на месте", "blind": "морок: все удары мимо", "miss": "промахи", "vuln": "урон по зверю выше",
+	"weak": "удары зверя слабее", "taunt": "зверь бьёт героя",
+}
+
+## Движок эффектов (данные умения; применяет HeroSkillFx, вызывает Player.use_skill):
+## Пассивные (kind "passive") и переключаемые ("toggle"): bonus — {ключ: массив по уровням}, ключи BONUS_NAMES
+##   (у Player.recalc_stats: атака/защита/HP/MP в долях и числах, уклонение, крит, скорость, блок, перезарядка,
+##   7 статов "str"…"luck" — прибавка к статам до формул); у переключаемых ещё mp (включение) и upkeep
+##   (MP за UPKEEP_PERIOD с); aura — "both" (герою и питомцу) / "pet" (только питомцу, герою бонус не идёт;
+##   питомцу — этап 2: PetManager читает HeroSkills.pet_aura_bonuses); group — одно умение группы за раз.
+## Активные (kind "active"): use — как выбирается цель: "melee" (удар оружием по цели рядом), "ranged" (снаряд
+##   оружия), "magic" (заклинание по цели до range м; proj = true — летит сгусток, эффекты при попадании),
+##   "near" (цель в radius м), "self" (без цели), "pet" (призванный питомец); anim — "attack" | "cast" | "bash" |
+##   "spin" | "buff" | "dash"; mp, cd — числа или массивы по уровням; fx — список эффектов по порядку:
+##   {"do": "damage", "mult", "flat", "hits", "crit": bool, "power": "atk" | "matk", "area": радиус вокруг цели,
+##     "leech": доля урона в HP героя};
+##   {"do": "heal", "who": "self" | "pet" | "ally" (кому хуже), "pct": доля макс. HP, "mult": доля маг. атаки};
+##   {"do": "hot", "who", "pct": доля макс. HP за всё время, "time"} — лечение со временем;
+##   {"do": "status", "status": STATUS_NAMES, "time", "value" (доля для slow/miss/vuln/weak), "chance", "area"};
+##   {"do": "dot", "mult", "flat", "time", "no_regen"} — урон в секунду;
+##   {"do": "knock", "dist"} — отбросить;
+##   {"do": "buff", "who": "self" | "pet" | "both", "time", "bonus": {ключ: массив}} — усиление на время
+##     (значок у полоски HP, Player.timed_bonus; питомцу — этап 2);
+##   {"do": "special", "handler": "<имя>"} — особая механика: метод sp_<имя>(sid, n, target, e) в HeroSkillFx.
+##   Числа эффектов — массивы по уровням умения (или одно число).
+## Наёмник (SKILLS выше) — прежний формат активных (target, mult, flat, hits, crit, heal, sleep, fear, knock, root,
+##   dot, buff), его применяет Player._cast_hero.
+
+## Профессия, для которой по умолчанию берутся вкладка, уровни, пререквизит и оружие общих умений (ставит Game).
+static var job := ""
+static var _merged: Dictionary = {}
 
 
 # ---------- Данные ----------
 
-## Умение по id: из древа или (у других классов) обёртка умения ClassData. Пустой словарь — нет такого.
-static func get_skill(id: String) -> Dictionary:
+## Данные умения без привязки к профессии (Наёмник или JobSkills); {} — нет такого.
+static func base_skill(id: String) -> Dictionary:
 	if SKILLS.has(id):
 		return SKILLS[id]
-	var cs := ClassData.skill(id)
-	if cs.is_empty():
+	return JobSkills.SKILLS.get(id, {})
+
+
+## Есть ли умение героя с таким id.
+static func is_skill(id: String) -> bool:
+	return not base_skill(id).is_empty()
+
+
+## Умение по id для профессии class_id ("" — текущая, HeroSkills.job): данные умения + запись древа профессии
+## (вкладка, уровни jlv, пререквизит, оружие). Умения Наёмника в его древе — как есть. {} — нет такого.
+static func get_skill(id: String, class_id: String = "") -> Dictionary:
+	var base := base_skill(id)
+	if base.is_empty():
 		return {}
-	var nm := String(cs["name"])
-	var col := Color(0.6, 0.45, 0.85)
-	for cid in ClassData.CLASSES:
-		var c: Dictionary = ClassData.CLASSES[cid]
-		if (c["skills"] as Array).has(id):
-			col = c["accent"]
-	return {
-		"name": nm, "kind": "active", "tab": "common", "weapon": "", "glyph": nm.substr(0, 1), "color": col,
-		"desc": String(cs.get("desc", "")), "req": [1], "jp": [0], "start": true, "class_skill": true,
-		"cd": float(cs.get("cd", 1.0)), "mp": [0],
-	}
+	var cid := class_id if class_id != "" else job
+	var e := JobSkills.entry(cid, id)
+	if e.is_empty():
+		if SKILLS.has(id):
+			return base
+		cid = JobSkills.first_job_with(id)
+		e = JobSkills.entry(cid, id)
+	var key := cid + "/" + id
+	if _merged.has(key):
+		return _merged[key]
+	var sk: Dictionary = base.duplicate()
+	if not e.is_empty():
+		var first := int(e[2])
+		var lv := int(base.get("lv", 3 if first >= 35 else 5))
+		if base.has("jlv"):
+			lv = (base["jlv"] as Array).size()
+		sk["tab"] = String(e[1])
+		sk["jlv"] = jlv_levels(first, lv)
+		sk.erase("req")
+		sk.erase("start")
+		if String(e[3]) != "":
+			sk["pre"] = [String(e[3]), 1]
+		else:
+			sk.erase("pre")
+		if e.size() > 4:
+			sk["weapon"] = e[4]
+		if not sk.has("jp") or (sk["jp"] as Array).size() != lv:
+			var src: Array = [1, 2, 3, 4, 5] if String(sk.get("kind", "")) == "passive" else [1, 1, 2, 3, 4]
+			if lv <= 3:
+				src = [1, 2, 3]
+			sk["jp"] = src.slice(0, lv)
+	if not sk.has("glyph"):
+		sk["glyph"] = String(sk.get("name", "?")).substr(0, 1)
+	if not sk.has("color"):
+		sk["color"] = JobSkills.COLORS.get(String(sk.get("c", "")), Color(0.6, 0.6, 0.7))
+	if not sk.has("weapon"):
+		sk["weapon"] = ""
+	if not sk.has("tab"):
+		sk["tab"] = "common"
+	_merged[key] = sk
+	return sk
+
+
+## JLv вики по уровням умения: 1-й — first, дальше не раньше 10, 20, 30, последний — 40.
+static func jlv_levels(first: int, lv: int) -> Array:
+	var res: Array = []
+	for k in lv:
+		if k == lv - 1 and lv > 1:
+			res.append(maxi(first, 40))
+		else:
+			res.append(maxi(first, int(JLV_STEPS[mini(k, JLV_STEPS.size() - 1)])))
+	return res
+
+
+## Наш уровень героя для JLv вики: 10 + JLv × 0.75 (JLv 1 → 11, 5 → 14, 10 → 18, 20 → 25, 30 → 33, 40 → 40).
+static func req_level(jlv: int) -> int:
+	return roundi(JOB_REQ_BASE + float(jlv) * JOB_REQ_K)
 
 
 static func has_tree(class_id: String) -> bool:
-	return CLASS_TREES.has(class_id)
+	return not list_for(class_id).is_empty()
 
 
-## id умений класса (у Наёмника — всё древо, у других — два умения класса).
+## id умений профессии (у Бродяги — пусто).
 static func list_for(class_id: String) -> Array:
 	if CLASS_TREES.has(class_id):
 		return CLASS_TREES[class_id]
-	return ClassData.cls(class_id)["skills"]
+	return JobSkills.ids(class_id)
 
 
-## Вкладки древа класса: [[id, название], ...].
+## Вкладки древа профессии: [[id, название], ...] (у Бродяги — пусто).
 static func tabs_for(class_id: String) -> Array:
 	if CLASS_TREES.has(class_id):
 		return TABS
-	return [["common", "Умения"]]
+	return JobSkills.TABS.get(class_id, [])
 
 
-## id умений класса на вкладке tab.
+## id умений профессии на вкладке tab.
 static func list_tab(class_id: String, tab: String) -> Array:
 	var res: Array = []
 	for id in list_for(class_id):
-		if String(get_skill(String(id)).get("tab", "common")) == tab:
+		if String(get_skill(String(id), class_id).get("tab", "common")) == tab:
 			res.append(String(id))
 	return res
 
@@ -314,26 +436,26 @@ static func has_skill(class_id: String, id: String) -> bool:
 	return list_for(class_id).has(id)
 
 
-static func max_level(id: String) -> int:
-	var sk := get_skill(id)
+static func max_level(id: String, class_id: String = "") -> int:
+	var sk := get_skill(id, class_id)
 	if sk.has("req"):
 		return (sk["req"] as Array).size()
 	return (sk.get("jlv", []) as Array).size()
 
 
 ## Наш уровень героя для уровня n умения (0 — такого уровня нет).
-static func level_needed(id: String, n: int) -> int:
-	var sk := get_skill(id)
-	if n < 1 or n > max_level(id):
+static func level_needed(id: String, n: int, class_id: String = "") -> int:
+	var sk := get_skill(id, class_id)
+	if n < 1 or n > max_level(id, class_id):
 		return 0
 	if sk.has("req"):
 		return int(sk["req"][n - 1])
-	return PetSkills.req_level(int(sk["jlv"][n - 1]))
+	return req_level(int(sk["jlv"][n - 1]))
 
 
 ## Стоимость уровня n в JP.
-static func jp_cost(id: String, n: int) -> int:
-	var a: Array = get_skill(id).get("jp", [])
+static func jp_cost(id: String, n: int, class_id: String = "") -> int:
+	var a: Array = get_skill(id, class_id).get("jp", [])
 	if n < 1 or n > a.size():
 		return 0
 	return int(a[n - 1])
@@ -341,7 +463,11 @@ static func jp_cost(id: String, n: int) -> int:
 
 ## Значение поля key на уровне n: массив — n-й элемент (за краем — последний), число — как есть.
 static func field(id: String, key: String, n: int) -> float:
-	var v: Variant = get_skill(id).get(key, 0.0)
+	return value_at(get_skill(id).get(key, 0.0), n)
+
+
+## Число из значения-массива по уровням (или числа) на уровне n.
+static func value_at(v: Variant, n: int) -> float:
 	if v is Array:
 		var a: Array = v
 		if a.is_empty():
@@ -365,21 +491,81 @@ static func cooldown(id: String, n: int) -> float:
 
 
 static func kind(id: String) -> String:
-	return String(get_skill(id).get("kind", ""))
+	return String(base_skill(id).get("kind", ""))
 
 
 static func kind_name(id: String) -> String:
-	return String(KIND_NAMES.get(kind(id), ""))
+	var t := String(KIND_NAMES.get(kind(id), ""))
+	match String(base_skill(id).get("aura", "")):
+		"both":
+			t += " (аура: герой и питомец)"
+		"pet":
+			t += " (аура питомца)"
+	return t
 
 
-## Подходит ли надетое оружие (вид ItemData: "daggers", "dual_swords", "crossbow", "" — нет) умению.
-static func weapon_ok(id: String, weapon_kind: String) -> bool:
-	var need := String(get_skill(id).get("weapon", ""))
-	return need == "" or ItemData.weapon_group(weapon_kind) == need
+## Готово ли действие умения (этап 1: умения Наёмника и образцы движка). Остальные можно изучить, действие —
+## на этапе 2.
+static func is_ready(id: String) -> bool:
+	var sk := base_skill(id)
+	match String(sk.get("kind", "")):
+		"passive", "toggle":
+			return sk.has("bonus")
+		"active":
+			return sk.has("fx") or sk.has("target")
+	return false
 
 
-static func weapon_name(id: String) -> String:
-	return String(WEAPON_NAMES.get(String(get_skill(id).get("weapon", "")), "любое"))
+# ---------- Оружие ----------
+
+## Группы оружия, которые нужны умению (пусто — любое).
+static func weapon_need(id: String, class_id: String = "") -> Array:
+	var w: Variant = get_skill(id, class_id).get("weapon", "")
+	if w is Array:
+		return w
+	var s := String(w)
+	return [] if s == "" else [s]
+
+
+## Подходит ли оружие вида weapon_kind (и щит во второй руке) группе group.
+static func group_fits(group: String, weapon_kind: String, shield: bool = false) -> bool:
+	var g: Dictionary = WEAPON_GROUPS.get(group, {})
+	if bool(g.get("shield", false)):
+		return shield
+	return (g.get("kinds", []) as Array).has(weapon_kind)
+
+
+## Подходит ли надетое оружие (вид ItemData, "" — нет; shield — щит во второй руке) умению.
+static func weapon_ok(id: String, weapon_kind: String, shield: bool = false, class_id: String = "") -> bool:
+	var need := weapon_need(id, class_id)
+	if need.is_empty():
+		return true
+	for g in need:
+		if group_fits(String(g), weapon_kind, shield):
+			return true
+	return false
+
+
+static func weapon_name(id: String, class_id: String = "") -> String:
+	var need := weapon_need(id, class_id)
+	if need.is_empty():
+		return "любое"
+	var names: PackedStringArray = []
+	for g in need:
+		names.append(String((WEAPON_GROUPS.get(String(g), {}) as Dictionary).get("name", String(g))))
+	return " или ".join(names)
+
+
+## Почему умение id нельзя применить с оружием ("" — можно): «Нужен арбалет», «Нужны клинки», «Нужен щит»…
+static func weapon_block(id: String, weapon_kind: String, shield: bool = false) -> String:
+	if weapon_ok(id, weapon_kind, shield):
+		return ""
+	var need := weapon_need(id)
+	if need.size() == 1:
+		var g: Dictionary = WEAPON_GROUPS.get(String(need[0]), {})
+		if g.has("need"):
+			return String(g["need"])
+	return "Нужно оружие: " + weapon_name(id)
 
 
 ## Путь значка умения (может не существовать — тогда древо рисует кружок с буквой).
@@ -401,8 +587,9 @@ static func new_record(class_id: String, lvl: int) -> Dictionary:
 	return rec
 
 
-## Приводит запись к классу: поля на месте, стартовые умения изучены, чужие умения и кнопки убраны,
-## пустые кнопки — стартовыми активными умениями.
+## Приводит запись к профессии: поля на месте, стартовые умения изучены, чужие умения и кнопки убраны,
+## пустые кнопки — стартовыми активными умениями (ClassData skills). Умения, изученные раньше на уровне ниже нового
+## требования (старые сохранения), не отбираются.
 static func ensure_record(rec: Dictionary, class_id: String) -> void:
 	if not rec.has("jp"):
 		rec["jp"] = JP_START
@@ -413,11 +600,11 @@ static func ensure_record(rec: Dictionary, class_id: String) -> void:
 	if src is Dictionary:
 		for k in src:
 			var id := String(k)
-			var n := mini(int(src[k]), max_level(id))
+			var n := mini(int(src[k]), max_level(id, class_id))
 			if n > 0 and has_skill(class_id, id):
 				skills[id] = n
 	for id in list_for(class_id):
-		if bool(get_skill(String(id)).get("start", false)) and int(skills.get(id, 0)) < 1:
+		if bool(get_skill(String(id), class_id).get("start", false)) and int(skills.get(id, 0)) < 1:
 			skills[String(id)] = 1
 	rec["skills"] = skills
 	var toggles: Dictionary = {}
@@ -441,15 +628,30 @@ static func ensure_record(rec: Dictionary, class_id: String) -> void:
 			any = true
 		slots.append(id)
 	if not any:
-		# Пустые кнопки — стартовые активные умения в порядке класса (ClassData: «Удар в спину», «Шаг тени»)
+		# Пустые кнопки — стартовые активные умения в порядке профессии (Наёмник: «Удар в спину», «Шаг тени»)
 		var i := 0
-		for id in ClassData.cls(class_id)["skills"]:
+		for id in ClassData.cls(class_id).get("skills", []):
 			if i >= SLOTS:
 				break
 			if int(skills.get(String(id), 0)) > 0 and kind(String(id)) == "active":
 				slots[i] = String(id)
 				i += 1
 	rec["slots"] = slots
+
+
+## Сбросить все изученные умения с возвратом потраченных JP (стартовые уровни бесплатны). Возвращает JP.
+static func refund_all(rec: Dictionary, class_id: String) -> int:
+	var jp := 0
+	var src: Variant = rec.get("skills", {})
+	if src is Dictionary:
+		for k in src:
+			for n in range(1, int((src as Dictionary)[k]) + 1):
+				jp += jp_cost(String(k), n, class_id)
+	rec["skills"] = {}
+	rec["toggles"] = {}
+	rec["slots"] = []
+	rec["jp"] = int(rec.get("jp", 0)) + jp
+	return jp
 
 
 static func skill_level(rec: Dictionary, id: String) -> int:
@@ -466,23 +668,25 @@ static func toggle_on(rec: Dictionary, id: String) -> bool:
 	return false
 
 
-## Почему нельзя изучить следующий уровень умения id героем класса class_id уровня lvl ("" — можно).
+## Почему нельзя изучить следующий уровень умения id героем профессии class_id уровня lvl ("" — можно).
 static func learn_block(rec: Dictionary, class_id: String, lvl: int, id: String) -> String:
-	var sk := get_skill(id)
+	if ClassData.is_wanderer(class_id):
+		return WANDERER_NOTE
+	var sk := get_skill(id, class_id)
 	if sk.is_empty() or not has_skill(class_id, id):
-		return "Классу умение недоступно"
+		return "Профессии умение недоступно"
 	var n := skill_level(rec, id) + 1
-	if n > max_level(id):
+	if n > max_level(id, class_id):
 		return "Изучено полностью"
-	var need := level_needed(id, n)
+	var need := level_needed(id, n, class_id)
 	if lvl < need:
 		return "Нужен ур. %d" % need
 	if sk.has("pre"):
 		var pre: Array = sk["pre"]
 		var pl := int(pre[1])
 		if skill_level(rec, String(pre[0])) < pl:
-			return "Нужно «%s» ур. %d" % [String(get_skill(String(pre[0]))["name"]), pl]
-	var cost := jp_cost(id, n)
+			return "Нужно «%s» ур. %d" % [String(get_skill(String(pre[0]), class_id)["name"]), pl]
+	var cost := jp_cost(id, n, class_id)
 	if int(rec.get("jp", 0)) < cost:
 		return "Не хватает JP (нужно %d)" % cost
 	return ""
@@ -495,34 +699,35 @@ static func learn(rec: Dictionary, class_id: String, lvl: int, id: String) -> bo
 	var n := skill_level(rec, id) + 1
 	var skills: Dictionary = rec["skills"]
 	skills[id] = n
-	rec["jp"] = int(rec["jp"]) - jp_cost(id, n)
+	rec["jp"] = int(rec["jp"]) - jp_cost(id, n, class_id)
 	return true
 
 
-## Выключить переключаемые умения, которым не подходит оружие weapon_kind. Возвращает их id.
-static func drop_unfit_toggles(rec: Dictionary, weapon_kind: String) -> Array:
+## Изучить всё, что можно (по кругу, пока изучается; для админ-панели). Возвращает число изученных уровней.
+static func learn_all(rec: Dictionary, class_id: String, lvl: int) -> int:
+	var count := 0
+	var again := true
+	while again:
+		again = false
+		for id in list_for(class_id):
+			if learn(rec, class_id, lvl, String(id)):
+				count += 1
+				again = true
+	return count
+
+
+## Выключить переключаемые умения, которым не подходит оружие weapon_kind (и щит). Возвращает их id.
+static func drop_unfit_toggles(rec: Dictionary, weapon_kind: String, shield: bool = false) -> Array:
 	var off: Array = []
 	var tg: Variant = rec.get("toggles", {})
 	if not (tg is Dictionary):
 		return off
 	var d: Dictionary = tg
 	for k in d.keys():
-		if not weapon_ok(String(k), weapon_kind):
+		if not weapon_ok(String(k), weapon_kind, shield):
 			d.erase(k)
 			off.append(String(k))
 	return off
-
-
-## Почему умение id нельзя применить с оружием weapon_kind ("" — можно): «Нужен арбалет» / «Нужны клинки».
-static func weapon_block(id: String, weapon_kind: String) -> String:
-	if weapon_ok(id, weapon_kind):
-		return ""
-	match String(get_skill(id).get("weapon", "")):
-		"crossbow":
-			return "Нужен арбалет"
-		"blades":
-			return "Нужны клинки"
-	return "Не подходит оружие"
 
 
 ## Начислить JP долями (amount может быть дробным). Возвращает, сколько целых JP прибавилось.
@@ -534,34 +739,46 @@ static func add_jp(rec: Dictionary, amount: float) -> int:
 	return whole
 
 
-## Сумма бонусов пассивных и включённых переключаемых умений при оружии weapon_kind:
-## {"eva", "atk_pct", "atk_flat", "hp_pct", "def_flat", "crit", "speed_pct", "aspd", "basic_pct", "double",
-##  "mp_drain", "stealth", "hp_from_eva", "mp_from_eva"} (только то, что есть).
-static func bonuses(rec: Dictionary, class_id: String, weapon_kind: String) -> Dictionary:
+## Сумма бонусов героя от пассивных и включённых переключаемых умений при оружии weapon_kind (и щите):
+## {ключ BONUS_NAMES: число} (только то, что есть). Ауры только для питомца (aura "pet") герою не идут.
+static func bonuses(rec: Dictionary, class_id: String, weapon_kind: String, shield: bool = false) -> Dictionary:
+	return _sum_bonuses(rec, class_id, weapon_kind, shield, false)
+
+
+## Бонусы питомцу от аур героя (aura "both" и "pet") — для этапа 2 (PetManager / Pet).
+static func pet_aura_bonuses(rec: Dictionary, class_id: String, weapon_kind: String, shield: bool = false) -> Dictionary:
+	return _sum_bonuses(rec, class_id, weapon_kind, shield, true)
+
+
+static func _sum_bonuses(rec: Dictionary, class_id: String, weapon_kind: String, shield: bool, for_pet: bool) -> Dictionary:
 	var res: Dictionary = {}
 	for id in list_for(class_id):
 		var sid := String(id)
-		var sk := get_skill(sid)
+		var sk := get_skill(sid, class_id)
 		if not sk.has("bonus"):
 			continue
+		var aura := String(sk.get("aura", ""))
+		if for_pet and aura == "":
+			continue
+		if not for_pet and aura == "pet":
+			continue
 		var n := skill_level(rec, sid)
-		if n <= 0 or not weapon_ok(sid, weapon_kind):
+		if n <= 0 or not weapon_ok(sid, weapon_kind, shield, class_id):
 			continue
 		if String(sk["kind"]) == "toggle" and not toggle_on(rec, sid):
 			continue
 		var b: Dictionary = sk["bonus"]
 		for key in b:
-			var a: Array = b[key]
-			res[key] = float(res.get(key, 0.0)) + float(a[clampi(n - 1, 0, a.size() - 1)])
+			res[key] = float(res.get(key, 0.0)) + value_at(b[key], n)
 	return res
 
 
-## Сколько JP стоит всё древо класса (без стартовых уровней) — для проверки темпа.
+## Сколько JP стоит всё древо профессии (без стартовых уровней) — для проверки темпа.
 static func total_cost(class_id: String) -> int:
 	var t := 0
 	for id in list_for(class_id):
-		for n in range(1, max_level(String(id)) + 1):
-			t += jp_cost(String(id), n)
+		for n in range(1, max_level(String(id), class_id) + 1):
+			t += jp_cost(String(id), n, class_id)
 	return t
 
 
@@ -582,10 +799,16 @@ static func _num(v: float) -> String:
 
 static func bonus_text(key: String, v: float) -> String:
 	match key:
-		"eva", "crit", "atk_pct", "hp_pct", "speed_pct", "aspd", "basic_pct":
+		"eva", "crit", "atk_pct", "hp_pct", "speed_pct", "aspd", "basic_pct", "def_pct", "matk_pct", "mp_pct", "block":
 			return "%s +%s" % [String(BONUS_NAMES[key]), _pct(v)]
-		"atk_flat", "def_flat":
+		"atk_flat", "def_flat", "mdef_flat", "hp_flat", "str", "vit", "agi", "int", "wis", "dex", "luck":
 			return "%s +%s" % [String(BONUS_NAMES[key]), _num(v)]
+		"regen":
+			return "восстановление HP +%s/с" % _num(v)
+		"guard":
+			return "получаемый урон −%s" % _pct(v)
+		"cdr":
+			return "перезарядка умений −%s" % _pct(v)
 		"double":
 			return "шанс второго удара %s" % _pct(v)
 		"mp_drain":
@@ -596,7 +819,7 @@ static func bonus_text(key: String, v: float) -> String:
 			return "макс. HP +%s%% за 1%% уклонения" % _num(v)
 		"mp_from_eva":
 			return "макс. MP +%s%% за 1%% уклонения" % _num(v)
-	return "%s %s" % [key, _num(v)]
+	return "%s %s" % [String(BONUS_NAMES.get(key, key)), _num(v)]
 
 
 ## Урон одного удара: «307% атаки + 8».
@@ -613,66 +836,123 @@ static func effect_text(id: String, n: int) -> String:
 	var sk := get_skill(id)
 	if sk.is_empty():
 		return ""
-	if bool(sk.get("class_skill", false)):
-		return "%s; перезарядка %s с" % [String(sk["desc"]), _num(float(sk["cd"]))]
 	var parts: PackedStringArray = []
 	var k := String(sk.get("kind", ""))
+	if not is_ready(id):
+		return "действие умения появится в следующем обновлении (изучить можно уже сейчас)"
 	if k == "passive" or k == "toggle":
-		var b: Dictionary = sk["bonus"]
+		var b: Dictionary = sk.get("bonus", {})
 		for key in b:
 			parts.append(bonus_text(String(key), field_bonus(id, String(key), n)))
 		if k == "toggle":
 			parts.append("включение %d MP, %d MP / 10 с" % [mp_cost(id, n), upkeep(id, n)])
 		return ", ".join(parts)
-	match String(sk.get("target", "")):
-		"dash":
-			parts.append("рывок к цели до %s м" % _num(field(id, "dash", n)))
-		"self":
-			var bf: Dictionary = sk.get("buff", {})
-			var bp: PackedStringArray = []
-			for key in bf:
-				bp.append(bonus_text(String(key), field_buff(id, String(key), n)))
-			parts.append("%s с: %s" % [_num(float(sk.get("buff_time", 0.0))), ", ".join(bp)])
-		"near":
-			pass
-		_:
-			var hits := int(sk.get("hits", 1))
-			if hits > 1:
-				parts.append("урон %d × (%s)" % [hits, _dmg_text(id, n)])
-			else:
-				parts.append("урон %s" % _dmg_text(id, n))
-	if bool(sk.get("crit", false)):
-		parts.append("всегда крит")
-	if sk.has("heal"):
-		parts.append("лечит на %s урона" % _pct(float(sk["heal"])))
-	if sk.has("sleep"):
-		parts.append("сон %s с (будит удар), до %s м" % [_num(field(id, "sleep", n)), _num(float(sk.get("radius", 6.0)))])
-	if sk.has("fear"):
-		parts.append("страх %s с: зверь убегает и не бьёт" % _num(field(id, "fear", n)))
-	if sk.has("knock"):
-		parts.append("отбрасывает на %s м и держит %s с" % [_num(float(sk["knock"])), _num(float(sk.get("root", 0.0)))])
-	if sk.has("dot"):
-		var dt := "%s атаки" % _pct(field(id, "dot", n))
-		if field(id, "dot_flat", n) > 0.0:
-			dt += " + %s" % _num(field(id, "dot_flat", n))
-		parts.append("ещё %s с по %s в секунду%s" % [_num(float(sk["dot_time"])), dt,
-			", зверь не лечится" if bool(sk.get("no_regen", false)) else ""])
+	if sk.has("fx"):
+		parts.append(fx_text(id, n))
+	else:
+		match String(sk.get("target", "")):
+			"dash":
+				parts.append("рывок к цели до %s м" % _num(field(id, "dash", n)))
+			"self":
+				var bf: Dictionary = sk.get("buff", {})
+				var bp: PackedStringArray = []
+				for key in bf:
+					bp.append(bonus_text(String(key), field_buff(id, String(key), n)))
+				parts.append("%s с: %s" % [_num(float(sk.get("buff_time", 0.0))), ", ".join(bp)])
+			"near":
+				pass
+			_:
+				var hits := int(sk.get("hits", 1))
+				if hits > 1:
+					parts.append("урон %d × (%s)" % [hits, _dmg_text(id, n)])
+				else:
+					parts.append("урон %s" % _dmg_text(id, n))
+		if bool(sk.get("crit", false)):
+			parts.append("всегда крит")
+		if sk.has("heal"):
+			parts.append("лечит на %s урона" % _pct(float(sk["heal"])))
+		if sk.has("sleep"):
+			parts.append("сон %s с (будит удар), до %s м" % [_num(field(id, "sleep", n)), _num(float(sk.get("radius", 6.0)))])
+		if sk.has("fear"):
+			parts.append("страх %s с: зверь убегает и не бьёт" % _num(field(id, "fear", n)))
+		if sk.has("knock"):
+			parts.append("отбрасывает на %s м и держит %s с" % [_num(float(sk["knock"])), _num(float(sk.get("root", 0.0)))])
+		if sk.has("dot"):
+			var dt := "%s атаки" % _pct(field(id, "dot", n))
+			if field(id, "dot_flat", n) > 0.0:
+				dt += " + %s" % _num(field(id, "dot_flat", n))
+			parts.append("ещё %s с по %s в секунду%s" % [_num(float(sk["dot_time"])), dt,
+				", зверь не лечится" if bool(sk.get("no_regen", false)) else ""])
 	if mp_cost(id, n) > 0:
 		parts.append("MP %d" % mp_cost(id, n))
 	parts.append("перезарядка %s с" % _num(cooldown(id, n)))
 	return ", ".join(parts)
 
 
+## Эффекты движка (поле fx) уровня n одной строкой.
+static func fx_text(id: String, n: int) -> String:
+	var sk := get_skill(id)
+	var parts: PackedStringArray = []
+	for e in sk.get("fx", []):
+		var d: Dictionary = e
+		match String(d.get("do", "")):
+			"damage":
+				var power := "маг. атаки" if String(d.get("power", "atk")) == "matk" else "атаки"
+				var t := "%s %s" % [_pct(value_at(d.get("mult", 1.0), n)), power]
+				var fl := value_at(d.get("flat", 0.0), n)
+				if fl > 0.0:
+					t += " + %s" % _num(fl)
+				var hits := int(value_at(d.get("hits", 1), n))
+				t = ("урон %d × (%s)" % [hits, t]) if hits > 1 else "урон " + t
+				if d.has("area"):
+					t += " всем зверям в %s м" % _num(value_at(d["area"], n))
+				if bool(d.get("crit", false)):
+					t += ", всегда крит"
+				if d.has("leech"):
+					t += ", лечит на %s урона" % _pct(value_at(d["leech"], n))
+				parts.append(t)
+			"heal", "hot":
+				var who: String = {"self": "героя", "pet": "питомца", "ally": "героя или питомца (кому хуже)"}.get(
+					String(d.get("who", "self")), "героя")
+				var t := "лечит %s на %s макс. HP" % [who, _pct(value_at(d.get("pct", 0.0), n))]
+				if d.has("mult"):
+					t += " + %s маг. атаки" % _pct(value_at(d["mult"], n))
+				if String(d["do"]) == "hot":
+					t += " за %s с" % _num(value_at(d.get("time", 10.0), n))
+				parts.append(t)
+			"status":
+				var st := String(d.get("status", ""))
+				var t := String(STATUS_NAMES.get(st, st))
+				if d.has("value"):
+					t += " на %s" % _pct(value_at(d["value"], n))
+				t += " %s с" % _num(value_at(d.get("time", 0.0), n))
+				if d.has("chance"):
+					t = "шанс %s: %s" % [_pct(value_at(d["chance"], n)), t]
+				parts.append(t)
+			"dot":
+				parts.append("ещё %s с по %s атаки в секунду" % [_num(value_at(d.get("time", 10.0), n)),
+					_pct(value_at(d.get("mult", 0.0), n))])
+			"knock":
+				parts.append("отбрасывает на %s м" % _num(value_at(d.get("dist", 3.0), n)))
+			"buff":
+				var bp: PackedStringArray = []
+				var bf: Dictionary = d.get("bonus", {})
+				for key in bf:
+					bp.append(bonus_text(String(key), value_at(bf[key], n)))
+				parts.append("%s с: %s" % [_num(value_at(d.get("time", 10.0), n)), ", ".join(bp)])
+			"special":
+				parts.append(String(sk.get("desc", "")))
+	return ", ".join(parts)
+
+
 static func field_bonus(id: String, key: String, n: int) -> float:
 	var b: Dictionary = get_skill(id).get("bonus", {})
-	var a: Array = b.get(key, [])
-	return 0.0 if a.is_empty() else float(a[clampi(n - 1, 0, a.size() - 1)])
+	return value_at(b.get(key, []), n)
 
 
 static func field_buff(id: String, key: String, n: int) -> float:
 	var b: Dictionary = get_skill(id).get("buff", {})
-	var a: Array = b.get(key, [])
-	return 0.0 if a.is_empty() else float(a[clampi(n - 1, 0, a.size() - 1)])
+	return value_at(b.get(key, []), n)
 
 
 ## Требования к уровню n: «ур. 6, «Три тени» ур. 1, 2 JP».
