@@ -5,6 +5,9 @@ extends Node3D
 ## Рост ~1.8 м, ноги на y = 0, лицом к -Z.
 ## Если в параметрах есть "asset" (путь к glTF), вместо примитивов берётся готовая модель из файла
 ## со своим скелетом и анимациями (Meshy/Mixamo), см. раздел «Готовая модель из файла».
+## Жители-NPC (npc_spec): своя внешность из примитивов для каждого (причёски short/long/ponytail/braid,
+## борода beard / long_beard / beard_style "short" | "full", очки glasses, обруч circlet, шрам scar, одежда
+## по образу); если есть assets/characters/npc_<id>.glb (npc_asset) — модель из файла без оружия в руках.
 ##
 ## Использование:
 ##   var m := CharacterModel.new()
@@ -257,7 +260,8 @@ class GeoBuf:
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 
 
-## Вид оружия: "axe" | "bow" | "sword_shield" | "sword" | "staff" | "daggers" | "" (без оружия).
+## Вид оружия: "axe" | "bow" | "sword_shield" | "sword" | "staff" | "daggers" | "dual_swords" | "crossbow" |
+## у жителей-NPC — "cane" (трость), "hammer" (молот), "scroll_staff" (посох со свитком) | "" (без оружия).
 var weapon_kind := ""
 ## Параметры внешности, из которых собрана модель (см. spec_for()).
 var spec: Dictionary = {}
@@ -395,12 +399,126 @@ static func kirk_spec() -> Dictionary:
 	}
 
 
-## Внешность NPC по id (NpcData): торговец, Учитель Кирк; неизвестный — как торговец.
+## Староста Ольвин (деревня людей): пожилой мужчина, седеющие волосы, коротко стриженная борода и усы,
+## тёплый коричневый кафтан с поясом, жилет, трость.
+static func elder_human_spec() -> Dictionary:
+	return {
+		"skin": Color(0.94, 0.78, 0.64), "hair": Color(0.64, 0.62, 0.58), "hair_style": "short",
+		"eyes": Color(0.42, 0.3, 0.18), "eye_style": "smile", "ears": false,
+		"outfit": "elder", "main": Color(0.56, 0.36, 0.2), "accent": Color(0.84, 0.66, 0.34),
+		"weapon": "cane", "girth": 1.1, "beard": true, "beard_style": "short",
+	}
+
+
+## Староста Элиарна (деревня светлых эльфов): эльфийка средних лет, длинные платиновые волосы, бело-голубое
+## платье с золотой каймой, тонкий золотой обруч.
+static func elder_light_spec() -> Dictionary:
+	return {
+		"skin": Color(0.99, 0.9, 0.83), "hair": Color(0.93, 0.92, 0.86), "hair_style": "long",
+		"eyes": Color(0.36, 0.6, 0.9), "eye_style": "normal", "ears": true,
+		"outfit": "lady", "main": Color(0.95, 0.96, 0.99), "second": Color(0.58, 0.74, 0.95),
+		"accent": Color(0.95, 0.78, 0.35), "weapon": "", "girth": 0.96, "circlet": true,
+	}
+
+
+## Староста Вейрис (деревня тёмных эльфов): тёмная эльфийка, серая кожа, белые волосы в высоком хвосте,
+## тёмно-фиолетовые одежды с серебром, высокий воротник.
+static func elder_dark_spec() -> Dictionary:
+	return {
+		"skin": Color(0.6, 0.6, 0.66), "hair": Color(0.96, 0.96, 0.98), "hair_style": "ponytail",
+		"eyes": Color(0.88, 0.36, 0.5), "eye_style": "normal", "ears": true,
+		"outfit": "noble_dark", "main": Color(0.3, 0.17, 0.42), "accent": Color(0.82, 0.84, 0.92),
+		"weapon": "", "girth": 0.98,
+	}
+
+
+## Кладовщик Тобин (город): полноватый, фартук, нарукавники, связка ключей на поясе, очки, гроссбух в руке.
+static func storekeeper_spec() -> Dictionary:
+	return {
+		"skin": Color(0.96, 0.8, 0.68), "hair": Color(0.44, 0.31, 0.2), "hair_style": "short",
+		"eyes": Color(0.36, 0.44, 0.3), "eye_style": "normal", "ears": false,
+		"outfit": "storekeeper", "main": Color(0.38, 0.45, 0.58), "accent": Color(0.86, 0.68, 0.3),
+		"weapon": "", "girth": 1.3, "glasses": true,
+	}
+
+
+## Кузнец Гуннар (город): могучий, рыжие волосы и густая рыжая борода, кожаный фартук, закатанные рукава, молот.
+static func smith_spec() -> Dictionary:
+	return {
+		"skin": Color(0.92, 0.72, 0.58), "hair": Color(0.8, 0.34, 0.15), "hair_style": "short",
+		"eyes": Color(0.3, 0.46, 0.62), "eye_style": "normal", "ears": false,
+		"outfit": "smith", "main": Color(0.78, 0.72, 0.6), "accent": Color(0.45, 0.28, 0.15),
+		"weapon": "hammer", "girth": 1.34, "beard": true, "beard_style": "full",
+	}
+
+
+## Мудрец Альдерик (город): старец, длинная белая борода, тёмно-синяя мантия со звёздами, книга, посох со свитком
+## (в отличие от Кирка: мантия синяя, без сумки с картами и без плаща).
+static func sage_spec() -> Dictionary:
+	return {
+		"skin": Color(0.94, 0.8, 0.7), "hair": Color(0.97, 0.97, 0.96), "hair_style": "short",
+		"eyes": Color(0.36, 0.46, 0.78), "eye_style": "normal", "ears": false,
+		"outfit": "sage", "main": Color(0.14, 0.2, 0.46), "accent": Color(0.96, 0.84, 0.42),
+		"weapon": "scroll_staff", "girth": 1.02, "beard": true, "long_beard": true,
+	}
+
+
+## Охотница Ярра (лагерь): женщина-человек, каштановая коса, кожаная куртка с меховым воротом, лук за спиной, колчан.
+static func hunter_spec() -> Dictionary:
+	return {
+		"skin": Color(0.95, 0.8, 0.67), "hair": Color(0.46, 0.27, 0.14), "hair_style": "braid",
+		"eyes": Color(0.34, 0.56, 0.34), "eye_style": "normal", "ears": false,
+		"outfit": "hunter", "main": Color(0.5, 0.33, 0.2), "accent": Color(0.84, 0.78, 0.66),
+		"weapon": "", "girth": 0.96,
+	}
+
+
+## Корвен, глава наёмников (у пещеры): суровый, шрам через глаз, тёмный кожаный доспех с наплечником,
+## красный рваный плащ, меч в ножнах на поясе.
+static func merc_chief_spec() -> Dictionary:
+	return {
+		"skin": Color(0.9, 0.74, 0.6), "hair": Color(0.2, 0.17, 0.16), "hair_style": "short",
+		"eyes": Color(0.46, 0.4, 0.34), "eye_style": "normal", "ears": false,
+		"outfit": "merc", "main": Color(0.24, 0.21, 0.23), "accent": Color(0.72, 0.16, 0.14),
+		"weapon": "", "girth": 1.16, "scar": true,
+	}
+
+
+## Путь модели NPC из файла (Meshy со скелетом Mixamo и клипами Idle / Wave): есть — грузится вместо примитивов.
+static func npc_asset(npc_id: String) -> String:
+	return "res://assets/characters/npc_%s.glb" % npc_id
+
+
+## Внешность NPC по id (NpcData): торговец, Учитель Кирк, мудрец, кузнец, кладовщик, старосты, охотница, глава
+## наёмников; неизвестный — как торговец. Если есть модель из файла (npc_asset) — она (без оружия в руках).
 static func npc_spec(npc_id: String) -> Dictionary:
+	var s: Dictionary
 	match npc_id:
 		"kirk":
-			return kirk_spec()
-	return merchant_spec()
+			s = kirk_spec()
+		"elder_human":
+			s = elder_human_spec()
+		"elder_light":
+			s = elder_light_spec()
+		"elder_dark":
+			s = elder_dark_spec()
+		"storekeeper":
+			s = storekeeper_spec()
+		"smith":
+			s = smith_spec()
+		"sage":
+			s = sage_spec()
+		"hunter":
+			s = hunter_spec()
+		"merc_chief":
+			s = merc_chief_spec()
+		_:
+			s = merchant_spec()
+	var asset := npc_asset(npc_id)
+	if use_assets and ResourceLoader.exists(asset):
+		s["asset"] = asset
+		s["weapon"] = ""
+	return s
 
 
 ## Собрать модель по параметрам (можно вызывать до добавления в дерево). Возвращает себя.
@@ -550,6 +668,59 @@ func _palette(outfit: String) -> Dictionary:
 			p["belt"] = Color(0.42, 0.28, 0.16)
 			p["pants"] = Color(0.3, 0.26, 0.22)
 			p["boots"] = Color(0.36, 0.24, 0.15)
+		"elder":
+			# Кафтан до колен с поясом
+			p["sleeve"] = main_c.darkened(0.06)
+			p["skirt"] = main_c.darkened(0.14)
+			p["skirt_len"] = "mid"
+			p["belt"] = Color(0.3, 0.2, 0.12)
+			p["pants"] = Color(0.36, 0.31, 0.25)
+			p["boots"] = Color(0.3, 0.2, 0.12)
+		"lady":
+			# Белый лиф, голубые рукава и юбка до пят, золотой пояс
+			var second: Color = spec.get("second", Color(0.6, 0.75, 0.95))
+			p["sleeve"] = second
+			p["skirt"] = second
+			p["skirt_len"] = "long"
+			p["belt"] = acc
+			p["boots"] = Color(0.88, 0.85, 0.78)
+		"noble_dark":
+			p["sleeve"] = main_c.darkened(0.15)
+			p["skirt"] = main_c.darkened(0.3)
+			p["skirt_len"] = "long"
+			p["belt"] = acc
+			p["boots"] = Color(0.14, 0.11, 0.17)
+		"storekeeper":
+			p["sleeve"] = main_c.lightened(0.08)
+			p["skirt"] = main_c.darkened(0.2)
+			p["belt"] = Color(0.36, 0.23, 0.13)
+			p["pants"] = Color(0.34, 0.3, 0.26)
+		"smith":
+			# Рукава закатаны: руки голые, рубаха льняная
+			p["sleeve"] = spec.get("skin", Color(0.92, 0.72, 0.58))
+			p["skirt"] = Color(0.36, 0.3, 0.24)
+			p["belt"] = Color(0.3, 0.2, 0.12)
+			p["pants"] = Color(0.26, 0.23, 0.22)
+			p["boots"] = Color(0.22, 0.15, 0.1)
+		"sage":
+			p["sleeve"] = main_c.darkened(0.1)
+			p["skirt"] = main_c.darkened(0.15)
+			p["skirt_len"] = "long"
+			p["belt"] = acc.darkened(0.2)
+			p["pants"] = Color(0.24, 0.24, 0.3)
+			p["boots"] = Color(0.3, 0.22, 0.16)
+		"hunter":
+			p["sleeve"] = main_c.darkened(0.1)
+			p["skirt"] = main_c.darkened(0.22)
+			p["belt"] = Color(0.3, 0.2, 0.12)
+			p["pants"] = Color(0.34, 0.3, 0.22)
+			p["boots"] = Color(0.3, 0.2, 0.12)
+		"merc":
+			p["sleeve"] = main_c.lightened(0.06)
+			p["skirt"] = main_c.darkened(0.2)
+			p["belt"] = Color(0.36, 0.22, 0.12)
+			p["pants"] = Color(0.2, 0.18, 0.2)
+			p["boots"] = Color(0.14, 0.12, 0.12)
 	return p
 
 
@@ -625,6 +796,38 @@ func _build_head() -> void:
 			_add(_head, _sphere(0.035, 0.07, 8, 4),
 				_dir(0.12 * side, -0.42) * (HEAD_R + 0.008) + Vector3(0.012 * side, 0, 0), hair, OL_THIN,
 				Vector3(0, 0, -0.35 * side), Vector3(1.3, 0.6, 0.5))
+	match String(spec.get("beard_style", "")):
+		"short":
+			# Коротко стриженная борода по линии челюсти (рот открыт) и бакенбарды
+			var bc: Color = spec.get("hair", Color(0.5, 0.45, 0.4))
+			_add(_head, _sphere(0.1, 0.2, 12, 6), Vector3(0, -0.2, -0.085), bc, OL_THIN, Vector3.ZERO,
+				Vector3(1.2, 0.85, 0.9))
+			for sd in [-1.0, 1.0]:
+				var side: float = sd
+				_add(_head, _sphere(0.04, 0.08, 8, 4), _dir(1.2 * side, -0.35) * (HEAD_R - 0.01), bc, OL_THIN,
+					Vector3.ZERO, Vector3(0.6, 1.5, 0.9))
+		"full":
+			# Густая окладистая борода клином и бакенбарды
+			var fc: Color = spec.get("hair", Color(0.7, 0.3, 0.15))
+			_add(_head, _sphere(0.12, 0.24, 12, 6), Vector3(0, -0.23, -0.09), fc, OL, Vector3.ZERO,
+				Vector3(1.25, 1.1, 0.95))
+			_spike(_head, Vector3(0, -0.3, -0.13), Vector3(0, -0.45, -0.15), 0.08, fc)
+			for sd in [-1.0, 1.0]:
+				var side: float = sd
+				_add(_head, _sphere(0.05, 0.1, 8, 4), _dir(1.15 * side, -0.4) * (HEAD_R - 0.005), fc, OL_THIN,
+					Vector3.ZERO, Vector3(0.7, 1.5, 1.0))
+	if bool(spec.get("glasses", false)):
+		# Круглые очки в тонкой оправе перед глазами
+		var rim := Color(0.72, 0.56, 0.28)
+		for sd in [-1.0, 1.0]:
+			var side: float = sd
+			_add(_head, _torus(0.036, 0.044), Vector3(0.072 * side, -0.03, -0.2), rim, 0.0, Vector3(PI * 0.5, 0, 0))
+		_add(_head, _box(Vector3(0.05, 0.008, 0.008)), Vector3(0, -0.022, -0.205), rim, 0.0)
+	if bool(spec.get("circlet", false)):
+		# Тонкий золотой обруч на лбу с голубым камнем
+		var gold: Color = spec.get("accent", GOLD)
+		_add(_head, _torus(0.226, 0.24), Vector3(0, 0.09, 0.02), gold, OL_THIN, Vector3(-0.22, 0, 0))
+		_add(_head, _sphere(0.022, 0.044, 8, 4), Vector3(0, 0.045, -0.212), Color(0.5, 0.8, 1.0), OL_THIN)
 	if bool(spec.get("long_beard", false)):
 		# Длинная борода клином от подбородка и две пряди по бокам
 		var beard: Color = spec.get("hair", Color(0.85, 0.85, 0.83))
@@ -675,6 +878,12 @@ func _face_mesh(closed: bool) -> ArrayMesh:
 	# Маленький рот-улыбка
 	_f_arc(b, 0.0, -0.55, Vector2.ZERO, 0.022, 0.009, 1.12 * PI, 1.88 * PI, 0.006, 1.0, 0.002,
 		Color(0.5, 0.2, 0.22))
+	if bool(spec.get("scar", false)):
+		# Шрам наискось через левую бровь и щёку (поверх глаза)
+		var scar := skin.darkened(0.3).lerp(Color(0.6, 0.25, 0.25), 0.35)
+		for i in 7:
+			var f := float(i) / 6.0
+			_f_ellipse(b, lerpf(-0.5, -0.27, f), lerpf(0.32, -0.42, f), Vector2.ZERO, 0.006, 0.014, 0.007, scar)
 	var m := ArrayMesh.new()
 	b.commit(m)
 	return m
@@ -767,6 +976,22 @@ func _build_hair() -> void:
 			_add(_hair_back, _sphere(0.075, 0.13, 10, 5), Vector3(0, -0.01, 0.04), hair)
 			_spike(_hair_back, Vector3(0, 0.0, 0.05), Vector3(0, -0.72, 0.15), 0.085, hair)
 			_spike(_hair_back, Vector3(0.035, -0.02, 0.04), Vector3(0.08, -0.5, 0.22), 0.055, hair)
+		"braid":
+			# Чёлка на пробор, пряди у висков, толстая коса от затылка до лопаток с завязкой
+			_strand(-0.32, 1.1, -0.6, 0.28, 0.06, hair)
+			_strand(-0.08, 1.15, -0.16, 0.34, 0.06, hair)
+			_strand(0.2, 1.12, 0.3, 0.36, 0.06, hair)
+			_strand(0.45, 1.05, 0.75, 0.22, 0.055, hair)
+			_strand(1.2, 0.5, 1.28, -0.5, 0.055, hair)
+			_strand(-1.2, 0.5, -1.28, -0.5, 0.055, hair)
+			_hair_back = _bone(_head, "HairBack", Vector3(0, -0.04, 0.2))
+			for i in 5:
+				var f := float(i)
+				var r := 0.062 - f * 0.006
+				_add(_hair_back, _sphere(r, r * 2.3, 8, 4), Vector3(0, -0.02 - f * 0.105, 0.03 + f * 0.012), hair,
+					OL_THIN)
+			_add(_hair_back, _cyl(0.035, 0.035, 0.04, 8), Vector3(0, -0.52, 0.08), acc, OL_THIN)
+			_spike(_hair_back, Vector3(0, -0.53, 0.08), Vector3(0, -0.66, 0.09), 0.04, hair)
 		_:
 			# Короткая: чёлка прядями, пряди у висков, острые пряди на затылке, «антенна» на макушке
 			_strand(-0.35, 1.1, -0.62, 0.3, 0.06, hair)
@@ -884,6 +1109,138 @@ func _build_outfit(outfit: String) -> void:
 			for i in cards.size():
 				_add(_torso, _box(Vector3(0.05, 0.08, 0.008)), Vector3(-0.27 + 0.04 * float(i), 0.11, -0.05), cards[i],
 					OL_THIN, Vector3(0, 0, 0.18 * (float(i) - 1.0)))
+		"elder", "lady", "noble_dark", "storekeeper", "smith", "sage", "hunter", "merc":
+			_build_npc_outfit(outfit, main_c, acc)
+
+
+## Одежда жителей-NPC (староста, кладовщик, кузнец, мудрец, охотница, глава наёмников). Перед — −Z, спина — +Z,
+## координаты узла Torso (бёдра — 0, плечи — SHOULDER_Y).
+func _build_npc_outfit(outfit: String, main_c: Color, acc: Color) -> void:
+	var g := _girth
+	var front := -0.132 * g
+	var leather := Color(0.42, 0.28, 0.16)
+	match outfit:
+		"elder":
+			# Тёмный жилет поверх кафтана: полы жилета по бокам, полоса кафтана с пуговицами спереди, ворот
+			var vest := main_c.darkened(0.45)
+			for sd in [-1.0, 1.0]:
+				var side: float = sd
+				_add(_torso, _box(Vector3(0.12 * g, 0.36, 0.03)), Vector3(0.085 * g * side, 0.27, front - 0.012), vest, OL,
+					Vector3(0, 0, -0.06 * side))
+			for i in 4:
+				_add(_torso, _sphere(0.014, 0.028, 6, 3), Vector3(0, 0.39 - 0.085 * float(i), front - 0.03), acc, 0.0)
+			_add(_torso, _torus(0.1, 0.15), Vector3(0, 0.55, 0), main_c.darkened(0.1), OL_THIN, Vector3.ZERO,
+				Vector3(1.0, 1.6, 0.9))
+		"lady":
+			# Золотой ворот, кайма подола, полоса золотой вышивки по юбке и лёгкая накидка на плечах
+			_add(_torso, _torus(0.1, 0.14), Vector3(0, 0.55, 0), acc, OL_THIN, Vector3.ZERO, Vector3(1.0, 1.4, 0.9))
+			_add(_torso, _torus(0.315, 0.35), Vector3(0, -0.69, 0), acc, OL_THIN, Vector3.ZERO, Vector3(1.0, 1.0, 0.85))
+			_add(_torso, _box(Vector3(0.07, 0.62, 0.015)), Vector3(0, -0.36, -0.215), acc, OL_THIN, Vector3(0.36, 0, 0))
+			_add(_torso, _cyl(0.1, 0.25, 0.2, 12), Vector3(0, 0.46, 0), main_c.darkened(0.04), OL, Vector3.ZERO,
+				Vector3(1.0, 1.0, 0.88))
+		"noble_dark":
+			# Высокий стоячий воротник, серебряная застёжка и кайма, длинный плащ
+			_add(_torso, _cyl(0.17, 0.13, 0.26, 12), Vector3(0, 0.62, 0.03), main_c.darkened(0.4), OL, Vector3(0.12, 0, 0),
+				Vector3(1.0, 1.0, 0.9))
+			_add(_torso, _torus(0.16, 0.19), Vector3(0, 0.75, 0.04), acc, OL_THIN, Vector3(0.12, 0, 0))
+			_add(_torso, _box(Vector3(0.07, 0.07, 0.02)), Vector3(0, 0.4, front - 0.02), acc, OL_THIN,
+				Vector3(0, 0, PI * 0.25))
+			_add(_torso, _torus(0.315, 0.35), Vector3(0, -0.69, 0), acc, OL_THIN, Vector3.ZERO, Vector3(1.0, 1.0, 0.85))
+			_cape = _bone(_torso, "Cape", Vector3(0, 0.5, 0.12))
+			_cape_rest = -0.1
+			_add(_cape, _box(Vector3(0.42, 1.08, 0.025)), Vector3(0, -0.54, 0.03), main_c.darkened(0.5))
+		"storekeeper":
+			# Длинный фартук, нарукавники, связка ключей на поясе, гроссбух в левой руке
+			var apron := Color(0.88, 0.84, 0.74)
+			_add(_torso, _box(Vector3(0.3 * g, 0.36, 0.02)), Vector3(0, 0.25, front - 0.012), apron, OL)
+			_add(_torso, _box(Vector3(0.34 * g, 0.5, 0.02)), Vector3(0, -0.17, -0.25 * 0.85 * g - 0.02), apron, OL,
+				Vector3(0.14, 0, 0))
+			for arm in [_arm_l, _arm_r]:
+				_add(arm, _cyl(0.068, 0.072, 0.17), Vector3(0, -0.36, 0), Color(0.3, 0.3, 0.34), OL_THIN)
+			var keys := _node(_torso, "Keys", Vector3(0.19 * g, 0.0, -0.06))
+			_add(keys, _torus(0.03, 0.04), Vector3.ZERO, acc, OL_THIN, Vector3(PI * 0.5, 0, 0.3))
+			for i in 3:
+				_add(keys, _box(Vector3(0.012, 0.07, 0.006)), Vector3(-0.02 + 0.02 * float(i), -0.06, -0.01), acc, 0.0,
+					Vector3(0, 0, 0.3 * (float(i) - 1.0)))
+			_book(Color(0.42, 0.2, 0.14), Color(0.92, 0.88, 0.76))
+		"smith":
+			# Короткие рукава рубахи, кожаный фартук с нагрудником и лямкой, наручи
+			for arm in [_arm_l, _arm_r]:
+				_add(arm, _cyl(0.07, 0.068, 0.14), Vector3(0, -0.04, 0), main_c, OL_THIN)
+				_add(arm, _torus(0.055, 0.075), Vector3(0, -0.12, 0), main_c.darkened(0.1), OL_THIN)
+				_add(arm, _cyl(0.064, 0.068, 0.12), Vector3(0, -0.42, 0), leather.darkened(0.2), OL_THIN)
+			_add(_torso, _box(Vector3(0.3 * g, 0.38, 0.025)), Vector3(0, 0.23, front - 0.014), acc, OL)
+			_add(_torso, _box(Vector3(0.36 * g, 0.62, 0.025)), Vector3(0, -0.24, -0.25 * 0.85 * g - 0.02), acc, OL,
+				Vector3(0.12, 0, 0))
+			_add(_torso, _box(Vector3(0.035, 0.03, 0.3 * g)), Vector3(0, 0.53, 0), acc.darkened(0.1), OL_THIN)
+		"sage":
+			# Широкий ворот, золотые звёзды по мантии, капюшон за спиной, книга в левой руке
+			_add(_torso, _cyl(0.1, 0.26, 0.24, 12), Vector3(0, 0.45, 0), main_c.darkened(0.08), OL, Vector3.ZERO,
+				Vector3(1.0, 1.0, 0.88))
+			_add(_torso, _sphere(0.14, 0.18), Vector3(0, 0.55, 0.16), main_c.darkened(0.2), OL, Vector3.ZERO,
+				Vector3(1.1, 1.0, 0.75))
+			_add(_torso, _torus(0.315, 0.35), Vector3(0, -0.69, 0), acc, OL_THIN, Vector3.ZERO, Vector3(1.0, 1.0, 0.85))
+			var stars := [Vector3(-0.1, 0.24, -0.15), Vector3(0.09, 0.12, -0.15), Vector3(0.0, -0.3, -0.24),
+				Vector3(-0.17, -0.52, -0.25), Vector3(0.16, -0.45, -0.25), Vector3(0.21, -0.2, -0.17),
+				Vector3(-0.2, -0.15, -0.18)]
+			for s in stars:
+				var sp: Vector3 = s
+				_add(_torso, _box(Vector3(0.035, 0.035, 0.01)), sp, acc, 0.0, Vector3(0, 0, PI * 0.25))
+				_add(_torso, _box(Vector3(0.012, 0.06, 0.01)), sp, acc, 0.0)
+			_book(Color(0.2, 0.3, 0.6), Color(0.95, 0.9, 0.75))
+		"hunter":
+			# Меховой ворот, ремень через грудь, лук за спиной наискось, колчан на правом бедре
+			_add(_torso, _sphere(0.2, 0.14), Vector3(0, 0.48, 0.01), acc, OL, Vector3.ZERO, Vector3(1.0, 1.0, 0.85))
+			_add(_torso, _box(Vector3(0.045, 0.6, 0.02)), Vector3(0.02, 0.27, front - 0.012), leather.darkened(0.2),
+				OL_THIN, Vector3(0, 0, 0.62))
+			var bow := _node(_torso, "Bow", Vector3(-0.02, 0.28, 0.2 * g))
+			bow.rotation.z = 0.7
+			var bw := Color(0.44, 0.27, 0.14)
+			_add(bow, _cyl(0.027, 0.027, 0.2, 8), Vector3.ZERO, Color(0.3, 0.2, 0.12), OL_THIN)
+			for sd in [-1.0, 1.0]:
+				var y: float = sd
+				_segment(bow, Vector3(0, 0.1 * y, 0), Vector3(0, 0.34 * y, 0.04), 0.022, 0.018, bw)
+				_segment(bow, Vector3(0, 0.34 * y, 0.04), Vector3(0, 0.52 * y, 0.12), 0.018, 0.012, bw)
+			_segment(bow, Vector3(0, 0.52, 0.12), Vector3(0, -0.52, 0.12), 0.004, 0.004, Color(0.95, 0.95, 0.88), 0.0)
+			var q := _node(_torso, "Quiver", Vector3(0.21 * g, -0.08, 0.08))
+			q.rotation.z = 0.25
+			_add(q, _cyl(0.055, 0.05, 0.42), Vector3.ZERO, Color(0.45, 0.28, 0.15))
+			_add(q, _cyl(0.075, 0.03, 0.1, 8), Vector3(0, 0.25, 0), Color(0.93, 0.9, 0.82), OL_THIN)
+		"merc":
+			# Кожаный нагрудник с пластинами, большой наплечник слева, рваный красный плащ, меч в ножнах слева
+			var plate := Color(0.34, 0.33, 0.36)
+			_add(_torso, _box(Vector3(0.26 * g, 0.3, 0.03)), Vector3(0, 0.27, front - 0.012), main_c.darkened(0.3), OL)
+			for i in 2:
+				_add(_torso, _box(Vector3(0.24 * g, 0.03, 0.035)), Vector3(0, 0.18 + 0.12 * float(i), front - 0.03), plate,
+					OL_THIN)
+			_add(_arm_l, _sphere(0.13, 0.19), Vector3(-0.03, 0.02, 0), plate, OL, Vector3(0, 0, 0.4))
+			_add(_arm_l, _sphere(0.1, 0.13), Vector3(-0.05, -0.07, 0), plate.darkened(0.2), OL_THIN, Vector3(0, 0, 0.4))
+			_add(_torso, _box(Vector3(0.045, 0.6, 0.02)), Vector3(-0.02, 0.27, front - 0.03), leather.darkened(0.3),
+				OL_THIN, Vector3(0, 0, -0.62))
+			_cape = _bone(_torso, "Cape", Vector3(0, 0.5, 0.12))
+			_cape_rest = -0.12
+			_add(_cape, _box(Vector3(0.42, 0.7, 0.025)), Vector3(0, -0.35, 0.03), acc)
+			# Рваный низ: полосы разной длины
+			var tails := [[-0.16, 0.34], [-0.05, 0.22], [0.06, 0.38], [0.16, 0.18]]
+			for t in tails:
+				var e: Array = t
+				var tl := float(e[1])
+				_add(_cape, _box(Vector3(0.1, tl, 0.024)), Vector3(float(e[0]), -0.7 - tl * 0.5, 0.03), acc.darkened(0.08),
+					OL, Vector3(0, 0, 0.05 * float(e[0]) * 10.0))
+			var sh := _node(_torso, "Scabbard", Vector3(-0.2 * g, 0.02, -0.04))
+			sh.rotation = Vector3(-0.35, 0, -0.25)
+			_add(sh, _cyl(0.028, 0.035, 0.72, 8), Vector3(0, -0.36, 0), Color(0.18, 0.14, 0.12), OL_THIN,
+				Vector3.ZERO, Vector3(1.0, 1.0, 0.45))
+			_add(sh, _box(Vector3(0.16, 0.03, 0.04)), Vector3(0, 0.02, 0), Color(0.62, 0.6, 0.55), OL_THIN)
+			_add(sh, _cyl(0.02, 0.02, 0.16, 6), Vector3(0, 0.11, 0), Color(0.3, 0.2, 0.14), OL_THIN)
+			_add(sh, _sphere(0.028, 0.056, 6, 3), Vector3(0, 0.2, 0), Color(0.62, 0.6, 0.55), OL_THIN)
+
+
+## Книга (гроссбух) в левой руке: переплёт и обрез страниц.
+func _book(cover: Color, pages: Color) -> void:
+	var b := _node(_grip_l, "Book", Vector3(0.02, -0.02, -0.05))
+	_add(b, _box(Vector3(0.06, 0.26, 0.2)), Vector3.ZERO, cover, OL_THIN)
+	_add(b, _box(Vector3(0.045, 0.24, 0.19)), Vector3(0.008, 0, -0.008), pages, 0.0)
 
 
 ## Наплечники на обоих плечах (двигаются вместе с рукой).
@@ -908,6 +1265,29 @@ func _build_weapon() -> void:
 			_add(w, _cyl(0.032, 0.032, 0.14, 8), Vector3(0, 0.0, 0), acc.darkened(0.3), OL_THIN)
 			_add(w, _cyl(0.15, 0.15, 0.03, 14), Vector3(0, 0.64, -0.11), steel, OL_THIN, Vector3(0, 0, PI * 0.5))
 			_add(w, _box(Vector3(0.06, 0.15, 0.07)), Vector3(0, 0.64, 0), Color(0.42, 0.42, 0.48), OL_THIN)
+		"cane":
+			# Трость: в покое смотрит вниз (кисть повёрнута), загнутая рукоять в кулаке
+			var cn := _node(_grip_r, "Cane", Vector3.ZERO)
+			_add(cn, _cyl(0.02, 0.016, 0.86, 8), Vector3(0, 0.4, 0), wood.darkened(0.15), OL_THIN)
+			_segment(cn, Vector3(0, -0.02, 0), Vector3(0, -0.06, -0.08), 0.024, 0.022, wood.darkened(0.25))
+			_add(cn, _cyl(0.024, 0.024, 0.03, 8), Vector3(0, 0.83, 0), acc.darkened(0.2), OL_THIN)
+		"hammer":
+			# Кузнечный молот: рукоять и тяжёлый боёк; в покое опущен бойком к земле
+			var hm := _node(_grip_r, "Hammer", Vector3.ZERO)
+			_add(hm, _cyl(0.024, 0.028, 0.62, 8), Vector3(0, 0.22, 0), wood, OL_THIN)
+			_add(hm, _box(Vector3(0.1, 0.12, 0.22)), Vector3(0, 0.55, 0), Color(0.36, 0.36, 0.4), OL_THIN)
+			_add(hm, _box(Vector3(0.11, 0.13, 0.04)), Vector3(0, 0.55, -0.12), Color(0.5, 0.5, 0.56), OL_THIN)
+		"scroll_staff":
+			# Посох со свитком: светлое древко, на навершии свёрнутый свиток с золотыми торцами и лентой
+			var ss := _node(_grip_r, "ScrollStaff", Vector3.ZERO)
+			_add(ss, _cyl(0.022, 0.026, 1.6, 8), Vector3(0, 0.3, 0), Color(0.7, 0.55, 0.36), OL_THIN)
+			_add(ss, _cyl(0.05, 0.05, 0.32, 10), Vector3(0, 1.14, 0), Color(0.95, 0.9, 0.76), OL_THIN,
+				Vector3(0, 0, PI * 0.5))
+			for sd in [-1.0, 1.0]:
+				var side: float = sd
+				_add(ss, _cyl(0.058, 0.058, 0.03, 10), Vector3(0.17 * side, 1.14, 0), GOLD, OL_THIN, Vector3(0, 0, PI * 0.5))
+			_add(ss, _box(Vector3(0.03, 0.22, 0.008)), Vector3(0.04, 1.0, -0.05), main_c.lightened(0.2), OL_THIN,
+				Vector3(0, 0, 0.15))
 		"sword", "sword_shield", "dual_swords":
 			for g in ([_grip_r, _grip_l] if weapon_kind == "dual_swords" else [_grip_r]):
 				var grip: Node3D = g
@@ -988,9 +1368,18 @@ func _apply_rest() -> void:
 				_rest_arm_l = 0.35
 				_rest_grip_l = -0.35
 				_amp_l = 0.25
-		"staff":
+		"staff", "scroll_staff":
 			_rest_arm_r = 0.25
 			_rest_grip_r = -0.25
+			_amp_r = 0.2
+		"cane":
+			# Рука чуть вперёд, трость остриём в землю
+			_rest_arm_r = 0.3
+			_rest_grip_r = -PI - 0.2
+			_amp_r = 0.15
+		"hammer":
+			_rest_arm_r = 0.12
+			_rest_grip_r = -2.9
 			_amp_r = 0.2
 		"bow":
 			_rest_arm_l = 0.12
@@ -1324,7 +1713,8 @@ func _setup_asset(path: String) -> bool:
 	_asset.rotation.y = PI
 	add_child(_asset)
 	_has_ears = true
-	if not ASSET_WEAPONS.has(weapon_kind):
+	# Без оружия ("") — житель-NPC из файла: руки пустые
+	if weapon_kind != "" and not ASSET_WEAPONS.has(weapon_kind):
 		weapon_kind = "sword"
 
 	var tex_path := path.get_basename() + ".png"
@@ -1368,7 +1758,7 @@ func _setup_asset(path: String) -> bool:
 		var hand_l: BoneAttachment3D = null
 		if weapon_kind == "dual_swords" or weapon_kind == "daggers":
 			hand_l = _attach(skel, "LeftHand", "GripL")
-		if hand != null:
+		if hand != null and weapon_kind != "":
 			match weapon_kind:
 				"crossbow":
 					_hold(hand, "Crossbow", _crossbow_mesh(), Transform3D(Basis(CROSSBOW_ROT.normalized()), GRIP_POS))

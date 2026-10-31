@@ -421,6 +421,22 @@
     71.0
    ],
    "radius": 10.0
+  },
+  {
+   "id": "hunter_camp",
+   "center": [
+    -110.0,
+    11.0
+   ],
+   "radius": 9.0
+  },
+  {
+   "id": "merc_post",
+   "center": [
+    -90.5,
+    41.5
+   ],
+   "radius": 4.0
   }
  ],
  "pois": [

@@ -11,7 +11,8 @@ extends RefCounted
 ## toon.gdshader и crystal.gdshader). Ограды, мост, причал, пламя, флажки, колосья — всегда процедурные.
 ## Постройки — StaticBody3D (слой 1) с простыми боксами/цилиндрами; клетки под
 ## ними помечаются непроходимыми (звери и растительность туда не попадут), настил причала — проходимым.
-## Следы построек для других модулей: world.get_meta("poi_footprints") — [{"c": Vector2, "r": float}].
+## Следы построек для других модулей: world.get_meta("poi_footprints") — [{"c": Vector2, "r": float}];
+## мелочи без коллизии (бочки, ящики, сено, камни у пещеры) — world.get_meta("poi_props") в том же виде.
 ##
 ## Отрисовка (телефон: важно число вызовов). Всё неподвижное склеивается по зонам (город, деревня с
 ## мельницей, полями и загоном, порт с маяком и причалом, пещера с лагерями, ...): у зоны два меша —
@@ -74,6 +75,8 @@ var taken: Array[Dictionary] = []
 var rects: Array[Dictionary] = []
 ## Следы построек для других модулей.
 var footprints: Array = []
+## Мелочи без коллизии (бочки, ящики, сено, камни у пещеры) — чтобы жители-NPC не вставали в них.
+var small_props: Array = []
 ## Сдвинутые с дороги центры POI (id → Vector2).
 var moved := {}
 ## Зоны склейки мешей и текущая (куда идут модели строящегося POI).
@@ -152,6 +155,7 @@ func _build(world: IslandWorld) -> void:
 	_bridge_rails()
 	_finish_zones()
 	w.set_meta("poi_footprints", footprints)
+	w.set_meta("poi_props", small_props)
 
 
 # ---------- Места: занятость, проверки, поиск ----------
@@ -426,6 +430,7 @@ func _prop(parent: Node3D, kind: String, p: Vector2, yaw: float, col_r: float = 
 		return body
 	_put(parent, kind, _xf(pos, yaw), true)
 	_take(p, 0.5)
+	small_props.append({"c": p, "r": 0.5})
 	return null
 
 
@@ -1491,6 +1496,7 @@ func _cave(h: Node3D, poi: Dictionary) -> void:
 		var sz := s * rng.randf_range(0.9, 1.3)
 		# Крупные — в меш построек (с тенью), мелкие — в меш мелочей
 		_put(h, kind, _xf(rpos, ryaw, Vector3(sx, s, sz)), s <= 0.7)
+		small_props.append({"c": p, "r": s * 1.3})
 
 
 ## Пещера из файла: скала со входом (вход на +Z модели) отодвинута назад — проём примерно там же, где
@@ -1517,6 +1523,7 @@ func _cave_model(body: StaticBody3D, c: Vector2, f: Vector2, yaw: float) -> void
 		var kind := "rock" if rng.randf() < 0.6 else "rock_dark"
 		var s := rng.randf_range(0.35, 0.9)
 		_put(h, kind, _xf(w.ground(p.x, p.y, -0.1 * s), rng.randf() * TAU, Vector3(s, s * 0.85, s)), s <= 0.6)
+		small_props.append({"c": p, "r": s})
 
 
 ## Локальная точка (x — вправо, y — вперёд по f) в мировое смещение.
