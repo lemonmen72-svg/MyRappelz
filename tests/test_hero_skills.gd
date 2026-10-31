@@ -562,7 +562,7 @@ func _check_save(player: Player) -> void:
 	check(game.weapon == "dual_swords_starter" and (game.hero["slots"] as Array)[0] == "backstab",
 		"старый воин: парные мечи и «Удар в спину» на кнопке 1")
 	check(int(game.hero["jp"]) == HeroSkills.default_jp(3), "старый воин 3 ур.: %d JP" % int(game.hero["jp"]))
-	check(game.load_note.contains("Наёмников"), "сообщение игроку: %s" % game.load_note)
+	check(game.load_note.contains("Наёмник"), "сообщение игроку: %s" % game.load_note)
 	check(game.load_game(), "игра загружена снова")
 	player.apply_class()
 

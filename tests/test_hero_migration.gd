@@ -59,7 +59,7 @@ func run_step() -> void:
 			check(player.max_hp == int(d["max_hp"]) and player.eva > 0.0 and player.accuracy > 0,
 				"статы Наёмника %d ур.: HP %d, уклонение %.1f%%, точность %d" % [OLD_LEVEL, player.max_hp,
 				player.eva * 100.0, player.accuracy])
-			check(main.hud._msg_label.text.contains("Наёмников") and game.load_note == "",
+			check(main.hud._msg_label.text.contains("Наёмник") and game.load_note == "",
 				"сообщение при входе: %s" % main.hud._msg_label.text)
 			check(player.global_position.distance_to(main.world.spawn_point("dark_elf")) < 3.0, "старт в деревне тёмных эльфов")
 			step = 1
