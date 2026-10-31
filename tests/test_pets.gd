@@ -28,9 +28,10 @@ func run_step() -> void:
 			check(pm != null and tm != null, "модули питомцев и приручения созданы")
 			check(game.pets.is_empty() and pm.active_pet == null, "питомцев пока нет")
 			for id in MobData.TYPES:
-				# Летающие рыбы — только звери мира, питомцами не бывают
-				check(PetData.SPECIES.has(id) != MobData.flying(id), "вид питомца для зверя %s: %s" % [id,
-					"нет (летающий)" if MobData.flying(id) else "есть"])
+				# Летающие рыбы и анатемы — только звери мира, питомцами не бывают; у кабана и стража вид питомца
+				# остался (старые питомцы, хотя теперь их нельзя приручить)
+				var pet_kind: bool = MobData.tameable(id) or ["boar", "golem"].has(id)
+				check(PetData.SPECIES.has(id) == pet_kind, "вид питомца для зверя %s: %s" % [id, "есть" if pet_kind else "нет"])
 			check(PetData.role("turtle") == "tank" and PetData.role("golem") == "tank", "черепаха и страж — танки")
 			check(PetData.role("pheasant") == "healer" and PetData.role("panther") == "mage", "фазан — лекарь, пантера — маг")
 			for id in ["bear", "sparkbug", "fairy"]:
@@ -63,13 +64,13 @@ func run_step() -> void:
 			check(PetData.stage_scale("boar", 30) > PetData.stage_scale("boar", 1), "старшая стадия крупнее")
 			step = 1
 		1:
-			# Уникального стража приручить нельзя
-			mob = find_mob("golem")
-			check(mob != null, "найден каменный страж")
+			# Вожака анатем (и любую анатему) приручить нельзя
+			mob = find_mob("anathema_chief")
+			check(mob != null, "найден вожак анатем")
 			stand_near(mob, 3.0)
 			player.current_target = mob
 			main._on_action("tame")
-			check(tm.marked == null and not mob.tame_marked, "на стража метка не ставится")
+			check(tm.marked == null and not mob.tame_marked, "на вожака анатем метка не ставится")
 			var msg: String = main.hud._msg_label.text
 			check(msg.contains("Этого зверя нельзя приручить"), "сообщение: " + msg)
 			player.current_target = null
@@ -119,7 +120,7 @@ func run_step() -> void:
 			step = 4
 		4:
 			# Питомец помогает убить зверя и получает опыт
-			mob = find_mob("boar")
+			mob = find_mob("pheasant")
 			if mob == null:
 				return
 			var pet: Pet = pm.active_pet
@@ -144,7 +145,7 @@ func run_step() -> void:
 				return
 			stand_near(mob, 2.0)
 			if mob.hp < mob.max_hp and timer % 60 == 0:
-				print("  кабан: %d/%d" % [mob.hp, mob.max_hp])
+				print("  фазан: %d/%d" % [mob.hp, mob.max_hp])
 		6:
 			# Эволюция на 15 уровне
 			var pet: Pet = pm.active_pet

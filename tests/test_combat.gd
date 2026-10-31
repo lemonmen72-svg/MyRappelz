@@ -23,20 +23,20 @@ func run_step() -> void:
 			check(player.skill_id("skill1") == "power_shot" and player.skill_id("skill2") == "quick_step",
 				"умения следопыта на кнопках")
 			check(player.cooldown_frac("skill1") == 0.0, "умение готово в начале")
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан")
 			player.select_target(mob)
 			t0 = frame
 			step = 1
 		1:
 			if not mob_ok(mob):
-				check(shots > 0, "следопыт убил кабана стрелами (выстрелов: %d)" % shots)
+				check(shots > 0, "следопыт убил фазана стрелами (выстрелов: %d)" % shots)
 				check(min_dist > 5.0, "стрельба с расстояния больше 5 м (мин. %.1f м)" % min_dist)
 				check(game.xp > 0, "опыт за убийство получен")
 				step = 2
 				return
 			if frame - t0 > 60 * 30:
-				fail("следопыт не убил кабана за 30 с")
+				fail("следопыт не убил фазана за 30 с")
 				return
 			player.hp = player.max_hp
 			var d := player.global_position.distance_to(mob.global_position)
@@ -50,8 +50,8 @@ func run_step() -> void:
 					check(count_projectiles() > 0, "стрела летит к цели")
 					check(mob.hp == mob.max_hp, "урон наносится при попадании, а не сразу")
 		2:
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан для «Меткого выстрела»")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан для «Меткого выстрела»")
 			place_far(mob, 9.0)
 			player.select_target(mob)
 			hp_before = mob.hp
@@ -96,24 +96,24 @@ func run_step() -> void:
 			player.apply_class()
 			check(player.attack_kind == "melee" and player._weapon_kind == "axe", "воин: ближний бой, топор")
 			check(player.skill_id("skill1") == "cleave", "умения воина на кнопках")
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан для воина")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан для воина")
 			player.select_target(mob)
 			t0 = frame
 			step = 8
 		8:
 			if not mob_ok(mob):
-				check(true, "воин убил кабана в ближнем бою")
+				check(true, "воин убил фазана в ближнем бою")
 				step = 9
 				return
 			if frame - t0 > 60 * 30:
-				fail("воин не убил кабана за 30 с")
+				fail("воин не убил фазана за 30 с")
 				return
 			stand_near(mob)
 			player.try_attack()
 		9:
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан для «Рассечения»")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан для «Рассечения»")
 			stand_near(mob)
 			hp_before = mob.hp
 			check(player.use_skill("skill1"), "«Рассечение» применено")

@@ -9,6 +9,8 @@ signal changed
 
 const SAVE_VERSION := 1
 const MAX_PETS := 6
+## Виды питомцев, ушедшие с острова (модели из примитивов), → вид, которым становится питомец при загрузке.
+const RETIRED_PETS := {"boar": "wolf", "golem": "turtle"}
 
 ## Тесты подменяют путь, чтобы не трогать настоящее сохранение.
 var save_path := "user://save.json"
@@ -208,6 +210,7 @@ func from_dict(d: Dictionary) -> void:
 		load_note = legacy_note if load_note == "" else load_note + ". " + legacy_note
 	inventory.from_dict(migrate_items(old_inv))
 	inventory.load_layout(d.get("bag", []))
+	var retired := false
 	for p in d.get("pets", []):
 		var r: Dictionary = p
 		var sp := String(r.get("species", "boar"))
@@ -218,17 +221,30 @@ func from_dict(d: Dictionary) -> void:
 			# Вид из старой версии заменён новым: имя — название стадии нового вида
 			sp = new_sp
 			pet_name = PetData.stage_name(sp, lvl)
+		# Кабан и каменный страж (модели из примитивов) ушли с острова: питомец становится волком / черепахой
+		# с тем же уровнем и опытом, JP за умения, которых у нового вида нет, возвращаются
+		var refund := 0
+		if RETIRED_PETS.has(sp):
+			var old_sp := sp
+			sp = String(RETIRED_PETS[old_sp])
+			refund = retired_refund(sp, r.get("skills", {}))
+			if (PetData.get_species(old_sp)["stages"] as Array).has(pet_name):
+				pet_name = PetData.stage_name(sp, lvl)
+			retired = true
 		pets.append({
 			"species": sp, "name": pet_name,
 			"level": lvl, "xp": int(r.get("xp", 0)),
 			"hp": int(r.get("hp", -1)), "dead": bool(r.get("dead", false)),
 			"mp": int(r.get("mp", -1)),
 			# Старые сохранения без JP: столько, сколько питомец накопил бы к своему уровню
-			"jp": int(r.get("jp", PetStats.default_jp(lvl))),
+			"jp": int(r.get("jp", PetStats.default_jp(lvl))) + refund,
 			"jp_part": float(r.get("jp_part", 0.0)),
 			"skills": _load_skills(sp, r.get("skills", {})),
-			"toggles": _load_toggles(r.get("toggles", {})),
+			"toggles": _load_toggles(r.get("toggles", {}), sp),
 		})
+	if retired:
+		var pet_note := "Кабаны и каменные стражи ушли с острова: ваши питомцы-кабаны стали волками, стражи — черепахами (уровень и опыт сохранены, JP за недоступные умения возвращены)"
+		load_note = pet_note if load_note == "" else load_note + ". " + pet_note
 	active_pet = int(d.get("active_pet", -1))
 	if active_pet >= pets.size():
 		active_pet = -1
@@ -306,15 +322,30 @@ static func _load_skills(species: String, src: Variant) -> Dictionary:
 	return res
 
 
-static func _load_toggles(src: Variant) -> Dictionary:
+static func _load_toggles(src: Variant, species: String = "") -> Dictionary:
 	var res: Dictionary = {}
 	if not (src is Dictionary):
 		return res
 	var d: Dictionary = src
 	for k in d:
-		if bool(d[k]):
+		if bool(d[k]) and (species == "" or PetSkills.has_skill(species, String(k))):
 			res[String(k)] = true
 	return res
+
+
+## JP за изученные умения, которых нет у вида species (питомец ушедшего с острова вида): уровень × цена уровня.
+static func retired_refund(species: String, src: Variant) -> int:
+	var jp := 0
+	if not (src is Dictionary):
+		return jp
+	var d: Dictionary = src
+	for k in d:
+		var id := String(k)
+		var sk := PetSkills.get_skill(id)
+		if sk.is_empty() or PetSkills.has_skill(species, id):
+			continue
+		jp += mini(int(d[k]), PetSkills.max_level(id)) * int(sk.get("jp", 1))
+	return jp
 
 
 ## Сообщение о замене кристаллов души и убранных карт (кабана, стража) зеркальными картами

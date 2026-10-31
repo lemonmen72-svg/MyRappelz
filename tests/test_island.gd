@@ -48,7 +48,8 @@ func run_step() -> void:
 				if w.in_safe_zone(p) or not w.is_walkable(p.x, p.z):
 					bad += 1
 			check(bad == 0, "звери появляются вне безопасных зон и на суше (плохих: %d)" % bad)
-			check(find_mob("golem") != null and find_mob("golem").level == 10, "страж пещеры 10 уровня")
+			check(find_mob("anathema_chief") != null and find_mob("anathema_chief").level == 10, "вожак анатем в пещере 10 уровня")
+			check(find_mob("golem") == null and find_mob("boar") == null, "кабанов и стражей на острове нет")
 			wait = 30
 			step = 1
 		1:

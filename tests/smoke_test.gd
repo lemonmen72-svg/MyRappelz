@@ -18,8 +18,8 @@ func run_step() -> void:
 			gold_before = game.gold
 			step = 1
 		1:
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан")
+			mob = find_mob("pheasant")
+			check(mob != null, "найден фазан")
 			step = 2
 		2:
 			if not mob_ok(mob):

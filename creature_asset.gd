@@ -50,6 +50,13 @@ const DEFAULTS := {
 		"attack_hit_time": 0.42, "hover": 1.5},
 	"flyfish_drake": {"height": 2.17, "length": 1.8, "width": 1.25, "walk_speed": 1.5, "run_speed": 4.2,
 		"attack_hit_time": 0.42, "hover": 1.55},
+	# Анатемы — двуногие ящеры (tools/prepare_creatures.py, стиль «biped»: клипы Quaternius UAL); ширина — с клинками
+	"anathema": {"height": 1.9, "length": 0.55, "width": 0.89, "walk_speed": 0.92, "run_speed": 5.72,
+		"attack_hit_time": 0.23},
+	"anathema_blade": {"height": 2.0, "length": 0.64, "width": 0.98, "walk_speed": 1.0, "run_speed": 5.71,
+		"attack_hit_time": 0.23},
+	"anathema_chief": {"height": 2.2, "length": 0.72, "width": 1.31, "walk_speed": 1.16, "run_speed": 6.94,
+		"attack_hit_time": 0.27},
 }
 ## Окончания моделей стадий эволюции: стадия 1 (в коде 0..2) → "_2", стадия 2 → "_3".
 const STAGE_SUFFIX := ["", "_2", "_3"]

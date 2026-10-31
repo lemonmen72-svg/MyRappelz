@@ -7,7 +7,8 @@ extends Node
 ## ломается она, а карта существа остаётся. Формирование (form): карта с душой расходуется, в коллекции
 ## Game.pets появляется существо 1-го уровня (если в коллекции есть место).
 ## Метка одна, держится 30 с или пока зверь жив и не ушёл домой. Перезарядка умения 3 с.
-## Не всех зверей можно приручить (MobData.tameable: кабан и каменный страж — нельзя, карт у них нет).
+## Не всех зверей можно приручить (MobData.tameable: летающие рыбы, анатемы, а также кабан и каменный страж — нельзя,
+## карт у них нет; кабана и стража на острове больше нет).
 ## Описание карты для карточки предмета (где водится вид, уровни, тир, где взять) — card_lines.
 ## Сигналы soul_caught и formed слушают задания (Quests).
 
@@ -156,7 +157,7 @@ static func badge_state(type_id: String) -> String:
 
 
 ## Где взять карту: «продаётся у Учителя Кирка в центре города» (кто торгует ею — NpcData) или «выпадает
-## из волка» (по добыче MobData).
+## из волка» (по добыче MobData; только звери, что водятся на острове — кабана и стража там больше нет).
 static func where_to_get(card_id: String) -> String:
 	if int(ItemData.get_item(card_id).get("buy", 0)) > 0:
 		var sellers := NpcData.sellers_of(card_id)
@@ -166,6 +167,8 @@ static func where_to_get(card_id: String) -> String:
 		return "продаётся у %s %s" % [NpcData.name_gen(s), String(NpcData.npc(s).get("where", ""))]
 	var from: Array = []
 	for k in MobData.TYPES:
+		if not lives_in_world(String(k)):
+			continue
 		for e in MobData.get_type(String(k)).get("loot", []):
 			var entry: Array = e
 			if String(entry[0]) == card_id:
@@ -185,6 +188,17 @@ static func habitat_text(species: String) -> String:
 			var lt := "ур. %d" % int(lv[0]) if int(lv[0]) == int(lv[1]) else "ур. %d–%d" % [int(lv[0]), int(lv[1])]
 			parts.append("%s (%s)" % [String(zone["name"]), lt])
 	return ", ".join(PackedStringArray(parts))
+
+
+## Водится ли вид в зонах острова (нет конфига — считаем, что да).
+static func lives_in_world(species: String) -> bool:
+	var zs := zones()
+	if zs.is_empty():
+		return true
+	for z in zs:
+		if ((z as Dictionary)["mobs"] as Array).has(species):
+			return true
+	return false
 
 
 ## Зоны зверей острова: [{"name": String, "levels": [мин., макс.], "mobs": [id вида]}].
