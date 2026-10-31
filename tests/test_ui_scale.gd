@@ -227,6 +227,20 @@ func _check_hud() -> void:
 			if near.distance_to(c) <= r:
 				check(false, "кнопка %s налезает на панель %s" % [id, rr])
 		check(c.distance_to(joy_home) > r + joy_r, "кнопка %s не на джойстике" % id)
+	# Значки эффектов: ряд игрока — до панели цели, ряд цели — не на меню, трекере и экране; значки кнопок — в круге
+	var fxp := hud.status_row("player")
+	var fxt := hud.status_row("target")
+	var pr_fx := Rect2(fxp.global_position, Vector2(fxp.max_w, fxp.icon_px))
+	var tr_fx := Rect2(fxt.global_position, Vector2(fxt.max_w, fxt.icon_px))
+	check(fxp.capacity() >= 3 and pr_fx.end.x <= tr.position.x and not pr_fx.intersects(mr),
+		"значки эффектов игрока до панели цели: %s, мест %d" % [pr_fx, fxp.capacity()])
+	check(fxt.capacity() >= 3 and screen.encloses(tr_fx) and not tr_fx.intersects(mr) and not tr_fx.intersects(trk),
+		"значки эффектов цели на экране, не на меню и трекере: %s, мест %d" % [tr_fx, fxt.capacity()])
+	for id in ["attack", "skill1", "potion", "tame"]:
+		var ic := hud.button_icon(String(id))
+		var rr := float(hud._buttons[id]["r"])
+		check(ic != null and ic.size.x <= rr * 2.0 and ic.size.x >= rr * 1.6,
+			"значок кнопки %s вписан в круг: %.0f / Ø %.0f" % [id, ic.size.x if ic != null else 0.0, rr * 2.0])
 	print("  кнопки: атака r %.0f, мельчайшая Ø %.0f, зазор ≥ %.1f; меню %s; трекер %s" % [attack_r, min_d, min_gap, mr, trk])
 
 

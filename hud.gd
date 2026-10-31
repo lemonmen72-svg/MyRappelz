@@ -12,6 +12,10 @@ extends CanvasLayer
 ## На ПК: WASD/стрелки, Пробел = атака, 1–4 = умения, T = приручить, Q = зелье, K = окно героя,
 ## P = питомцы, C = окно существа, I или B = сумка, E = торговец, R = говорить, J = задания,
 ## F = питомец атакует, G = питомец за мной, O = настройки.
+## Круглые кнопки со значками (set_button_icon → IconView: умение, оружие, зелье с числом, карта существа, рисунок);
+## перезарядка — тёмный сектор по часовой стрелке, неподходящее оружию — красная метка. Справа от полосок HP
+## игрока, питомца и цели — значки действующих эффектов (StatusRow по реестру StatusEffects сущности);
+## касание по значку эффекта — подпись (название, сколько осталось).
 
 ## Нажатие кнопки действия (касание, клавиша или кнопка меню).
 signal action(id: String)
@@ -55,12 +59,17 @@ const TARGET_FONT := 15
 ## Сообщения на экране: высота строки сверху и шрифт (было 190 / 28).
 const MSG_Y := 165.0
 const MSG_FONT := 19
+## Значки эффектов у полосок HP: размер и зазор («Средний»), ширина ряда питомца.
+const FX_ICON := 26.0
+const FX_GAP := 4.0
+const FX_PET_W := 240.0
 
 var move_vec := Vector2.ZERO
 
 ## id -> {"panel": Panel, "label": Label, "offset": Vector2, "r": float, "hold": bool, "touch": int,
 ## "color": Color (заливка), "blocked": bool (не подходит оружию — затемнена),
-## "base_offset": Vector2, "base_r": float (как передано в add_button, для «Среднего»)}.
+## "base_offset": Vector2, "base_r": float (как передано в add_button, для «Среднего»),
+## "icon": IconView или null (значок вместо подписи — set_button_icon)}.
 ## offset и r — уже с масштабом UiScale.
 var _buttons := {}
 var _joy_idx := -1
@@ -103,6 +112,12 @@ var _menu: HBoxContainer
 var _pet_btns: HBoxContainer
 ## Элементы интерфейса поверх мира (трекер заданий): касание по ним не начинает джойстик и вращение камеры.
 var _blockers: Array[Control] = []
+## Значки эффектов справа от полосок HP игрока, питомца и цели; подпись по касанию значка.
+var _fx_player: StatusRow
+var _fx_pet: StatusRow
+var _fx_target: StatusRow
+var _fx_tip: Label
+var _fx_tip_time := 0.0
 
 
 func _ready() -> void:
@@ -136,10 +151,19 @@ func _ready() -> void:
 	_tame_tier = _square(_target_box, 2)
 	_set_tame_badge("", "")
 	_target_box.visible = false
+	_fx_player = StatusRow.new()
+	add_child(_fx_player)
+	_fx_pet = StatusRow.new()
+	_pet_box.add_child(_fx_pet)
+	_fx_target = StatusRow.new()
+	_target_box.add_child(_fx_target)
 
 	_msg_label = _label(self)
 	_msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_msg_label.add_theme_color_override("font_color", Color(1, 0.95, 0.5))
+
+	_fx_tip = _label(self)
+	_fx_tip.visible = false
 
 	_menu = HBoxContainer.new()
 	_menu.name = "Menu"
@@ -214,6 +238,12 @@ func _apply_sizes() -> void:
 	_place_square(_tame_tier, Vector2(-bs - ts - UiScale.px(10), bar_y + (bar_h - ts) * 0.5), ts, 2)
 
 	_font(_msg_label, UiScale.fs(MSG_FONT))
+	_font(_fx_tip, UiScale.fs(UiScale.FONT_SMALL))
+	var fx := UiScale.px(FX_ICON)
+	_fx_player.position = Vector2(x + w + UiScale.px(8), x + (hp_h + mp_h + 2.0 - fx) * 0.5)
+	var pet_bars := UiScale.px(10) + 2.0 + UiScale.px(6)
+	_fx_pet.position = Vector2(pw + UiScale.px(8), py + (pet_bars - fx) * 0.5)
+	_fx_pet.set_layout(fx, UiScale.px(FX_GAP), UiScale.px(FX_PET_W))
 
 	_menu.add_theme_constant_override("separation", int(UiScale.px(5)))
 	for b in _menu.get_children():
@@ -236,7 +266,7 @@ func add_button(id: String, text: String, offset: Vector2, radius: float, color:
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(l)
 	_buttons[id] = {"panel": p, "label": l, "offset": offset, "r": radius, "hold": hold, "touch": -1,
-		"color": color, "blocked": false, "base_offset": offset, "base_r": radius, "text": text}
+		"color": color, "blocked": false, "base_offset": offset, "base_r": radius, "text": text, "icon": null}
 	_size_button(id)
 	_layout()
 
@@ -253,6 +283,11 @@ func _size_button(id: String) -> void:
 	l.add_theme_font_size_override("font_size", int(clampf(r * 0.33, 11.0, 22.0)))
 	l.add_theme_constant_override("outline_size", 4)
 	_fit_button_text(id)
+	var ic: IconView = b["icon"]
+	if ic != null:
+		var inset := (3.0 if r < 45.0 else 4.0) + 1.0
+		ic.position = Vector2(inset, inset)
+		ic.size = Vector2(r - inset, r - inset) * 2.0
 
 
 ## Подпись кнопки: перенос по словам в ширину кружка, по центру кружка.
@@ -298,13 +333,59 @@ func set_button_text(id: String, text: String) -> void:
 		_fit_button_text(id)
 
 
-## frac > 0: кнопка на перезарядке (затемнена). Кнопка с неподходящим оружием (set_blocked) — темнее всегда.
+## frac > 0: кнопка на перезарядке (затемнена; у значка — тёмный сектор доли frac, край идёт по часовой стрелке).
+## Кнопка с неподходящим оружием (set_blocked) — темнее всегда.
 func set_cooldown(id: String, frac: float) -> void:
 	if _buttons.has(id):
+		var ic: IconView = _buttons[id]["icon"]
 		var a := 0.35 if frac > 0.0 else 1.0
+		if ic != null:
+			if frac > 0.0:
+				ic.set_sector(1.0 - frac, 1.0)
+			else:
+				ic.set_sector(0.0, 0.0)
+			a = 0.75 if frac > 0.0 else 1.0
 		if bool(_buttons[id]["blocked"]):
-			a = 0.28
+			a = 0.28 if ic == null else 0.5
 		_buttons[id]["panel"].modulate = Color(1, 1, 1, a)
+
+
+## Значок на круглой кнопке вместо подписи (спецификация IconView; пустая — снова подпись).
+## Подпись остаётся в button_text (для подсказок и тестов). Тот же значок — ничего не перестраивается.
+func set_button_icon(id: String, spec: Dictionary) -> void:
+	if not _buttons.has(id):
+		return
+	var b: Dictionary = _buttons[id]
+	var ic: IconView = b["icon"]
+	if spec.is_empty():
+		if ic != null:
+			ic.visible = false
+		(b["label"] as Label).visible = true
+		return
+	if ic == null:
+		ic = IconView.new()
+		(b["panel"] as Panel).add_child(ic)
+		b["icon"] = ic
+		_size_button(id)
+		ic.set_blocked(bool(b["blocked"]))
+	ic.visible = true
+	ic.set_spec(spec)
+	(b["label"] as Label).visible = false
+
+
+## Значок кнопки (null — у кнопки подпись).
+func button_icon(id: String) -> IconView:
+	if not _buttons.has(id):
+		return null
+	var ic: IconView = _buttons[id]["icon"]
+	return ic if ic != null and ic.visible else null
+
+
+## Число на значке кнопки (зелья в сумке); -1 — без числа.
+func set_button_count(id: String, n: int) -> void:
+	var ic := button_icon(id)
+	if ic != null:
+		ic.set_count(n)
 
 
 ## Кнопка недоступна (например, умение не подходит к оружию): затемнена, нажатие всё равно шлёт действие
@@ -312,6 +393,9 @@ func set_cooldown(id: String, frac: float) -> void:
 func set_blocked(id: String, blocked: bool) -> void:
 	if _buttons.has(id):
 		_buttons[id]["blocked"] = blocked
+		var ic: IconView = _buttons[id]["icon"]
+		if ic != null:
+			ic.set_blocked(blocked)
 
 
 func is_blocked(id: String) -> bool:
@@ -326,6 +410,11 @@ func set_button_color(id: String, c: Color) -> void:
 	var sb := p.get_theme_stylebox("panel") as StyleBoxFlat
 	if sb != null:
 		sb.bg_color = c
+	# Значок почти закрывает заливку: включённое (цвет не исходный) — ещё и кольцо этого цвета
+	var ic: IconView = _buttons[id]["icon"]
+	if ic != null:
+		var base: Color = _buttons[id]["color"]
+		ic.set_ring(Color(c.r, c.g, c.b, 1.0) if c != base else Color(0, 0, 0, 0), UiScale.px(4))
 
 
 ## Исходный цвет кнопки (как при add_button).
@@ -496,6 +585,7 @@ func is_window_open() -> bool:
 # ---------- Панели ----------
 
 func update_player(p: Player) -> void:
+	_fx_player.bind(p.effects)
 	_hp_bar.max_value = p.max_hp
 	_hp_bar.value = p.hp
 	_mp_bar.visible = p.max_mp > 0
@@ -515,8 +605,10 @@ func update_player(p: Player) -> void:
 func update_pet(pet: Node) -> void:
 	if pet == null or not is_instance_valid(pet):
 		_pet_box.visible = false
+		_fx_pet.bind(null)
 		return
 	_pet_box.visible = true
+	_fx_pet.bind(pet.get("effects") as StatusEffects)
 	_pet_label.text = "%s  Ур.%d  HP %d/%d" % [pet.pet_name, pet.level, pet.hp, pet.max_hp]
 	_pet_bar.max_value = pet.max_hp
 	_pet_bar.value = pet.hp
@@ -705,6 +797,23 @@ func _place_target() -> void:
 	var tx := minf((_view.x - tw) / 2.0 - UiScale.px(50), _menu.position.x - tw - UiScale.px(20))
 	var min_x := maxf(UiScale.px(TARGET_MIN_X), player_rect().end.x + UiScale.px(16))
 	_target_box.position = Vector2(maxf(min_x, tx), UiScale.px(10))
+	_place_fx()
+
+
+## Ряды значков эффектов: у игрока — до панели цели; у цели — справа от полоски до меню,
+## а если там меньше трёх значков — под полоской.
+func _place_fx() -> void:
+	var fx := UiScale.px(FX_ICON)
+	var g := UiScale.px(FX_GAP)
+	_fx_player.set_layout(fx, g, _target_box.position.x - _fx_player.position.x - UiScale.px(10))
+	var tw := UiScale.px(TARGET_W)
+	var right := _menu.position.x - (_target_box.position.x + tw + UiScale.px(8)) - UiScale.px(6)
+	if right >= (fx + g) * 3.0:
+		_fx_target.position = Vector2(tw + UiScale.px(8), _target_bar.position.y + (_target_bar.size.y - fx) * 0.5)
+		_fx_target.set_layout(fx, g, right)
+	else:
+		_fx_target.position = Vector2(0, _target_bar.position.y + _target_bar.size.y + UiScale.px(4))
+		_fx_target.set_layout(fx, g, tw)
 
 
 func _reset_joy() -> void:
@@ -756,6 +865,8 @@ func _input(event: InputEvent) -> void:
 	if te != null:
 		if te.pressed:
 			var p := te.position
+			if _show_fx_tip(p):
+				return
 			var id := _button_at(p)
 			if id == "" and over_blocker(p):
 				return
@@ -822,6 +933,12 @@ func _process(delta: float) -> void:
 
 	_refresh_target()
 	_keep_window_on_screen()
+	_fx_player.refresh()
+	_fx_pet.refresh()
+	_fx_target.refresh()
+	if _fx_tip_time > 0.0:
+		_fx_tip_time -= delta
+		_fx_tip.visible = _fx_tip_time > 0.0
 
 	if _msg_time > 0.0:
 		_msg_time -= delta
@@ -833,8 +950,10 @@ func _refresh_target() -> void:
 		_target = null
 		_target_box.visible = false
 		_set_tame_badge("", "")
+		_fx_target.bind(null)
 		return
 	_target_box.visible = true
+	_fx_target.bind(_target.get("effects") as StatusEffects)
 	var tid = _target.get("type_id")
 	if tid is String:
 		var sp := String(tid)
@@ -849,3 +968,29 @@ func _refresh_target() -> void:
 		_target_label.text = "%s  Ур.%d" % [_target.get("mob_name"), _target.get("level")]
 	_target_bar.max_value = _target.get("max_hp")
 	_target_bar.value = _target.get("hp")
+
+
+## Касание по значку эффекта: подпись рядом (название, источник, сколько осталось). true — касание по значку.
+func _show_fx_tip(p: Vector2) -> bool:
+	for row in [_fx_player, _fx_pet, _fx_target]:
+		var e: Dictionary = (row as StatusRow).entry_at(p)
+		if e.is_empty():
+			continue
+		_fx_tip.text = StatusEffects.describe(e)
+		_fx_tip.reset_size()
+		var sz := _fx_tip.get_combined_minimum_size()
+		_fx_tip.position = Vector2(clampf(p.x - sz.x * 0.5, 4.0, _view.x - sz.x - 4.0), p.y + UiScale.px(FX_ICON) * 0.7)
+		_fx_tip.visible = true
+		_fx_tip_time = 2.5
+		return true
+	return false
+
+
+## Ряд значков эффектов: "player", "pet" или "target" (для тестов и скриншотов).
+func status_row(which: String) -> StatusRow:
+	match which:
+		"pet":
+			return _fx_pet
+		"target":
+			return _fx_target
+	return _fx_player

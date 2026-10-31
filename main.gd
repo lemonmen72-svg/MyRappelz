@@ -39,6 +39,14 @@ const OTHER_BUTTONS := [
 ]
 ## Цвет кнопки включённого переключаемого умения.
 const TOGGLE_ON_COLOR := Color(0.3, 0.85, 0.45, 0.6)
+## Значки круглых кнопок без своего источника (IconView): облачко речи, мешочек торговца.
+## Умения — значок умения, «Атака» — надетое оружие, «Зелье» — зелье с числом, «Приручить» — карта существа цели.
+const BUTTON_ICONS := {
+	"talk": {"shape": "talk", "color": Color(0.95, 0.6, 0.25)},
+	"shop": {"shape": "shop", "color": Color(0.85, 0.7, 0.2)},
+}
+## Карта на кнопке «Приручить», пока у цели своей карты нет.
+const TAME_ICON_CARD := "card_panther"
 
 var player: Player
 var hud: HUD
@@ -129,6 +137,9 @@ func _build_hud() -> void:
 		hud.add_button(String(b[0]), String(b[1]), b[2], float(b[3]), b[4])
 	hud.set_button_visible("shop", false)
 	hud.set_button_visible("talk", false)
+	for id in BUTTON_ICONS:
+		hud.set_button_icon(String(id), BUTTON_ICONS[id])
+	refresh_tame_icon(null)
 
 
 func _build_player() -> void:
@@ -139,7 +150,9 @@ func _build_player() -> void:
 		hud.update_player(player)
 		refresh_skill_buttons())
 	player.message.connect(func(t: String): hud.show_message(t))
-	player.target_changed.connect(func(t: Node3D): hud.set_target(t))
+	player.target_changed.connect(func(t: Node3D):
+		hud.set_target(t)
+		refresh_tame_icon(t))
 
 	cam = Camera3D.new()
 	cam.fov = 55.0
@@ -258,11 +271,16 @@ func _process(delta: float) -> void:
 		Game.save_game()
 
 
-## Подписи, видимость и вид кнопок умений по назначенным умениям (Game.hero.slots) и надетому оружию:
-## пустая кнопка скрыта, неподходящая оружию — затемнена с подсказкой, включённое переключаемое — зелёная.
+## Подписи, значки, видимость и вид кнопок умений по назначенным умениям (Game.hero.slots) и надетому оружию:
+## пустая кнопка скрыта, неподходящая оружию — затемнена с подсказкой (и красной меткой на значке),
+## включённое переключаемое — зелёная. На «Атаке» — значок надетого оружия (без оружия — меч).
 func refresh_skill_buttons() -> void:
 	if hud == null or player == null:
 		return
+	if Game.weapon != "":
+		hud.set_button_icon("attack", IconView.item(Game.weapon))
+	else:
+		hud.set_button_icon("attack", IconView.shape("sword", Color(0.85, 0.85, 0.95)))
 	for b in SKILL_BUTTONS:
 		var bid := String(b[0])
 		var sid := player.skill_id(bid)
@@ -278,6 +296,19 @@ func refresh_skill_buttons() -> void:
 		var on := HeroSkills.kind(sid) == "toggle" and HeroSkills.toggle_on(Game.hero, sid)
 		hud.set_button_color(bid, TOGGLE_ON_COLOR if on else hud.button_color(bid))
 		hud.set_button_text(bid, text)
+		hud.set_button_icon(bid, IconView.hero_skill(sid))
+
+
+## Значок «Приручить»: карта существа вида цели (если у вида есть карта), иначе базовая карта.
+func refresh_tame_icon(t: Node3D) -> void:
+	if hud == null:
+		return
+	var card := TAME_ICON_CARD
+	if t != null and is_instance_valid(t) and t.get("type_id") is String:
+		var own := "card_" + String(t.get("type_id"))
+		if not ItemData.get_item(own).is_empty():
+			card = own
+	hud.set_button_icon("tame", IconView.item(card))
 
 
 func _cam_offset() -> Vector3:

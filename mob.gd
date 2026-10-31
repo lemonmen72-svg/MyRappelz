@@ -65,6 +65,10 @@ var fear_time := 0.0
 var fear_from := Vector3.ZERO
 var dots: Dictionary = {}
 var no_regen_time := 0.0
+## Действующие ослабления для HUD (значки у полоски HP цели): вид (StatusEffects.KINDS) или "dot:<умение>";
+## оставшееся время каждый кадр сверяется с полями выше (_sync_effects). src у методов ниже — источник
+## (StatusEffects.source_*: название и значок умения); без него значок — буква вида эффекта.
+var effects := StatusEffects.new()
 var returning := false
 var target: Node3D = null
 ## На звере метка приручения (ставит и снимает Taming).
@@ -214,6 +218,7 @@ func _physics_process(delta: float) -> void:
 	_tick_dots(delta)
 	if is_dead:
 		return
+	_sync_effects()
 	if stun_time > 0.0 or sleep_time > 0.0:
 		stun_time = maxf(0.0, stun_time - delta)
 		sleep_time = maxf(0.0, sleep_time - delta)
@@ -358,37 +363,67 @@ func _slam() -> void:
 
 
 ## Оглушить на sec секунд.
-func stun(sec: float) -> void:
+func stun(sec: float, src: Dictionary = {}) -> void:
 	stun_time = maxf(stun_time, sec)
+	_add_effect("stun", stun_time, src)
 
 
 ## Замедлить на долю frac (0..1) на sec секунд.
-func slow(frac: float, sec: float) -> void:
+func slow(frac: float, sec: float, src: Dictionary = {}) -> void:
 	slow_frac = maxf(slow_frac if slow_time > 0.0 else 0.0, clampf(frac, 0.0, 0.9))
 	slow_time = maxf(slow_time, sec)
+	_add_effect("slow", slow_time, src)
 
 
 ## Морок: sec секунд все удары зверя мимо.
-func blind(sec: float) -> void:
+func blind(sec: float, src: Dictionary = {}) -> void:
 	blind_time = maxf(blind_time, sec)
+	_add_effect("blind", blind_time, src)
 
 
 ## Сбить прицел: доля frac ударов мимо на sec секунд.
-func weaken_aim(frac: float, sec: float) -> void:
+func weaken_aim(frac: float, sec: float, src: Dictionary = {}) -> void:
 	miss_frac = maxf(miss_frac if miss_time > 0.0 else 0.0, clampf(frac, 0.0, 0.9))
 	miss_time = maxf(miss_time, sec)
+	_add_effect("miss", miss_time, src)
 
 
 ## Уязвимость: урон по зверю больше на долю frac на sec секунд.
-func expose(frac: float, sec: float) -> void:
+func expose(frac: float, sec: float, src: Dictionary = {}) -> void:
 	vuln_frac = maxf(vuln_frac if vuln_time > 0.0 else 0.0, maxf(frac, 0.0))
 	vuln_time = maxf(vuln_time, sec)
+	_add_effect("vuln", vuln_time, src)
 
 
 ## Ослабление: удары зверя слабее на долю frac (0..0.9) на sec секунд.
-func weaken(frac: float, sec: float) -> void:
+func weaken(frac: float, sec: float, src: Dictionary = {}) -> void:
 	weak_frac = maxf(weak_frac if weak_time > 0.0 else 0.0, clampf(frac, 0.0, 0.9))
 	weak_time = maxf(weak_time, sec)
+	_add_effect("weak", weak_time, src)
+
+
+## Значок эффекта kind у полоски HP цели (не на мёртвом).
+func _add_effect(kind: String, left: float, src: Dictionary) -> void:
+	if not is_dead:
+		effects.add(kind, left, StatusEffects.effect_info(kind, src))
+
+
+## Оставшееся время значков — из полей-таймеров (снятый досрочно эффект, например сон от удара, пропадает).
+func _sync_effects() -> void:
+	if effects.is_empty():
+		return
+	effects.sync("stun", stun_time)
+	effects.sync("sleep", sleep_time)
+	effects.sync("fear", fear_time)
+	effects.sync("slow", slow_time)
+	effects.sync("blind", blind_time)
+	effects.sync("miss", miss_time)
+	effects.sync("vuln", vuln_time)
+	effects.sync("weak", weak_time)
+	effects.sync("taunt", taunt_time)
+	for id in dots:
+		var d: Dictionary = dots[id]
+		effects.sync(String(d["fx"]), float(d["left"]))
 
 
 ## Урон удара с учётом ослабления (не меньше 1).
@@ -399,14 +434,16 @@ func _weakened(dmg: int) -> int:
 
 
 ## Усыпить на sec секунд: не двигается и не бьёт, пока не получит урон.
-func sleep(sec: float) -> void:
+func sleep(sec: float, src: Dictionary = {}) -> void:
 	sleep_time = maxf(sleep_time, sec)
+	_add_effect("sleep", sleep_time, src)
 
 
 ## Напугать на sec секунд: убегает от точки from и не атакует.
-func frighten(sec: float, from: Vector3) -> void:
+func frighten(sec: float, from: Vector3, src: Dictionary = {}) -> void:
 	fear_time = maxf(fear_time, sec)
 	fear_from = from
+	_add_effect("fear", fear_time, src)
 	_slam_windup = 0.0
 	_hit_target = null
 
@@ -429,15 +466,20 @@ func knock_back(from: Vector3, dist: float) -> void:
 
 ## Урон со временем от умения id: dps в секунду (дробный копится), sec секунд, by — кто наносит (может пропасть).
 ## Повторное попадание тем же умением обновляет время. no_regen = true — пока идёт, зверь не лечится.
-func add_dot(id: String, dps: float, sec: float, by: Node3D, no_regen: bool = false) -> void:
+func add_dot(id: String, dps: float, sec: float, by: Node3D, no_regen: bool = false, src: Dictionary = {}) -> void:
 	if is_dead or dps <= 0.0 or sec <= 0.0:
 		return
 	var acc := 0.0
 	if dots.has(id):
 		acc = float(dots[id]["acc"])
-	dots[id] = {"dps": dps, "left": sec, "acc": acc, "by": by}
+	var fx := "dot:" + id
+	dots[id] = {"dps": dps, "left": sec, "acc": acc, "by": by, "fx": fx}
 	if no_regen:
 		no_regen_time = maxf(no_regen_time, sec)
+	var info := StatusEffects.effect_info("dot", src)
+	if no_regen:
+		info["name"] = String(info["name"]) + ", без лечения"
+	effects.add(fx, sec, info)
 
 
 func _tick_dots(delta: float) -> void:
@@ -458,6 +500,7 @@ func _tick_dots(delta: float) -> void:
 				return
 		if float(d["left"]) <= 0.0:
 			dots.erase(id)
+			effects.remove(String(d["fx"]))
 
 
 ## Страх: бежит прочь от fear_from (медленнее обычного бега), не атакует.
@@ -507,11 +550,12 @@ func _missed(t: Node3D) -> bool:
 
 
 ## Заставить атаковать by в течение sec секунд.
-func taunt(by: Node3D, sec: float) -> void:
+func taunt(by: Node3D, sec: float, src: Dictionary = {}) -> void:
 	if is_dead or returning:
 		return
 	target = by
 	taunt_time = sec
+	_add_effect("taunt", sec, src)
 
 
 ## Показать или убрать метку приручения (светящееся кольцо под зверем и ромб-печать над головой).
@@ -636,6 +680,7 @@ func _keeps_target(attacker: Node3D) -> bool:
 
 func _die() -> void:
 	is_dead = true
+	effects.clear()
 	remove_from_group("mobs")
 	collision_layer = 0
 	_label.hide()

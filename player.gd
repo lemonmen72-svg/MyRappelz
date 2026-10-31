@@ -92,6 +92,9 @@ var aura_def := 0
 var aura_regen := 0.0
 ## Кто поставил бонусы: id объекта питомца (0 — никто).
 var _aura_src := 0
+## Действующие эффекты для HUD (значки у полоски HP): усиления выше (atk, speed, guard, shade — сверяются
+## с таймерами каждый кадр), включённые переключаемые героя ("toggle:<id>") и «Узы» питомца ("pet:<id>").
+var effects := StatusEffects.new()
 var _aura_acc := 0.0
 
 var _model: CharacterModel
@@ -183,6 +186,23 @@ func recalc_stats() -> void:
 	max_mp = roundi(float(max_mp) * (1.0 + _bv(b, "mp_from_eva") * eva))
 	hp = mini(hp, max_hp)
 	mp = mini(mp, max_mp)
+	_sync_toggle_effects()
+
+
+## Значки включённых переключаемых умений героя (без таймера) — после любого пересчёта (вкл./выкл.,
+## смена оружия, нехватка MP).
+func _sync_toggle_effects() -> void:
+	var on := {}
+	var tg: Dictionary = Game.hero.get("toggles", {})
+	for id in tg:
+		if bool(tg[id]):
+			on["toggle:" + String(id)] = StatusEffects.toggle_info(StatusEffects.source_hero_skill(String(id)))
+	effects.sync_toggles("toggle:", on)
+
+
+## Усиление kind (StatusEffects.KINDS) на sec секунд от источника src — значок у полоски HP.
+func add_effect(kind: String, sec: float, src: Dictionary) -> void:
+	effects.add(kind, sec, StatusEffects.effect_info(kind, src))
 
 
 static func _bv(b: Dictionary, key: String) -> float:
@@ -350,6 +370,11 @@ func _tick_skills(delta: float) -> void:
 			shade_atk = 0.0
 			shade_crit = 0.0
 			stats_changed.emit()
+	if not effects.is_empty():
+		effects.sync("atk", atk_buff_time)
+		effects.sync("speed", speed_buff_time)
+		effects.sync("guard", guard_time)
+		effects.sync("shade", shade_time)
 
 
 ## Восстановление MP и поддержка переключаемых умений (раз в HeroSkills.UPKEEP_PERIOD с).
@@ -442,6 +467,7 @@ func set_pet_aura(src: Object, atk_pct: float, def_bonus: int, regen: float) -> 
 func clear_pet_aura(src: Object) -> void:
 	if src != null and _aura_src == src.get_instance_id():
 		set_pet_aura(null, 0.0, 0, 0.0)
+		effects.sync_toggles("pet:", {})
 
 
 func clear_buffs() -> void:
@@ -455,6 +481,8 @@ func clear_buffs() -> void:
 	shade_eva = 0.0
 	shade_atk = 0.0
 	shade_crit = 0.0
+	for k in ["atk", "speed", "guard", "shade"]:
+		effects.remove(String(k))
 	_update_guard_fx()
 
 
@@ -750,6 +778,7 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 		"war_cry":
 			atk_buff = value
 			atk_buff_time = time
+			add_effect("atk", time, StatusEffects.source_hero_skill(sid))
 			_anim_buff()
 			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(1, 0.3, 0.2), 2.5, 0.4)
 			_announce(sname, "атака +%d%% на %d с" % [roundi(value * 100.0), roundi(time)])
@@ -764,6 +793,7 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 		"quick_step":
 			speed_buff = value
 			speed_buff_time = time
+			add_effect("speed", time, StatusEffects.source_hero_skill(sid))
 			_anim_buff()
 			Projectile.burst(fx_parent, global_position + Vector3(0, 0.3, 0), Color(0.5, 1, 0.6), 1.8, 0.3)
 			_announce(sname, "скорость +%d%% на %d с" % [roundi(value * 100.0), roundi(time)])
@@ -776,13 +806,14 @@ func _cast(sid: String, sk: Dictionary) -> bool:
 			_deal(t, _roll(mult, false))
 			Vfx.hit_spark(fx_parent, t.aim_point(), Color(1, 1, 0.5), 1.5)
 			if not t.is_dead:
-				t.stun(time)
+				t.stun(time, StatusEffects.source_hero_skill(sid))
 				Util.float_text(fx_parent, t.global_position + Vector3(0, 2.4 * t.body_scale + 0.8, 0),
 					"Оглушён!", Color(1, 1, 0.5))
 			_announce(sname, "")
 		"holy_guard":
 			guard = value
 			guard_time = time
+			add_effect("guard", time, StatusEffects.source_hero_skill(sid))
 			_update_guard_fx()
 			_anim_buff()
 			_announce(sname, "урон −%d%% на %d с" % [roundi(value * 100.0), roundi(time)])
@@ -859,6 +890,7 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			shade_eva = HeroSkills.field_buff(sid, "eva", n)
 			shade_atk = HeroSkills.field_buff(sid, "atk_pct", n)
 			shade_crit = HeroSkills.field_buff(sid, "crit", n)
+			add_effect("shade", shade_time, StatusEffects.source_hero_skill(sid))
 			_anim_buff()
 			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), col, 2.0, 0.4)
 			_announce(sname, "уклонение +%d%% на %d с" % [roundi(shade_eva * 100.0), roundi(shade_time)])
@@ -869,7 +901,7 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			_engage(t)
 			_anim_cast()
 			var sec := HeroSkills.field(sid, "sleep", n)
-			t.sleep(sec)
+			t.sleep(sec, StatusEffects.source_hero_skill(sid))
 			Projectile.burst(fx_parent, t.aim_point(), col, 1.3, 0.4)
 			Util.float_text(fx_parent, t.global_position + Vector3(0, 2.4 * t.body_scale + 0.8, 0), "Сон", col.lightened(0.4))
 			_announce(sname, "сон %.1f с" % sec)
@@ -891,7 +923,7 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			if sk.has("heal"):
 				heal(maxi(1, roundi(float(dmg) * float(sk["heal"]))))
 			if sk.has("fear") and not t.is_dead:
-				t.frighten(HeroSkills.field(sid, "fear", n), global_position)
+				t.frighten(HeroSkills.field(sid, "fear", n), global_position, StatusEffects.source_hero_skill(sid))
 				Util.float_text(fx_parent, t.global_position + Vector3(0, 2.4 * t.body_scale + 0.8, 0), "Страх!",
 					col.lightened(0.4))
 			_announce(sname, "")
@@ -924,12 +956,13 @@ func _bolt_effects(hit: Mob, sid: String, n: int) -> void:
 	var fx_parent := get_parent()
 	if sk.has("knock"):
 		hit.knock_back(global_position, float(sk["knock"]))
-		hit.stun(float(sk.get("root", 0.0)))
+		hit.stun(float(sk.get("root", 0.0)), StatusEffects.source_hero_skill(sid))
 		Util.float_text(fx_parent, hit.global_position + Vector3(0, 2.4 * hit.body_scale + 0.8, 0), "Отброшен!",
 			Color(1, 0.85, 0.5))
 	if sk.has("dot"):
 		var dps := float(cur_atk()) * HeroSkills.field(sid, "dot", n) + HeroSkills.field(sid, "dot_flat", n)
-		hit.add_dot(sid, dps, float(sk.get("dot_time", 10.0)), self, bool(sk.get("no_regen", false)))
+		hit.add_dot(sid, dps, float(sk.get("dot_time", 10.0)), self, bool(sk.get("no_regen", false)),
+			StatusEffects.source_hero_skill(sid))
 
 
 ## Анимация умения ближнего боя (SKILL_ANIM).
