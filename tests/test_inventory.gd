@@ -216,6 +216,12 @@ func run_step() -> void:
 			_press("act_buy")
 			check(not inv.has("daggers_steel", 2) and game.gold == 10, "без золота не купить")
 			game.gold = 500
+			# Выше в сумку клали по одному каждому предмету игры (их стало больше 40 ячеек) — освободим место:
+			# уберём оружие 1-го ранга (не надетое)
+			for key in ItemData.ITEMS:
+				var wid := String(key)
+				if wid.begins_with("weapon_") and wid != game.weapon and wid != game.shield:
+					inv.remove(wid, inv.count(wid))
 			var steel: int = inv.count("daggers_steel")
 			var free_slots: int = inv.room_for("daggers_steel")
 			_press("act_buy")
