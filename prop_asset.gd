@@ -66,6 +66,7 @@ static var enabled := true
 static var _meta := {}
 static var _meta_loaded := false
 static var _meshes := {}
+static var _bases := {}
 static var _mats := {}
 ## Материалы мелочей зон: контур включается по качеству (apply_quality).
 static var _near_mats: Array[ShaderMaterial] = []
@@ -152,6 +153,35 @@ static func mesh(id: String) -> Mesh:
 		root.free()
 	_meshes[id] = m
 	return m
+
+
+## Вершины основания модели (ниже h над низом модели, координаты модели) — корни дерева, низ камня или куста.
+static func base_points(id: String, h: float = 0.1) -> PackedVector3Array:
+	var key := "%s|%.3f" % [id, h]
+	if _bases.has(key):
+		return _bases[key]
+	var out := PackedVector3Array()
+	var m := mesh(id)
+	if m != null and m.get_surface_count() > 0:
+		var arr := m.surface_get_arrays(0)
+		var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var lo := INF
+		for i in verts.size():
+			lo = minf(lo, verts[i].y)
+		for i in verts.size():
+			if verts[i].y < lo + h:
+				out.append(verts[i])
+	_bases[key] = out
+	return out
+
+
+## Радиус основания модели (м, по X/Z от оси): насколько далеко от ствола касаются земли корни.
+static func base_radius(id: String, h: float = 0.1) -> float:
+	var r := 0.0
+	var pts := base_points(id, h)
+	for i in pts.size():
+		r = maxf(r, Vector2(pts[i].x, pts[i].z).length())
+	return r
 
 
 ## Материал страницы атласа (prop.gdshader, общий). outline.a > 0 — контур (veg_outline.gdshader:

@@ -5,6 +5,11 @@
 // Свечение (кристаллы, стекло фонарей, огонь жаровни) — альфа цвета вершины (0..1, пишет скрипт по цвету
 // текстуры): свой цвет текстуры без света и мягкая пульсация (фаза — по мировым координатам, у склеенного меша
 // нет своего объекта). Один сэмплер — дёшево для GL Compatibility на телефоне.
+// Двусторонний (cull_disabled) — страховка: у одинарных панелей Meshy скрипт разворачивает грани наружу
+// (orient_faces), но изнанка всё равно не даёт дыры. Нормаль изнанки Godot сам переворачивает
+// (DO_SIDE_CHECK при cull_disabled: на задней грани NORMAL = −нормаль), свет на ней верный.
+// Светлое (белые стены эльфов, солома, штукатурка) мягко ограничено сверху (highlight_knee/slope):
+// с солнцем, небом и кромкой белое не выжигается в сплошное пятно.
 shader_type spatial;
 render_mode cull_disabled, depth_draw_opaque;
 
@@ -17,7 +22,10 @@ uniform vec4 shadow_color : source_color = vec4(0.72, 0.68, 0.88, 1.0);
 uniform float rim_strength : hint_range(0.0, 1.0) = 0.15;
 uniform float rim_width : hint_range(0.0, 1.0) = 0.3;
 uniform vec4 rim_color : source_color = vec4(1.0, 0.96, 0.88, 1.0);
-uniform float glow_energy = 1.3;
+// Яркость текстуры выше knee растёт с наклоном slope (по наибольшему каналу — оттенок сохраняется).
+uniform float highlight_knee : hint_range(0.0, 1.0) = 0.58;
+uniform float highlight_slope : hint_range(0.0, 1.0) = 0.35;
+uniform float glow_energy = 1.1;
 uniform float pulse_amount : hint_range(0.0, 1.0) = 0.25;
 uniform float pulse_speed = 1.7;
 
@@ -31,6 +39,10 @@ void vertex() {
 
 void fragment() {
 	vec3 c = texture(albedo_tex, UV).rgb * tint.rgb;
+	float m = max(c.r, max(c.g, c.b));
+	if (m > highlight_knee) {
+		c *= (highlight_knee + (m - highlight_knee) * highlight_slope) / m;
+	}
 	ALBEDO = c * (1.0 - 0.7 * v_glow);
 	if (v_glow > 0.01) {
 		float pulse = 1.0 - pulse_amount + pulse_amount * (0.5 + 0.5 * sin(TIME * pulse_speed

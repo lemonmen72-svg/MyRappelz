@@ -1583,6 +1583,7 @@ func _camp(h: Node3D, poi: Dictionary) -> void:
 # ---------- Мосты ----------
 
 ## Перила мостов: столбики по краям настила и поручни; настил и его коллизию строит ядро.
+## Высоты — по профилю настила (IslandWorld.bridge_point): перила повторяют горб моста.
 func _bridge_rails() -> void:
 	var holder := Node3D.new()
 	holder.name = "BridgeRails"
@@ -1601,14 +1602,14 @@ func _bridge_rails() -> void:
 		var yaw := atan2(flat.x, flat.y)
 		var k := PoiModels.Kit.new()
 		var n := maxi(2, int(ceilf(length / 1.6)))
-		var dy := e.y - a.y
-		var pitch := -atan2(dy, length)
 		for s in [-1.0, 1.0]:
 			var x: float = float(s) * (width * 0.5 - 0.1)
+			var prev_y := 0.0
+			var prev_z := 0.0
 			for i in n + 1:
 				var t := float(i) / float(n)
 				var z := (t - 0.5) * length
-				var y := a.y + dy * t + 0.05 - mid.y
+				var y := IslandWorld.bridge_point(br, t).y - mid.y
 				var end := i == 0 or i == n
 				var ps := 0.24 if end else 0.14
 				var ph := 1.25 if end else 1.0
@@ -1617,9 +1618,18 @@ func _bridge_rails() -> void:
 				k.tex = -1
 				if end:
 					k.ball(Vector3(x, y + ph + 0.1, z), Vector3(0.16, 0.16, 0.16), PoiModels.WOOD, 6, 3)
-			var ymid := 0.05 + (a.y + e.y) * 0.5 - mid.y
-			k.tex = WorldTextures.LOG
-			k.box(Vector3(x, ymid + 0.95, 0), Vector3(0.12, 0.12, length), PoiModels.WOOD, Vector3(pitch, 0, 0))
-			k.box(Vector3(x, ymid + 0.5, 0), Vector3(0.08, 0.08, length), PoiModels.WOOD, Vector3(pitch, 0, 0))
-			k.tex = -1
+				if i > 0:
+					# Поручень и средняя жердь между соседними столбиками — по наклону настила
+					var dz := z - prev_z
+					var dy := y - prev_y
+					var seg := sqrt(dz * dz + dy * dy) + 0.04
+					var pitch := -atan2(dy, dz)
+					var cy := (y + prev_y) * 0.5
+					var cz := (z + prev_z) * 0.5
+					k.tex = WorldTextures.LOG
+					k.box(Vector3(x, cy + 0.95, cz), Vector3(0.12, 0.12, seg), PoiModels.WOOD, Vector3(pitch, 0, 0))
+					k.box(Vector3(x, cy + 0.5, cz), Vector3(0.08, 0.08, seg), PoiModels.WOOD, Vector3(pitch, 0, 0))
+					k.tex = -1
+				prev_y = y
+				prev_z = z
 		_put_kit(holder, k, _xf(mid, yaw))

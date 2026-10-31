@@ -67,11 +67,14 @@
 				6.023,
 				2.5
 			],
-			"tris": 3488,
-			"verts": 6536,
+			"tris": 3512,
+			"verts": 6551,
 			"src_tris": 12458,
 			"open_edges": 820,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 24,
+			"flipped": 51,
 			"markers": {
 				"front": [
 					-0.245,
@@ -103,16 +106,19 @@
 				5.731,
 				2.374
 			],
-			"tris": 3494,
-			"verts": 6887,
+			"tris": 3669,
+			"verts": 7026,
 			"src_tris": 12330,
-			"open_edges": 617,
+			"open_edges": 625,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 176,
+			"flipped": 209,
 			"markers": {
 				"front": [
-					0.239,
-					1.85,
-					2.268
+					0.179,
+					1.877,
+					2.269
 				]
 			}
 		},
@@ -126,29 +132,32 @@
 			"src": "Meshy_AI_Ivybell_Cottage_1031080953_texture.glb",
 			"size": [
 				7.345,
-				9.075,
-				7.195
+				9.121,
+				7.177
 			],
 			"min": [
 				-3.672,
 				0.0,
-				-3.598
+				-3.588
 			],
 			"max": [
 				3.672,
-				9.075,
-				3.598
+				9.121,
+				3.588
 			],
-			"tris": 4490,
-			"verts": 8569,
+			"tris": 4896,
+			"verts": 9328,
 			"src_tris": 13534,
-			"open_edges": 531,
+			"open_edges": 526,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 406,
+			"flipped": 225,
 			"markers": {
 				"front": [
-					-0.317,
-					0.322,
-					3.435
+					-0.307,
+					0.365,
+					3.426
 				]
 			}
 		},
@@ -176,15 +185,18 @@
 				1.016
 			],
 			"tris": 1471,
-			"verts": 2645,
+			"verts": 2480,
 			"src_tris": 13730,
 			"open_edges": 154,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 161,
 			"markers": {
 				"front": [
-					0.007,
-					0.373,
-					0.963
+					0.011,
+					0.36,
+					0.964
 				]
 			}
 		},
@@ -212,15 +224,18 @@
 				0.5
 			],
 			"tris": 988,
-			"verts": 1900,
+			"verts": 1794,
 			"src_tris": 14630,
 			"open_edges": 105,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 101,
 			"markers": {
 				"front": [
-					-0.008,
-					1.65,
-					0.482
+					0.015,
+					1.652,
+					0.483
 				]
 			}
 		},
@@ -248,15 +263,18 @@
 				1.111
 			],
 			"tris": 1495,
-			"verts": 2770,
+			"verts": 2587,
 			"src_tris": 14468,
 			"open_edges": 121,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 171,
 			"markers": {
 				"front": [
-					-0.006,
-					4.72,
-					1.054
+					-0.022,
+					4.717,
+					1.053
 				]
 			}
 		},
@@ -283,11 +301,14 @@
 				2.525,
 				1.283
 			],
-			"tris": 1492,
-			"verts": 3069,
+			"tris": 1528,
+			"verts": 3153,
 			"src_tris": 14799,
 			"open_edges": 36,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 38,
+			"flipped": 77,
 			"markers": {
 				"front": [
 					-0.006,
@@ -320,10 +341,13 @@
 				2.599
 			],
 			"tris": 3496,
-			"verts": 6296,
+			"verts": 6363,
 			"src_tris": 13182,
 			"open_edges": 1038,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 97,
 			"markers": {
 				"front": [
 					-0.101,
@@ -355,16 +379,19 @@
 				5.668,
 				2.599
 			],
-			"tris": 3480,
-			"verts": 7424,
+			"tris": 3505,
+			"verts": 7340,
 			"src_tris": 13575,
-			"open_edges": 204,
+			"open_edges": 203,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 24,
+			"flipped": 164,
 			"markers": {
 				"front": [
-					-0.375,
-					1.387,
-					2.455
+					-0.372,
+					1.381,
+					2.452
 				]
 			}
 		},
@@ -378,7 +405,7 @@
 			"src": "Meshy_AI_Whisperwind_Watchtowe_1031081901_texture.glb",
 			"size": [
 				4.791,
-				10.417,
+				10.433,
 				5.973
 			],
 			"min": [
@@ -388,18 +415,21 @@
 			],
 			"max": [
 				2.396,
-				10.417,
+				10.433,
 				2.987
 			],
-			"tris": 3495,
-			"verts": 6542,
+			"tris": 3855,
+			"verts": 7180,
 			"src_tris": 12733,
-			"open_edges": 497,
+			"open_edges": 491,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 355,
+			"flipped": 232,
 			"markers": {
 				"front": [
-					-0.009,
-					7.396,
+					-0.025,
+					7.424,
 					2.987
 				]
 			}
@@ -415,28 +445,31 @@
 			"size": [
 				9.58,
 				9.492,
-				0.851
+				0.856
 			],
 			"min": [
 				-4.79,
 				-4.746,
-				-0.426
+				-0.428
 			],
 			"max": [
 				4.79,
 				4.746,
-				0.426
+				0.428
 			],
-			"tris": 1476,
-			"verts": 2981,
+			"tris": 1591,
+			"verts": 3255,
 			"src_tris": 15615,
-			"open_edges": 101,
+			"open_edges": 106,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 115,
+			"flipped": 92,
 			"markers": {
 				"front": [
 					0.012,
 					-0.038,
-					0.42
+					0.423
 				]
 			}
 		},
@@ -464,10 +497,13 @@
 				0.38
 			],
 			"tris": 767,
-			"verts": 1455,
+			"verts": 1457,
 			"src_tris": 14897,
 			"open_edges": 88,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 28,
 			"markers": {
 				"front": [
 					0.035,
@@ -487,28 +523,31 @@
 			"size": [
 				1.033,
 				1.024,
-				1.109
+				1.092
 			],
 			"min": [
 				-0.516,
 				0.0,
-				-0.554
+				-0.546
 			],
 			"max": [
 				0.516,
 				1.024,
-				0.554
+				0.546
 			],
-			"tris": 475,
-			"verts": 758,
+			"tris": 473,
+			"verts": 759,
 			"src_tris": 13168,
 			"open_edges": 133,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 33,
 			"markers": {
 				"front": [
-					0.021,
-					0.445,
-					0.526
+					-0.013,
+					0.477,
+					0.514
 				]
 			}
 		},
@@ -540,6 +579,9 @@
 			"src_tris": 15147,
 			"open_edges": 3,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 0,
 			"markers": {
 				"front": [
 					-0.073,
@@ -572,15 +614,18 @@
 				2.574
 			],
 			"tris": 4496,
-			"verts": 7212,
+			"verts": 7171,
 			"src_tris": 2947094,
 			"open_edges": 0,
-			"glow_verts": 202,
+			"glow_verts": 83,
+			"glow_max": 0.55,
+			"panel_tris": 0,
+			"flipped": 66,
 			"markers": {
 				"glow": [
-					-0.06,
-					0.822,
-					0.133
+					0.023,
+					0.658,
+					0.065
 				],
 				"front": [
 					0.023,
@@ -612,21 +657,24 @@
 				11.0,
 				2.193
 			],
-			"tris": 3470,
-			"verts": 6105,
+			"tris": 3656,
+			"verts": 6412,
 			"src_tris": 13737,
-			"open_edges": 724,
-			"glow_verts": 13,
+			"open_edges": 730,
+			"glow_verts": 0,
+			"glow_max": 0.27,
+			"panel_tris": 172,
+			"flipped": 91,
 			"markers": {
 				"glow": [
-					0.035,
-					10.472,
-					-0.062
+					0.028,
+					10.166,
+					-0.004
 				],
 				"front": [
-					-0.03,
-					0.062,
-					2.043
+					-0.025,
+					0.061,
+					2.046
 				]
 			}
 		},
@@ -653,21 +701,24 @@
 				5.882,
 				2.7
 			],
-			"tris": 4460,
-			"verts": 8450,
+			"tris": 4647,
+			"verts": 8775,
 			"src_tris": 25363,
-			"open_edges": 1794,
-			"glow_verts": 187,
+			"open_edges": 1834,
+			"glow_verts": 6,
+			"glow_max": 0.379,
+			"panel_tris": 185,
+			"flipped": 201,
 			"markers": {
 				"glow": [
-					-0.269,
-					3.001,
-					-0.169
+					-0.301,
+					3.135,
+					-0.074
 				],
 				"front": [
-					0.047,
+					0.053,
 					0.159,
-					2.551
+					2.552
 				]
 			}
 		},
@@ -681,7 +732,7 @@
 			"src": "Meshy_AI_Amethyst_Spire_1031082521_texture.glb",
 			"size": [
 				6.328,
-				15.811,
+				15.844,
 				7.0
 			],
 			"min": [
@@ -691,24 +742,27 @@
 			],
 			"max": [
 				3.164,
-				15.811,
+				15.844,
 				3.5
 			],
-			"tris": 3477,
-			"verts": 6681,
+			"tris": 3879,
+			"verts": 7541,
 			"src_tris": 13521,
-			"open_edges": 807,
-			"glow_verts": 156,
+			"open_edges": 844,
+			"glow_verts": 84,
+			"glow_max": 0.55,
+			"panel_tris": 388,
+			"flipped": 89,
 			"markers": {
 				"glow": [
-					-0.072,
-					7.193,
-					0.265
+					-0.186,
+					7.625,
+					0.291
 				],
 				"front": [
-					0.035,
-					0.302,
-					3.286
+					-0.01,
+					0.296,
+					3.289
 				]
 			}
 		},
@@ -721,35 +775,38 @@
 			],
 			"src": "Meshy_AI_Crimson_Beacon_1031083527_texture.glb",
 			"size": [
-				5.041,
+				5.142,
 				13.979,
 				5.579
 			],
 			"min": [
-				-2.521,
+				-2.571,
 				0.0,
 				-2.789
 			],
 			"max": [
-				2.521,
+				2.571,
 				13.979,
 				2.789
 			],
-			"tris": 3443,
-			"verts": 6467,
+			"tris": 5189,
+			"verts": 9178,
 			"src_tris": 13583,
-			"open_edges": 614,
-			"glow_verts": 249,
+			"open_edges": 652,
+			"glow_verts": 293,
+			"glow_max": 1.0,
+			"panel_tris": 1711,
+			"flipped": 148,
 			"markers": {
 				"glow": [
-					0.024,
-					11.033,
-					0.03
+					-0.105,
+					11.035,
+					0.037
 				],
 				"front": [
-					-0.042,
-					0.172,
-					2.643
+					-0.058,
+					0.164,
+					2.656
 				],
 				"lamp": [
 					0.0,
@@ -781,16 +838,19 @@
 				9.088,
 				4.769
 			],
-			"tris": 4470,
-			"verts": 8467,
+			"tris": 5580,
+			"verts": 10581,
 			"src_tris": 29274,
-			"open_edges": 632,
+			"open_edges": 724,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 1104,
+			"flipped": 219,
 			"markers": {
 				"front": [
-					0.012,
-					2.798,
-					4.482
+					0.02,
+					2.799,
+					4.481
 				]
 			}
 		},
@@ -803,28 +863,31 @@
 			],
 			"src": "Meshy_AI_Overgrown_Mine_Entran_1031083228_texture.glb",
 			"size": [
-				9.137,
+				9.328,
 				6.185,
 				7.995
 			],
 			"min": [
-				-4.568,
+				-4.664,
 				0.0,
 				-3.998
 			],
 			"max": [
-				4.568,
+				4.664,
 				6.185,
 				3.998
 			],
-			"tris": 3452,
-			"verts": 5616,
+			"tris": 3654,
+			"verts": 5942,
 			"src_tris": 13204,
-			"open_edges": 1051,
+			"open_edges": 1053,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 199,
+			"flipped": 68,
 			"markers": {
 				"front": [
-					-2.254,
+					-2.159,
 					0.124,
 					3.838
 				]
@@ -853,16 +916,19 @@
 				3.274,
 				1.841
 			],
-			"tris": 1495,
-			"verts": 2481,
+			"tris": 1531,
+			"verts": 2643,
 			"src_tris": 15201,
 			"open_edges": 37,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 46,
+			"flipped": 134,
 			"markers": {
 				"front": [
-					0.171,
-					0.097,
-					1.751
+					0.038,
+					0.093,
+					1.749
 				]
 			}
 		},
@@ -889,16 +955,19 @@
 				2.319,
 				1.707
 			],
-			"tris": 1484,
-			"verts": 2544,
+			"tris": 1796,
+			"verts": 3188,
 			"src_tris": 15123,
-			"open_edges": 189,
+			"open_edges": 191,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 314,
+			"flipped": 70,
 			"markers": {
 				"front": [
-					-0.098,
-					0.066,
-					1.668
+					-0.738,
+					0.061,
+					1.662
 				]
 			}
 		},
@@ -926,10 +995,13 @@
 				0.84
 			],
 			"tris": 780,
-			"verts": 1495,
+			"verts": 1487,
 			"src_tris": 14426,
 			"open_edges": 35,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 25,
 			"markers": {
 				"front": [
 					-0.002,
@@ -961,16 +1033,19 @@
 				1.52,
 				0.552
 			],
-			"tris": 997,
-			"verts": 2169,
+			"tris": 996,
+			"verts": 2134,
 			"src_tris": 15404,
 			"open_edges": 296,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 135,
 			"markers": {
 				"front": [
 					-0.593,
 					0.499,
-					0.526
+					0.527
 				]
 			}
 		},
@@ -997,11 +1072,14 @@
 				3.398,
 				0.235
 			],
-			"tris": 593,
-			"verts": 1173,
+			"tris": 592,
+			"verts": 1150,
 			"src_tris": 14050,
-			"open_edges": 154,
+			"open_edges": 150,
 			"glow_verts": 21,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 15,
 			"markers": {
 				"glow": [
 					-0.481,
@@ -1029,38 +1107,41 @@
 			],
 			"src": "Meshy_AI_Moonlit_Arcana_Lanter_1031083006_texture.glb",
 			"size": [
-				1.678,
+				1.683,
 				3.388,
-				0.833
+				0.861
 			],
 			"min": [
-				-0.839,
+				-0.842,
 				0.0,
-				-0.416
+				-0.43
 			],
 			"max": [
-				0.839,
+				0.842,
 				3.388,
-				0.416
+				0.43
 			],
-			"tris": 757,
-			"verts": 1476,
+			"tris": 1022,
+			"verts": 1996,
 			"src_tris": 15937,
-			"open_edges": 5,
-			"glow_verts": 95,
+			"open_edges": 16,
+			"glow_verts": 164,
+			"glow_max": 1.0,
+			"panel_tris": 249,
+			"flipped": 36,
 			"markers": {
 				"glow": [
-					-0.503,
-					2.156,
-					0.028
+					-0.324,
+					1.482,
+					-0.051
 				],
 				"front": [
-					-0.098,
-					0.264,
-					0.394
+					0.006,
+					0.304,
+					0.412
 				],
 				"lamp": [
-					-0.554,
+					-0.556,
 					2.1,
 					0.0
 				]
@@ -1090,10 +1171,13 @@
 				0.412
 			],
 			"tris": 798,
-			"verts": 1430,
+			"verts": 1443,
 			"src_tris": 13718,
 			"open_edges": 203,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 13,
 			"markers": {
 				"front": [
 					0.05,
@@ -1126,15 +1210,18 @@
 				0.293
 			],
 			"tris": 770,
-			"verts": 1651,
+			"verts": 1652,
 			"src_tris": 14394,
 			"open_edges": 188,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 97,
 			"markers": {
 				"front": [
-					0.02,
-					1.212,
-					0.274
+					0.024,
+					1.181,
+					0.273
 				]
 			}
 		},
@@ -1162,15 +1249,18 @@
 				0.376
 			],
 			"tris": 857,
-			"verts": 1986,
+			"verts": 1953,
 			"src_tris": 15281,
 			"open_edges": 54,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 91,
 			"markers": {
 				"front": [
-					-0.035,
+					-0.032,
 					0.035,
-					0.36
+					0.361
 				]
 			}
 		},
@@ -1198,14 +1288,17 @@
 				0.403
 			],
 			"tris": 396,
-			"verts": 784,
+			"verts": 772,
 			"src_tris": 14333,
 			"open_edges": 52,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 13,
 			"markers": {
 				"front": [
-					-0.003,
-					0.476,
+					-0.002,
+					0.462,
 					0.392
 				]
 			}
@@ -1221,27 +1314,30 @@
 			"size": [
 				0.834,
 				0.855,
-				0.846
+				0.843
 			],
 			"min": [
 				-0.417,
 				0.0,
-				-0.423
+				-0.422
 			],
 			"max": [
 				0.417,
 				0.855,
-				0.423
+				0.422
 			],
 			"tris": 499,
-			"verts": 737,
+			"verts": 732,
 			"src_tris": 15369,
 			"open_edges": 3,
 			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 26,
 			"markers": {
 				"front": [
-					0.038,
-					0.431,
+					0.02,
+					0.445,
 					0.397
 				]
 			}
@@ -1270,10 +1366,13 @@
 				0.664
 			],
 			"tris": 987,
-			"verts": 1852,
+			"verts": 1843,
 			"src_tris": 14798,
 			"open_edges": 86,
 			"glow_verts": 160,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 51,
 			"markers": {
 				"glow": [
 					0.01,
@@ -1310,21 +1409,24 @@
 				5.535,
 				1.059
 			],
-			"tris": 991,
-			"verts": 1819,
+			"tris": 1202,
+			"verts": 2226,
 			"src_tris": 15301,
-			"open_edges": 7,
-			"glow_verts": 185,
+			"open_edges": 20,
+			"glow_verts": 149,
+			"glow_max": 1.0,
+			"panel_tris": 202,
+			"flipped": 8,
 			"markers": {
 				"glow": [
-					0.095,
-					2.922,
-					0.046
+					0.066,
+					2.899,
+					-0.016
 				],
 				"front": [
-					0.611,
-					0.068,
-					0.995
+					0.607,
+					0.061,
+					0.997
 				]
 			}
 		},
@@ -1352,15 +1454,18 @@
 				0.855
 			],
 			"tris": 896,
-			"verts": 1624,
+			"verts": 1634,
 			"src_tris": 14471,
 			"open_edges": 203,
-			"glow_verts": 678,
+			"glow_verts": 680,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 15,
 			"markers": {
 				"glow": [
-					-0.002,
-					0.917,
-					0.008
+					-0.001,
+					0.916,
+					0.009
 				],
 				"front": [
 					-0.008,
@@ -1396,12 +1501,15 @@
 			"verts": 1680,
 			"src_tris": 15546,
 			"open_edges": 23,
-			"glow_verts": 569,
+			"glow_verts": 556,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 10,
 			"markers": {
 				"glow": [
 					0.005,
-					0.899,
-					0.022
+					0.895,
+					0.024
 				],
 				"front": [
 					-0.041,
@@ -1434,15 +1542,18 @@
 				0.935
 			],
 			"tris": 894,
-			"verts": 1696,
+			"verts": 1694,
 			"src_tris": 13008,
 			"open_edges": 209,
-			"glow_verts": 876,
+			"glow_verts": 884,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 11,
 			"markers": {
 				"glow": [
-					0.001,
-					1.048,
-					0.032
+					0.003,
+					1.045,
+					0.026
 				],
 				"front": [
 					-0.055,

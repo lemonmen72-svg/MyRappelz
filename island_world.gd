@@ -22,6 +22,15 @@ const FAR := 16.0
 const MAX_STEP := 0.9
 ## «Не вода» для _raster_segment.
 const NO_LEVEL := -1000.0
+## Ширина склона русла реки от края воды, м (дальше — ровный берег).
+const RIVER_BANK := 4.0
+## Мост: на сколько метров концы настила заходят на ровный берег за склоном русла (поперёк реки), толщина настила.
+const BRIDGE_BANK := 1.2
+const BRIDGE_THICK := 0.3
+## Точек профиля настила (высота верха по длине моста).
+const BRIDGE_SAMPLES := 16
+## Подход к мосту — точка на дороге за концом настила, м (bridge_waypoint: путь питомцев и зверей).
+const BRIDGE_APPROACH := 1.8
 ## Лесная подстилка: шаг сетки веса леса, м, и радиус пятна под деревом, м.
 const FOREST_STEP := 2.0
 const FOREST_RADIUS := 5.5
@@ -46,7 +55,8 @@ var sea_level := -2.5
 var river_level := -2.2
 ## Материал рельефа (Quality переключает облегчённый режим шейдера).
 var terrain_material: ShaderMaterial = null
-## Мосты: {"a": Vector3, "b": Vector3, "width": float}
+## Мосты: {"a": Vector3, "b": Vector3, "width": float, "deck": PackedFloat32Array} — концы на земле (a, b),
+## ширина настила и высоты верха настила в BRIDGE_SAMPLES + 1 точках от a до b (bridge_point).
 var bridges: Array[Dictionary] = []
 ## Вес леса 0..1 на сетке FOREST_STEP (лесная подстилка под деревьями; bake_forest).
 var forest_w := PackedFloat32Array()
@@ -285,8 +295,8 @@ func _compute_heights(_rng: RandomNumberGenerator) -> void:
 			var wl := water_level[k]
 			var bed := wl - depth
 			var half := river_w * 0.5
-			if water_d[k] < half + 4.0:
-				var t := smoothstep(half * 0.55, half + 4.0, water_d[k])
+			if water_d[k] < half + RIVER_BANK:
+				var t := smoothstep(half * 0.55, half + RIVER_BANK, water_d[k])
 				h = minf(h, lerpf(bed, maxf(h, wl + 0.6), t))
 			heights[k] = h
 
@@ -335,6 +345,10 @@ func _raster_hill(c: Vector2, r: float, h: float) -> void:
 func _find_bridges() -> void:
 	var river_w := float(cfg.get("river", {}).get("width", 5.0))
 	var road_w := float(cfg.get("roads", {}).get("width", 3.2))
+	# Концы моста — там, где дорога вышла из русла на ровный берег (за склоном RIVER_BANK + BRIDGE_BANK):
+	# по самой дороге, поэтому и при косом пересечении, и на изгибе дороги концы не остаются на склоне
+	# (0.14.0: у кольцевой дороги конец был на склоне русла — настил шёл криво, со ступенькой)
+	var dry := river_w * 0.5 + RIVER_BANK + BRIDGE_BANK
 	var segs: Array = []
 	for br in cfg.get("river", {}).get("branches", []):
 		var pts: Array = br
@@ -342,6 +356,7 @@ func _find_bridges() -> void:
 			segs.append([v2(pts[s]), v2(pts[s + 1])])
 	for key in cfg.get("roads", {}).get("paths", {}):
 		var path: Array = cfg["roads"]["paths"][key]
+		var along := 0.0
 		for s in range(path.size() - 1):
 			var a := v2(path[s])
 			var b := v2(path[s + 1])
@@ -350,15 +365,115 @@ func _find_bridges() -> void:
 				if hit == null:
 					continue
 				var p: Vector2 = hit
-				var dir := (b - a).normalized()
-				var half := river_w * 0.5 + 4.5
-				var pa := p - dir * half
-				var pb := p + dir * half
-				bridges.append({
+				var s0 := along + a.distance_to(p)
+				var sa := s0
+				while s0 - sa < 25.0:
+					var q := _path_point(path, sa)
+					if water_distance(q.x, q.y) >= dry:
+						break
+					sa -= 0.5
+				var sb := s0
+				while sb - s0 < 25.0:
+					var q := _path_point(path, sb)
+					if water_distance(q.x, q.y) >= dry:
+						break
+					sb += 0.5
+				var pa := _path_point(path, sa)
+				var pb := _path_point(path, sb)
+				var br := {
 					"a": Vector3(pa.x, height_at(pa.x, pa.y), pa.y),
 					"b": Vector3(pb.x, height_at(pb.x, pb.y), pb.y),
 					"width": road_w + 0.8,
-				})
+				}
+				# Две дороги пересекают реку рядом и сходятся на берегу (кольцевая и дорога к эльфам у развилки):
+				# второй мост лёг бы настилом на первый — он не нужен, берега уже связаны
+				if _bridge_overlaps(br):
+					continue
+				br["deck"] = _deck_profile(br)
+				bridges.append(br)
+			along += a.distance_to(b)
+
+
+## Настил br ближе ширины к настилу уже поставленного моста.
+func _bridge_overlaps(br: Dictionary) -> bool:
+	var a3: Vector3 = br["a"]
+	var b3: Vector3 = br["b"]
+	for o in bridges:
+		var c3: Vector3 = o["a"]
+		var e3: Vector3 = o["b"]
+		var gap := (float(br["width"]) + float(o["width"])) * 0.5 + 0.5
+		for i in 11:
+			var t := float(i) / 10.0
+			var p := Vector2(a3.x, a3.z).lerp(Vector2(b3.x, b3.z), t)
+			var q := Geometry2D.get_closest_point_to_segment(p, Vector2(c3.x, c3.z), Vector2(e3.x, e3.z))
+			if p.distance_to(q) < gap:
+				return true
+	return false
+
+
+## Точка ломаной на расстоянии s от начала (за концами — по продолжению крайнего отрезка).
+func _path_point(path: Array, s: float) -> Vector2:
+	var along := 0.0
+	for i in range(path.size() - 1):
+		var a := v2(path[i])
+		var b := v2(path[i + 1])
+		var l := a.distance_to(b)
+		if s <= along + l or i == path.size() - 2:
+			if s < 0.0 and i == 0:
+				return a + (b - a).normalized() * s
+			return a + (b - a).normalized() * (s - along)
+		along += l
+	return v2(path[path.size() - 1])
+
+
+## Профиль настила: верх концов вровень с землёй (чуть ниже — без ступеньки, на которой застревает
+## коробка питомца), между ними — прямая от конца к концу, но не ниже земли под настилом (по всей ширине)
+## на 8 см; сглажено, чтобы на горбе берега не было излома.
+func _deck_profile(br: Dictionary) -> PackedFloat32Array:
+	var a: Vector3 = br["a"]
+	var e: Vector3 = br["b"]
+	var half_w := float(br["width"]) * 0.5
+	var flat := Vector2(e.x - a.x, e.z - a.z)
+	var side := Vector2(-flat.y, flat.x).normalized()
+	var n := BRIDGE_SAMPLES
+	var floor_y := PackedFloat32Array()
+	floor_y.resize(n + 1)
+	for i in n + 1:
+		var t := float(i) / float(n)
+		var q := Vector2(a.x, a.z) + flat * t
+		var g := -INF
+		for k in 5:
+			var o := side * half_w * (float(k) / 2.0 - 1.0)
+			g = maxf(g, height_at(q.x + o.x, q.y + o.y))
+		floor_y[i] = g
+	var ya := height_at(a.x, a.z) - 0.03
+	var yb := height_at(e.x, e.z) - 0.03
+	var deck := PackedFloat32Array()
+	deck.resize(n + 1)
+	for i in n + 1:
+		deck[i] = maxf(lerpf(ya, yb, float(i) / float(n)), floor_y[i] + 0.08)
+	deck[0] = ya
+	deck[n] = yb
+	for _pass in 3:
+		var sm := deck.duplicate()
+		for i in range(1, n):
+			sm[i] = maxf(deck[i - 1] * 0.25 + deck[i] * 0.5 + deck[i + 1] * 0.25, floor_y[i] + 0.06)
+		deck = sm
+	return deck
+
+
+## Верх настила моста в доле t (0 — конец a, 1 — конец b), мировые координаты.
+static func bridge_point(br: Dictionary, t: float) -> Vector3:
+	var a: Vector3 = br["a"]
+	var e: Vector3 = br["b"]
+	var deck: PackedFloat32Array = br.get("deck", PackedFloat32Array())
+	var p := a.lerp(e, clampf(t, 0.0, 1.0))
+	if deck.size() < 2:
+		return p
+	var f := clampf(t, 0.0, 1.0) * float(deck.size() - 1)
+	var i := mini(int(floorf(f)), deck.size() - 2)
+	p.y = lerpf(deck[i], deck[i + 1], f - float(i))
+	return p
 
 
 # ---------- Проходимость ----------
@@ -522,29 +637,67 @@ func _build_bridges() -> void:
 	for b in bridges:
 		var a: Vector3 = b["a"]
 		var e: Vector3 = b["b"]
-		var width := float(b["width"])
-		a.y += 0.05
-		e.y += 0.05
 		var mid := (a + e) * 0.5
-		var length := a.distance_to(e)
 		var body := StaticBody3D.new()
 		body.name = "Bridge"
 		body.add_to_group("bridges")
-		body.transform = Transform3D(Basis.looking_at(e - mid, Vector3.UP), mid)
+		body.position = mid
+		var built := _deck_mesh(b, mid)
+		var mesh: ArrayMesh = built[0]
+		var faces: PackedVector3Array = built[1]
 		var col := CollisionShape3D.new()
-		var box := BoxShape3D.new()
-		box.size = Vector3(width, 0.3, length)
-		col.shape = box
-		col.position.y = -0.15
+		var shape := ConcavePolygonShape3D.new()
+		shape.set_faces(faces)
+		col.shape = shape
 		body.add_child(col)
 		var deck := MeshInstance3D.new()
-		var bm := BoxMesh.new()
-		bm.size = Vector3(width, 0.3, length)
-		deck.mesh = bm
-		deck.position.y = -0.15
+		deck.mesh = mesh
 		deck.material_override = deck_mat
 		body.add_child(deck)
 		add_child(body)
+
+
+## Меш настила по профилю (bridge_point): верх, бока и низ толщиной BRIDGE_THICK; концы уходят в землю.
+## Возвращает [ArrayMesh, PackedVector3Array треугольников для коллизии].
+func _deck_mesh(br: Dictionary, center: Vector3) -> Array:
+	var a: Vector3 = br["a"]
+	var e: Vector3 = br["b"]
+	var half_w := float(br["width"]) * 0.5
+	var flat := Vector3(e.x - a.x, 0.0, e.z - a.z)
+	var side := Vector3(-flat.z, 0.0, flat.x).normalized() * half_w
+	var down := Vector3(0.0, -BRIDGE_THICK, 0.0)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Плоские нормали — как у прежнего настила-коробки (рёбра досок не скругляются светом)
+	st.set_smooth_group(-1)
+	var faces := PackedVector3Array()
+	var n := BRIDGE_SAMPLES
+	for i in n:
+		var p0 := bridge_point(br, float(i) / float(n)) - center
+		var p1 := bridge_point(br, float(i + 1) / float(n)) - center
+		var l0 := p0 + side
+		var r0 := p0 - side
+		var l1 := p1 + side
+		var r1 := p1 - side
+		faces.append_array(_quad(st, l0, l1, r1, r0))
+		faces.append_array(_quad(st, l0 + down, r0 + down, r1 + down, l1 + down))
+		faces.append_array(_quad(st, l0, l0 + down, l1 + down, l1))
+		faces.append_array(_quad(st, r1, r1 + down, r0 + down, r0))
+	var s0 := bridge_point(br, 0.0) - center
+	var s1 := bridge_point(br, 1.0) - center
+	faces.append_array(_quad(st, s0 - side, s0 - side + down, s0 + side + down, s0 + side))
+	faces.append_array(_quad(st, s1 + side, s1 + side + down, s1 - side + down, s1 - side))
+	st.generate_normals()
+	return [st.commit(), faces]
+
+
+## Четырёхугольник a-b-c-d (против часовой при взгляде с лицевой стороны) двумя треугольниками; возвращает
+## их вершины (для коллизии). У Godot лицевая сторона — по часовой, поэтому вершины идут в обратном порядке.
+static func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> PackedVector3Array:
+	var tri := PackedVector3Array([a, c, b, a, d, c])
+	for i in tri.size():
+		st.add_vertex(tri[i])
+	return tri
 
 
 # ---------- Запросы ----------
@@ -734,6 +887,108 @@ static func constrain(body: Node3D, prev: Vector3) -> void:
 	var h := w.height_at(p.x, p.z)
 	if p.y < h - 0.6 and not w._on_bridge(p):
 		body.global_position.y = h + 0.05
+
+
+## Прямой путь от a до b по суше: все клетки на отрезке проходимы (шаг — полклетки сетки).
+func segment_walkable(a: Vector3, b: Vector3) -> bool:
+	var d := Vector2(b.x - a.x, b.z - a.z)
+	var n := maxi(1, int(ceilf(d.length() / (step * 0.5))))
+	for i in range(1, n + 1):
+		var t := float(i) / float(n)
+		if not is_walkable(a.x + d.x * t, a.z + d.y * t):
+			return false
+	return true
+
+
+## Куда идти от from к to, если прямой путь упирается в воду (реку): через мост с наименьшим обходом.
+## Не на мосту — к подходу ближнего конца (на дороге в BRIDGE_APPROACH м от настила), от подхода и на
+## мосту — к сходу с дальнего конца. Vector3.INF — прямой путь свободен (или мостов нет).
+func bridge_waypoint(from: Vector3, to: Vector3) -> Vector3:
+	if bridges.is_empty() or segment_walkable(from, to):
+		return Vector3.INF
+	var best := Vector3.INF
+	var best_cost := INF
+	for br in bridges:
+		var a: Vector3 = br["a"]
+		var e: Vector3 = br["b"]
+		var axis := Vector3(e.x - a.x, 0.0, e.z - a.z).normalized()
+		var outs: Array[Vector3] = [a - axis * BRIDGE_APPROACH, e + axis * BRIDGE_APPROACH]
+		var on := _near_bridge(br, from, 0.3)
+		for k in 2:
+			var near_in: Vector3 = outs[k]
+			var far_out: Vector3 = outs[1 - k]
+			var cost := 0.0
+			var wp := far_out
+			if on:
+				# На мосту: к сходу с того конца, откуда ближе к цели
+				cost = _flat_dist(from, far_out) + _flat_dist(far_out, to)
+			else:
+				var at_in := _flat_dist(from, near_in) < 1.2
+				if not at_in and not segment_walkable(from, near_in):
+					continue
+				if not at_in:
+					wp = near_in
+				cost = _flat_dist(from, near_in) + _flat_dist(near_in, far_out) + _flat_dist(far_out, to)
+			if not segment_walkable(far_out, to):
+				cost += 60.0
+			if cost < best_cost:
+				best_cost = cost
+				best = wp
+	# Слишком далёкий обход (мост на другом краю острова) — не идём: застрявшего питомца перенесёт к хозяину
+	if best_cost > _flat_dist(from, to) * 3.0 + 40.0:
+		return Vector3.INF
+	return best
+
+
+## Путь существа (питомец, зверь) в обход реки: направление к цели напрямую или через мост
+## (bridge_waypoint; путь пересчитывается раз в 0.25 с или когда цель сдвинулась больше чем на 1.5 м).
+class Route:
+	var waypoint := Vector3.INF
+	var goal := Vector3.INF
+	var timer := 0.0
+
+	## Единичное направление по земле от from к to (ноль — уже на месте).
+	func dir_to(from: Vector3, to: Vector3, delta: float) -> Vector3:
+		var straight := Vector3(to.x - from.x, 0.0, to.z - from.z)
+		straight = straight.normalized() if straight.length() > 0.001 else Vector3.ZERO
+		timer -= delta
+		if timer <= 0.0 or not goal.is_finite() or to.distance_to(goal) > 1.5:
+			timer = 0.25
+			goal = to
+			waypoint = Vector3.INF
+			var w := IslandWorld.current
+			if w != null and is_instance_valid(w):
+				waypoint = w.bridge_waypoint(from, to)
+		if not waypoint.is_finite():
+			return straight
+		var d := Vector3(waypoint.x - from.x, 0.0, waypoint.z - from.z)
+		if d.length() < 0.4:
+			# Дошёл до точки обхода — следующую посчитать сразу
+			timer = 0.0
+			return straight
+		return d.normalized()
+
+	func reset() -> void:
+		waypoint = Vector3.INF
+		goal = Vector3.INF
+		timer = 0.0
+
+
+static func _flat_dist(a: Vector3, b: Vector3) -> float:
+	return Vector2(a.x - b.x, a.z - b.z).length()
+
+
+## Точка над мостом br (в пределах ширины настила + margin, между концами).
+func _near_bridge(br: Dictionary, p: Vector3, margin: float) -> bool:
+	var a3: Vector3 = br["a"]
+	var b3: Vector3 = br["b"]
+	var a := Vector2(a3.x, a3.z)
+	var ab := Vector2(b3.x, b3.z) - a
+	var q := Vector2(p.x, p.z)
+	var t := (q - a).dot(ab) / maxf(ab.length_squared(), 0.0001)
+	if t < 0.0 or t > 1.0:
+		return false
+	return q.distance_to(a + ab * t) <= float(br["width"]) * 0.5 + margin
 
 
 func _on_bridge(p: Vector3) -> bool:

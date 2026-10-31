@@ -4,6 +4,9 @@ extends "res://tests/test_base.gd"
 ## пределах процедурной модели того же вида, основание на y = 0; на острове постройки — модели из файлов
 ## (поверхности с материалом атласа в мешах зон), коллизия по габаритам модели, постройки не висят в воздухе
 ## и не утонули; крылья мельницы и корабль — модели из файлов; деревья, кусты и камни — тоже.
+## Стены построек без дыр: лучи снаружи на высоте первого этажа упираются в ближнюю стену (не проходят
+## внутрь дома и насквозь) и попадают в лицевую сторону грани (панели Meshy развёрнуты наружу); материал
+## двусторонний (страховка); свечение домов эльфов — только окна и кристаллы и умеренное.
 
 const IDS := ["town_house", "town_house_b", "town_hall", "well", "notice_board", "town_gate", "merchant_stall",
 	"human_house_thatch", "human_house_red", "windmill_tower", "windmill_sails", "scarecrow", "hay_bale", "trough",
@@ -13,6 +16,11 @@ const IDS := ["town_house", "town_house_b", "town_hall", "well", "notice_board",
 	"crystal_purple", "tree_oak", "tree_pine", "tree_elf", "tree_dead", "bush", "rock", "rock_dark"]
 ## Модели, у которых основание не на y = 0: крылья мельницы (ступица в центре), корабль (ватерлиния).
 const NOT_ON_GROUND := ["windmill_sails", "ship"]
+## Постройки: стены проверяются лучами (_check_walls).
+const BUILDINGS := ["town_house", "town_house_b", "town_hall", "human_house_thatch", "human_house_red",
+	"windmill_tower", "light_elf_house", "light_elf_tower", "dark_elf_house", "dark_elf_tower", "lighthouse"]
+## Дома и башни эльфов: свечение ограничено (_check_glow).
+const ELF_BUILDINGS := ["light_elf_house", "light_elf_tower", "dark_elf_house", "dark_elf_tower"]
 ## Процедурные модели, с которыми сравнивается размер (вид PoiModels → id).
 const COMPARE := ["town_house", "town_house_b", "town_hall", "well", "notice_board", "lantern_town", "weapon_rack",
 	"dummy", "crate", "barrel", "human_house_thatch", "human_house_red", "windmill", "scarecrow", "hay", "trough",
@@ -28,6 +36,8 @@ func run_step() -> void:
 	match step:
 		0:
 			_check_files()
+			_check_walls()
+			_check_glow()
 			step = 1
 		1:
 			_check_island()
@@ -164,3 +174,109 @@ func _check_vegetation() -> void:
 	print("  растительность из файлов: участков %d, модели %s" % [prop_chunks, ids.keys()])
 	for id in ["tree_oak", "tree_pine", "tree_elf", "tree_dead", "bush", "rock"]:
 		check(ids.has(id), "на острове есть %s из файла" % id)
+
+
+## Стены построек: с 8 сторон на высоте 0.7 м, 1.5 м и 40 % высоты (и со сдвигом вбок) луч к середине
+## модели должен упереться в стену до середины (не уйти в дыру внутрь дома или насквозь) и попасть в лицевую
+## сторону грани. Модели 0.14.0 (дыры в стенах) не проходили: у town_house_b 9, у dark_elf_house 19 лучей
+## из 48 уходили внутрь.
+func _check_walls() -> void:
+	var sh := load(PropAsset.SHADER) as Shader
+	check(sh != null and sh.code.contains("cull_disabled"), "материал моделей из файлов двусторонний (страховка от дыр)")
+	for i in BUILDINGS:
+		var id := String(i)
+		var m := PropAsset.mesh(id)
+		if m == null:
+			continue
+		var faces := m.get_faces()
+		var bb := m.get_aabb()
+		var rays := 0
+		var holes := 0
+		var backs := 0
+		for y in [0.7, 1.5, bb.size.y * 0.4]:
+			# Только треугольники на высоте луча (быстрее: лучи горизонтальные)
+			var yy := bb.position.y + float(y)
+			var band := PackedVector3Array()
+			var fi := 0
+			while fi + 2 < faces.size():
+				var y0 := minf(faces[fi].y, minf(faces[fi + 1].y, faces[fi + 2].y))
+				var y1 := maxf(faces[fi].y, maxf(faces[fi + 1].y, faces[fi + 2].y))
+				if y0 <= yy and y1 >= yy:
+					band.append(faces[fi])
+					band.append(faces[fi + 1])
+					band.append(faces[fi + 2])
+				fi += 3
+			for k in 8:
+				var a := TAU * float(k) / 8.0 + 0.2
+				var out := Vector3(sin(a), 0.0, cos(a))
+				var side := Vector3(out.z, 0.0, -out.x)
+				# Расстояние от середины до края габарита по направлению луча
+				var ext := minf(bb.size.x * 0.5 / maxf(absf(out.x), 0.001), bb.size.z * 0.5 / maxf(absf(out.z), 0.001))
+				for off in [-0.2, 0.2]:
+					var c := Vector3(bb.get_center().x, yy, bb.get_center().z) + side * ext * float(off)
+					var from := c + out * (ext + 2.0)
+					var hit := _ray_hit(band, from, -out)
+					rays += 1
+					if hit.is_empty():
+						holes += 1
+						continue
+					var p: Vector3 = hit["pos"]
+					if (p - c).dot(out) < 0.0:
+						holes += 1
+					var n: Vector3 = hit["normal"]
+					if n.dot(-out) > 0.0:
+						backs += 1
+		check(holes <= 1, "%s: стены без дыр (лучей сквозь стену %d из %d)" % [id, holes, rays])
+		check(backs <= 2, "%s: снаружи видна лицевая сторона граней (изнанкой %d из %d)" % [id, backs, rays])
+
+
+## Ближайшее пересечение луча с треугольниками faces (тройки вершин): {"pos", "normal"} или пусто.
+## Нормаль — лицевой стороны грани у Godot (Plane(a, b, c), по часовой).
+func _ray_hit(faces: PackedVector3Array, from: Vector3, dir: Vector3) -> Dictionary:
+	var best := INF
+	var res := {}
+	var i := 0
+	while i + 2 < faces.size():
+		var hit: Variant = Geometry3D.ray_intersects_triangle(from, dir, faces[i], faces[i + 1], faces[i + 2])
+		if hit != null:
+			var p: Vector3 = hit
+			var d := (p - from).dot(dir)
+			if d < best:
+				best = d
+				res = {"pos": p, "normal": Plane(faces[i], faces[i + 1], faces[i + 2]).normal}
+		i += 3
+	return res
+
+
+## Свечение домов и башен эльфов: альфа цвета вершин (сила свечения) не больше 0.6, светится не больше 6 %
+## площади (окна, кристаллы — не стены и не крыши).
+func _check_glow() -> void:
+	for i in ELF_BUILDINGS:
+		var id := String(i)
+		var m := PropAsset.mesh(id)
+		if m == null:
+			continue
+		var arr := m.surface_get_arrays(0)
+		var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var cols: PackedColorArray = arr[Mesh.ARRAY_COLOR]
+		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
+		check(cols.size() == verts.size(), "%s: цвет вершин (свечение) есть" % id)
+		if cols.size() != verts.size():
+			continue
+		var amax := 0.0
+		for ci in cols.size():
+			amax = maxf(amax, cols[ci].a)
+		var total := 0.0
+		var lit := 0.0
+		var t := 0
+		while t + 2 < idx.size():
+			var va := verts[idx[t]]
+			var ar := (verts[idx[t + 1]] - va).cross(verts[idx[t + 2]] - va).length() * 0.5
+			total += ar
+			var g := (cols[idx[t]].a + cols[idx[t + 1]].a + cols[idx[t + 2]].a) / 3.0
+			if g > 0.15:
+				lit += ar
+			t += 3
+		var share := lit / maxf(total, 0.001)
+		check(amax <= 0.6, "%s: свечение умеренное (наибольшее %.2f)" % [id, amax])
+		check(share <= 0.06, "%s: светятся только окна и кристаллы (%.1f %% площади)" % [id, share * 100.0])
