@@ -3705,9 +3705,12 @@ class BipedRetarget:
 		return short
 
 
-def biped_plant(rt: BipedRetarget, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, speed=None) -> tuple:
+def biped_plant(rt: BipedRetarget, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, speed=None,
+		max_slide=None) -> tuple:
 	"""Опорные стопы не скользят: интервалы, где опора ноги у земли, — опора стоит (speed is None — неподвижно;
-	иначе едет назад со скоростью хода speed, если она 0 — оценивается по клипу). Возвращает (скорость, недостача)."""
+	иначе едет назад со скоростью хода speed, если она 0 — оценивается по клипу). max_slide (м/с) — опорой считается
+	только стопа, которая по земле движется медленнее (скольжение в выпаде остаётся как в клипе).
+	Возвращает (скорость, недостача)."""
 	ra, rig = rt.ra, rt.rig
 	F = len(times)
 	Gq, Gp = rt.fk(Lq, Lt)
@@ -3719,6 +3722,9 @@ def biped_plant(rt: BipedRetarget, times: np.ndarray, Lq: np.ndarray, Lt: np.nda
 	for s, b in rt.contact.items():
 		y = Gp[:, b, 1]
 		stance[s] = y < y.min() + 0.025 * H
+		if max_slide is not None and F > 2:
+			v = np.hypot(np.gradient(Gp[:, b, 0], times), np.gradient(Gp[:, b, 2], times))
+			stance[s] &= v < max_slide
 	if loco and speed == 0.0:
 		vs = []
 		for s, b in rt.contact.items():
