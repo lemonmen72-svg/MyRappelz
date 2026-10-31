@@ -5,7 +5,8 @@
 по папкам «ГОРОД», «ДЕРЕВНЯ ЛЮДЕЙ», …). Какой файл какой объект — таблица PROPS (поле src — часть имени файла).
 Для каждого объекта пишет в assets/props/:
   <id>.glb        — упрощённый по форме меш (meshoptimizer по сваренным позициям — развёртка Meshy из сотен мелких
-                    островов держит упрощение и рвёт текстуру), реальный размер (вписан в рамку fit — габариты
+                    островов держит упрощение и рвёт текстуру; тонкие панели стен и окон не пропадают — simplify;
+                    грани, видные снаружи изнанкой, развёрнуты наружу — orient_faces), реальный размер (вписан в рамку fit — габариты
                     процедурной модели того же вида в PoiModels), основание на y = 0 (корабль — на sink ниже), центр
                     по X/Z, фасад (дверь) на +Z (поворот rot); своя развёртка (xatlas) прямо в клетку атласа;
                     нормали — плавные на скруглённом и резкие на рёбрах (угол 50°); цвет вершины: rgb = 1,
@@ -17,7 +18,8 @@
 запекается: каждый тексель новой развёртки берёт цвет ближайших точек поверхности исходной модели (с нормалью в ту же
 сторону — тонкие доски и листья не берут цвет обратной стороны); пустое вокруг развёрток залито цветом ближайшей
 развёртки (без тёмных швов на мипах).
-props.json — размеры (м), страница, клетка, треугольники, точки (glow — центр светящихся вершин; lamp — фонарь;
+props.json — размеры (м), страница, клетка, треугольники (panel_tris — из них сохранённые панели, flipped —
+развёрнутые наружу грани, glow_max — наибольшее свечение), точки (glow — центр светящихся вершин; lamp — фонарь;
 front — самая передняя точка, у башни мельницы — ступица крыльев), для игры и тестов.
 
 Зачем атлас: все объекты страницы — один материал, поэтому в игре экземпляры склеиваются в меши зон
@@ -34,7 +36,8 @@ fit — рамка, tris, tex 1024/512, rot — поворот, чтобы дв�
   python3 -I tools/prepare_props.py --src <папка с GLB Meshy>              # собрать всё
   python3 -I tools/prepare_props.py --src <папка> --only well,barrel       # только эти (их страницы пересобираются целиком)
   python3 -I tools/prepare_props.py --check                               # проверить готовые assets/props
-  python3 -I tools/prepare_props.py --check --preview /tmp/props          # плюс картинки (спереди, сбоку, сзади, сверху)
+  python3 -I tools/prepare_props.py --check --preview /tmp/props          # плюс картинки (4 стороны и сверху;
+                                                                          # изнанка граней — пурпурная, дыры — фон)
 """
 import argparse
 import colorsys
@@ -61,6 +64,10 @@ GLOW_BLUE = [(0.47, 0.6, 0.35, 0.55)]
 GLOW_GOLD = [(0.07, 0.15, 0.45, 0.72)]
 GLOW_PURPLE = [(0.7, 0.88, 0.3, 0.42)]
 GLOW_WARM = [(0.08, 0.17, 0.3, 0.86)]
+# У домов эльфов светятся только окна и кристаллы: строже по насыщенности и яркости (стены и крыши не светятся),
+# а сила свечения — glow_max (0.14.0: дома светились слишком сильно).
+GLOW_BLUE_HOUSE = [(0.47, 0.6, 0.4, 0.6)]
+GLOW_PURPLE_HOUSE = [(0.7, 0.88, 0.34, 0.46)]
 
 # Страницы атласа: имя → (ширина, высота).
 PAGES = {
@@ -73,9 +80,10 @@ PAGES = {
 }
 
 # id → src (часть имени файла Meshy), fit — рамка X×Y×Z (м) после поворота (масштаб общий, наибольший, при
-# котором модель влезает), tris — треугольников, tex — клетка атласа, rot — поворот вокруг Y (градусы, против
+# котором модель влезает), tris — бюджет упрощения (сверх него — сохранённые панели стен, simplify), tex — клетка атласа, rot — поворот вокруг Y (градусы, против
 # часовой при взгляде сверху: rot 90 переводит −X в +Z), page, sink — насколько основание ниже y = 0 (м),
-# center — центр по всем осям (крылья мельницы: ступица в начале координат), glow — свечение по цвету,
+# center — центр по всем осям (крылья мельницы: ступица в начале координат), glow — свечение по цвету
+# (glow_max — его наибольшая сила, альфа цвета вершины),
 # lamp — фонарь: (центр x, y, z, полуразмер x, y, z) в долях габаритов; вершины в нём светятся, центр — точка «lamp».
 PROPS = {
 	# Город
@@ -100,13 +108,13 @@ PROPS = {
 	"trough": dict(src="Mosswood_Trough", fit=(1.7, 0.6, 0.7), tris=500, tex=512, rot=0, page="village"),
 	# Светлые и тёмные эльфы
 	"light_elf_house": dict(src="Crystalspire_Manor", fit=(6.4, 7.6, 5.4), tris=4500, tex=1024, rot=0, page="elves",
-		glow=GLOW_BLUE),
+		glow=GLOW_BLUE_HOUSE, glow_max=0.55),
 	"light_elf_tower": dict(src="Crystal_Spire_Tower", fit=(5.0, 11.0, 5.0), tris=3500, tex=1024, rot=0,
-		page="elves", glow=GLOW_BLUE),
+		page="elves", glow=GLOW_BLUE_HOUSE, glow_max=0.55),
 	"dark_elf_house": dict(src="Violet_Gloom_Manor_1031082549", fit=(6.4, 8.2, 5.4), tris=4500, tex=1024, rot=0,
-		page="elves", glow=GLOW_PURPLE),
+		page="elves", glow=GLOW_PURPLE_HOUSE, glow_max=0.55),
 	"dark_elf_tower": dict(src="Amethyst_Spire", fit=(7.0, 16.0, 7.0), tris=3500, tex=1024, rot=0, page="elves",
-		glow=GLOW_PURPLE),
+		glow=GLOW_PURPLE_HOUSE, glow_max=0.55),
 	# Порт, лагеря, пещера
 	"lighthouse": dict(src="Crimson_Beacon", fit=(5.6, 15.0, 5.6), tris=3500, tex=1024, rot=0, page="port",
 		lamp=(0.5, 0.78, 0.5, 0.2, 0.035, 0.2)),
@@ -242,37 +250,192 @@ def place(m: dict, cfg: dict) -> dict:
 	return out
 
 
-def simplify(m: dict, target: int) -> dict:
-	"""Упрощение по форме (meshoptimizer, сваренные позиции, без оглядки на развёртку Meshy — у неё сотни
-	мелких островов, которые держат упрощение и рвут текстуру): вершины не сдвигаются, остаются исходные."""
+def _meshopt(pos: np.ndarray, t: np.ndarray, target: int, error: float = 1.0, options: int = 0) -> tuple:
+	"""meshopt_simplify по индексам (вершины не сдвигаются): (треугольники, относительная ошибка).
+	options: 1 — не трогать открытые края (meshopt_SimplifyLockBorder)."""
 	import ctypes
 	from meshoptimizer._loader import lib
+	if len(t) <= target:
+		return t, 0.0
+	idx = np.ascontiguousarray(t.astype(np.uint32).ravel())
+	vp = np.ascontiguousarray(pos.astype(np.float32))
+	P = ctypes.POINTER
+	fn = lib.meshopt_simplify
+	fn.argtypes = [P(ctypes.c_uint), P(ctypes.c_uint), ctypes.c_size_t, P(ctypes.c_float), ctypes.c_size_t,
+		ctypes.c_size_t, ctypes.c_size_t, ctypes.c_float, ctypes.c_uint, P(ctypes.c_float)]
+	fn.restype = ctypes.c_size_t
+	dest = np.zeros(len(idx), dtype=np.uint32)
+	e = ctypes.c_float(0.0)
+	n = fn(dest.ctypes.data_as(P(ctypes.c_uint)), idx.ctypes.data_as(P(ctypes.c_uint)), len(idx),
+		vp.ctypes.data_as(P(ctypes.c_float)), len(vp), 12, target * 3, error, options, ctypes.byref(e))
+	return dest[:n].astype(np.int64).reshape(-1, 3), float(e.value)
+
+
+# Защита панелей при упрощении: часть меша (связная), у которой больше PANEL_LOST м² (и больше PANEL_SHARE её
+# площади) поверхности ушло дальше
+# HOLE_DIST от упрощённой модели (дыра, а не сглаженный рельеф), упрощается отдельно — с неподвижным краем
+# и малой ошибкой PANEL_ERROR; если и так дыра — остаётся как в исходнике.
+PANEL_LOST = 0.03
+PANEL_SHARE = 0.03
+HOLE_DIST = 0.1
+PANEL_ERROR = 0.002
+
+
+def surface_points(pos: np.ndarray, tris: np.ndarray, n: int, seed: int = 3) -> tuple:
+	"""Точки по поверхности (по площади): (точки, номер грани)."""
+	rng = np.random.default_rng(seed)
+	a, b, c = pos[tris[:, 0]], pos[tris[:, 1]], pos[tris[:, 2]]
+	area = 0.5 * np.linalg.norm(np.cross(b - a, c - a), axis=1)
+	sel = rng.choice(len(tris), n, p=area / area.sum())
+	r1, r2 = rng.random(n), rng.random(n)
+	flip = r1 + r2 > 1.0
+	r1[flip], r2[flip] = 1.0 - r1[flip], 1.0 - r2[flip]
+	return a[sel] + r1[:, None] * (b - a)[sel] + r2[:, None] * (c - a)[sel], sel
+
+
+def simplify(m: dict, target: int) -> dict:
+	"""Упрощение по форме (meshoptimizer, сваренные позиции, без оглядки на развёртку Meshy — у неё сотни
+	мелких островов, которые держат упрощение и рвут текстуру): вершины не сдвигаются, остаются исходные.
+
+	Стены и окна у Meshy — часто отдельные тонкие панели и пластины (отдельные связные части меша).
+	Ошибка упрощения считается по отклонению от плоскостей, поэтому meshoptimizer схлопывает такую панель
+	целиком почти «бесплатно» — в стене дыра насквозь (дома 0.14.0). Поэтому после упрощения точки исходной
+	поверхности сравниваются с упрощённой: части, где появились дыры (поверхность ушла дальше HOLE_DIST),
+	упрощаются отдельно с неподвижным краем (если и так дыра — остаются как в исходнике), остальное —
+	заново под тот же бюджет (без них упрощение мягче), пока дыры не пропадут. Треугольников выходит
+	target + панели."""
+	from scipy.sparse import coo_matrix
+	from scipy.sparse.csgraph import connected_components
+	from scipy.spatial import cKDTree
 	q = np.round(m["pos"] / 1e-5).astype(np.int64)
 	_, first, inv = np.unique(q, axis=0, return_index=True, return_inverse=True)
 	inv = inv.ravel()
 	pos = m["pos"][first]
 	t = inv[m["tris"]]
 	t = t[(t[:, 0] != t[:, 1]) & (t[:, 1] != t[:, 2]) & (t[:, 2] != t[:, 0])]
+	# Одинаковые грани (две на одних вершинах) — одна (материал двусторонний, сторону выберет orient_faces)
+	_, uniq = np.unique(np.sort(t, axis=1), axis=0, return_index=True)
+	t = t[np.sort(uniq)]
+	nv = len(pos)
+	e = np.concatenate([t[:, [0, 1]], t[:, [1, 2]], t[:, [2, 0]]])
+	nc, vlab = connected_components(coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(nv, nv)),
+		directed=False)
+	flab = vlab[t[:, 0]]
+	area = 0.5 * np.linalg.norm(np.cross(pos[t[:, 1]] - pos[t[:, 0]], pos[t[:, 2]] - pos[t[:, 0]]), axis=1)
+	n_pts = int(np.clip(area.sum() * 1500, 50000, 400000))
+	pts, pf = surface_points(pos, t, n_pts)
+	plab = flab[pf]
+	per_pt = area.sum() / n_pts
+
+	def lost_area(tt: np.ndarray, comps: np.ndarray) -> np.ndarray:
+		"""Площадь дыр по частям: точки исходника из частей comps, далёкие от поверхности tt."""
+		sel = comps[plab]
+		out = np.zeros(nc)
+		if not sel.any():
+			return out
+		if len(tt) == 0:
+			return np.bincount(plab[sel], minlength=nc) * per_pt
+		sp, _ = surface_points(pos, tt, max(n_pts, len(tt) * 20), 5)
+		d, _ = cKDTree(sp).query(pts[sel], workers=-1)
+		far = d > HOLE_DIST
+		return np.bincount(plab[sel][far], minlength=nc) * per_pt
+
+	# Дыра — больше PANEL_LOST м² и больше PANEL_SHARE площади части (у большой части — крыши из соломы,
+	# паруса — сглаженные мелочи по краям дырой не считаются)
+	lost_max = np.maximum(PANEL_LOST, PANEL_SHARE * np.bincount(flab, area, nc))
+	keep = np.zeros(nc, bool)
 	err = 0.0
-	if len(t) > target:
-		idx = np.ascontiguousarray(t.astype(np.uint32).ravel())
-		vp = np.ascontiguousarray(pos.astype(np.float32))
-		P = ctypes.POINTER
-		fn = lib.meshopt_simplify
-		fn.argtypes = [P(ctypes.c_uint), P(ctypes.c_uint), ctypes.c_size_t, P(ctypes.c_float), ctypes.c_size_t,
-			ctypes.c_size_t, ctypes.c_size_t, ctypes.c_float, ctypes.c_uint, P(ctypes.c_float)]
-		fn.restype = ctypes.c_size_t
-		dest = np.zeros(len(idx), dtype=np.uint32)
-		e = ctypes.c_float(0.0)
-		n = fn(dest.ctypes.data_as(P(ctypes.c_uint)), idx.ctypes.data_as(P(ctypes.c_uint)), len(idx),
-			vp.ctypes.data_as(P(ctypes.c_float)), len(vp), 12, target * 3, 1.0, 0, ctypes.byref(e))
-		t = dest[:n].astype(np.int64).reshape(-1, 3)
-		err = float(e.value)
+	tt = t
+	for _ in range(8):
+		tt, err = _meshopt(pos, t[~keep[flab]], target)
+		lost = (~keep) & (lost_area(tt, ~keep) > lost_max)
+		if not lost.any():
+			break
+		keep |= lost
+	panels = t[keep[flab]]
+	if len(panels):
+		# Панели — отдельно, с неподвижным краем: контур остаётся, внутри — сколько можно без отклонения.
+		# Тонкие замкнутые пластины (стекло окон — два слоя в доли миллиметра) края не имеют и схлопываются
+		# и так — такие части остаются как в исходнике.
+		ps, _ = _meshopt(pos, panels, 0, PANEL_ERROR, 1)
+		raw = keep & (lost_area(ps, keep) > lost_max)
+		panels = np.vstack([ps[~raw[vlab[ps[:, 0]]]], t[raw[flab]]])
+	out = np.vstack([tt, panels])
 	# Без вырожденных треугольников, только нужные вершины
-	cr = np.linalg.norm(np.cross(pos[t[:, 1]] - pos[t[:, 0]], pos[t[:, 2]] - pos[t[:, 0]]), axis=1)
-	t = t[cr > 1e-12]
-	used, t2 = np.unique(t.ravel(), return_inverse=True)
-	return {"pos": pos[used], "tris": t2.reshape(-1, 3).astype(np.int64), "err": err}
+	cr = np.linalg.norm(np.cross(pos[out[:, 1]] - pos[out[:, 0]], pos[out[:, 2]] - pos[out[:, 0]]), axis=1)
+	out = out[cr > 1e-12]
+	used, t2 = np.unique(out.ravel(), return_inverse=True)
+	return {"pos": pos[used], "tris": t2.reshape(-1, 3).astype(np.int64), "err": err,
+		"panels": int(keep.sum()), "panel_tris": int(len(panels))}
+
+
+def view_dirs() -> np.ndarray:
+	"""Направления «на камеру» вокруг объекта: по кругу на 4 высотах и сверху (снизу на постройки не смотрят)."""
+	out = [(0.0, 1.0, 0.0)]
+	for el in (2.0, 22.0, 45.0, 70.0):
+		e = np.radians(el)
+		for k in range(16):
+			a = np.radians(k * 22.5 + (11.25 if el in (22.0, 70.0) else 0.0))
+			out.append((np.sin(a) * np.cos(e), np.sin(e), np.cos(a) * np.cos(e)))
+	return np.array(out)
+
+
+def visible_faces(pos: np.ndarray, tris: np.ndarray, d: np.ndarray, size: int = 256) -> np.ndarray:
+	"""Буфер номеров граней (size×size, −1 — пусто) при ортографическом взгляде вдоль −d (камера со стороны d)."""
+	right = np.cross([0.0, 1.0, 0.0], d)
+	if np.linalg.norm(right) < 1e-6:
+		right = np.array([1.0, 0.0, 0.0])
+	right /= np.linalg.norm(right)
+	up = np.cross(d, right)
+	c = (pos.min(0) + pos.max(0)) * 0.5
+	span = float(np.linalg.norm(pos.max(0) - pos.min(0))) * 1.02
+	p = pos - c
+	sx = (p @ right / span + 0.5) * (size - 1)
+	sy = (0.5 - p @ up / span) * (size - 1)
+	sz = p @ d
+	X, Y, Z = sx[tris], sy[tris], sz[tris]
+	x0 = np.maximum(np.ceil(X.min(1)), 0).astype(int)
+	x1 = np.minimum(np.floor(X.max(1)), size - 1).astype(int)
+	y0 = np.maximum(np.ceil(Y.min(1)), 0).astype(int)
+	y1 = np.minimum(np.floor(Y.max(1)), size - 1).astype(int)
+	den = (Y[:, 1] - Y[:, 2]) * (X[:, 0] - X[:, 2]) + (X[:, 2] - X[:, 1]) * (Y[:, 0] - Y[:, 2])
+	zbuf = np.full(size * size, -1e9)
+	ids = np.full(size * size, -1, dtype=np.int64)
+	for f in np.nonzero((x1 >= x0) & (y1 >= y0) & (np.abs(den) > 1e-9))[0]:
+		gx, gy = np.meshgrid(np.arange(x0[f], x1[f] + 1), np.arange(y0[f], y1[f] + 1))
+		gx, gy = gx.ravel(), gy.ravel()
+		xf, yf = X[f], Y[f]
+		l0 = ((yf[1] - yf[2]) * (gx - xf[2]) + (xf[2] - xf[1]) * (gy - yf[2])) / den[f]
+		l1 = ((yf[2] - yf[0]) * (gx - xf[2]) + (xf[0] - xf[2]) * (gy - yf[2])) / den[f]
+		l2 = 1.0 - l0 - l1
+		ins = (l0 >= 0) & (l1 >= 0) & (l2 >= 0)
+		if not ins.any():
+			continue
+		pix = gy[ins] * size + gx[ins]
+		z = l0[ins] * Z[f, 0] + l1[ins] * Z[f, 1] + l2[ins] * Z[f, 2]
+		closer = z > zbuf[pix]
+		zbuf[pix[closer]] = z[closer]
+		ids[pix[closer]] = f
+	return ids
+
+
+def orient_faces(pos: np.ndarray, tris: np.ndarray) -> np.ndarray:
+	"""Знак граней (+1 / −1): −1 — грань, которую снаружи видно изнанкой (одинарные панели стен и окон Meshy
+	с нормалью внутрь дома). Голоса — пиксели, где грань ближайшая, с ~65 сторон: лицом к камере «за»,
+	изнанкой «против». Переворачивается грань, у которой «против» заметно больше; невидимые снаружи не трогаются."""
+	fn = np.cross(pos[tris[:, 1]] - pos[tris[:, 0]], pos[tris[:, 2]] - pos[tris[:, 0]])
+	fn /= np.maximum(np.linalg.norm(fn, axis=1, keepdims=True), 1e-12)
+	front = np.zeros(len(tris))
+	back = np.zeros(len(tris))
+	for d in view_dirs():
+		ids = visible_faces(pos, tris, d)
+		cnt = np.bincount(ids[ids >= 0], minlength=len(tris)).astype(np.float64)
+		facing = fn @ d
+		front += cnt * (facing > 0.02)
+		back += cnt * (facing < -0.02)
+	sign = np.ones(len(tris))
+	sign[(back > 2.0 * front + 2.0)] = -1.0
+	return sign
 
 
 def corner_normals(pos: np.ndarray, tris: np.ndarray, angle: float = 50.0) -> np.ndarray:
@@ -312,6 +475,8 @@ def unwrap(pos: np.ndarray, tris: np.ndarray, size: int) -> dict:
 		raise SystemExit("развёртка не влезла в одну клетку")
 	vmap, ind, uvs = atlas[0]
 	ind = ind.astype(np.int64)
+	if len(ind) != len(tris) or np.any(vmap[ind] != tris):
+		raise SystemExit("xatlas изменил порядок граней")
 	# xatlas хранит порядок граней; нормаль угла — из corner_normals, вершины делятся по (вершина развёртки, нормаль)
 	keys = {}
 	P, N, U, T = [], [], [], []
@@ -354,16 +519,19 @@ def surface_samples(src: dict, n: int) -> tuple:
 	return pts, fn[sel], col.astype(np.float64), float(area.sum())
 
 
-def bake(src: dict, m: dict, size: int):
+def bake(src: dict, m: dict, size: int, sign=None):
 	"""Текстура клетки: каждый тексель развёртки упрощённого меша берёт цвет ближайших точек исходника
 	(с нормалью в ту же сторону — тонкие доски и листья не берут цвет обратной стороны). Пустое — заливкой
-	от ближайшей развёртки (без тёмных швов на мипах)."""
+	от ближайшей развёртки (без тёмных швов на мипах). sign — знак граней после orient_faces: у перевёрнутых
+	граней сторона сравнивается с исходной (у исходника они смотрят внутрь)."""
 	from PIL import Image
 	from scipy import ndimage
 	from scipy.spatial import cKDTree
 	pos, tris, uv = m["pos"], m["tris"], m["uv"] * size
 	fn = np.cross(pos[tris[:, 1]] - pos[tris[:, 0]], pos[tris[:, 2]] - pos[tris[:, 0]])
 	fn /= np.maximum(np.linalg.norm(fn, axis=1, keepdims=True), 1e-12)
+	if sign is not None:
+		fn *= sign[:, None]
 	pts, nrm, owner = [], [], []
 	for f in range(len(tris)):
 		q = uv[tris[f]]
@@ -555,11 +723,17 @@ def build(src_dir: str, only: list) -> dict:
 			src["tex"] = np.asarray(src["img"])
 			x0, y0, size = slots[cid]
 			low = simplify(src, cfg["tris"])
-			print("    ошибка упрощения %.4f" % low["err"])
+			print("    ошибка упрощения %.4f, сохранено панелей %d (%d тр.)" % (low["err"], low["panels"],
+				low["panel_tris"]))
+			# Панели с нормалью внутрь — лицом наружу (порядок граней xatlas сохраняет — знак годится и для bake)
+			sign = orient_faces(low["pos"], low["tris"])
+			low["tris"][sign < 0] = low["tris"][sign < 0][:, ::-1]
+			flipped = int((sign < 0).sum())
+			print("    перевёрнуто граней %d" % flipped)
 			m = unwrap(low["pos"], low["tris"], size)
-			tile = bake(src, m, size)
+			tile = bake(src, m, size, sign)
 			atlas.paste(tile, (x0, y0))
-			glow = glow_weights(np.asarray(tile), m["uv"], cfg.get("glow", []))
+			glow = glow_weights(np.asarray(tile), m["uv"], cfg.get("glow", [])) * cfg.get("glow_max", 1.0)
 			lamp = None
 			if "lamp" in cfg:
 				lo, hi = m["pos"].min(0), m["pos"].max(0)
@@ -591,6 +765,8 @@ def build(src_dir: str, only: list) -> dict:
 				"min": [round(float(v), 3) for v in lo], "max": [round(float(v), 3) for v in hi],
 				"tris": int(len(m["tris"])), "verts": int(len(m["pos"])), "src_tris": int(len(src["tris"])),
 				"open_edges": st["open_edges"], "glow_verts": int((glow > 0.3).sum()),
+				"glow_max": round(float(glow.max()) if len(glow) else 0.0, 3),
+				"panel_tris": low["panel_tris"], "flipped": flipped,
 				"markers": markers(m["pos"], glow),
 			}
 			if lamp is not None:
@@ -653,8 +829,18 @@ def check(preview: str) -> bool:
 		bad = []
 		if m["images"]:
 			bad.append("в GLB есть картинки")
-		if len(m["tris"]) > cfg["tris"] * 1.25:
-			bad.append("треугольников %d > %d" % (len(m["tris"]), cfg["tris"]))
+		# Бюджет tris — упрощение; сверх него — сохранённые панели стен и окон (simplify, panel_tris)
+		limit = cfg["tris"] * 1.25 + info.get("panel_tris", 0)
+		if len(m["tris"]) > limit:
+			bad.append("треугольников %d > %d" % (len(m["tris"]), limit))
+		if cfg["tex"] >= 1024:
+			# Постройки: снаружи не видно изнанки граней (одинарные панели Meshy развёрнуты наружу)
+			sign = orient_faces(m["pos"], m["tris"])
+			fa = 0.5 * np.linalg.norm(np.cross(m["pos"][m["tris"][:, 1]] - m["pos"][m["tris"][:, 0]],
+				m["pos"][m["tris"][:, 2]] - m["pos"][m["tris"][:, 0]]), axis=1)
+			back = float(fa[sign < 0].sum() / fa.sum())
+			if back > 0.01:
+				bad.append("изнанкой наружу %.1f %% площади" % (back * 100))
 		if np.any(hi - lo > np.array(cfg["fit"]) + 0.01):
 			bad.append("не влезает в рамку %s" % (cfg["fit"],))
 		if max((hi - lo)[k] / cfg["fit"][k] for k in range(3)) < 0.9:
@@ -680,20 +866,40 @@ def check(preview: str) -> bool:
 
 
 def write_preview(path: str, m: dict, tex: np.ndarray) -> None:
-	"""Спереди (+Z), справа (+X), сзади, сверху; красные точки — светящиеся вершины."""
+	"""Спереди (+Z), справа (+X), сзади, слева — чуть сверху, и сверху: грани z-буфером (цвет текстуры
+	в середине грани, простой свет). Изнанка грани (нормаль от камеры) — пурпурная: так видны развёрнутые
+	внутрь панели; дыра — фон насквозь."""
 	from PIL import Image
+	size = 320
+	pos, tris, uv = m["pos"], m["tris"], m["uv"]
+	fn = np.cross(pos[tris[:, 1]] - pos[tris[:, 0]], pos[tris[:, 2]] - pos[tris[:, 0]])
+	fn /= np.maximum(np.linalg.norm(fn, axis=1, keepdims=True), 1e-12)
+	cu = uv[tris].mean(1)
+	h, w = tex.shape[:2]
+	col = tex[np.clip((cu[:, 1] % 1.0) * h, 0, h - 1).astype(int), np.clip((cu[:, 0] % 1.0) * w, 0, w - 1).astype(int)]
+	col = col / 255.0
+	light = np.array([0.4, 0.8, 0.45])
+	light /= np.linalg.norm(light)
 	panels = []
-	box = (m["pos"].min(0) - 0.0, m["pos"].max(0))
-	for ang in (0, -90, 180):
-		a = np.radians(ang)
-		R = np.array([[np.cos(a), 0, np.sin(a)], [0, 1, 0], [-np.sin(a), 0, np.cos(a)]])
-		p = m["pos"] @ R.T
-		panels.append(pc.render_mesh(p, m["tris"], m["uv"], tex, views=("front",), size=320, samples=300000))
-	panels.append(pc.render_mesh(m["pos"], m["tris"], m["uv"], tex, views=("top",), size=320, samples=300000,
-		box=box))
-	im = Image.new("RGB", (320 * 4, 320), (255, 255, 255))
+	views = []
+	for ang in (0.0, 90.0, 180.0, 270.0):
+		a, e = np.radians(ang), np.radians(15.0)
+		views.append(np.array([np.sin(a) * np.cos(e), np.sin(e), np.cos(a) * np.cos(e)]))
+	views.append(np.array([0.0, 1.0, 0.0]))
+	for d in views:
+		ids = visible_faces(pos, tris, d, size)
+		img = np.full((size * size, 3), 0.93)
+		ok = ids >= 0
+		f = ids[ok]
+		front = fn[f] @ d >= 0
+		shade = 0.45 + 0.55 * np.clip(np.abs(fn[f] @ light), 0, 1)
+		c = col[f] * shade[:, None]
+		c[~front] = (0.9, 0.1, 0.9)
+		img[ok] = c
+		panels.append(Image.fromarray((img.reshape(size, size, 3) * 255).astype(np.uint8)))
+	im = Image.new("RGB", (size * len(panels), size), (255, 255, 255))
 	for i, p in enumerate(panels):
-		im.paste(p, (i * 320, 0))
+		im.paste(p, (i * size, 0))
 	im.save(path)
 
 

@@ -2,6 +2,7 @@ extends "res://tests/test_base.gd"
 ## Растительность и качество графики: растительность построена по зонам; деревья, кусты и камни
 ## не на дорогах, не в безопасных зонах и не на площадках построек; пресеты качества сразу меняют
 ## тени солнца и постобработку и сохраняются в user://settings.cfg; окно настроек открывается.
+## Корни деревьев, низ камней и кустов из файлов на склонах не висят в воздухе (основание — по рельефу под ним).
 
 var _had_cfg := false
 var _old_level := Quality.MEDIUM
@@ -40,6 +41,24 @@ func run_step() -> void:
 			check(bad_safe == 0, "в безопасных зонах нет деревьев, кустов и камней (плохих: %d)" % bad_safe)
 			check(bad_road == 0, "на дорогах нет деревьев, кустов и камней (плохих: %d)" % bad_road)
 			check(bad_flat == 0, "на площадках построек нет деревьев, кустов и камней (плохих: %d)" % bad_flat)
+			# Корни деревьев и низ камней и кустов из файлов не висят над склоном: каждая вершина основания
+			# (PropAsset.base_points — ниже 10 см над низом модели) не выше рельефа под ней больше чем на 5 см
+			var bases: Array = holder.get_meta("prop_bases", [])
+			check(bases.size() >= 100, "основания моделей растительности записаны: %d" % bases.size())
+			var hanging := 0
+			var worst := -INF
+			for e in bases:
+				var it: Array = e
+				var xf: Transform3D = it[1]
+				var pts := PropAsset.base_points(String(it[0]))
+				var top := -INF
+				for i in pts.size():
+					var p := xf * pts[i]
+					top = maxf(top, p.y - w.height_at(p.x, p.z))
+				worst = maxf(worst, top)
+				if top > 0.05:
+					hanging += 1
+			check(hanging == 0, "корни и основания не висят в воздухе (висит: %d, хуже всего %.2f м)" % [hanging, worst])
 			# Тёмные земли — мёртвые деревья, светлые — без мёртвых (участки Decor<группа>_x_z: процедурные
 			# мёртвые — своя группа G_DEAD, из файлов — модель tree_dead в meta "props" участка)
 			var dead_dark := false

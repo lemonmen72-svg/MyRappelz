@@ -24,6 +24,11 @@ const LEASH := 14.0
 const DEFEND_RANGE := 10.0
 ## Отстал дальше — переносится к хозяину.
 const TELEPORT_DIST := 30.0
+## Размер подписи над питомцем относительно подписи зверя (Mob: pixel_size UiScale.world_px(0.01)).
+const LABEL_PX := 0.62
+## Застрял (хочет идти, а за это время сдвинулся меньше STUCK_MOVE м) — переносится к хозяину.
+const STUCK_TIME := 1.8
+const STUCK_MOVE := 0.6
 const FOLLOW_DIST := 3.0
 ## Лекарь лечит хозяина не дальше этого.
 const HEAL_RANGE := 15.0
@@ -115,6 +120,13 @@ var _hp_acc := 0.0
 var _mp_acc := 0.0
 var _upkeep_t := 0.0
 var _last_crit := false
+## Путь в обход реки через мосты (IslandWorld.bridge_waypoint).
+var _route := IslandWorld.Route.new()
+## Проверка «застрял»: сколько секунд хочет идти и откуда начал отсчёт.
+var _stuck_t := 0.0
+var _stuck_from := Vector3.ZERO
+## Сколько раз перенесён к хозяину, потому что застрял (для тестов).
+var stuck_teleports := 0
 
 
 ## Вызывать до добавления в сцену. rec — запись из Game.pets (не копия).
@@ -146,7 +158,9 @@ func _ready() -> void:
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.no_depth_test = true
-	_label.pixel_size = UiScale.world_px(0.01)
+	# Питомец всегда рядом с камерой (в 2–3 м от героя), поэтому подпись мельче, чем у зверей
+	# (LABEL_PX от их размера): на экране она не крупнее подписей зверей поблизости и имён жителей
+	_label.pixel_size = UiScale.world_px(0.01 * LABEL_PX)
 	_label.font_size = 40
 	_label.outline_size = 10
 	_label.modulate = Color(0.6, 0.9, 1.0)
@@ -250,7 +264,7 @@ func _physics_process(delta: float) -> void:
 					dir = to.normalized()
 					spd = speed * 3.5
 			elif dist > reach:
-				dir = to.normalized()
+				dir = _route.dir_to(global_position, target.global_position, delta)
 			elif attack_cd <= 0.0:
 				attack_cd = attack_time
 				var sid := _pick_active(target)
@@ -263,8 +277,8 @@ func _physics_process(delta: float) -> void:
 			_dash_skill = ""
 			var d := to_o.length()
 			if d > FOLLOW_DIST:
-				dir = to_o.normalized()
-				face = to_o
+				dir = _route.dir_to(global_position, owner_node.global_position, delta)
+				face = dir
 				if d > 8.0:
 					spd = speed * 1.5
 			_regen(delta)
@@ -278,6 +292,8 @@ func _physics_process(delta: float) -> void:
 	var prev := global_position
 	move_and_slide()
 	IslandWorld.constrain(self, prev)
+	if _check_stuck(delta, dir):
+		return
 
 	if face.length() > 0.01:
 		rotation.y = lerp_angle(rotation.y, atan2(-face.x, -face.z), 10.0 * delta)
@@ -1025,8 +1041,54 @@ func _write_record() -> void:
 	record["mp"] = -1 if mp >= max_mp else mp
 
 
+## Хочет идти (dir), а почти не сдвинулся за STUCK_TIME — перенос к хозяину (как в MMO, когда питомец
+## застрял у моста или в скалах). true — перенесён.
+func _check_stuck(delta: float, dir: Vector3) -> bool:
+	var far := Vector2(owner_node.global_position.x - global_position.x,
+		owner_node.global_position.z - global_position.z).length() > FOLLOW_DIST + 1.0
+	if dir == Vector3.ZERO or _dash_time > 0.0 or not far:
+		_stuck_t = 0.0
+		_stuck_from = global_position
+		return false
+	_stuck_t += delta
+	if _stuck_t < STUCK_TIME:
+		return false
+	var moved := Vector2(global_position.x - _stuck_from.x, global_position.z - _stuck_from.z).length()
+	_stuck_t = 0.0
+	_stuck_from = global_position
+	if moved >= STUCK_MOVE:
+		return false
+	stuck_teleports += 1
+	_teleport_to_owner()
+	return true
+
+
+## Перенос к хозяину (отстал или застрял): вспышка там, где был, и там, где появился; место — проходимое
+## рядом с хозяином (за спиной или сбоку), на его высоте (на мосту — на настиле).
 func _teleport_to_owner() -> void:
-	global_position = owner_node.global_position + Vector3(1.5, 0.2, 1.5)
+	var old := global_position
+	var op := owner_node.global_position
+	var w := IslandWorld.current
+	var spot := op + Vector3(1.5, 0.2, 1.5)
+	var back := owner_node.global_transform.basis.z
+	back.y = 0.0
+	back = back.normalized() if back.length() > 0.01 else Vector3(0, 0, 1)
+	for k in 8:
+		var off := back.rotated(Vector3.UP, TAU * float(k) / 8.0) * 1.6
+		var q := op + off
+		if w == null or not is_instance_valid(w) or w.is_walkable(q.x, q.z):
+			spot = Vector3(q.x, op.y + 0.2, q.z)
+			if w != null and is_instance_valid(w):
+				spot.y = maxf(op.y, w.height_at(q.x, q.z)) + 0.2
+			break
+	global_position = spot
+	velocity = Vector3.ZERO
+	_route.reset()
+	_stuck_t = 0.0
+	_stuck_from = spot
+	if is_inside_tree() and get_parent() != null:
+		Vfx.magic_burst(get_parent(), old + Vector3(0, 0.5, 0), Color(0.45, 0.85, 1.0), 0.8, 0.35)
+		Vfx.magic_burst(get_parent(), spot + Vector3(0, 0.5, 0), Color(0.45, 0.85, 1.0), 0.8, 0.35)
 	target = null
 	_pending = null
 	_dash_time = 0.0

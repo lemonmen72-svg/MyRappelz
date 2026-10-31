@@ -81,6 +81,8 @@ var _wander_wait := 0.0
 var _regen_acc := 0.0
 var _mat: Material
 var _label: Label3D
+## Путь в обход реки через мосты (погоня и возврат домой).
+var _route := IslandWorld.Route.new()
 var _model: Node3D
 ## Модель из файла (или null — модель из примитивов).
 var _asset: CreatureAsset = null
@@ -251,7 +253,7 @@ func _physics_process(delta: float) -> void:
 		if to_home.length() < 1.5:
 			returning = false
 		else:
-			dir = to_home.normalized()
+			dir = _route.dir_to(global_position, home, delta)
 			spd = speed * 1.5
 		_heal(delta, 0.25)
 	elif target != null:
@@ -276,7 +278,8 @@ func _physics_process(delta: float) -> void:
 				wt.tween_property(_model, "scale", Vector3(0.92, 1.12, 0.92), SLAM_WINDUP * 0.8)
 				wt.tween_property(_model, "scale", Vector3.ONE, 0.1)
 		elif to.length() > _reach():
-			dir = to.normalized()
+			# Цель за рекой — через мост (IslandWorld.Route)
+			dir = _route.dir_to(global_position, target.global_position, delta)
 		elif attack_cd <= 0.0:
 			attack_cd = attack_every
 			var dmg := _weakened(atk + randi_range(-1, 2))

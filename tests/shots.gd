@@ -689,6 +689,64 @@ func run_step() -> void:
 			step = 705
 		705:
 			shot("75_npc_merc_chief")
+			# Постройки вблизи (кадры 76–81): стены без дыр, дома эльфов без пересвета; HUD и герой скрыты
+			player.visible = false
+			player.global_position = Vector3(0, 0.1, 3.0)
+			_building_view("town_house_b", 0.0)
+			wait = 40
+			step = 800
+		800:
+			shot("76_town_house_front")
+			_building_view("town_house_b", 90.0)
+			wait = 30
+			step = 801
+		801:
+			shot("77_town_house_side")
+			_building_view("town_house_b", 180.0)
+			wait = 30
+			step = 802
+		802:
+			shot("78_town_house_back")
+			_building_view("Windmill", 35.0, 11.0, 3.0)
+			wait = 40
+			step = 803
+		803:
+			shot("79_mill_close")
+			_building_view("light_elf_house", 25.0)
+			wait = 40
+			step = 804
+		804:
+			shot("80_light_elf_house_close")
+			_building_view("dark_elf_house", -25.0)
+			wait = 40
+			step = 805
+		805:
+			shot("81_dark_elf_house_close")
+			# Мост с питомцем (кадр 82): герой на середине настила, волк идёт к нему с берега через мост
+			var w := IslandWorld.current
+			if w != null and not w.bridges.is_empty():
+				var b: Dictionary = w.bridges[0]
+				var a: Vector3 = b["a"]
+				var e: Vector3 = b["b"]
+				var axis := Vector3(e.x - a.x, 0.0, e.z - a.z).normalized()
+				var side := Vector3(-axis.z, 0.0, axis.x)
+				player.visible = true
+				player.global_position = IslandWorld.bridge_point(b, 0.6) + Vector3(0, 0.2, 0)
+				main.pets.summon(0)
+				var pet: Pet = main.pets.active_pet
+				if pet != null:
+					pet.set_mode("follow")
+					var ps := a - axis * 3.0 + side * 3.0
+					pet.global_position = w.ground(ps.x, ps.z, 0.2)
+				var mid := IslandWorld.bridge_point(b, 0.4)
+				var cam := mid + side * 9.0 - axis * 3.0
+				_top.global_position = Vector3(cam.x, maxf(w.height_at(cam.x, cam.z), mid.y) + 4.0, cam.z)
+				_top.look_at(mid + Vector3(0, 0.5, 0))
+			wait = 150
+			step = 806
+		806:
+			shot("82_bridge_pet")
+			main.pets.recall()
 			_top.queue_free()
 			main.cam.current = true
 			main.hud.visible = true
@@ -732,6 +790,29 @@ func _poi_c(id: String) -> Vector2:
 	if w == null or w.poi(id).is_empty():
 		return Vector2.ZERO
 	return IslandWorld.v2(w.poi(id)["center"])
+
+
+## Камера _top у постройки (тело poi_buildings с именем bname — первое найденное): с направления angle°
+## от её фасада (0 — спереди, 90 — справа, 180 — сзади) на расстоянии dist, на высоте h; смотрит на середину стены.
+func _building_view(bname: String, angle: float, dist: float = 8.5, h: float = 2.2) -> void:
+	var body: Node3D = null
+	for b in get_tree().get_nodes_in_group("poi_buildings"):
+		var n := b as Node3D
+		if n != null and String(n.name).begins_with(bname):
+			body = n
+			break
+	if body == null:
+		print("  постройка %s не найдена" % bname)
+		return
+	var fwd := body.global_transform.basis.z
+	fwd.y = 0.0
+	fwd = fwd.normalized().rotated(Vector3.UP, deg_to_rad(angle))
+	var c := body.global_position
+	var from := c + fwd * dist
+	var w := IslandWorld.current
+	var gy := w.height_at(from.x, from.z) if w != null else c.y
+	_top.global_position = Vector3(from.x, maxf(gy, c.y) + h, from.z)
+	_top.look_at(c + Vector3(0, 1.8, 0))
 
 
 ## Камера _top из точки from (x, z) на высоте h над землёй смотрит на точку to на высоте th над землёй.

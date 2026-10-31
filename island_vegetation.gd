@@ -106,6 +106,8 @@ class Ctx:
 	## Точки деревьев, кустов и камней (для проверок и тестов).
 	var solids := PackedVector3Array()
 	var trees: Array[Vector3] = []
+	## Модели из файлов для проверки корней: [id модели, Transform3D] (тесты: meta "prop_bases").
+	var bases: Array = []
 	var stats := {"trees": 0, "bushes": 0, "rocks": 0, "crystals": 0, "grass": 0, "flowers": 0}
 
 
@@ -162,6 +164,7 @@ static func build(world: IslandWorld, rng: RandomNumberGenerator) -> void:
 	holder.set_meta("small_mats", [mats[G_BUSH], mats[G_ROCK], mats[G_PSMALL]])
 	holder.set_meta("stats", c.stats)
 	holder.set_meta("solid_points", c.solids)
+	holder.set_meta("prop_bases", c.bases)
 	holder.set_meta("built_level", Quality.level())
 	if world.is_inside_tree():
 		apply_quality(world.get_tree())
@@ -403,6 +406,30 @@ static func _decor_add(c: Ctx, group: int, mesh: Mesh, xf: Transform3D, prop_id:
 			ids.append(prop_id)
 
 
+## Высота основания процедурной модели на склоне: наименьшая высота рельефа под следом (центр и по 8 точек
+## на кругах r/2 и r) — низ не висит над склоном (на ровном месте — как высота в центре). Ни эта функция,
+## ни _fit_base ГСЧ не расходуют: расстановка та же.
+static func _base_y(w: IslandWorld, x: float, z: float, r: float) -> float:
+	var y := w.height_at(x, z)
+	for ring in 2:
+		var rr := r * (0.5 + 0.5 * float(ring))
+		for k in 8:
+			var a := TAU * (float(k) + 0.5 * float(ring)) / 8.0
+			y = minf(y, w.height_at(x + cos(a) * rr, z + sin(a) * rr))
+	return y
+
+
+## Высота основания модели из файла на склоне: каждая вершина основания (корни, низ камня или куста —
+## PropAsset.base_points) не выше рельефа под ней (с запасом gap); на ровном месте — y0.
+static func _fit_base(w: IslandWorld, pid: String, b: Basis, x: float, z: float, y0: float, gap: float) -> float:
+	var y := y0
+	var pts := PropAsset.base_points(pid)
+	for i in pts.size():
+		var p := b * pts[i]
+		y = minf(y, w.height_at(x + p.x, z + p.z) - p.y - gap)
+	return y
+
+
 static func _yaw_scale(rng: RandomNumberGenerator, s: float) -> Basis:
 	return Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(s, s, s))
 
@@ -460,12 +487,18 @@ static func _add_tree(c: Ctx, kits: Array, kind: int, x: float, z: float, s: flo
 	var mesh: Mesh = kit[c.rng.randi() % kit.size()]
 	var pos := Vector3(x, c.w.height_at(x, z) - 0.12, z)
 	var pid: String = TREE_PROP[kind]
+	var tr: float = TRUNK_R[kind]
 	if PropAsset.has(pid):
 		var ps: float = TREE_PROP_SCALE[kind]
-		_decor_add(c, G_PTREE, PropAsset.mesh(pid), Transform3D(_yaw_scale(c.rng, s * ps), pos), pid)
+		# На склоне корни не висят: основание — по самой низкой точке рельефа под ними
+		var tb := _yaw_scale(c.rng, s * ps)
+		pos.y = _fit_base(c.w, pid, tb, x, z, pos.y, 0.03)
+		var xf := Transform3D(tb, pos)
+		_decor_add(c, G_PTREE, PropAsset.mesh(pid), xf, pid)
+		c.bases.append([pid, xf])
 	else:
+		pos.y = minf(pos.y, _base_y(c.w, x, z, tr * s * 1.6) - 0.04)
 		_decor_add(c, G_DEAD if kind >= T_DEAD else G_TREES, mesh, Transform3D(_yaw_scale(c.rng, s), pos))
-	var tr: float = TRUNK_R[kind]
 	c.colliders.append([pos, tr * s, 3.0])
 	c.trees.append(pos)
 	c.solids.append(pos)
@@ -731,8 +764,13 @@ static func _place_bushes(c: Ctx, kits: Array) -> void:
 		var bs := c.rng.randf_range(0.75, 1.3)
 		if b != B_DARK and PropAsset.has("bush"):
 			# Куст из файла (1.6 м) чуть мельче процедурного; колючие тёмных земель — процедурные
-			_decor_add(c, G_PSMALL, PropAsset.mesh("bush"), Transform3D(_yaw_scale(c.rng, bs * 0.85), pos), "bush")
+			var bb := _yaw_scale(c.rng, bs * 0.85)
+			pos.y = _fit_base(c.w, "bush", bb, q.x, q.y, pos.y, 0.03)
+			var xf := Transform3D(bb, pos)
+			_decor_add(c, G_PSMALL, PropAsset.mesh("bush"), xf, "bush")
+			c.bases.append(["bush", xf])
 		else:
+			pos.y = minf(pos.y, _base_y(c.w, q.x, q.y, 0.6 * bs) - 0.03)
 			_decor_add(c, G_BUSH, mesh, Transform3D(_yaw_scale(c.rng, bs), pos))
 		c.solids.append(pos)
 		c.stats["bushes"] = int(c.stats["bushes"]) + 1
@@ -856,8 +894,11 @@ static func _add_rock(c: Ctx, kits: Array, b: int, x: float, z: float, s: float)
 	if s >= 0.5 and PropAsset.has(pid):
 		# Камень из файла: ниже и шире (как процедурный — валун, вросший в землю)
 		var rb := Basis(Vector3.UP, c.rng.randf() * TAU) * Basis.from_scale(Vector3(s, s * 0.75, s))
+		pos.y = _fit_base(c.w, pid, rb, x, z, pos.y, 0.03)
 		_decor_add(c, G_PSMALL, PropAsset.mesh(pid), Transform3D(rb, pos), pid)
+		c.bases.append([pid, Transform3D(rb, pos)])
 	else:
+		pos.y = minf(pos.y, _base_y(c.w, x, z, 0.7 * s) - 0.03)
 		_decor_add(c, G_ROCK, mesh, Transform3D(_yaw_scale(c.rng, s), pos))
 	if s > 1.1 and c.w.is_walkable(x, z):
 		c.colliders.append([pos, 0.85 * s, 1.0 * s])
