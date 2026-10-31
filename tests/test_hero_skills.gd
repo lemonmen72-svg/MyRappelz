@@ -33,22 +33,25 @@ func run_step() -> void:
 			_check_stats(player)
 			step = 1
 		1:
-			# Оружие: парные мечи → кинжалы → арбалет
-			check(player.weapon_kind == "dual_swords" and player.attack_kind == "melee", "в руках парные мечи, ближний бой")
-			check(is_equal_approx(player.attack_range, 2.4), "дальность мечей 2.4 м")
-			_check_model(player, ["Sword", "SwordL"], "парные мечи в обеих руках")
-			var cd_swords := player.attack_time
-			check(player.equip("daggers_starter") == "", "надеты парные кинжалы")
-			check(player.weapon_kind == "daggers" and player.attack_time < cd_swords, "кинжалы бьют чаще: %.2f < %.2f с"
-				% [player.attack_time, cd_swords])
+			# Оружие: два кинжала → один меч → два меча → арбалет
+			check(player.weapon_kind == "daggers" and player.attack_kind == "melee", "в руках два кинжала, ближний бой")
+			check(is_equal_approx(player.attack_range, 2.2), "дальность кинжалов 2.2 м")
 			_check_model(player, ["DaggerR", "DaggerL"], "кинжалы в обеих руках")
+			var cd_daggers := player.attack_time
+			game.inventory.add("weapon_sword_1h_r1", 2)
+			check(player.equip("weapon_sword_1h_r1") == "" and player.weapon_kind == "sword_1h" and game.offhand == "",
+				"один меч: кинжал из второй руки снят")
+			check(player.slot_block("skill1") == "", "«Удар в спину» и с одним мечом")
+			check(_swords(player), "второй меч во вторую руку — два меча")
+			check(player.attack_time > cd_daggers, "мечи бьют реже кинжалов: %.2f > %.2f с" % [player.attack_time, cd_daggers])
+			_check_model(player, ["Sword", "SwordL"], "два меча в обеих руках")
 			check(player.equip("crossbow_starter") == "", "надет лёгкий арбалет")
 			check(player.attack_kind == "ranged" and player.attack_range > 10.0, "арбалет стреляет издалека: %.1f м"
 				% player.attack_range)
 			_check_model(player, ["Crossbow"], "арбалет в руках")
 			check(player._model.find_child("SwordL", true, false) == null, "с арбалетом клинков в руках нет")
 			check(player.equip("hp_potion") != "", "зелье не надеть как оружие")
-			check(player.equip("daggers_steel") != "", "оружие не из сумки не надеть")
+			check(player.equip("dagger_steel") != "", "оружие не из сумки не надеть")
 			mob = find_mob("pheasant")
 			check(mob != null, "найден фазан")
 			place_far(mob, 8.0)
@@ -86,7 +89,7 @@ func run_step() -> void:
 			player.select_target(mob)
 			check(not player.use_skill("skill1"), "с арбалетом «Удар в спину» не применить")
 			check(main.hud._msg_label.text.contains("Нужны клинки"), "сообщение: %s" % main.hud._msg_label.text)
-			check(player.equip("dual_swords_starter") == "", "снова парные мечи")
+			check(_swords(player), "снова два меча")
 			check(player.slot_block("skill1") == "" and not main.hud.is_blocked("skill1"), "с мечами кнопка 1 доступна")
 			step = 4
 		4:
@@ -148,7 +151,7 @@ func run_step() -> void:
 		7:
 			# Сон, страх, отбрасывание, урон со временем (умения героя и сами механизмы зверя)
 			var rec: Dictionary = game.hero
-			check(player.equip("dual_swords_starter") == "", "снова мечи")
+			check(_swords(player), "снова мечи")
 			check(HeroSkills.learn(rec, "assassin", game.level, "sleeping_dust"), "изучена «Сонная пыльца»")
 			mob = find_mob("pheasant")
 			stand_near(mob)
@@ -294,7 +297,8 @@ func _check_start(player: Player) -> void:
 	check(player.skill_id("skill1") == "backstab" and player.skill_id("skill2") == "shadow_step", "стартовые умения на кнопках 1 и 2")
 	check(player.skill_id("skill3") == "" and not main.hud.is_button_visible("skill3"), "кнопка 3 пуста и скрыта")
 	check(int(rec["jp"]) == HeroSkills.JP_START, "у нового героя %d JP" % HeroSkills.JP_START)
-	check(game.weapon == "dual_swords_starter", "надеты парные мечи")
+	check(game.weapon == "weapon_dagger_r1" and game.offhand == "weapon_dagger_r1" and player.weapon_kind == "daggers",
+		"в руках два кинжала")
 	for id in ItemData.STARTER_WEAPONS["assassin"]:
 		check(game.inventory.has(String(id)), "в сумке %s" % ItemData.item_name(String(id)))
 	check(player.max_mp > 0 and player.mp == player.max_mp, "у Наёмника есть MP: %d" % player.max_mp)
@@ -342,19 +346,24 @@ func _check_stats(player: Player) -> void:
 	# Игрок: статы применены, оружие поверх
 	check(player.hero_stats.size() > 0 and player.max_hp == int(d1["max_hp"]) and player.max_mp == int(d1["max_mp"]),
 		"игрок 1-го ур.: HP %d, MP %d" % [player.max_hp, player.max_mp])
-	var sw := ItemData.get_item("dual_swords_starter")
-	check(player.atk == int(d1["patk"]) + int(sw["atk"]), "атака с мечами: %d = %d + %d" % [player.atk, int(d1["patk"]), int(sw["atk"])])
+	var dg := ItemData.grip_bonus("weapon_dagger_r1", "weapon_dagger_r1")
+	check(player.atk == int(d1["patk"]) + int(dg["atk"]), "атака с двумя кинжалами: %d = %d + %d"
+		% [player.atk, int(d1["patk"]), int(dg["atk"])])
+	check(player.matk == int(d1["matk"]) + int(dg["matk"]), "кинжалы дают и маг. атаку: %d = %d + %d"
+		% [player.matk, int(d1["matk"]), int(dg["matk"])])
 	check(is_equal_approx(player.eva, float(d1["eva"]) / 100.0) and is_equal_approx(player.crit, float(d1["crit"]) / 100.0),
 		"уклонение %.1f%% и крит %.1f%% героя — из статов" % [player.eva * 100.0, player.crit * 100.0])
-	check(is_equal_approx(player.aspd, float(d1["aspd"]) / 100.0), "скорость атаки от Ловкости: %d%%" % roundi(player.aspd * 100.0))
-	check(is_equal_approx(player.attack_time, float(sw["cd"]) / player.aspd), "удар раз в %.2f с" % player.attack_time)
+	check(is_equal_approx(player.aspd, float(d1["aspd"]) / 100.0 + 0.25), "скорость атаки от Ловкости и кинжала (+25%%): %d%%"
+		% roundi(player.aspd * 100.0))
+	check(is_equal_approx(player.attack_time, ItemData.base_cd("dagger") / player.aspd), "удар раз в %.2f с" % player.attack_time)
 	check(player.accuracy == int(d1["acc"]) and player.hp_regen > 0.0, "точность %d, восстановление HP %.1f/с"
 		% [player.accuracy, player.hp_regen])
 	check(player.mp_regen_rate(true) > 0.0 and player.mp_regen_rate(false) > player.mp_regen_rate(true), "восстановление MP")
 	check(player.equip("crossbow_starter") == "", "арбалет")
 	var cb := ItemData.get_item("crossbow_starter")
 	check(player.atk == int(d1["ratk"]) + int(cb["atk"]), "атака арбалета от Меткости: %d" % player.atk)
-	check(player.equip("dual_swords_starter") == "", "снова мечи")
+	check(is_equal_approx(player.aspd, float(d1["aspd"]) / 100.0 - 0.2), "арбалет: скорость атаки −20%")
+	check(_daggers(player), "снова кинжалы")
 	# Точность: по зверям своего уровня без промахов, по сильным — изредка
 	var weak := find_mob("pheasant")
 	check(weak != null and player.hit_chance(weak) >= 1.0, "по фазану 1-го ур. без промахов")
@@ -406,7 +415,7 @@ func _check_learning(player: Player) -> void:
 	check(HeroSkills.learn(rec, "assassin", 40, "crossbow_mastery"), "изучена «Твёрдая рука»")
 	player.refresh_skills()
 	check(player.atk > bow_atk, "«Твёрдая рука» с арбалетом: атака %d → %d" % [bow_atk, player.atk])
-	check(player.equip("dual_swords_starter") == "", "мечи")
+	check(_swords(player), "мечи")
 	check(not HeroSkills.bonuses(rec, "assassin", "dual_swords").has("atk_flat"), "с мечами «Твёрдая рука» не действует")
 	# Общие пассивки: уклонение и HP
 	var eva0 := player.eva
@@ -431,7 +440,7 @@ func _check_learning(player: Player) -> void:
 ## Переключаемые: MP при включении и поддержка, бонус, выключение без MP; оружейные выключаются при смене оружия.
 func _check_toggles(player: Player) -> void:
 	var rec: Dictionary = game.hero
-	check(player.equip("dual_swords_starter") == "", "мечи")
+	check(_swords(player), "мечи")
 	check(HeroSkills.learn(rec, "assassin", game.level, "concentration"), "изучен «Холодный расчёт»")
 	player.mp = player.max_mp
 	var crit0 := player.crit
@@ -463,7 +472,10 @@ func _check_toggles(player: Player) -> void:
 	check(not HeroSkills.toggle_on(rec, "twin_fury") and is_zero_approx(player.double_chance),
 		"при смене на арбалет «Вихрь клинков» выключился")
 	check(player.set_toggle("twin_fury", true) == "Нужны клинки", "с арбалетом «Вихрь клинков» не включить")
-	check(player.equip("dual_swords_starter") == "", "мечи")
+	check(player.equip("weapon_dagger_r1") == "" and player.weapon_kind == "dagger", "один кинжал")
+	check(player.set_toggle("twin_fury", true) == "", "«Вихрь клинков» и с одним кинжалом")
+	check(_swords(player) and HeroSkills.toggle_on(rec, "twin_fury"), "кинжал → два меча: «Вихрь клинков» остался включён")
+	check(player.set_toggle("twin_fury", false) == "" and is_zero_approx(player.double_chance), "«Вихрь клинков» выключен")
 	player.mp = player.max_mp
 
 
@@ -526,13 +538,13 @@ func _check_window(player: Player) -> void:
 		check(player.speed > sp0, "«Попутный ветер»: бег %.1f → %.1f м/с" % [sp0, player.speed])
 	main._on_action("hero_window")
 	check(not main.hud.is_window_open(), "клавиша K закрывает окно героя")
-	check(player.equip("dual_swords_starter") == "", "мечи")
+	check(_swords(player), "мечи")
 
 
 ## Сохранение и загрузка: оружие, JP, умения, переключаемые, кнопки; старые сохранения.
 func _check_save(player: Player) -> void:
 	var rec: Dictionary = game.hero
-	check(player.equip("daggers_starter") == "", "кинжалы перед сохранением")
+	check(_daggers(player), "кинжалы перед сохранением")
 	check(game.save_game(), "игра сохранена")
 	var jp := int(rec["jp"])
 	var skills: Dictionary = (rec["skills"] as Dictionary).duplicate()
@@ -543,7 +555,8 @@ func _check_save(player: Player) -> void:
 	check(game.load_game(), "игра загружена")
 	player.apply_class()
 	var r: Dictionary = game.hero
-	check(game.weapon == "daggers_starter" and player.weapon_kind == "daggers", "оружие восстановлено: кинжалы")
+	check(game.weapon == "weapon_dagger_r1" and game.offhand == "weapon_dagger_r1" and player.weapon_kind == "daggers",
+		"оружие восстановлено: два кинжала")
 	check(int(r["jp"]) == jp, "JP восстановлены: %d" % jp)
 	var ok := (r["skills"] as Dictionary).size() == skills.size()
 	for k in skills:
@@ -553,7 +566,7 @@ func _check_save(player: Player) -> void:
 	check((r["toggles"] as Dictionary).keys() == toggles.keys(), "переключаемые восстановлены: %s" % [r["toggles"]])
 	# Старое сохранение Наёмника без оружия и умений героя
 	game.from_dict({"name": "Старая", "race": "dark_elf", "class": "assassin", "level": 5, "inventory": {"hp_potion": 2}})
-	check(game.weapon == "dual_swords_starter", "старое сохранение: парные мечи")
+	check(game.weapon == "weapon_dagger_r1" and game.offhand == "weapon_dagger_r1", "старое сохранение без оружия: два кинжала")
 	for id in ItemData.STARTER_WEAPONS["assassin"]:
 		check(game.inventory.has(String(id)), "старое сохранение: в сумке %s" % ItemData.item_name(String(id)))
 	check(int(game.hero["jp"]) == HeroSkills.default_jp(5), "старое сохранение 5 ур.: %d JP" % int(game.hero["jp"]))
@@ -564,8 +577,8 @@ func _check_save(player: Player) -> void:
 	game.from_dict({"name": "Старый", "race": "human", "class": "warrior", "level": 3, "gold": 77})
 	check(game.race_id == "dark_elf" and game.class_id == "assassin", "старый воин стал Наёмником")
 	check(game.level == 3 and game.gold == 77, "уровень и золото сохранены")
-	check(game.weapon == "dual_swords_starter" and (game.hero["slots"] as Array)[0] == "backstab",
-		"старый воин: парные мечи и «Удар в спину» на кнопке 1")
+	check(game.weapon == "weapon_dagger_r1" and game.offhand == "weapon_dagger_r1" and (game.hero["slots"] as Array)[0] == "backstab",
+		"старый воин: два кинжала и «Удар в спину» на кнопке 1")
 	check(int(game.hero["jp"]) == HeroSkills.default_jp(3), "старый воин 3 ур.: %d JP" % int(game.hero["jp"]))
 	check(game.load_note.contains("Наёмник"), "сообщение игроку: %s" % game.load_note)
 	check(game.load_game(), "игра загружена снова")
@@ -573,6 +586,21 @@ func _check_save(player: Player) -> void:
 
 
 # ---------- Помощники ----------
+
+## Два меча в обеих руках (мечи — в сумку, если их меньше двух). true — надеты.
+func _swords(player: Player) -> bool:
+	var have := game.inventory.count("weapon_sword_1h_r1")
+	if have < 2:
+		game.inventory.add("weapon_sword_1h_r1", 2 - have)
+	return player.equip("weapon_sword_1h_r1") == "" and player.equip("weapon_sword_1h_r1", true) == "" \
+		and player.weapon_kind == "dual_swords"
+
+
+## Два кинжала в обеих руках (стартовый набор Наёмника). true — надеты.
+func _daggers(player: Player) -> bool:
+	return player.equip("weapon_dagger_r1") == "" and player.equip("weapon_dagger_r1", true) == "" \
+		and player.weapon_kind == "daggers"
+
 
 ## Весь текст открытого окна.
 func _window_text() -> String:

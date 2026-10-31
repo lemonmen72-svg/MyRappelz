@@ -254,10 +254,11 @@ const CLASS_TREES := {
 	],
 }
 
-## Группы оружия для поля weapon умения: kinds — виды оружия (ItemData.WEAPON_KINDS), shield — нужен щит во второй
+## Группы оружия для поля weapon умения: kinds — виды хвата (ItemData.WEAPON_KINDS, ItemData.grip_kind: один кинжал —
+## "dagger", два — "daggers"), shield — нужен щит во второй
 ## руке, name — для карточки, need — сообщение, когда оружие не подходит (по умолчанию «Нужно оружие: …»).
 const WEAPON_GROUPS := {
-	"blades": {"kinds": ["daggers", "dual_swords"], "name": "кинжалы или мечи", "need": "Нужны клинки"},
+	"blades": {"kinds": ["dagger", "daggers", "sword_1h", "dual_swords"], "name": "кинжалы или мечи", "need": "Нужны клинки"},
 	"crossbow": {"kinds": ["crossbow"], "name": "арбалет", "need": "Нужен арбалет"},
 	"bow": {"kinds": ["bow"], "name": "лук", "need": "Нужен лук"},
 	"shield": {"kinds": [], "shield": true, "name": "щит", "need": "Нужен щит"},
@@ -266,8 +267,8 @@ const WEAPON_GROUPS := {
 	"axe": {"kinds": ["axe_1h", "axe_2h", "dual_axes"], "name": "топор"},
 	"staff": {"kinds": ["staff_1h", "staff_2h"], "name": "посох"},
 	"dagger": {"kinds": ["dagger", "daggers"], "name": "кинжал"},
-	"dual_swords": {"kinds": ["dual_swords"], "name": "парные мечи"},
-	"dual_axes": {"kinds": ["dual_axes"], "name": "парные топоры"},
+	"dual_swords": {"kinds": ["dual_swords"], "name": "два меча", "need": "Нужны два меча"},
+	"dual_axes": {"kinds": ["dual_axes"], "name": "два топора", "need": "Нужны два топора"},
 	"sword_2h": {"kinds": ["sword_2h"], "name": "двуручный меч"},
 	"axe_2h": {"kinds": ["axe_2h"], "name": "двуручный топор"},
 }
@@ -287,6 +288,7 @@ const BONUS_NAMES := {
 	"hp_from_eva": "HP от уклонения", "mp_from_eva": "MP от уклонения",
 	"def_pct": "защита", "matk_pct": "маг. атака", "mdef_flat": "маг. защита", "mp_pct": "макс. MP", "hp_flat": "макс. HP",
 	"regen": "восстановление HP", "guard": "получаемый урон", "block": "шанс блока", "cdr": "перезарядка умений",
+	"cast": "скорость каста",
 	"str": "Сила", "vit": "Выносливость", "agi": "Ловкость", "int": "Интеллект", "wis": "Мудрость", "dex": "Меткость",
 	"luck": "Удача",
 }
@@ -799,7 +801,7 @@ static func _num(v: float) -> String:
 
 static func bonus_text(key: String, v: float) -> String:
 	match key:
-		"eva", "crit", "atk_pct", "hp_pct", "speed_pct", "aspd", "basic_pct", "def_pct", "matk_pct", "mp_pct", "block":
+		"eva", "crit", "atk_pct", "hp_pct", "speed_pct", "aspd", "basic_pct", "def_pct", "matk_pct", "mp_pct", "block", "cast":
 			return "%s +%s" % [String(BONUS_NAMES[key]), _pct(v)]
 		"atk_flat", "def_flat", "mdef_flat", "hp_flat", "str", "vit", "agi", "int", "wis", "dex", "luck":
 			return "%s +%s" % [String(BONUS_NAMES[key]), _num(v)]

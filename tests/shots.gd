@@ -23,6 +23,18 @@ const HERO_ROW2 := ["res://assets/characters/hero_assassin_f.glb", "res://assets
 	"res://assets/characters/hero_dark_elf_f_starter.glb", "res://assets/characters/hero_dark_elf_m_starter.glb",
 	"res://assets/characters/hero_light_elf_f_starter.glb", "res://assets/characters/hero_light_elf_m_starter.glb",
 	"res://assets/characters/hero_human_f_starter.glb", "res://assets/characters/hero_human_m_starter.glb"]
+## Оружие героев (кадр 91): [модель, вид оружия ItemData, щит во второй руке] — одноручное со щитом, лук, пары,
+## посох, двуручное.
+const WEAPON_ROW := [
+	["res://assets/characters/hero_swordsman_m.glb", "sword_1h", true],
+	["res://assets/characters/hero_warrior_m.glb", "bow", false],
+	["res://assets/characters/hero_warrior_f.glb", "dual_axes", false],
+	["res://assets/characters/hero_assassin_f.glb", "daggers", false],
+	["res://assets/characters/hero_swordsman_f.glb", "dual_swords", false],
+	["res://assets/characters/hero_dark_elf_m_starter.glb", "staff_2h", false],
+	["res://assets/characters/hero_dark_elf_f_starter.glb", "dagger", true],
+	["res://assets/characters/hero_human_m_starter.glb", "axe_2h", false],
+]
 var _heroes: Node3D = null
 var _top: Camera3D = null
 var _row: Node3D = null
@@ -38,7 +50,7 @@ const HERO_SKILLS := [["blade_mastery", 2], ["charge_stab", 2], ["dark_strike", 
 	["concentration", 1], ["crossbow_mastery", 1], ["dual_shot", 1]]
 ## Предметы для кадров сумки и торговца (27–30): [id, количество]. Карты существ: пустые, с душой, зеркальная.
 const BAG_ITEMS := [
-	["daggers_steel", 1], ["crossbow_heavy", 1], ["card_panther", 4], ["card_wolf", 1], ["card_turtle", 1],
+	["dagger_steel", 1], ["sword_steel", 2], ["crossbow_heavy", 1], ["card_panther", 4], ["card_wolf", 1], ["card_turtle", 1],
 	["card_panther_soul", 1], ["card_wolf_soul", 1], ["mirror_card", 2], ["lizard_scale", 7],
 	["wolf_pelt", 3], ["panther_fang", 2], ["pheasant_feather", 4], ["shell_plate", 2], ["chief_spike", 1],
 	["hp_potion", 12],
@@ -268,7 +280,9 @@ func run_step() -> void:
 			step = 25
 		25:
 			shot("23_hero_crossbow_shot")
-			player.equip("dual_swords_starter")
+			game.inventory.add("sword_steel", 2)
+			player.equip("sword_steel")
+			player.equip("sword_steel", true)
 			wait = 40
 			step = 26
 		26:
@@ -278,7 +292,8 @@ func run_step() -> void:
 			step = 27
 		27:
 			shot("25_hero_dual_attack")
-			player.equip("daggers_starter")
+			player.equip("weapon_dagger_r1")
+			player.equip("weapon_dagger_r1", true)
 			wait = 40
 			step = 28
 		28:
@@ -293,9 +308,9 @@ func run_step() -> void:
 			wait = 10
 			step = 29
 		29:
-			# Окно сумки: карточка стальных кинжалов (сравнение с надетыми)
+			# Окно сумки: карточка стального кинжала (сравнение с надетым)
 			main.economy.open_bag()
-			main.economy.window.select_cell(game.inventory.find_cell("daggers_steel"))
+			main.economy.window.select_cell(game.inventory.find_cell("dagger_steel"))
 			wait = 8
 			step = 30
 		30:
@@ -832,6 +847,20 @@ func run_step() -> void:
 		813:
 			shot("93_admin_world")
 			main.hud.close_window()
+			# Оружие профессий: одноручное со щитом, лук, два топора, два кинжала, два меча, посох, кинжал и щит
+			var paths: Array = []
+			for e in WEAPON_ROW:
+				paths.append(String((e as Array)[0]))
+			_heroes_row(paths, 1.0, 5.6, WEAPON_ROW)
+			wait = 60
+			step = 813
+		813:
+			shot("91_weapons")
+			_heroes.queue_free()
+			_top.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
+			main.player.visible = true
 			ok_done()
 
 
@@ -1032,7 +1061,7 @@ func _anathema_row() -> void:
 
 ## Героиня (скелет Mixamo) и герои из Meshy с родным скелетом в ряд на площади города перед камерой (Idle, парные
 ## мечи; у последнего — арбалет), игрок скрыт, HUD скрыт. gap — шаг ряда, м; dist — камера от ряда, м.
-func _heroes_row(paths: Array, gap: float, dist: float) -> void:
+func _heroes_row(paths: Array, gap: float, dist: float, weapons: Array = []) -> void:
 	var player: Player = main.player
 	player.visible = false
 	# Площадь города (ровно, без воды); игрок скрыт там же
@@ -1045,6 +1074,9 @@ func _heroes_row(paths: Array, gap: float, dist: float) -> void:
 	main.add_child(_heroes)
 	for i in paths.size():
 		var spec := CharacterModel.spec_for("dark_elf", "assassin", "crossbow" if i == paths.size() - 1 else "dual_swords")
+		if i < weapons.size():
+			var we: Array = weapons[i]
+			spec = CharacterModel.spec_for("dark_elf", "assassin", String(we[1]), "f", bool(we[2]))
 		spec["asset"] = String(paths[i])
 		var m := CharacterModel.new()
 		m.setup(spec)

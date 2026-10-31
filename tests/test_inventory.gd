@@ -23,12 +23,12 @@ func run_step() -> void:
 			_unit_layout()
 			step = 1
 		1:
-			# Новый Наёмник: надетые парные мечи в ячейке не лежат
-			check(game.weapon == "dual_swords_starter", "надеты парные мечи")
-			check(inv.equipped == game.weapon, "сумка знает надетое оружие")
-			check(inv.find_cell(game.weapon) == -1, "надетое оружие не занимает ячейку")
-			check(inv.count(game.weapon) == 1, "но числится в сумке (count)")
-			check(inv.used_cells() == 4, "занято ячеек: %d (2 оружия, зелья, свиток; карт в подарок нет)" % inv.used_cells())
+			# Новый Наёмник: два надетых кинжала (основная и вторая рука) в ячейках не лежат
+			check(game.weapon == "weapon_dagger_r1" and game.offhand == "weapon_dagger_r1", "в руках два кинжала")
+			check(inv.equipped == game.weapon and inv.equipped_off == game.offhand, "сумка знает оружие обеих рук")
+			check(inv.find_cell(game.weapon) == -1, "надетые кинжалы не занимают ячеек")
+			check(inv.count(game.weapon) == 2, "но числятся в сумке (count)")
+			check(inv.used_cells() == 3, "занято ячеек: %d (арбалет, зелья, свиток; карт в подарок нет)" % inv.used_cells())
 			check(ItemData.is_weapon(String(inv.cell(0).get("id", ""))), "новая сумка разложена по порядку: оружие первым")
 			player.global_position = Vector3(0, 0.1, 7.0)
 			wait = 3
@@ -42,7 +42,7 @@ func run_step() -> void:
 			for e in InventoryWindow.EQUIP_SLOTS:
 				check(win.buttons.has("equip_" + String(e[0])), "слот экипировки «%s»" % String(e[1]))
 			var used := main.hud._window.find_child("used_label", true, false) as Label
-			check(used != null and used.text == "Занято: 4/%d" % Inventory.CAPACITY, "занятость: %s" % (used.text if used else "?"))
+			check(used != null and used.text == "Занято: 3/%d" % Inventory.CAPACITY, "занятость: %s" % (used.text if used else "?"))
 			# Карточка надетого оружия — касание слота «Оружие»
 			_press("equip_weapon")
 			check(win.sel_kind == "equip" and win.sel_index == 0, "выбран слот «Оружие»")
@@ -69,21 +69,34 @@ func run_step() -> void:
 			check(inv.count("revive_scroll") == 1, "свиток не тратится без погибших питомцев")
 			step = 3
 		3:
-			# Надеть кинжалы из карточки: мечи ложатся в ту же ячейку
-			var dc := inv.find_cell("daggers_starter")
-			check(dc >= 0, "кинжалы в ячейке %d" % dc)
+			# Надеть меч из карточки: кинжал из основной руки ложится в ту же ячейку, второй — из второй руки в сумку
+			inv.add("weapon_sword_1h_r1")
+			var dc := inv.find_cell("weapon_sword_1h_r1")
+			check(dc >= 0, "меч в ячейке %d" % dc)
 			_press("cell_%d" % dc)
 			check(win.buttons.has("act_equip") and not (win.buttons["act_equip"] as Button).disabled, "кнопка «Надеть»")
+			check(not win.buttons.has("act_equip_off"), "к кинжалу меч во вторую руку не взять")
 			var lines := _card_texts()
-			check(lines.find("Атака") >= 0 and lines.find("Удар раз в") >= 0, "у оружия характеристики")
+			check(lines.find("Физ. атака") >= 0 and lines.find("Скорость атаки") >= 0, "у оружия бонусы вида")
 			check(_has_text_containing("разница с надетым"), "сравнение с надетым")
+			check(_has_text_containing("можно два"), "хват: можно два меча")
 			_press("act_equip")
-			check(game.weapon == "daggers_starter", "надеты кинжалы")
-			check(player.weapon_kind == "daggers", "у игрока в руках кинжалы")
-			check(String(inv.cell(dc).get("id", "")) == "dual_swords_starter", "мечи легли в ту же ячейку")
-			check(inv.find_cell("daggers_starter") == -1, "кинжалы ушли из сумки в слот")
+			check(game.weapon == "weapon_sword_1h_r1", "надет меч")
+			check(player.weapon_kind == "sword_1h" and game.offhand == "", "один меч: вторая рука свободна")
+			check(String(inv.cell(dc).get("id", "")) == "weapon_dagger_r1", "кинжал лёг в ту же ячейку")
+			check(inv.count("weapon_dagger_r1") == 2 and inv.find_cell("weapon_sword_1h_r1") == -1, "меч ушёл из сумки в слот")
 			check(win.sel_kind == "equip", "после «Надеть» выбран слот оружия")
-			check(inv.used_cells() == 4, "занято ячеек: %d (обмен, не больше)" % inv.used_cells())
+			check(inv.used_cells() == 5, "занято ячеек: %d (два кинжала вернулись в сумку)" % inv.used_cells())
+			# Второй меч — кнопкой «Во 2-ю руку»
+			inv.add("weapon_sword_1h_r1")
+			_press("cell_%d" % inv.find_cell("weapon_sword_1h_r1"))
+			check(win.buttons.has("act_equip_off") and not (win.buttons["act_equip_off"] as Button).disabled, "кнопка «Во 2-ю руку»")
+			_press("act_equip_off")
+			check(game.offhand == "weapon_sword_1h_r1" and player.weapon_kind == "dual_swords", "второй меч — два меча")
+			check(win.sel_kind == "equip" and win.sel_index == 1, "выбран слот «2-я рука»")
+			var off_slot: Button = win.buttons["equip_offhand"]
+			check(not off_slot.call("_can_drop_data", Vector2.ZERO, {"inv_cell": inv.find_cell("weapon_dagger_r1")}),
+				"кинжал к мечу во вторую руку не бросить")
 			# Перетаскивание арбалета в слот «Оружие»
 			var cc := inv.find_cell("crossbow_starter")
 			var slot: Button = win.buttons["equip_weapon"]
@@ -91,8 +104,9 @@ func run_step() -> void:
 			var pc := inv.find_cell("hp_potion")
 			check(not slot.call("_can_drop_data", Vector2.ZERO, {"inv_cell": pc}), "зелье в слот оружия не бросить")
 			slot.call("_drop_data", Vector2.ZERO, {"inv_cell": cc})
-			check(game.weapon == "crossbow_starter" and String(inv.cell(cc).get("id", "")) == "daggers_starter",
-				"арбалет надет перетаскиванием, кинжалы на его месте")
+			check(game.weapon == "crossbow_starter" and String(inv.cell(cc).get("id", "")) == "weapon_sword_1h_r1",
+				"арбалет надет перетаскиванием, меч на его месте")
+			check(game.offhand == "" and inv.count("weapon_sword_1h_r1") == 2, "арбалет двуручный: второй меч снят")
 			step = 4
 		4:
 			# «Переместить»: касание предмета → «Переместить» → касание пустой ячейки
@@ -200,7 +214,7 @@ func run_step() -> void:
 			var kirk_goods := InventoryWindow.goods(game.class_id, "kirk")
 			check(kirk_goods.has("card_panther") and kirk_goods.has("mirror_card") and not kirk_goods.has("card_wolf"),
 				"карты существ — у Учителя Кирка: %s" % [kirk_goods])
-			check(win.buttons.has("good_daggers_steel"), "оружие Наёмника в товарах")
+			check(win.buttons.has("good_dagger_steel") and win.buttons.has("good_weapon_bow_r1"), "оружие в товарах")
 			check(not win.buttons.has("good_boar_tusk"), "трофеи не продаются")
 			check(win.buttons.has("cell_0"), "сумка в окне торговца")
 			_press("good_hp_potion")
@@ -209,25 +223,25 @@ func run_step() -> void:
 			var potions: int = inv.count("hp_potion")
 			_press("act_buy5")
 			check(game.gold == 50 and inv.count("hp_potion") == potions + 5, "куплено 5 зелий")
-			_press("good_daggers_steel")
+			_press("good_dagger_steel")
 			check(not win.buttons.has("act_buy5"), "оружие — по одному")
 			check(_has_text_containing("разница с надетым"), "оружие сравнивается с надетым")
 			game.gold = 10
 			_press("act_buy")
-			check(not inv.has("daggers_steel", 2) and game.gold == 10, "без золота не купить")
+			check(not inv.has("dagger_steel", 2) and game.gold == 10, "без золота не купить")
 			game.gold = 500
 			# Выше в сумку клали по одному каждому предмету игры (их стало больше 40 ячеек) — освободим место:
 			# уберём оружие 1-го ранга (не надетое)
 			for key in ItemData.ITEMS:
 				var wid := String(key)
-				if wid.begins_with("weapon_") and wid != game.weapon and wid != game.shield:
+				if wid.begins_with("weapon_") and wid != game.weapon and wid != game.offhand:
 					inv.remove(wid, inv.count(wid))
-			var steel: int = inv.count("daggers_steel")
-			var free_slots: int = inv.room_for("daggers_steel")
+			var steel: int = inv.count("dagger_steel")
+			var free_slots: int = inv.room_for("dagger_steel")
 			_press("act_buy")
-			check(inv.count("daggers_steel") == steel + 1 and game.gold == 380,
-				"куплены стальные кинжалы (было %d, стало %d, золото %d, место %d, в продаже %s, сообщение «%s»)" % [steel,
-				inv.count("daggers_steel"), game.gold, free_slots, InventoryWindow.goods(game.class_id).has("daggers_steel"),
+			check(inv.count("dagger_steel") == steel + 1 and game.gold == 500 - int(ItemData.get_item("dagger_steel")["buy"]),
+				"куплен стальной кинжал (было %d, стало %d, золото %d, место %d, в продаже %s, сообщение «%s»)" % [steel,
+				inv.count("dagger_steel"), game.gold, free_slots, InventoryWindow.goods(game.class_id).has("dagger_steel"),
 				main.hud._msg_label.text])
 			# Продажа в окне торговца — из ячейки сумки
 			var sc := inv.find_cell("shell_plate")
@@ -240,7 +254,7 @@ func run_step() -> void:
 			# Сумка полна: покупка не проходит (клыков в сумке нет — для проверки добычи ниже)
 			inv.remove("boar_tusk", inv.count("boar_tusk"))
 			var room := Inventory.CAPACITY - inv.used_cells()
-			inv.add("dual_swords_steel", room)
+			inv.add("sword_steel", room)
 			check(inv.is_full(), "сумка заполнена (%d/%d)" % [inv.used_cells(), Inventory.CAPACITY])
 			win.refresh()
 			_press("good_crossbow_heavy")
@@ -261,7 +275,7 @@ func run_step() -> void:
 			check(not inv.has("boar_tusk"), "клыки не взяты")
 			check(last_hud_text() == "Сумка полна", "сообщение «Сумка полна» при добыче")
 			# Освобождаем ячейку — мешочек подбирается при следующей попытке
-			inv.remove_at(inv.find_cell("dual_swords_steel"))
+			inv.remove_at(inv.find_cell("sword_steel"))
 			wait = int(LootDrop.RETRY_TIME * 60.0) + 20
 			step = 7
 		7:
@@ -279,10 +293,10 @@ func _unit_stacks() -> void:
 	check(inv.used_cells() == 2 and int(inv.cell(0).get("n", 0)) == 99 and int(inv.cell(1).get("n", 0)) == 51,
 		"150 клыков — стопки 99 + 51")
 	check(inv.room_for("boar_tusk") == (Inventory.CAPACITY - 2) * 99 + 48, "место для клыков: %d" % inv.room_for("boar_tusk"))
-	check(ItemData.stack_size("daggers_steel") == 1 and ItemData.stack_size("hp_potion") == ItemData.STACK, "размер стопок")
-	inv.add("daggers_steel", 3)
+	check(ItemData.stack_size("dagger_steel") == 1 and ItemData.stack_size("hp_potion") == ItemData.STACK, "размер стопок")
+	inv.add("dagger_steel", 3)
 	check(inv.used_cells() == 5, "оружие — по одному в ячейке")
-	inv.add("dual_swords_steel", Inventory.CAPACITY - 5)
+	inv.add("sword_steel", Inventory.CAPACITY - 5)
 	check(inv.is_full() and inv.used_cells() == Inventory.CAPACITY, "сумка полна")
 	check(inv.room_for("hp_potion") == 0 and inv.try_add("hp_potion", 3) == 0 and not inv.has("hp_potion"),
 		"в полную сумку новый предмет не кладётся")
@@ -295,12 +309,12 @@ func _unit_stacks() -> void:
 		"remove снимает с последних стопок")
 	# Надетое оружие ячейку не занимает
 	var inv2 := Inventory.new()
-	inv2.add("daggers_starter", 1)
+	inv2.add("weapon_dagger_r1", 1)
 	inv2.add("crossbow_starter", 1)
-	inv2.equipped = "daggers_starter"
-	check(inv2.used_cells() == 1 and inv2.find_cell("daggers_starter") == -1, "надетое оружие — не в ячейке")
+	inv2.equipped = "weapon_dagger_r1"
+	check(inv2.used_cells() == 1 and inv2.find_cell("weapon_dagger_r1") == -1, "надетое оружие — не в ячейке")
 	inv2.equipped = "crossbow_starter"
-	check(inv2.find_cell("daggers_starter") >= 0 and inv2.find_cell("crossbow_starter") == -1, "смена надетого")
+	check(inv2.find_cell("weapon_dagger_r1") >= 0 and inv2.find_cell("crossbow_starter") == -1, "смена надетого")
 
 
 func _unit_move_sort() -> void:
@@ -324,18 +338,18 @@ func _unit_move_sort() -> void:
 	inv.remove_at(1, 3)
 	check(inv.move(12, 1) and int(inv.cell(1).get("n", 0)) == 99 and int(inv.cell(12).get("n", 0)) == 3,
 		"что не влезло в стопку, остаётся на месте")
-	inv.add("daggers_steel", 1)
+	inv.add("dagger_steel", 1)
 	inv.add("mirror_card", 1)
 	inv.add("card_panther", 2)
 	inv.add("card_wolf_soul", 1)
-	inv.move(inv.find_cell("daggers_steel"), 20)
+	inv.move(inv.find_cell("dagger_steel"), 20)
 	inv.sort()
 	var order: Array = []
 	for c in inv.cells():
 		var d: Dictionary = c
 		if not d.is_empty():
 			order.append(String(d["id"]))
-	check(order == ["daggers_steel", "hp_potion", "hp_potion", "card_wolf_soul", "card_panther", "mirror_card", "boar_tusk"],
+	check(order == ["dagger_steel", "hp_potion", "hp_potion", "card_wolf_soul", "card_panther", "mirror_card", "boar_tusk"],
 		"сортировка: оружие, расходники, карты (с душой раньше пустых, зеркальная в конце), трофеи: %s" % [order])
 	check(int(inv.cell(1).get("n", 0)) == 99 and int(inv.cell(2).get("n", 0)) == 3, "стопки собраны при сортировке")
 
@@ -356,9 +370,9 @@ func _unit_layout() -> void:
 	check(inv2.count("hp_potion") == 3, "количества восстановлены")
 	# Старый формат: раскладки нет — по порядку сортировки
 	var old := Inventory.new()
-	old.from_dict({"boar_tusk": 2, "hp_potion": 3, "dual_swords_starter": 1})
+	old.from_dict({"boar_tusk": 2, "hp_potion": 3, "sword_steel": 1})
 	old.load_layout([])
-	check(String(old.cell(0).get("id", "")) == "dual_swords_starter" and String(old.cell(1).get("id", "")) == "hp_potion"
+	check(String(old.cell(0).get("id", "")) == "sword_steel" and String(old.cell(1).get("id", "")) == "hp_potion"
 		and String(old.cell(2).get("id", "")) == "boar_tusk", "старое сохранение разложено по порядку")
 	# Раскладка расходится с количествами: верят количествам
 	var bad := Inventory.new()
