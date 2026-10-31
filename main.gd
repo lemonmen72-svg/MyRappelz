@@ -40,6 +40,15 @@ const OTHER_BUTTONS := [
 	["shop", "Торговец", Vector2(330, 170), 34.0, Color(0.85, 0.7, 0.2, 0.45)],
 	["talk", "Говорить", Vector2(420, 110), 34.0, Color(0.95, 0.6, 0.25, 0.45)],
 ]
+## Кнопки команд питомца (HUD.add_pet_button — в ряд под панелью питомца, видны при призванном питомце):
+## [id, подпись, цвет]. «Авто» — сам нападает на зверей рядом, «Атака» — бьёт выделенную цель героя, «Защита» —
+## бьёт напавших на героя и его цель, «За мной» — следует без боя (PetManager, Pet.set_mode).
+const PET_BUTTONS := [
+	["pet_auto", "Авто", Color(0.3, 0.6, 0.95, 0.45)],
+	["pet_attack", "Атака", Color(0.9, 0.3, 0.25, 0.45)],
+	["pet_defend", "Защита", Color(0.35, 0.7, 0.45, 0.45)],
+	["pet_follow", "За мной", Color(0.75, 0.6, 0.35, 0.45)],
+]
 ## Цвет кнопки включённого переключаемого умения.
 const TOGGLE_ON_COLOR := Color(0.3, 0.85, 0.45, 0.6)
 ## Значки круглых кнопок без своего источника (IconView): облачко речи, мешочек торговца.
@@ -47,6 +56,10 @@ const TOGGLE_ON_COLOR := Color(0.3, 0.85, 0.45, 0.6)
 const BUTTON_ICONS := {
 	"talk": {"shape": "talk", "color": Color(0.95, 0.6, 0.25)},
 	"shop": {"shape": "shop", "color": Color(0.85, 0.7, 0.2)},
+	"pet_auto": {"shape": "pet_auto", "color": Color(0.45, 0.7, 1.0)},
+	"pet_attack": {"shape": "pet_attack", "color": Color(1.0, 0.4, 0.3)},
+	"pet_defend": {"shape": "pet_defend", "color": Color(0.35, 0.65, 0.45)},
+	"pet_follow": {"shape": "pet_follow", "color": Color(0.85, 0.68, 0.4)},
 }
 ## Карта на кнопке «Приручить», пока у цели своей карты нет.
 const TAME_ICON_CARD := "card_panther"
@@ -154,6 +167,8 @@ func _build_hud() -> void:
 		hud.add_button(String(b[0]), "", b[1], float(b[2]), b[3])
 	for b in OTHER_BUTTONS:
 		hud.add_button(String(b[0]), String(b[1]), b[2], float(b[3]), b[4])
+	for b in PET_BUTTONS:
+		hud.add_pet_button(String(b[0]), String(b[1]), b[2])
 	hud.set_button_visible("shop", false)
 	hud.set_button_visible("talk", false)
 	for id in BUTTON_ICONS:

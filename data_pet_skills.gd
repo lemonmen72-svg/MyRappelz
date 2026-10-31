@@ -6,6 +6,12 @@ extends RefCounted
 ## на 1-й, 2-й и 3-й стадии ([0, 0] — на этой стадии умения ещё нет). Уровень вики → наш: × 0.3 (req_level()).
 ## Виды умений: "active" — применяет ИИ питомца (цель есть, перезарядка готова, хватает MP; сильные первыми),
 ## "toggle" — включается в окне существа и тратит MP каждые 10 с, "passive" — действует всегда.
+## Ячейки умений питомца (окно существа): 3 «Авто» (slots) — активные умения, которые ИИ применяет сам, по порядку
+## ячеек (только из них); 2 «Ауры» (aura_slots) — переключаемые (узы, вызов): включены, только пока стоят в ячейке,
+## снятие из ячейки выключает. Пассивные ячеек не занимают. Первое изучение активного умения ставит его в свободную
+## ячейку «Авто». Старые записи (без ячеек): изученные активные заполняют «Авто» по силе (prio), включённые
+## переключаемые — ячейки аур (больше двух — остальные выключаются). Команда питомца — поле записи cmd
+## ("auto" | "defend" | "follow", COMMANDS).
 ## Числовые поля — [на 1 уровне, прибавка за уровень] (value()). MP — в единицах вики, × MP_SCALE.
 ## Перезарядки (cd) и время каста (cast) — наши: бои на острове короткие (вики — в tools/rappelz_pet_reference.md).
 ##
@@ -25,6 +31,13 @@ const MP_SCALE := 0.1
 ## Поддержка переключаемых умений списывается раз в UPKEEP_PERIOD секунд.
 const UPKEEP_PERIOD := 10.0
 const KIND_NAMES := {"active": "активное", "passive": "пассивное", "toggle": "переключаемое"}
+## Ячейки умений: «Авто» (активные) и «Ауры» (переключаемые).
+const AUTO_SLOTS := 3
+const AURA_SLOTS := 2
+## Режимы питомца, которые запоминаются в записи (cmd): сам нападает рядом, защищает хозяина, следует.
+## Разовая команда «Атака» (атаковать цель героя) не запоминается.
+const COMMANDS := ["auto", "defend", "follow"]
+const DEFAULT_COMMAND := "defend"
 
 const VIOLET := Color(0.55, 0.32, 0.95)
 const GREEN := Color(0.3, 0.68, 0.45)
@@ -408,7 +421,11 @@ static func field(id: String, key: String, n: int) -> float:
 
 # ---------- Запись питомца ----------
 
-## Дополняет запись питомца (Game.pets) полями умений: jp, jp_part, skills {id: ур.}, toggles {id: true}, mp.
+## Дополняет запись питомца (Game.pets) полями умений: jp, jp_part, skills {id: ур.}, toggles {id: true}, mp,
+## ячейки slots (3 id активных, "" — пусто), aura_slots (2 id переключаемых), команда cmd. Ячейки чистятся:
+## неизученное, чужое виду и умение не того типа убираются; включённое переключаемое без ячейки занимает
+## свободную ячейку ауры, а если их нет — выключается. Массивы и словари меняются на месте (питомец в мире
+## держит ссылки на них).
 static func ensure_record(rec: Dictionary) -> void:
 	if not rec.has("jp"):
 		rec["jp"] = PetStats.default_jp(int(rec.get("level", 1)))
@@ -420,6 +437,158 @@ static func ensure_record(rec: Dictionary) -> void:
 		rec["toggles"] = {}
 	if not rec.has("mp"):
 		rec["mp"] = -1
+	if not COMMANDS.has(String(rec.get("cmd", ""))):
+		rec["cmd"] = DEFAULT_COMMAND
+	_ensure_slots(rec)
+
+
+## Ячейки «Авто» и «Ауры»: перенос старых записей и чистка (см. ensure_record).
+static func _ensure_slots(rec: Dictionary) -> void:
+	var sp := String(rec.get("species", "boar"))
+	var skills: Dictionary = rec["skills"]
+	var toggles: Dictionary = rec["toggles"]
+	var migrate := not (rec.get("slots") is Array)
+	var auto := _clean_slots(rec.get("slots", []), AUTO_SLOTS, sp, skills, "active")
+	var aura := _clean_slots(rec.get("aura_slots", []), AURA_SLOTS, sp, skills, "toggle")
+	if migrate:
+		# Старая запись: изученные активные — по силе (prio), как раньше выбирал ИИ
+		var learned: Array[String] = []
+		for aid in list_for(sp):
+			var act := String(aid)
+			if String(get_skill(act).get("kind", "")) == "active" and int(skills.get(act, 0)) > 0:
+				learned.append(act)
+		learned.sort_custom(func(a: String, b: String) -> bool:
+			return int(get_skill(a).get("prio", 0)) > int(get_skill(b).get("prio", 0)))
+		for lid in learned:
+			var empty_i := auto.find("")
+			if empty_i < 0:
+				break
+			auto[empty_i] = lid
+	# Включённые переключаемые: в ячейках ауры; без ячейки — в свободную, мест нет — выключить
+	for id in list_for(sp):
+		var sid := String(id)
+		if not bool(toggles.get(sid, false)) or aura.has(sid):
+			continue
+		var free := aura.find("")
+		if free >= 0 and String(get_skill(sid).get("kind", "")) == "toggle" and int(skills.get(sid, 0)) > 0:
+			aura[free] = sid
+		else:
+			toggles.erase(sid)
+	for k in toggles.keys():
+		if not aura.has(String(k)):
+			toggles.erase(k)
+	_store_slots(rec, "slots", auto)
+	_store_slots(rec, "aura_slots", aura)
+
+
+## count ячеек из src: только изученные умения вида с типом kind, без повторов; остальное — "".
+static func _clean_slots(src: Variant, count: int, species: String, skills: Dictionary, kind: String) -> Array:
+	var res: Array = []
+	var arr: Array = src if src is Array else []
+	for i in count:
+		var id: String = String(arr[i]) if i < arr.size() and arr[i] is String else ""
+		if id != "" and (res.has(id) or not has_skill(species, id) or int(skills.get(id, 0)) <= 0
+				or String(get_skill(id).get("kind", "")) != kind):
+			id = ""
+		res.append(id)
+	return res
+
+
+## Записать ячейки в rec[key]: тот же массив (на месте), если он уже есть.
+static func _store_slots(rec: Dictionary, key: String, vals: Array) -> void:
+	var cur: Variant = rec.get(key, null)
+	if cur is Array:
+		var a: Array = cur
+		if a == vals:
+			return
+		a.clear()
+		a.append_array(vals)
+	else:
+		rec[key] = vals
+
+
+# ---------- Ячейки умений («Авто» и «Ауры») ----------
+
+## Ячейка для умения id: "auto" (активное), "aura" (переключаемое), "" — пассивное, в ячейку не ставится.
+static func slot_kind(id: String) -> String:
+	match String(get_skill(id).get("kind", "")):
+		"active":
+			return "auto"
+		"toggle":
+			return "aura"
+	return ""
+
+
+## Ячейки записи: kind "auto" — slots, "aura" — aura_slots (массив записи, не копия).
+static func slots_of(rec: Dictionary, kind: String) -> Array:
+	ensure_record(rec)
+	return rec["aura_slots"] if kind == "aura" else rec["slots"]
+
+
+## Номер ячейки, где стоит умение id (-1 — не стоит).
+static func slot_of(rec: Dictionary, id: String) -> int:
+	var kind := slot_kind(id)
+	if kind == "":
+		return -1
+	return slots_of(rec, kind).find(id)
+
+
+## Первая свободная ячейка kind (-1 — все заняты).
+static func free_slot(rec: Dictionary, kind: String) -> int:
+	return slots_of(rec, kind).find("")
+
+
+## Почему умение id нельзя поставить в ячейку ("" — можно).
+static func slot_block(rec: Dictionary, id: String) -> String:
+	var sp := String(rec.get("species", "boar"))
+	if get_skill(id).is_empty() or not has_skill(sp, id):
+		return "Этому виду умение недоступно"
+	if slot_kind(id) == "":
+		return "Пассивное умение действует всегда, ячейка не нужна"
+	if skill_level(rec, id) <= 0:
+		return "Сначала изучите умение"
+	return ""
+
+
+## Поставить умение id в ячейку idx своего типа ("" — получилось, иначе причина). Умение из другой ячейки
+## переносится (стоявшее там меняется с ним местами); вытесненная аура выключается. Включение ауры (MP) —
+## у призванного питомца (Pet.assign_slot), у отдыхающего — отметка в записи (CreatureWindow).
+static func assign_slot(rec: Dictionary, id: String, idx: int) -> String:
+	var why := slot_block(rec, id)
+	if why != "":
+		return why
+	var kind := slot_kind(id)
+	var arr := slots_of(rec, kind)
+	if idx < 0 or idx >= arr.size():
+		return "Нет такой ячейки"
+	var old := arr.find(id)
+	var prev := String(arr[idx])
+	if old == idx:
+		return ""
+	if old >= 0:
+		arr[old] = prev
+	elif prev != "" and kind == "aura":
+		(rec["toggles"] as Dictionary).erase(prev)
+	arr[idx] = id
+	return ""
+
+
+## Убрать умение из ячейки idx типа kind; аура выключается. Возвращает id убранного ("" — ячейка была пуста).
+static func clear_slot(rec: Dictionary, kind: String, idx: int) -> String:
+	var arr := slots_of(rec, kind)
+	if idx < 0 or idx >= arr.size():
+		return ""
+	var id := String(arr[idx])
+	arr[idx] = ""
+	if kind == "aura" and id != "":
+		(rec["toggles"] as Dictionary).erase(id)
+	return id
+
+
+## Режим питомца из записи ("auto" | "defend" | "follow").
+static func command(rec: Dictionary) -> String:
+	var c := String(rec.get("cmd", DEFAULT_COMMAND))
+	return c if COMMANDS.has(c) else DEFAULT_COMMAND
 
 
 static func skill_level(rec: Dictionary, id: String) -> int:
@@ -473,8 +642,14 @@ static func learn(rec: Dictionary, id: String) -> bool:
 	if learn_block(rec, id) != "":
 		return false
 	var skills: Dictionary = rec["skills"]
+	var first := skill_level(rec, id) == 0
 	skills[id] = skill_level(rec, id) + 1
 	rec["jp"] = int(rec["jp"]) - int(get_skill(id)["jp"])
+	# Новое активное умение само встаёт в свободную ячейку «Авто» (ИИ применяет только умения из ячеек)
+	if first and slot_kind(id) == "auto":
+		var free := free_slot(rec, "auto")
+		if free >= 0 and slot_of(rec, id) < 0:
+			assign_slot(rec, id, free)
 	return true
 
 

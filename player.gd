@@ -102,6 +102,8 @@ var move_input := Vector2.ZERO
 var last_target: Node3D = null
 ## Текущая цель (для панели цели).
 var current_target: Mob = null
+## Последний зверь, ударивший героя (питомец в режиме «Защита» нападает на него). Без типа: зверь мог исчезнуть.
+var last_attacker: Variant = null
 
 ## Оставшаяся перезарядка умений: id умения → секунды.
 var skill_cd: Dictionary = {}
@@ -1144,6 +1146,9 @@ func _set_target(t: Mob) -> void:
 
 
 func take_damage(amount: int, attacker: Node3D) -> void:
+	# Кто напал — запоминается и при «Бессмертии» (питомец в режиме «Защита» бьёт его)
+	if attacker is Mob:
+		last_attacker = attacker
 	# «Бессмертие» админ-панели: урон не проходит
 	if AdminPanel.god:
 		return

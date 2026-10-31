@@ -11,7 +11,9 @@ extends CanvasLayer
 ## интерфейса и умножаются на UiScale.k(); смена размера в «Настройках» — apply_ui_scale() (HUD перестраивается сразу).
 ## На ПК: WASD/стрелки, Пробел = атака, 1–4 = умения, T = приручить, Q = зелье, K = окно героя,
 ## P = питомцы, C = окно существа, I или B = сумка, E = торговец, R = говорить, J = задания,
-## F = питомец атакует, G = питомец за мной, O = настройки.
+## питомец: Z = «Авто», F = «Атака» (цель героя), X = «Защита», G = «За мной»; O = настройки.
+## Кнопки питомца (add_pet_button) — круглые, рядом под его панелью слева вверху (над зоной джойстика), видны
+## только при призванном питомце; кнопка текущего режима питомца (поле mode: "pet_" + mode) — с кольцом.
 ## Круглые кнопки со значками (set_button_icon → IconView: умение, оружие, зелье с числом, карта существа, рисунок);
 ## перезарядка — тёмный сектор по часовой стрелке, неподходящее оружию — красная метка. Справа от полосок HP
 ## игрока, питомца и цели — значки действующих эффектов (StatusRow по реестру StatusEffects сущности);
@@ -39,6 +41,7 @@ const KEYS := {
 	KEY_SPACE: "attack", KEY_1: "skill1", KEY_2: "skill2", KEY_3: "skill3", KEY_4: "skill4", KEY_T: "tame",
 	KEY_Q: "potion", KEY_K: "hero_window",
 	KEY_P: "pets_window", KEY_I: "bag_window", KEY_E: "shop", KEY_F: "pet_attack", KEY_G: "pet_follow", KEY_O: "settings_window",
+	KEY_Z: "pet_auto", KEY_X: "pet_defend",
 	KEY_C: "creature_window", KEY_B: "bag_window", KEY_R: "talk", KEY_J: "quest_window",
 }
 ## Кнопки меню: размер шрифта и поля (меньше, чем в окнах: пять кнопок и панель цели на 1280).
@@ -63,6 +66,12 @@ const MSG_FONT := 19
 const FX_ICON := 26.0
 const FX_GAP := 4.0
 const FX_PET_W := 240.0
+## Круглые кнопки питомца: радиус («Средний»; не меньше BUTTON_MIN_R), зазор между ними и отступ от полосок питомца.
+const PET_BTN_R := 28.0
+const PET_BTN_GAP := 6.0
+const PET_BTN_TOP := 6.0
+## Кольцо на кнопке текущего режима питомца.
+const PET_MODE_ON := Color(0.35, 0.9, 1.0, 0.7)
 
 var move_vec := Vector2.ZERO
 
@@ -108,8 +117,11 @@ var target_card_tier := ""
 var _msg_label: Label
 var _msg_time := 0.0
 var _menu: HBoxContainer
-## Кнопки питомца под его панелью («Атакуй», «За мной», «Существо»).
+## Кнопка «Существо» (окно существа) правее круглых кнопок питомца.
 var _pet_btns: HBoxContainer
+## Круглые кнопки питомца по порядку (add_pet_button) и верх их ряда в панели питомца (с масштабом).
+var _pet_ids: Array[String] = []
+var _pet_row_y := 0.0
 ## Элементы интерфейса поверх мира (трекер заданий): касание по ним не начинает джойстик и вращение камеры.
 var _blockers: Array[Control] = []
 ## Значки эффектов справа от полосок HP игрока, питомца и цели; подпись по касанию значка.
@@ -137,8 +149,6 @@ func _ready() -> void:
 	_pet_mp_bar = _bar(_pet_box, Color(0.55, 0.45, 1.0))
 	_pet_btns = HBoxContainer.new()
 	_pet_box.add_child(_pet_btns)
-	_pet_btns.add_child(_menu_button("Атакуй", "pet_attack"))
-	_pet_btns.add_child(_menu_button("За мной", "pet_follow"))
 	_pet_btns.add_child(_menu_button("Существо", "creature_window"))
 
 	_target_box = Control.new()
@@ -218,7 +228,7 @@ func _apply_sizes() -> void:
 	var py := float(pet_font) * 1.45 + 1.0
 	_size_bar(_pet_bar, Vector2(0, py), Vector2(pw, UiScale.px(10)))
 	_size_bar(_pet_mp_bar, Vector2(0, py + UiScale.px(10) + 2.0), Vector2(pw, UiScale.px(6)))
-	_pet_btns.position = Vector2(0, py + UiScale.px(16) + UiScale.px(8))
+	_pet_row_y = py + UiScale.px(10) + 2.0 + UiScale.px(6) + UiScale.px(PET_BTN_TOP)
 	_pet_btns.add_theme_constant_override("separation", int(UiScale.px(6)))
 	for b in _pet_btns.get_children():
 		_compact(b as Button)
@@ -269,6 +279,23 @@ func add_button(id: String, text: String, offset: Vector2, radius: float, color:
 		"color": color, "blocked": false, "base_offset": offset, "base_r": radius, "text": text, "icon": null}
 	_size_button(id)
 	_layout()
+
+
+## Круглая кнопка питомца (команды «Авто», «Атака», «Защита», «За мной»): в ряд под панелью питомца слева
+## вверху, по порядку добавления; видна только вместе с панелью питомца (update_pet).
+func add_pet_button(id: String, text: String, color: Color) -> void:
+	add_button(id, text, Vector2.ZERO, PET_BTN_R, color)
+	_buttons[id]["pet"] = _pet_ids.size()
+	_pet_ids.append(id)
+	set_button_visible(id, _pet_box.visible)
+	_layout()
+
+
+## id круглых кнопок питомца по порядку.
+func pet_button_ids() -> Array[String]:
+	var res: Array[String] = []
+	res.append_array(_pet_ids)
+	return res
 
 
 ## Радиус, центр и шрифт круглой кнопки по UiScale.
@@ -606,8 +633,16 @@ func update_pet(pet: Node) -> void:
 	if pet == null or not is_instance_valid(pet):
 		_pet_box.visible = false
 		_fx_pet.bind(null)
+		for id in _pet_ids:
+			set_button_visible(id, false)
 		return
 	_pet_box.visible = true
+	# Кнопки питомца: видны, текущий режим — с кольцом
+	var mode: Variant = pet.get("mode")
+	for id in _pet_ids:
+		set_button_visible(id, true)
+		var on := mode is String and id == "pet_" + String(mode)
+		set_button_color(id, PET_MODE_ON if on else button_color(id))
 	_fx_pet.bind(pet.get("effects") as StatusEffects)
 	_pet_label.text = "%s  Ур.%d  HP %d/%d" % [pet.pet_name, pet.level, pet.hp, pet.max_hp]
 	_pet_bar.max_value = pet.max_hp
@@ -781,6 +816,7 @@ func _layout() -> void:
 		var b: Dictionary = _buttons[id]
 		var p: Panel = b["panel"]
 		p.position = _view - b["offset"] - p.size / 2.0
+	_place_pet_buttons()
 	_msg_label.position = Vector2(0, UiScale.px(MSG_Y))
 	_msg_label.size = Vector2(_view.x, float(UiScale.fs(MSG_FONT)) * 1.5)
 	var edge := UiScale.px(12)
@@ -789,6 +825,23 @@ func _layout() -> void:
 	_keep_window_on_screen()
 	if _joy_idx == -1:
 		_reset_joy()
+
+
+## Кнопки питомца: круглые в ряд под полосками питомца, правее — «Существо» (по центру ряда).
+func _place_pet_buttons() -> void:
+	var origin := _pet_box.position + Vector2(0, _pet_row_y)
+	var x := 0.0
+	var h := 0.0
+	for id in _pet_ids:
+		var b: Dictionary = _buttons[id]
+		var r := float(b["r"])
+		var p: Panel = b["panel"]
+		p.position = origin + Vector2(x, 0)
+		x += r * 2.0 + UiScale.px(PET_BTN_GAP)
+		h = maxf(h, r * 2.0)
+	_pet_btns.reset_size()
+	var bh := _pet_btns.get_combined_minimum_size().y
+	_pet_btns.position = Vector2(x + UiScale.px(PET_BTN_GAP), _pet_row_y + maxf(0.0, (h - bh) * 0.5))
 
 
 ## Панель цели: чуть левее центра, но не под кнопками меню справа вверху и не на панели игрока слева.

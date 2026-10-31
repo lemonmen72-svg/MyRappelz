@@ -63,7 +63,9 @@ var last_dropped_toggles: Array = []
 var load_note := ""
 ## Питомцы: {"species": String, "name": String, "level": int, "xp": int, "hp": int, "dead": bool,
 ## "mp": int, "jp": int (очки умений), "jp_part": float (накопленная доля JP), "skills": {id умения: уровень},
-## "toggles": {id включённого переключаемого умения: true}} (умения — PetSkills). hp, mp = -1: полный запас.
+## "toggles": {id включённого переключаемого умения: true}, "slots": [3 id умений в ячейках «Авто» или ""],
+## "aura_slots": [2 id умений в ячейках ауры или ""], "cmd": режим "auto" | "defend" | "follow"} (умения и ячейки —
+## PetSkills). hp, mp = -1: полный запас.
 var pets: Array[Dictionary] = []
 ## Индекс призванного питомца в pets, -1: никого.
 var active_pet := -1
@@ -440,7 +442,7 @@ func from_dict(d: Dictionary) -> void:
 			if (PetData.get_species(old_sp)["stages"] as Array).has(pet_name):
 				pet_name = PetData.stage_name(sp, lvl)
 			retired = true
-		pets.append({
+		var prec := {
 			"species": sp, "name": pet_name,
 			"level": lvl, "xp": int(r.get("xp", 0)),
 			"hp": int(r.get("hp", -1)), "dead": bool(r.get("dead", false)),
@@ -450,7 +452,16 @@ func from_dict(d: Dictionary) -> void:
 			"jp_part": float(r.get("jp_part", 0.0)),
 			"skills": _load_skills(sp, r.get("skills", {})),
 			"toggles": _load_toggles(r.get("toggles", {}), sp),
-		})
+			"cmd": String(r.get("cmd", PetSkills.DEFAULT_COMMAND)),
+		}
+		# Ячейки умений («Авто», «Ауры»): у старых сохранений их нет — PetSkills.ensure_record заполнит
+		# из изученных активных и включённых переключаемых
+		if r.get("slots") is Array:
+			prec["slots"] = (r["slots"] as Array).duplicate()
+		if r.get("aura_slots") is Array:
+			prec["aura_slots"] = (r["aura_slots"] as Array).duplicate()
+		PetSkills.ensure_record(prec)
+		pets.append(prec)
 	if retired:
 		var pet_note := "Кабаны и каменные стражи ушли с острова: ваши питомцы-кабаны стали волками, стражи — черепахами (уровень и опыт сохранены, JP за недоступные умения возвращены)"
 		load_note = pet_note if load_note == "" else load_note + ". " + pet_note

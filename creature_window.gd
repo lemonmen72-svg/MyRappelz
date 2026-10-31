@@ -1,12 +1,15 @@
 class_name CreatureWindow
 extends Node
-## Окно существа: характеристики питомца и его умения (изучение за очки умений JP, переключаемые — вкл/выкл).
+## Окно существа: характеристики питомца и его умения (изучение за очки умений JP, ячейки умений).
 ## Открывается кнопкой «Подробнее» в окне «Питомцы» и кнопкой «Существо» у панели питомца в HUD (клавиша C).
 ## Вкладки (кнопки сверху, не прокручиваются):
 ## «Существо» — 3D-превью модели, вид, роль, редкость, стадия, уровень и опыт, HP/MP, JP, 7 характеристик
 ## и боевые показатели (PetStats); «Умения» — компактное древо (SkillTree: ярусы по уровню питомца,
 ## линии пререквизитов) и карточка выбранного умения: тип, уровень, эффект сейчас и на следующем уровне,
-## требования, кнопка «+ N JP» (изучить), у переключаемых — «Вкл»/«Выкл».
+## требования, кнопка «+ N JP» (изучить), «В ячейку 1–3» / «В ячейку ауры 1–2» и «Убрать».
+## Над древом — 5 ячеек умений: 3 «Авто» (активные: ИИ питомца применяет только их, по порядку) и 2 «Ауры»
+## (переключаемые: включены, пока стоят в ячейке). Касание занятой ячейки убирает умение, пустой — ставит туда
+## выбранное в древе изученное умение подходящего типа. Пассивные действуют всегда, ячеек не занимают.
 ## Значки: res://assets/icons/pets/<вид>/<id умения>.png (нет файла — кружок с буквой).
 ## Живёт в PetManager (pets.creature). Данные — запись Game.pets[index]; призванный питомец пересчитывается сразу.
 
@@ -14,8 +17,10 @@ extends Node
 const WINDOW_SIZE := Vector2(1060, 600)
 ## Ширина переносимого текста по умолчанию.
 const TEXT_W := 700.0
-## Древо умений и карточка рядом (помещаются в окно без прокрутки).
-const TREE_SIZE := Vector2(600, 410)
+## Древо умений и карточка рядом (помещаются в окно без прокрутки вместе с рядом ячеек).
+const TREE_SIZE := Vector2(600, 350)
+## Ячейка умения (квадрат) над древом.
+const SLOT_PX := 46.0
 const CARD_W := 380.0
 const PREVIEW_SIZE := Vector2(230, 230)
 const GOLD := Color(1.0, 0.85, 0.45)
@@ -28,8 +33,9 @@ var pets: PetManager
 ## Индекс питомца в Game.pets (-1 — окно не открыто) и вкладка: "stats" | "skills".
 var index := -1
 var tab := "stats"
-## Кнопки открытого окна: "tab_stats", "tab_skills", "back", "skill_<id>" (значки древа),
-## "learn_<id>", "toggle_<id>" (карточка выбранного умения).
+## Кнопки открытого окна: "tab_stats", "tab_skills", "back", "skill_<id>" (значки древа), ячейки "slot_auto_<0..2>",
+## "slot_aura_<0..1>"; карточка выбранного умения: "learn_<id>", "toslot_<id>_<номер>" (в ячейку), "unslot_<id>"
+## (убрать из ячейки), "toggle_<id>" (включить ауру из ячейки, выключенную нехваткой MP).
 var buttons: Dictionary = {}
 ## Выбранное в древе умение и само древо (на вкладке «Умения»).
 var selected := ""
@@ -395,6 +401,7 @@ func _build_skills(body: VBoxContainer, rec: Dictionary) -> void:
 	var ids := PetSkills.list_for(sp)
 	if selected == "" or not ids.has(selected):
 		selected = _default_pick(rec, ids)
+	body.add_child(_slots_row(rec))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", int(UiScale.px(12)))
 	body.add_child(row)
@@ -408,6 +415,57 @@ func _build_skills(body: VBoxContainer, rec: Dictionary) -> void:
 	for id in tree.icons:
 		buttons["skill_" + String(id)] = tree.icons[id]
 	row.add_child(_card(rec, selected, pet))
+
+
+## Ряд ячеек: «Авто» 1–3, «Ауры» 1–2 и подсказка.
+func _slots_row(rec: Dictionary) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", int(UiScale.px(6)))
+	for kind in ["auto", "aura"]:
+		var k := String(kind)
+		var title := _label("Авто:" if k == "auto" else "   Ауры:", UiScale.FONT_HEAD, GOLD)
+		title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(title)
+		var arr := PetSkills.slots_of(rec, k)
+		for i in arr.size():
+			row.add_child(_slot_cell(rec, k, i, String(arr[i])))
+	var hint := _label("ИИ применяет умения из ячеек «Авто» по порядку, ауры в ячейках включены. Касание ячейки — убрать; "
+		+ "пустой — поставить выбранное умение.", UiScale.FONT_SMALL, MUTED, UiScale.px(470))
+	hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(hint)
+	return row
+
+
+## Ячейка kind ("auto" | "aura") номер i: значок умения id (пустая — номер). Аура, выключенная нехваткой MP, — бледнее.
+func _slot_cell(rec: Dictionary, kind: String, i: int, id: String) -> Button:
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	var sz := UiScale.px(SLOT_PX)
+	b.custom_minimum_size = Vector2(sz, sz)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.1, 0.12, 0.22, 0.95)
+	sb.border_color = Color(0.45, 0.75, 1.0, 0.85) if kind == "auto" else Color(0.55, 0.95, 0.6, 0.85)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(int(UiScale.px(8)))
+	for st in ["normal", "hover", "pressed"]:
+		b.add_theme_stylebox_override(st, sb)
+	if id != "":
+		var ic := IconView.new()
+		var inset := UiScale.px(4)
+		ic.position = Vector2(inset, inset)
+		ic.size = Vector2(sz - inset * 2.0, sz - inset * 2.0)
+		ic.set_spec(IconView.pet_skill(_species, id))
+		if kind == "aura" and not PetSkills.toggle_on(rec, id):
+			ic.modulate = Color(1, 1, 1, 0.45)
+		b.add_child(ic)
+		b.tooltip_text = String(PetSkills.get_skill(id).get("name", id))
+	else:
+		b.text = str(i + 1)
+		b.add_theme_color_override("font_color", Color(0.55, 0.6, 0.75))
+		b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT))
+	b.pressed.connect(_on_slot.bind(kind, i))
+	buttons["slot_%s_%d" % [kind, i]] = b
+	return b
 
 
 ## Первое умение, которое можно изучить, иначе первое в списке.
@@ -472,6 +530,9 @@ func _card(rec: Dictionary, id: String, pet: Pet) -> Control:
 		lvl_text += " (сейчас до %d)" % cap
 	var meta := "%s · %s · стадия %d+" % [PetSkills.kind_name(id), lvl_text, PetSkills.first_stage(id) + 1]
 	var on := kind == "toggle" and PetSkills.toggle_on(rec, id)
+	var slot := PetSkills.slot_of(rec, id)
+	if slot >= 0:
+		meta += " · %s %d" % ["ячейка «Авто»" if kind == "active" else "ячейка ауры", slot + 1]
 	if on:
 		meta += " · ВКЛЮЧЕНО"
 	box.add_child(_label(meta, UiScale.FONT_BODY, GOOD if on else MUTED, w))
@@ -505,14 +566,42 @@ func _card(rec: Dictionary, id: String, pet: Pet) -> Control:
 		plus.pressed.connect(_on_learn.bind(id))
 		btns.add_child(plus)
 		buttons["learn_" + id] = plus
-	if kind == "toggle" and cur > 0:
+	# Аура в ячейке, выключенная нехваткой MP, — включить сейчас
+	if kind == "toggle" and cur > 0 and slot >= 0 and not on:
 		var tb := Button.new()
-		tb.text = "Выкл" if on else "Вкл"
+		tb.text = "Вкл"
 		tb.focus_mode = Control.FOCUS_NONE
-		tb.custom_minimum_size = Vector2(UiScale.px(100), UiScale.button_h())
+		tb.custom_minimum_size = Vector2(UiScale.px(80), UiScale.button_h())
 		tb.pressed.connect(_on_toggle.bind(id))
 		btns.add_child(tb)
 		buttons["toggle_" + id] = tb
+	# Ячейки: «В ячейку 1–3» (активные) / «В ячейку ауры 1–2» (переключаемые), «Убрать»
+	var sk_kind := PetSkills.slot_kind(id)
+	if sk_kind != "" and cur > 0:
+		var srow := HBoxContainer.new()
+		srow.add_theme_constant_override("separation", int(UiScale.px(4)))
+		box.add_child(srow)
+		var st := _label("В ячейку:" if sk_kind == "auto" else "В ячейку ауры:", UiScale.FONT_BODY, MUTED)
+		st.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		srow.add_child(st)
+		var n: int = PetSkills.AUTO_SLOTS if sk_kind == "auto" else PetSkills.AURA_SLOTS
+		for i in n:
+			var sbtn := Button.new()
+			sbtn.text = str(i + 1)
+			sbtn.focus_mode = Control.FOCUS_NONE
+			sbtn.custom_minimum_size = Vector2(UiScale.px(44), UiScale.button_h())
+			sbtn.disabled = slot == i
+			sbtn.pressed.connect(_on_to_slot.bind(id, i))
+			srow.add_child(sbtn)
+			buttons["toslot_%s_%d" % [id, i]] = sbtn
+		if slot >= 0:
+			var ub := Button.new()
+			ub.text = "Убрать"
+			ub.focus_mode = Control.FOCUS_NONE
+			ub.custom_minimum_size = Vector2(0, UiScale.button_h())
+			ub.pressed.connect(_on_unslot.bind(id))
+			srow.add_child(ub)
+			buttons["unslot_" + id] = ub
 	return panel
 
 
@@ -539,6 +628,7 @@ func _on_learn(id: String) -> void:
 	refresh()
 
 
+## Включить или выключить переключаемое умение (включение ставит его в свободную ячейку ауры, выключение — убирает).
 func _on_toggle(id: String) -> void:
 	if index < 0 or index >= Game.pets.size():
 		return
@@ -555,16 +645,91 @@ func _on_toggle(id: String) -> void:
 	else:
 		if PetSkills.skill_level(rec, id) <= 0:
 			return
-		var tg: Dictionary = rec["toggles"]
 		if on:
-			tg[id] = true
+			var idx := PetSkills.slot_of(rec, id)
+			if idx < 0:
+				idx = PetSkills.free_slot(rec, "aura")
+			if idx < 0:
+				_msg("«%s»: обе ячейки аур заняты — сначала уберите умение из ячейки" % nm)
+				refresh()
+				return
+			PetSkills.assign_slot(rec, id, idx)
+			(rec["toggles"] as Dictionary)[id] = true
 		else:
-			tg.erase(id)
+			var at := PetSkills.slot_of(rec, id)
+			if at >= 0:
+				PetSkills.clear_slot(rec, "aura", at)
 	if on:
 		_msg("«%s» включено%s" % [nm, "" if pet != null else " (заработает, когда питомец будет призван)"])
 	else:
 		_msg("«%s» выключено" % nm)
+	Game.changed.emit()
 	refresh()
+
+
+## Поставить умение id в ячейку i своего типа (у призванного питомца аура сразу включается и тратит MP).
+func _on_to_slot(id: String, i: int) -> void:
+	if index < 0 or index >= Game.pets.size():
+		return
+	var rec: Dictionary = Game.pets[index]
+	var nm := String(PetSkills.get_skill(id).get("name", id))
+	var kind := PetSkills.slot_kind(id)
+	var pet := _live_pet(rec)
+	var err := ""
+	if pet != null:
+		err = pet.assign_slot(id, i)
+	else:
+		err = PetSkills.assign_slot(rec, id, i)
+		if err == "" and kind == "aura":
+			(rec["toggles"] as Dictionary)[id] = true
+	if err != "" and PetSkills.slot_of(rec, id) != i:
+		_msg("«%s»: %s" % [nm, err])
+	elif err != "":
+		_msg("«%s» — в ячейке ауры %d. %s" % [nm, i + 1, err])
+	else:
+		_msg("«%s» — в ячейке %s%d" % [nm, "«Авто» " if kind == "auto" else "ауры ", i + 1])
+	Game.changed.emit()
+	refresh()
+
+
+## Убрать умение id из его ячейки (аура выключается).
+func _on_unslot(id: String) -> void:
+	if index < 0 or index >= Game.pets.size():
+		return
+	var rec: Dictionary = Game.pets[index]
+	var at := PetSkills.slot_of(rec, id)
+	if at >= 0:
+		_clear_slot(rec, PetSkills.slot_kind(id), at)
+	refresh()
+
+
+## Касание ячейки: занятая — убрать умение; пустая — поставить выбранное в древе изученное умение её типа.
+func _on_slot(kind: String, i: int) -> void:
+	if index < 0 or index >= Game.pets.size():
+		return
+	var rec: Dictionary = Game.pets[index]
+	var arr := PetSkills.slots_of(rec, kind)
+	if i < 0 or i >= arr.size():
+		return
+	if String(arr[i]) != "":
+		_clear_slot(rec, kind, i)
+		refresh()
+		return
+	if selected != "" and PetSkills.slot_kind(selected) == kind and PetSkills.skill_level(rec, selected) > 0:
+		_on_to_slot(selected, i)
+		return
+	_msg("Выберите в древе изученное %s и нажмите «В ячейку%s»" % [
+		"активное умение" if kind == "auto" else "переключаемое умение (узы, вызов)", "" if kind == "auto" else " ауры"])
+
+
+func _clear_slot(rec: Dictionary, kind: String, i: int) -> void:
+	var pet := _live_pet(rec)
+	var id: String = pet.clear_slot(kind, i) if pet != null else PetSkills.clear_slot(rec, kind, i)
+	if id == "":
+		return
+	var nm := String(PetSkills.get_skill(id).get("name", id))
+	_msg("«%s» убрано из ячейки%s" % [nm, " и выключено" if kind == "aura" else ""])
+	Game.changed.emit()
 
 
 ## Подпись; font_size — для «Среднего» размера интерфейса (UiScale.FONT_*); wrap_w > 0 — перенос строк

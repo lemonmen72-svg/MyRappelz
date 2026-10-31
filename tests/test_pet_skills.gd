@@ -4,7 +4,8 @@ extends "res://tests/test_base.gd"
 ## данные умений и бюджет JP, изучение (уровень, стадия, пререквизит, JP), пассивки меняют характеристики,
 ## JP за опыт, активные умения в бою (MP, перезарядка, урон, оглушение, замедление, морок), переключаемые
 ## (MP при включении и поддержка, бонус хозяину, выключение без MP), окно существа (обе вкладки, древо умений
-## SkillTree: ярусы, пререквизиты, значки, карточка с кнопками), сохранение и загрузка умений, старые сохранения.
+## SkillTree: ярусы, пререквизиты, значки, карточка с кнопками, ячейки «Авто» и «Ауры»), сохранение и загрузка
+## умений, старые сохранения. Подробно ячейки и команды питомца — tests/test_pet_commands.gd.
 
 const BASIC := ["panther", "turtle", "pheasant"]
 ## Виды, которых можно приручить (у них проверяется сила против зверей мира).
@@ -65,6 +66,8 @@ func run_step() -> void:
 			check(PetSkills.learn(rec, "dusk_rupture"), "после «Двойного росчерка» изучен «Сумрачный разрыв»")
 			check(PetSkills.learn(rec, "shadow_fang") and PetSkills.learn(rec, "daze"), "изучены «Клык полуночи» и «Морок»")
 			check(int(rec["jp"]) == 60 - 5 - 1 - 2 - 2, "JP списаны верно: %d" % int(rec["jp"]))
+			check(rec["slots"] == ["shadow_rend", "dusk_rupture", "shadow_fang"] and not (rec["slots"] as Array).has("daze"),
+				"новые активные умения сами встали в ячейки «Авто» (мест 3 — «Морок» без ячейки): %s" % [rec["slots"]])
 			check(PetSkills.learn_block(rec, "shadow_bond").contains("ур. 14"), "«Узы тени» — с 14 уровня")
 			# Пассивки меняют характеристики
 			var atk0 := pet.atk
@@ -222,10 +225,14 @@ func run_step() -> void:
 			check(PetSkills.skill_level(rec, "calm_mind") == 1 and int(rec["jp"]) == jp0 - 1, "«+» изучил «Тихий разум»")
 			check(cw.is_open() and cw.tab == "skills" and cw.selected == "calm_mind", "окно перестроено на той же вкладке")
 			press_cw("skill_shadow_bond")
-			press_cw("toggle_shadow_bond")
-			check(not PetSkills.toggle_on(rec, "shadow_bond"), "кнопка «Выкл» выключила «Узы тени»")
-			press_cw("toggle_shadow_bond")
-			check(PetSkills.toggle_on(rec, "shadow_bond"), "кнопка «Вкл» включила «Узы тени»")
+			check(cw.buttons.has("slot_auto_2") and cw.buttons.has("slot_aura_1"), "в окне 5 ячеек: 3 «Авто» и 2 ауры")
+			press_cw("unslot_shadow_bond")
+			check(not PetSkills.toggle_on(rec, "shadow_bond") and PetSkills.slot_of(rec, "shadow_bond") < 0,
+				"«Убрать» выключил «Узы тени» и освободил ячейку")
+			pm.active_pet.mp = pm.active_pet.max_mp
+			press_cw("toslot_shadow_bond_0")
+			check(PetSkills.toggle_on(rec, "shadow_bond") and PetSkills.slot_of(rec, "shadow_bond") == 0,
+				"«В ячейку ауры 1» включил «Узы тени»")
 			press_cw("back")
 			check(pm.window_buttons.has("info_1"), "из окна существа — назад к питомцам")
 			var b: Button = pm.window_buttons["info_1"]
@@ -237,8 +244,9 @@ func run_step() -> void:
 			press_cw("skill_provoke")
 			press_cw("learn_provoke")
 			check(PetSkills.skill_level(rt, "provoke") == 1, "черепаха выучила «Дерзкий вызов» в окне")
-			press_cw("toggle_provoke")
-			check(PetSkills.toggle_on(rt, "provoke"), "у не призванного питомца переключаемое отмечено включённым")
+			press_cw("toslot_provoke_1")
+			check(PetSkills.toggle_on(rt, "provoke") and PetSkills.slot_of(rt, "provoke") == 1,
+				"у не призванного питомца аура в ячейке отмечена включённой")
 			check(cw.buttons.has("skill_ram") and not cw.buttons.has("skill_shadow_rend"), "у черепахи свои умения: «Таран»")
 			for i in [2, 3]:
 				check(pm.open_creature(i, "stats") and cw.is_open(), "окно существа: питомец %d, «Существо»" % i)

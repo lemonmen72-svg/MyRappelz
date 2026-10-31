@@ -5,7 +5,8 @@ extends Control
 ## Спецификация значка (set_spec) — словарь:
 ##   "path": PNG умения (res://assets/icons/skills/<id>.png и т. п.; грузится через SkillTree.load_icon, как в древе),
 ##   "item": id предмета (картинка ItemIcon.texture или процедурный значок ItemIcon),
-##   "shape": простой рисунок ("sword", "talk", "shop"), "glyph" + "color": кружок с буквой (как в древе умений,
+##   "shape": простой рисунок ("sword", "talk", "shop"; команды питомца "pet_auto", "pet_attack", "pet_defend",
+##   "pet_follow"), "glyph" + "color": кружок с буквой (как в древе умений,
 ##   когда картинки нет). Порядок: path (если файл есть) → item → shape → glyph.
 ## Картинка вписана в круг (полигон-круг с UV — маска круга). Поверх (отдельный узел, перерисовывается без
 ## картинки): тёмный сектор от 12 часов по часовой стрелке (set_sector — перезарядка кнопки или истёкшая доля
@@ -200,7 +201,8 @@ func _draw() -> void:
 		draw_string(font, pos, g, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
 
 
-## Простые рисунки кнопок HUD: меч (атака без оружия), облачко речи, мешочек с монетами.
+## Простые рисунки кнопок HUD: меч (атака без оружия), облачко речи, мешочек с монетами; команды питомца —
+## лапа с круговой стрелкой («Авто»), прицел («Атака»), щит с лапой («Защита»), следы лап («За мной»).
 func _draw_shape(shp: String, c: Vector2, r: float, col: Color) -> void:
 	var ink := Color(0.08, 0.06, 0.12, 0.95)
 	match shp:
@@ -234,8 +236,54 @@ func _draw_shape(shp: String, c: Vector2, r: float, col: Color) -> void:
 			draw_line(bag + Vector2(-r * 0.22, -r * 0.38), bag + Vector2(r * 0.22, -r * 0.38), ink, maxf(1.5, r * 0.07), true)
 			draw_circle(bag + Vector2(r * 0.05, r * 0.05), r * 0.2, Color(1.0, 0.85, 0.3))
 			draw_arc(bag + Vector2(r * 0.05, r * 0.05), r * 0.2, 0.0, TAU, 20, ink, 1.2, true)
+		"pet_auto":
+			# Лапа и круговая стрелка вокруг: сам ищет зверей
+			_paw(c + Vector2(0, r * 0.04), r * 0.55, col.lightened(0.35), ink)
+			var ar := r * 0.74
+			var a0 := -PI * 0.25
+			var a1 := PI * 1.3
+			draw_arc(c, ar, a0, a1, 28, Color(0.95, 0.97, 1.0), maxf(2.0, r * 0.1), true)
+			var tip := c + Vector2(cos(a1), sin(a1)) * ar
+			var tg := Vector2(-sin(a1), cos(a1))
+			var nrm := Vector2(cos(a1), sin(a1))
+			draw_colored_polygon(PackedVector2Array([tip + tg * r * 0.2, tip + nrm * r * 0.16, tip - nrm * r * 0.16]),
+				Color(0.95, 0.97, 1.0))
+		"pet_attack":
+			# Прицел на цели: питомец бьёт выделенного зверя
+			var rc := col.lightened(0.25)
+			var w := maxf(2.0, r * 0.1)
+			draw_arc(c, r * 0.5, 0.0, TAU, 28, rc, w, true)
+			for d in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
+				var dv: Vector2 = d
+				draw_line(c + dv * r * 0.28, c + dv * r * 0.78, rc, w, true)
+			draw_circle(c, r * 0.12, Color(1.0, 0.92, 0.85))
+		"pet_defend":
+			# Щит с лапой: защищает хозяина
+			var sh := PackedVector2Array([c + Vector2(-0.5, -0.58) * r, c + Vector2(0.5, -0.58) * r,
+				c + Vector2(0.5, 0.02) * r, c + Vector2(0.0, 0.66) * r, c + Vector2(-0.5, 0.02) * r])
+			draw_colored_polygon(sh, col)
+			var outline := sh.duplicate()
+			outline.append(sh[0])
+			draw_polyline(outline, ink, maxf(1.5, r * 0.06), true)
+			_paw(c + Vector2(0, -0.02 * r), r * 0.34, Color(0.97, 0.95, 0.88), ink)
+		"pet_follow":
+			# Следы лап: идёт следом
+			_paw(c + Vector2(-0.3, 0.3) * r, r * 0.36, col.lightened(0.2), ink)
+			_paw(c + Vector2(0.28, -0.26) * r, r * 0.36, col.lightened(0.45), ink)
 		_:
 			draw_circle(c, r * 0.5, col)
+
+
+## Отпечаток лапы размером s (подушечка и четыре пальца) с центром c.
+func _paw(c: Vector2, s: float, col: Color, ink: Color) -> void:
+	var pad := c + Vector2(0, s * 0.2)
+	draw_circle(pad, s * 0.32, col)
+	draw_arc(pad, s * 0.32, 0.0, TAU, 20, ink, maxf(1.0, s * 0.05), true)
+	for t in [Vector2(-0.4, -0.2), Vector2(-0.15, -0.46), Vector2(0.15, -0.46), Vector2(0.4, -0.2)]:
+		var tv: Vector2 = t
+		var tp := c + tv * s
+		draw_circle(tp, s * 0.13, col)
+		draw_arc(tp, s * 0.13, 0.0, TAU, 12, ink, maxf(1.0, s * 0.04), true)
 
 
 ## Сектор, кольцо, число и метка — на слое поверх картинки.
