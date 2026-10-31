@@ -19,6 +19,8 @@ for t in tests/smoke_test.gd tests/test_*.gd; do
 	status=$?
 	echo "===== $t (код $status) ====="
 	grep -vE "$NOISE" "$log" | tail -n 150
+	# [FAIL] печатается в stderr сразу, а stdout — при выходе: в хвосте лога его может не оказаться
+	grep -E "^\[FAIL\]" "$log" | head -n 20
 	if grep -nE "SCRIPT ERROR|Parse Error|Compile Error|Failed to load script|Invalid call|Invalid access|Invalid assignment" "$log"; then
 		echo "::error::$t: ошибки GDScript"
 		fail=1
