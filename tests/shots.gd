@@ -925,10 +925,38 @@ func run_step() -> void:
 			step = 819
 		819:
 			shot("99_skills_shaman")
+			# Умения Неофита (кадр 96): «Пылающая земля» и «Грозовой круг» на земле у зверя, «Сгусток пламени» летит,
+			# «Теневая печать» включена; значки зоны и горения у панели цели
+			game.admin_set_look("dark_elf", "f")
+			_job_showcase("neophyte", ["burning_ground", "storm_circle", "flame_orb", "wildfire"], ["shadow_seal"], 6.0)
+			main.player.use_skill("skill1")
+			main.player.use_skill("skill2")
+			wait = 50
+			step = 820
+		820:
+			main.player.skill_cd.clear()
+			main.player.attack_cd = 0.0
+			main.player.use_skill("skill3")
+			wait = 8
+			step = 821
+		821:
+			shot("96_skills_casters")
+			for z in get_tree().get_nodes_in_group("skill_zones"):
+				z.queue_free()
+			# Мечник и Волшебник (кадр 97): «Гром щита» (провокация), «Колючий щит» и «Благодать»; затем светлая магия
+			game.admin_set_look("light_elf", "m")
+			_job_showcase("swordsman", ["shield_thunder", "thorn_shield", "dawn_cross", "armor_breach"], ["grace", "blessed_blade"], 1.8)
+			main.player.use_skill("skill2")
+			main.player.use_skill("skill1")
+			main.player.use_skill("skill3")
+			wait = 8
+			step = 822
+		822:
+			shot("97_skills_guard")
 			ok_done()
 
 
-## Кадры 98–99: герой профессии job 40 ур. с изученным древом, умения slots на кнопках 1–4, включённые toggles,
+## Кадры 96–99: герой профессии job 40 ур. с изученным древом, умения slots на кнопках 1–4, включённые toggles,
 ## у волка (или фазана) на расстоянии dist м, MP полное.
 func _job_showcase(job: String, slots: Array, toggles: Array, dist: float) -> void:
 	var p: Player = main.player

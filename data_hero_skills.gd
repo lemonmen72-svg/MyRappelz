@@ -985,8 +985,8 @@ static func fx_text(id: String, n: int) -> String:
 				if d.has("say"):
 					var say := String(d["say"])
 					for key in d:
-						say = say.replace("{pct:%s}" % key, _pct(value_at(d[key], n))) \
-							.replace("{num:%s}" % key, _num(value_at(d[key], n)))
+						say = say.replace("{pct:%s}" % key, _pct(value_at(d[key], n)))
+						say = say.replace("{num:%s}" % key, _num(value_at(d[key], n)))
 					if say != "":
 						parts.append(say)
 				else:
