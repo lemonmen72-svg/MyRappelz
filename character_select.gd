@@ -11,7 +11,7 @@ signal create(slot: int)
 signal switch_account
 
 ## Карточка слота для «Среднего» размера интерфейса.
-const CARD_SIZE := Vector2(225, 220)
+const CARD_SIZE := Vector2(225, 190)
 
 ## Сообщение над карточками (перенос старого сохранения и т. п.).
 var note := ""
@@ -165,7 +165,7 @@ func _card(i: int) -> PanelContainer:
 	# Раса и пол — одной строкой (карточка невысокая: экран с подтверждением удаления влезает в 720 px на «Крупном»)
 	var race_name := String(ClassData.race(String(s.get("race", ""))).get("name", ""))
 	var who := _pass(MenuKit.label("%s · %s" % [race_name, ClassData.gender_name(String(s.get("gender", "f")))],
-		UiScale.FONT_TEXT, MenuKit.TEXT, true))
+		UiScale.FONT_TEXT, MenuKit.TEXT))
 	v.add_child(who)
 	return panel
 
