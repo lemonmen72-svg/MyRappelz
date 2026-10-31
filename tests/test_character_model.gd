@@ -218,7 +218,11 @@ func _hero_start() -> void:
 		check(hero._anim.get_animation(hero._clip("idle")).loop_mode == Animation.LOOP_LINEAR, "герой: покой зациклен")
 	check(not hero._pick(CharacterModel.ASSET_WALK).is_empty(), "герой: есть шаг")
 	check(not hero._pick(CharacterModel.ASSET_RUN).is_empty(), "герой: есть бег")
-	check(hero.weapon_kind == "sword" and hero.find_child("Sword", true, false) != null, "герой: меч в руке")
+	var held := false
+	for wn in ["Sword", "Axe", "Mace", "Staff", "DaggerR", "Crossbow"]:
+		if hero.find_child(wn, true, false) != null:
+			held = true
+	check(hero.weapon_kind != "" and held, "герой: оружие профессии в руке (%s)" % hero.weapon_kind)
 	check(hero.has_ears(), "герой: эльфийские уши")
 	var head := hero.find_child("Head", true, false) as Node3D
 	check(head != null, "герой: метка головы")

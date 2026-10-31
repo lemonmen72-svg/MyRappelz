@@ -262,10 +262,12 @@ func _build_right() -> PanelContainer:
 	head.add_child(_class_stripe)
 	var hv := VBoxContainer.new()
 	hv.add_theme_constant_override("separation", 0)
+	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(hv)
 	_class_title = _label("", UiScale.FONT_NAME, Color.WHITE)
 	hv.add_child(_class_title)
 	_class_sub = _label("", UiScale.FONT_BODY, MUTED)
+	_class_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hv.add_child(_class_sub)
 
 	_class_desc = _label("", UiScale.FONT_TEXT, Color(0.9, 0.9, 0.92))
@@ -276,7 +278,9 @@ func _build_right() -> PanelContainer:
 	v.add_child(_stats7)
 
 	v.add_child(HSeparator.new())
-	v.add_child(_label("Профессии расы — выбор на %d уровне" % ClassData.JOB_LEVEL, UiScale.FONT_TEXT, GOLD))
+	var jobs_head := _label("Профессии расы — выбор на %d уровне" % ClassData.JOB_LEVEL, UiScale.FONT_TEXT, GOLD)
+	jobs_head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(jobs_head)
 	_jobs_box = VBoxContainer.new()
 	_jobs_box.add_theme_constant_override("separation", int(UiScale.px(5)))
 	v.add_child(_jobs_box)
@@ -348,7 +352,10 @@ func _refresh_card() -> void:
 		top.add_theme_constant_override("separation", int(UiScale.px(8)))
 		var jc: Color = j["color"]
 		top.add_child(_label(String(j["name"]), UiScale.FONT_HEAD, jc.lightened(0.35)))
-		top.add_child(_label(String(j["role"]), UiScale.FONT_BODY, MUTED))
+		var role := _label(String(j["role"]), UiScale.FONT_BODY, MUTED)
+		role.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		role.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		top.add_child(role)
 		box.add_child(top)
 		var d := _label(String(j["desc"]), UiScale.FONT_SMALL, Color(0.85, 0.86, 0.9))
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

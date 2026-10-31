@@ -217,8 +217,12 @@ func run_step() -> void:
 			check(not inv.has("daggers_steel", 2) and game.gold == 10, "без золота не купить")
 			game.gold = 500
 			var steel: int = inv.count("daggers_steel")
+			var room: int = inv.room_for("daggers_steel")
 			_press("act_buy")
-			check(inv.count("daggers_steel") == steel + 1 and game.gold == 380, "куплены стальные кинжалы")
+			check(inv.count("daggers_steel") == steel + 1 and game.gold == 380,
+				"куплены стальные кинжалы (было %d, стало %d, золото %d, место %d, в продаже %s, сообщение «%s»)" % [steel,
+				inv.count("daggers_steel"), game.gold, room, InventoryWindow.goods(game.class_id).has("daggers_steel"),
+				main.hud._msg_label.text])
 			# Продажа в окне торговца — из ячейки сумки
 			var sc := inv.find_cell("shell_plate")
 			_press("cell_%d" % sc)
