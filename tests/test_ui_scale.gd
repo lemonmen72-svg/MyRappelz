@@ -345,6 +345,12 @@ func _check_screen(what: String) -> void:
 	if margin == null:
 		return
 	var need := margin.get_combined_minimum_size()
+	if need.y > view.y + 0.5 or need.x > view.x + 0.5:
+		# Разбор: минимальные размеры частей экрана (что раздувает)
+		for n in margin.find_children("*", "Control", true, false):
+			var c := n as Control
+			if c.visible and c.get_combined_minimum_size().y >= 60.0:
+				print("  %s %s: %s" % [c.get_path(), c.get_class(), c.get_combined_minimum_size()])
 	check(need.x <= view.x + 0.5 and need.y <= view.y + 0.5, "%s помещается в %s: нужно %s" % [what, view, need])
 	if _screen is CharacterSelect:
 		var cs := _screen as CharacterSelect
