@@ -4,7 +4,8 @@
 //
 // Вершинные данные (собирает IslandWorld._chunk_mesh):
 //   COLOR.rgb — оттенок травы зоны (sRGB), COLOR.a — вес площадки постройки (0..1);
-//   UV.x — расстояние до оси ближайшей дороги, м; UV.y — уровень ближайшей воды (море, река, пруд), м.
+//   UV.x — расстояние до оси ближайшей дороги, м; UV.y — уровень ближайшей воды (море, река, пруд), м;
+//   UV2.x — вес леса 0..1 (IslandWorld.bake_forest по деревьям; на площадках построек 0).
 //
 // Текстуры (WorldTextures, флаг textures; на «Низком» выключены — шейдер считает то же, что без них):
 // рисованные «детальные маски» (среднее 0.5) умножают цвет слоя на tex * 2 — палитра сохраняется.
@@ -13,6 +14,8 @@
 // Выборки только у слоёв с ненулевым весом (textureGrad с производными, посчитанными до ветвлений):
 // обычно 1 на пиксель («Среднее») / 2 («Высокое»), на краях дорог, песка и скал — больше.
 // Площадь и улицы города (town_center, plaza_radius, paved_radius) — брусчатка, только с текстурами.
+// Лесная подстилка (тёмная почва с листьями и мхом) — там, где вес леса велик, с рваным краем по шуму;
+// только с текстурами (как и брусчатка): в лесу трава не выбирается, выборок столько же.
 shader_type spatial;
 render_mode cull_disabled;
 
@@ -41,12 +44,14 @@ uniform sampler2D tex_dirt : hint_default_white, filter_linear_mipmap, repeat_en
 uniform sampler2D tex_sand : hint_default_white, filter_linear_mipmap, repeat_enable;
 uniform sampler2D tex_rock : hint_default_white, filter_linear_mipmap, repeat_enable;
 uniform sampler2D tex_stone : hint_default_white, filter_linear_mipmap, repeat_enable;
-// Метров на повтор текстуры.
-uniform float grass_tile = 4.0;
-uniform float dirt_tile = 3.5;
+uniform sampler2D tex_forest : hint_default_white, filter_linear_mipmap, repeat_enable;
+// Метров на повтор текстуры (рисунки Максима: брусчатка ~7 камней по 0.3 м, лист подстилки ~0.15 м).
+uniform float grass_tile = 3.5;
+uniform float dirt_tile = 3.0;
 uniform float sand_tile = 4.0;
 uniform float rock_tile = 5.0;
-uniform float stone_tile = 3.0;
+uniform float stone_tile = 2.2;
+uniform float forest_tile = 2.5;
 // Сила текстуры: 0 — нет, 1 — полная.
 uniform float tex_strength : hint_range(0.0, 1.0) = 0.85;
 // Город: центр, радиус мощёной площади и радиус, внутри которого дороги мощёные (0 — нет).
@@ -54,6 +59,9 @@ uniform vec2 town_center = vec2(0.0);
 uniform float plaza_radius = 0.0;
 uniform float paved_radius = 0.0;
 uniform vec3 cobble_color : source_color = vec3(0.74, 0.71, 0.66);
+// Лесная подстилка: цвет почвы (смешивается с оттенком травы зоны) и сила подстилки.
+uniform vec3 forest_floor : source_color = vec3(0.44, 0.38, 0.27);
+uniform float forest_strength : hint_range(0.0, 1.0) = 0.9;
 
 varying vec3 v_pos;
 varying vec3 v_nrm;
@@ -182,6 +190,12 @@ void fragment() {
 		road_m *= 1.0 - plaza_m;
 	}
 
+	// Лес (только с текстурами): вес леса из вершин, рваный край по шуму
+	float forest_m = 0.0;
+	if (tex_on && UV2.x > 0.01) {
+		forest_m = smoothstep(0.3, 0.6, UV2.x + (n1 - 0.5) * 0.3 + (n2 - 0.5) * 0.25) * forest_strength;
+	}
+
 	// --- Трава: крупные мягкие пятна (тёмное прохладное / основное / светлое тёплое) и мазки
 	vec3 tint = to_linear(COLOR.rgb);
 	float pat = rich ? n1 * 0.62 + n2 * 0.38 : n1;
@@ -191,9 +205,15 @@ void fragment() {
 	col = mix(col, g_light, smoothstep(0.60, 0.67, pat));
 	float grass_vis = (1.0 - road_m) * (1.0 - rock_m) * (1.0 - sand_m) * (1.0 - plaza_m);
 	if (tex_on) {
-		// Мазки и травинки — из текстуры
-		if (grass_vis > 0.002) {
+		// Мазки и травинки — из текстуры (под сплошной подстилкой не выбираются)
+		if (grass_vis > 0.002 && forest_m < 0.995) {
 			col *= detail(tex_xz(tex_grass, p, dpx.xz, dpy.xz, 1.0 / grass_tile, tex_full, n1));
+		}
+		// Лесная подстилка: почва с оттенком зоны (у тёмных эльфов холоднее), листья и мох — из текстуры
+		if (grass_vis > 0.002 && forest_m > 0.005) {
+			vec3 fl = mix(forest_floor, tint * 0.7, 0.3) * (0.92 + 0.12 * n3);
+			fl *= detail(tex_xz(tex_forest, p, dpx.xz, dpy.xz, 1.0 / forest_tile, tex_full, n2));
+			col = mix(col, fl, forest_m);
 		}
 	} else if (rich) {
 		// Мазки кистью: вытянутые пятнышки чуть светлее

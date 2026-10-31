@@ -15,8 +15,10 @@ extends RefCounted
 ## - "halo": UV — угол квадрата, UV2.x — размер ореола;
 ## - toon-поверхности: UV2.y = 1 — светящаяся вершина.
 ##
-## Альфа цвета вершины — номер рисованной текстуры детали (WorldTextures: доски, камень, штукатурка,
-## черепица, солома, скала; см. toon.gdshader): по цвету из палитры (texture_of) или явно — Kit.tex.
+## Альфа цвета вершины — номер рисованной текстуры детали (WorldTextures: доски, каменная кладка,
+## штукатурка, черепица, солома, скала, кора стоячего и лежачего бревна; см. toon.gdshader):
+## по цвету из палитры (texture_of) или явно — Kit.tex (кора — всегда явно: цвета у брёвен те же,
+## что у досок).
 
 const TOON_SHADER := "res://toon.gdshader"
 const CRYSTAL_SHADER := "res://crystal.gdshader"
@@ -98,8 +100,8 @@ const HULL := Color(0.45, 0.29, 0.18)
 const TEXTURE_OF := {
 	WOOD: WorldTextures.WOOD, WOOD_DARK: WorldTextures.WOOD, WOOD_LIGHT: WorldTextures.WOOD,
 	HULL: WorldTextures.WOOD,
-	STONE: WorldTextures.STONE, STONE_DARK: WorldTextures.STONE, ELF_STONE: WorldTextures.STONE,
-	DARK_STONE: WorldTextures.STONE, DARK_STONE2: WorldTextures.STONE,
+	STONE: WorldTextures.MASONRY, STONE_DARK: WorldTextures.MASONRY, ELF_STONE: WorldTextures.MASONRY,
+	DARK_STONE: WorldTextures.MASONRY, DARK_STONE2: WorldTextures.MASONRY,
 	PLASTER: WorldTextures.PLASTER, ELF_WHITE: WorldTextures.PLASTER, WHITEWASH: WorldTextures.PLASTER,
 	ROOF_ORANGE: WorldTextures.TILES, ROOF_RED: WorldTextures.TILES, ELF_ROOF: WorldTextures.TILES,
 	DARK_ROOF: WorldTextures.TILES,
@@ -601,8 +603,10 @@ static func get_kit(kind: String) -> Kit:
 		"hay":
 			hay_bale(k)
 		"bollard":
+			k.tex = WorldTextures.BARK
 			k.cyl(Vector3(0, 0.35, 0), 0.16, 0.14, 0.7, WOOD_DARK, 6)
 			k.cyl(Vector3(0, 0.74, 0), 0.2, 0.2, 0.08, WOOD_DARK, 6)
+			k.tex = -1
 		"wheat_clump":
 			wheat_clump(k)
 		"rock":
@@ -773,16 +777,47 @@ static func town_hall(k: Kit) -> void:
 	k.ball(Vector3(0, ty + 3.4, 0), Vector3(0.12, 0.12, 0.12), GOLD, 6, 3)
 
 
+## Столбик ограды из бревна (кора, волокна вертикальны) с острой верхушкой: p — низ, h — высота.
+## Цвет — свой у каждой ограды (темнее палитры), поэтому текстура задаётся явно.
+static func fence_post(k: Kit, p: Vector3, h: float, c: Color) -> void:
+	var prev := k.tex
+	k.tex = WorldTextures.BARK
+	k.box(p + Vector3(0, h * 0.5, 0), Vector3(0.18, h, 0.18), c)
+	k.cyl(p + Vector3(0, h + 0.1, 0), 0.13, 0.0, 0.2, c, 4, Vector3(0, PI * 0.25, 0))
+	k.tex = prev
+
+
+## Две жерди ограды между низами столбиков p0 и p1 (брёвна: волокна вдоль жерди); post_h — высота
+## столбиков. Возвращает поворот пролёта вокруг вертикали (для коллизии).
+static func fence_rails(k: Kit, p0: Vector3, p1: Vector3, post_h: float, c: Color) -> float:
+	var mid := (p0 + p1) * 0.5
+	var flat := Vector2(p1.x - p0.x, p1.z - p0.z)
+	var length := flat.length()
+	var yaw := atan2(-flat.y, flat.x)
+	var pitch := atan2(p1.y - p0.y, length)
+	var prev := k.tex
+	k.tex = WorldTextures.LOG
+	for hy in [0.45, 0.9]:
+		var yy: float = float(hy) * post_h
+		k.box(mid + Vector3(0, yy, 0), Vector3(length + 0.1, 0.12, 0.08), c, Vector3(0, yaw, pitch))
+	k.tex = prev
+	return yaw
+
+
 ## Тренировочный манекен: крестовина, столб, соломенное тело с мишенью, руки-перекладина, голова.
 static func training_dummy(k: Kit) -> void:
 	k.box(Vector3(0, 0.08, 0), Vector3(1.0, 0.16, 0.2), WOOD_DARK, Vector3.ZERO, "toon_ol")
 	k.box(Vector3(0, 0.08, 0), Vector3(0.2, 0.16, 1.0), WOOD_DARK, Vector3.ZERO, "toon_ol")
+	k.tex = WorldTextures.BARK
 	k.cyl(Vector3(0, 0.75, 0), 0.08, 0.08, 1.4, WOOD, 6, Vector3.ZERO, "toon_ol")
+	k.tex = -1
 	k.cyl(Vector3(0, 1.3, 0), 0.34, 0.3, 0.95, THATCH, 8, Vector3.ZERO, "toon_ol")
 	for y in [1.0, 1.6]:
 		var yy: float = y
 		k.cyl(Vector3(0, yy, 0), 0.36, 0.36, 0.08, WOOD_DARK, 8, Vector3.ZERO, "toon_ol")
+	k.tex = WorldTextures.LOG
 	k.cyl(Vector3(0, 1.5, 0), 0.06, 0.06, 1.5, WOOD, 6, Vector3(0, 0, PI * 0.5), "toon_ol")
+	k.tex = -1
 	k.ball(Vector3(0, 2.0, 0), Vector3(0.24, 0.26, 0.24), Color(0.86, 0.76, 0.56), 8, 5, Vector3.ZERO, "toon_ol")
 	# Мишень на груди
 	k.cyl(Vector3(0, 1.32, 0.31), 0.2, 0.2, 0.03, Color(0.92, 0.3, 0.26), 10, Vector3(PI * 0.5, 0, 0), "toon_ol")
@@ -791,9 +826,12 @@ static func training_dummy(k: Kit) -> void:
 
 ## Пугало в поле: манекен в шляпе.
 static func scarecrow(k: Kit) -> void:
+	k.tex = WorldTextures.BARK
 	k.cyl(Vector3(0, 1.0, 0), 0.07, 0.07, 2.0, WOOD, 6, Vector3.ZERO, "toon_ol")
+	k.tex = WorldTextures.LOG
 	k.cyl(Vector3(0, 1.45, 0), 0.32, 0.26, 0.85, Color(0.42, 0.55, 0.78), 8, Vector3.ZERO, "toon_ol")
 	k.cyl(Vector3(0, 1.6, 0), 0.05, 0.05, 1.7, WOOD, 6, Vector3(0, 0, PI * 0.5), "toon_ol")
+	k.tex = -1
 	for x in [-0.85, 0.85]:
 		var xx: float = x
 		k.cyl(Vector3(xx, 1.6, 0), 0.1, 0.06, 0.22, THATCH, 6, Vector3(0, 0, PI * 0.5), "toon_ol")
@@ -810,7 +848,9 @@ static func well(k: Kit) -> void:
 	for x in [-0.85, 0.85]:
 		var xx: float = x
 		k.box(Vector3(xx, 1.5, 0), Vector3(0.16, 1.5, 0.16), WOOD)
+	k.tex = WorldTextures.LOG
 	k.cyl(Vector3(0, 1.85, 0), 0.08, 0.08, 1.8, WOOD_DARK, 6, Vector3(0, 0, PI * 0.5))
+	k.tex = -1
 	k.cyl(Vector3(0, 1.45, 0), 0.16, 0.13, 0.26, WOOD_LIGHT, 8)
 	k.box(Vector3(0, 1.67, 0), Vector3(0.02, 0.4, 0.02), CANVAS_DARK)
 	gable_roof(k, 2.25, 1.5, 2.0, 0.6, 0.2, 0.1, ROOF_ORANGE, WOOD)
@@ -849,7 +889,9 @@ static func weapon_rack(k: Kit) -> void:
 ## Фонарь города и деревни людей: столб, тёплый огонёк, крыша-пирамидка.
 static func lantern_town(k: Kit) -> void:
 	k.box(Vector3(0, 0.15, 0), Vector3(0.5, 0.3, 0.5), STONE)
+	k.tex = WorldTextures.BARK
 	k.cyl(Vector3(0, 1.5, 0), 0.07, 0.07, 2.4, WOOD_DARK, 6)
+	k.tex = -1
 	k.box(Vector3(0, 2.72, 0), Vector3(0.44, 0.06, 0.44), WOOD_DARK)
 	k.box(Vector3(0, 2.93, 0), Vector3(0.28, 0.36, 0.28), WIN_WARM, Vector3.ZERO, "glow")
 	for x in [-0.16, 0.16]:
@@ -1207,7 +1249,9 @@ static func tent_bell(k: Kit) -> void:
 	k.cyl(Vector3(0, 1.75, 0), 1.85, 0.1, 2.5, CANVAS, 8)
 	k.quad(Vector3(-0.45, 0.02, 1.86), Vector3(0.45, 0.02, 1.86), Vector3(0.12, 1.5, 1.05), Vector3(-0.12, 1.5, 1.05),
 		Color(0.32, 0.24, 0.2), "toon", Vector3(0, 0.4, 1))
+	k.tex = WorldTextures.BARK
 	k.cyl(Vector3(0, 3.2, 0), 0.04, 0.04, 0.9, WOOD_DARK, 5)
+	k.tex = -1
 	k.box(Vector3(0.25, 3.45, 0), Vector3(0.5, 0.26, 0.03), ROOF_RED, Vector3.ZERO, "cloth")
 	for i in 4:
 		var a := PI * 0.25 + float(i) * PI * 0.5
@@ -1235,7 +1279,9 @@ static func tent_ridge(k: Kit) -> void:
 		Color(0.32, 0.24, 0.2), "toon", Vector3(0, 0, 1))
 	for e in [-1.0, 1.0]:
 		var ez2: float = e * (l * 0.5 + 0.1)
+		k.tex = WorldTextures.BARK
 		k.cyl(Vector3(0, h * 0.5 + 0.1, ez2), 0.04, 0.04, h + 0.2, WOOD_DARK, 5)
+		k.tex = -1
 
 
 ## Кострище: кольцо камней и сложенные шалашом поленья (огонь — отдельный меш "flame").
@@ -1248,12 +1294,16 @@ static func campfire_base(k: Kit) -> void:
 		var a := float(i) * PI * 0.5 + 0.3
 		var tangent := Vector3(-sin(a), 0.0, cos(a))
 		k.base = Transform3D(Basis(tangent, 0.45), Vector3(cos(a) * 0.25, 0.3, sin(a) * 0.25))
+		k.tex = WorldTextures.BARK
 		k.cyl(Vector3.ZERO, 0.07, 0.06, 0.75, WOOD_DARK, 5)
+		k.tex = -1
 	k.base = Transform3D.IDENTITY
 	# Брёвна-скамейки по касательной
 	for i in 2:
 		var a := float(i) * PI + 0.6
+		k.tex = WorldTextures.LOG
 		k.cyl(Vector3(cos(a) * 1.6, 0.18, sin(a) * 1.6), 0.18, 0.18, 1.3, WOOD, 6, Vector3(0, PI * 0.5 - a, PI * 0.5))
+		k.tex = -1
 
 
 ## Пламя: два вложенных светящихся конуса (наружный оранжевый, внутренний жёлтый).

@@ -1,12 +1,22 @@
 class_name WorldTextures
 extends RefCounted
-## Рисованные текстуры окружения (assets/textures/*.png, их делает tools/gen_textures.py).
-## Текстуры — «детальные маски»: почти серые, среднее 0.5; шейдеры умножают цвет на tex * 2,
-## поэтому палитра острова и цвета построек сохраняются, а текстура добавляет мазки, швы, доски.
+## Рисованные текстуры окружения (assets/textures/*.png): нарисованы Максимом в ChatGPT, нарезаны
+## из листов скриптом tools/import_texture_sheet.py (tools/gen_textures.py — прежние процедурные,
+## пишет только недостающие). Текстуры — «детальные маски»: почти серые, среднее 0.5, с четвертью
+## цвета; шейдеры умножают цвет на tex * 2, поэтому палитра острова и цвета построек сохраняются,
+## а текстура добавляет мазки, швы, доски, кладку.
 ##
-## Земля (island_terrain.gdshader): трава, утоптанная земля, песок, скала, брусчатка города.
+## Земля (island_terrain.gdshader): трава, утоптанная земля, песок, скала, брусчатка города (площадь
+## и улицы), лесная подстилка (под деревьями — вес леса в UV2.x вершин, IslandWorld.forest_at).
 ## Постройки (toon.gdshader): номер текстуры детали — в альфе цвета вершины (PoiModels.Kit,
-## layer_alpha) или параметр tex_layer у материала целиком (настил моста).
+## layer_alpha) или параметр tex_layer у материала целиком (настил моста). Камень построек
+## (цоколи, колодцы, стены, башни, трубы) — каменная кладка; брусчатка — только земля.
+## Кора: BARK — стоячие брёвна (столбы, сваи, шесты; волокна вертикальные), LOG — лежачие
+## (жерди оград, поленья, перекладины; волокна вдоль бревна) — одна текстура, разные проекции.
+##
+## Сэмплеры toon.gdshader: albedo_texture + 7 текстур = 8. Больше нельзя: в GL Compatibility
+## Godot 4.3 занимает верхние текстурные блоки (max − 1 … max − 8: тени, небо, отражения, экран),
+## а у многих телефонов их всего 16 — материалу остаются блоки 0–7.
 ##
 ## Качество (Quality.textures()): на «Низком» выборок текстур нет (флаг textures = false, шейдеры
 ## как раньше). «Среднее» — одна выборка на слой (земля — по XZ, постройки — по главной оси нормали).
@@ -16,24 +26,32 @@ extends RefCounted
 
 const DIR := "res://assets/textures/"
 
-## Номера текстур построек (альфа цвета вершины = 1 − номер / 16; 0 — без текстуры).
+## Номера текстур построек (альфа цвета вершины = 1 − номер / 16; 0 — без текстуры; до 15).
 const NONE := 0
+## Доски (стены, двери, настил, ящики).
 const WOOD := 1
-const STONE := 2
+## Каменная кладка (цоколи, колодцы, каменные стены, башни, трубы, ступени).
+const MASONRY := 2
 const PLASTER := 3
 const TILES := 4
 const THATCH := 5
 const ROCK := 6
+## Кора: стоячее бревно (столбы, сваи, шесты).
+const BARK := 7
+## Кора: лежачее бревно (жерди, поленья, перекладины) — волокна вдоль горизонтальной оси.
+const LOG := 8
 
 ## Параметр шейдера → имя файла текстуры.
 const TERRAIN_SAMPLERS := {
 	"tex_grass": "grass", "tex_dirt": "dirt", "tex_sand": "sand", "tex_rock": "rock", "tex_stone": "stone",
+	"tex_forest": "forest",
 }
 const TOON_SAMPLERS := {
-	"tex_wood": "wood", "tex_stone": "stone", "tex_plaster": "plaster", "tex_tiles": "tiles",
-	"tex_thatch": "thatch", "tex_rock": "rock",
+	"tex_wood": "wood", "tex_masonry": "masonry", "tex_plaster": "plaster", "tex_tiles": "tiles",
+	"tex_thatch": "thatch", "tex_rock": "rock", "tex_bark": "bark",
 }
-const ALL := ["grass", "dirt", "sand", "rock", "stone", "wood", "tiles", "thatch", "plaster"]
+const ALL := ["grass", "dirt", "sand", "rock", "stone", "wood", "tiles", "thatch", "plaster",
+	"forest", "masonry", "bark"]
 
 static var _cache := {}
 ## Материалы, которые переключает apply_quality() (WeakRef: материалы могут освободиться).
