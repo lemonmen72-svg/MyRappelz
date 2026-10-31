@@ -202,8 +202,9 @@ func _on_delete() -> void:
 		_confirm_box.remove_child(c)
 		c.queue_free()
 	var nick := String((slots[selected] as Dictionary).get("name", ""))
-	_confirm_box.add_child(MenuKit.label("Удалить «%s» навсегда? Чтобы подтвердить, введите ник:" % nick, UiScale.FONT_TEXT,
-		MenuKit.BAD, true))
+	# Без переноса: перенос в контейнере считает высоту по самой узкой ширине и выталкивает экран за 720 px
+	_confirm_box.add_child(MenuKit.label("Удалить «%s» навсегда? Введите ник для подтверждения:" % nick, UiScale.FONT_TEXT,
+		MenuKit.BAD))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", int(UiScale.px(10)))
 	_confirm_box.add_child(row)
