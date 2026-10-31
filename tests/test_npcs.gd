@@ -4,8 +4,9 @@ extends "res://tests/test_base.gd"
 ## земле, не на дороге, не в постройках и мелочах, в безопасных зонах (звери туда не заходят, не в логове анатем),
 ## не ближе 3 м друг к другу и к торговцу / Кирку, вдали от точек старта; своя внешность у каждого (модель из
 ## примитивов, лёгкая; заготовка npc_<id>.glb); рядом — кнопка «Говорить» выбирает ближайшего, диалог
-## открывается у каждого, пункты «скоро» и справочник мудреца показывают текст; реплики по положению героя;
-## задание мудреца «Знакомство с городом» (поговорить с кузнецом и кладовщиком) берётся и сдаётся.
+## открывается у каждого, пункты «скоро» и справочник мудреца показывают текст, «Склад» у кладовщика открывает
+## окно склада; реплики по положению героя; задания мудреца после старосты (четыре сразу, «Взять все»), задание
+## «Городской склад» (поговорить с кладовщиком, положить вещь на склад) берётся и сдаётся.
 
 ## Кто где стоит: id → [POI, ближайшая из POI этого вида должна быть она].
 const HOMES := {
@@ -73,6 +74,14 @@ func run_step() -> void:
 					continue
 				var label := (npcs.buttons[key] as Button).text
 				check(label.contains("скоро") == bool(d.get("soon", false)), "%s: подпись «%s»" % [id, label])
+				if d.has("action"):
+					# Пункт-окно: «Склад» у кладовщика
+					_press(key)
+					check(main.economy.is_storage_open() and not npcs.is_dialog_open(), "%s: «%s» открывает окно склада"
+						% [id, d["label"]])
+					hud.close_window()
+					npcs.open_dialog(id)
+					continue
 				_press(key)
 				check(npcs.page == "info" and npcs.reply == String(d["text"]) and _has_text(String(d["text"]).left(20)),
 					"%s / %s: текст «%s»" % [id, d["id"], npcs.reply.left(40)])
@@ -91,7 +100,13 @@ func run_step() -> void:
 			idx += 1
 			step = 1
 		10:
-			# Задание мудреца: взять у него
+			# Цепочка старосты сдана — у мудреца четыре задания сразу
+			for qid in QuestData.ELDER_CHAIN:
+				game.quests_done[String(qid)] = 1
+			game.level = 5
+			game.xp = 0
+			main.quests._changed()
+			npcs.refresh_marks()
 			var sage: Npc = npcs.npc("sage")
 			check(sage.mark_text() == "!", "над мудрецом «!»: «%s»" % sage.mark_text())
 			_stand_by("sage", 1.8)
@@ -103,41 +118,55 @@ func run_step() -> void:
 			check(npcs.reply == NpcData.greet("sage", "offer"), "мудрец предлагает дело: " + npcs.reply)
 			check((npcs.buttons["opt_quests"] as Button).text.contains("(!)"), "у «Задания» отметка нового")
 			_press("opt_quests")
-			_press("dq_sage_town_tour")
-			check(npcs.reply == String(QuestData.get_quest("sage_town_tour")["offer"]), "реплика при выдаче")
-			check(_has_text("Поговорить: Кузнец Гуннар") and _has_text("Поговорить: Кладовщик Тобин"), "цели: поговорить")
+			for qid in ["sage_path", "sage_storage", "sage_shop", "sage_teacher"]:
+				check(npcs.buttons.has("dq_" + String(qid)), "у мудреца задание «%s»" % QuestData.quest_name(String(qid)))
+			check(not npcs.buttons.has("dq_sage_to_hunter"), "«К охотнице» — только после склада, лавки и учителя")
+			check(npcs.buttons.has("accept_all") and (npcs.buttons["accept_all"] as Button).text.contains("4"),
+				"кнопка «Взять все задания (4)»")
+			_press("dq_sage_storage")
+			check(npcs.reply == QuestData.text("sage_storage", "offer"), "реплика при выдаче")
+			check(_has_text("Поговорить с Кладовщиком Тобином") and _has_text("Положить вещь на склад"), "цели склада")
 			_press("accept")
-			check(q.state("sage_town_tour") == "active", "«Знакомство с городом» взято")
-			check(npcs.npc("sage").mark_kind == "active", "над мудрецом серый «?»")
+			check(q.state("sage_storage") == "active", "«Городской склад» взято")
 			npcs.close_dialog()
-			npcs.talk_to("smith")
-			check(q.goal_done("sage_town_tour", 0) and not q.is_ready("sage_town_tour"), "поговорили с кузнецом: 1 из 2")
-			npcs.close_dialog()
-			npcs.talk_to("storekeeper")
-			check(q.is_ready("sage_town_tour"), "поговорили с кладовщиком — задание выполнено")
-			check(last_hud_text().contains("вернитесь к Мудрецу Альдерику"), "сообщение: " + last_hud_text())
-			npcs.close_dialog()
-			npcs.refresh_marks()
-			check(npcs.npc("sage").mark_kind == "ready", "над мудрецом золотой «?»")
-			_stand_by("sage", 1.8)
+			_stand_by("storekeeper", 1.8)
 			wait = 4
 			step = 12
 		12:
 			var q: Quests = main.quests
+			var eco: Economy = main.economy
+			main._on_action("talk")
+			check(npcs.dialog_npc == "storekeeper" and q.goal_done("sage_storage", 0), "поговорили с кладовщиком")
+			check(not q.is_ready("sage_storage"), "склад ещё пуст — задание не выполнено")
+			check(not (npcs.buttons["opt_storage"] as Button).text.contains("скоро"), "«Склад» — рабочий пункт")
+			_press("opt_storage")
+			check(eco.is_storage_open() and _has_text("Склад"), "окно склада открыто")
+			game.inventory.add("wolf_pelt", 2)
+			eco.window.refresh()
+			eco.window.select_cell(game.inventory.find_cell("wolf_pelt"))
+			check(eco.window.buttons.has("act_store") and eco.window.buttons.has("act_store_all"), "кнопки «На склад»")
+			(eco.window.buttons["act_store"] as Button).pressed.emit()
+			check(game.storage.count("wolf_pelt") == 1 and game.inventory.count("wolf_pelt") == 1, "одна шкура на складе")
+			check(q.is_ready("sage_storage"), "«Городской склад» выполнено")
+			check(last_hud_text().contains("вернитесь к Мудрецу Альдерику"), "сообщение: " + last_hud_text())
+			hud.close_window()
+			_stand_by("sage", 1.8)
+			wait = 4
+			step = 13
+		13:
+			var q: Quests = main.quests
 			main._on_action("talk")
 			check(npcs.dialog_npc == "sage" and npcs.reply == NpcData.greet("sage", "ready"), "мудрец: есть что сдать")
 			_press("opt_quests")
-			_press("dq_sage_town_tour")
+			_press("dq_sage_storage")
 			var g0: int = game.gold
 			var xp0 := _total_xp()
 			_press("complete")
-			check(q.state("sage_town_tour") == "done", "«Знакомство с городом» сдано")
-			check(game.gold == g0 + 15 and _total_xp() == xp0 + 30, "награда: 30 оп., 15 зол.")
-			check(npcs.reply == String(QuestData.get_quest("sage_town_tour")["done"]), "слова мудреца при сдаче")
-			check(npcs.npc("sage").mark_text() == "", "над мудрецом значка нет")
+			check(q.state("sage_storage") == "done", "«Городской склад» сдано")
+			check(game.gold == g0 + 15 and _total_xp() == xp0 + 160, "награда: 160 оп., 15 зол.")
+			check(npcs.reply == QuestData.text("sage_storage", "done"), "слова мудреца при сдаче")
+			check(npcs.npc("sage").mark_text() == "!", "у мудреца остались задания — «!»")
 			check(main.quests.state("kirk_first_card") == "available", "цепочка Кирка не задета")
-			_press("back")
-			check(npcs.reply == NpcData.greet("sage", "idle"), "мудрец без заданий: " + npcs.reply)
 			npcs.close_dialog()
 			ok_done()
 
@@ -172,16 +201,20 @@ func _unit_data() -> void:
 			check(String(d.get("label", "")) != "" and String(d.get("text", "")) != "", "%s: пункт %s с текстом" % [id, d.get("id")])
 			if bool(d.get("soon", false)):
 				soon += 1
-		# У мудреца «Первая профессия» теперь рабочая (задание на профессию), остальные дела — «скоро»
-		check(soon >= 1 or id == "sage", "%s: будущее дело с пометкой «скоро»" % id)
+		# Дела, которых ещё нет, — с пометкой «скоро» (кузница, подземелье); у мудреца, кладовщика (склад), старост
+		# и охотницы (задания) пункты рабочие
+		check(soon >= 1 or ["sage", "storekeeper", "elder_human", "elder_light", "elder_dark", "hunter"].has(id),
+			"%s: будущее дело с пометкой «скоро»" % id)
 		check(not NpcData.is_trader(id), "%s: не торгует" % id)
 	check(String(NpcData.talk_entry("sage", "profession").get("text", "")).contains("десятого уровня")
 		and not bool(NpcData.talk_entry("sage", "profession").get("soon", false)), "мудрец о первой профессии (рабочий пункт)")
 	check(String(NpcData.talk_entry("sage", "guide/pets").get("text", "")).contains("Кирк"), "справочник мудреца: питомцы — к Кирку")
 	check(NpcData.talk_entry("sage", "guide/nope").is_empty() and NpcData.talk_entry("smith", "").is_empty(),
 		"неизвестный пункт — пусто")
-	check(QuestData.giver("sage_town_tour") == "sage" and QuestData.goals("sage_town_tour").size() == 2,
-		"у мудреца задание с двумя целями «поговорить»")
+	check(not QuestData.has_quest("sage_town_tour"), "«Знакомство с городом» заменено заданиями мудреца")
+	check(String(NpcData.talk_entry("storekeeper", "storage").get("action", "")) == "storage", "у кладовщика — «Склад»")
+	check(NpcData.talk_entry("smith", "forge").get("soon", false) and NpcData.talk_entry("merc_chief", "dungeon").get("soon", false),
+		"кузница и подземелье — «скоро»")
 
 
 func _check_world() -> void:

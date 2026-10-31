@@ -985,6 +985,83 @@ func run_step() -> void:
 			step = 834
 		834:
 			shot("97_skills_guard")
+			# Цепочка заданий острова (кадры 110–114): Бродяга-человек у Старосты Ольвина
+			for z in get_tree().get_nodes_in_group("skill_zones"):
+				z.queue_free()
+			main.player._set_target(null)
+			game.admin_set_job(ClassData.WANDERER)
+			game.admin_set_look("human", "m")
+			game.level = 3
+			main.player.apply_class()
+			game.quests_active = {}
+			game.quests_done = {}
+			game.quest_tracked = ""
+			main.quests._changed()
+			_talk_view("elder_human")
+			main.npcs.talk_to("elder_human")
+			main.npcs.open_dialog("elder_human", "quest", "elder_hunt")
+			wait = 12
+			step = 920
+		920:
+			shot("110_elder_quest")
+			main.npcs.close_dialog()
+			# Склад у Кладовщика Тобина: стопки на складе, выбрана вещь из сумки
+			_talk_view("storekeeper")
+			for e in [["wolf_pelt", 6], ["pheasant_feather", 9], ["mirror_card", 2], ["hp_potion", 20], ["shell_plate", 3]]:
+				game.storage.add(String(e[0]), int(e[1]))
+			game.inventory.add("panther_fang", 4)
+			main.economy.open_storage()
+			main.economy.window.select_cell(game.inventory.find_cell("panther_fang"))
+			wait = 12
+			step = 921
+		921:
+			shot("111_storage")
+			main.hud.close_window()
+			# Журнал: четыре задания мудреца, у лавки куплено 2 из 3
+			for id in QuestData.ELDER_CHAIN:
+				game.quests_done[String(id)] = 1
+			game.level = 7
+			main.player.apply_class()
+			for id in ["sage_path", "sage_storage", "sage_shop", "sage_teacher"]:
+				main.quests.accept(String(id))
+			game.quests_active["sage_shop"]["progress"] = [2, 1]
+			game.quests_active["sage_teacher"]["progress"] = [1]
+			game.quest_tracked = "sage_shop"
+			main.quests.refresh_tracker()
+			main.quests.window.open("sage_shop")
+			wait = 10
+			step = 922
+		922:
+			shot("112_sage_journal")
+			main.hud.close_window()
+			# Охотница Ярра: семь вожаков и доклад мудрецу
+			for id in ["sage_storage", "sage_shop", "sage_teacher", "sage_to_hunter", "hunter_hunt"]:
+				game.quests_active.erase(String(id))
+				game.quests_done[String(id)] = 1
+			game.quest_tracked = "sage_path"
+			main.quests._changed()
+			_talk_view("hunter")
+			main.npcs.talk_to("hunter")
+			main.npcs.open_dialog("hunter", "quests")
+			wait = 12
+			step = 923
+		923:
+			shot("113_hunter_bosses")
+			var all_b: Button = main.npcs.buttons.get("accept_all")
+			if all_b != null:
+				all_b.pressed.emit()
+			main.npcs.close_dialog()
+			game.quest_tracked = "hunter_boss_wolf"
+			main.quests.refresh_tracker()
+			main.quests.window.open("hunter_boss_wolf")
+			wait = 10
+			step = 924
+		924:
+			shot("114_hunter_journal")
+			main.hud.close_window()
+			wait = 2
+			step = 925
+		925:
 			# Экраны до мира (кадры 102–109): вход, выбор персонажа, шаги создания, настройки со сменой персонажа
 			main.hud.close_window()
 			_menu = LoginScreen.new()
@@ -1088,6 +1165,26 @@ func _npc_view(id: String) -> void:
 	_top.global_position = from
 	_top.look_at(c + Vector3(0, 1.15, 0))
 	print("  %s: (%.1f, %.1f)" % [id, c.x, c.z])
+
+
+## Кадры 110–114: игрок в 2.6 м перед жителем id (кнопка «Говорить» видна, диалог не закрывается), камера
+## за игроком чуть сбоку — житель в кадре.
+func _talk_view(id: String) -> void:
+	var n: Npc = main.npcs.npc(id)
+	if n == null:
+		return
+	var p: Player = main.player
+	var fwd := Vector3(-sin(n.face_yaw), 0, -cos(n.face_yaw))
+	var pos := n.global_position + fwd * 2.6
+	var w := IslandWorld.current
+	if w != null:
+		pos.y = w.height_at(pos.x, pos.z) + 0.1
+	p.global_position = pos
+	p.visible = true
+	p.hp = p.max_hp
+	main.cam_yaw = atan2(fwd.x, fwd.z) + 0.35
+	main.cam_pitch = 0.33
+	main.cam_dist = 6.5
 
 
 ## Игрок в 3 м от Учителя Кирка (со стороны площади), камера за игроком чуть сбоку — Кирк в кадре.

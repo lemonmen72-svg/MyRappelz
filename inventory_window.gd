@@ -15,9 +15,13 @@ extends Node
 ## Торговля (у торговца или другого NPC — seller, ассортимент NpcData.shop): слева — товары (касание — карточка
 ## с «Купить» / «Купить ×5»), в центре — сумка (касание — карточка с «Продать» / «Продать все»), справа — карточка.
 ## Продать из сумки можно рядом с любым торгующим NPC.
-## Кнопки открытого окна для тестов (buttons): "cell_<i>", "equip_<слот>", "good_<id>", "sort", "act_equip",
-## "act_use", "act_form", "act_sell", "act_sell_all", "act_move", "act_move_cancel", "act_drop", "act_drop_yes", "act_drop_no",
-## "act_drop_minus", "act_drop_plus", "act_drop_all", "act_buy", "act_buy5".
+## Склад (у Кладовщика Тобина, Economy.open_storage): слева — ячейки склада (Game.storage), в центре — сумка, справа —
+## карточка: у вещи из сумки «На склад» / «На склад все», у вещи со склада «В сумку» / «В сумку все»; значок можно
+## перетащить из сумки на склад и обратно. Надетое оружие в ячейках сумки не лежит — на склад его не положить.
+## Кнопки открытого окна для тестов (buttons): "cell_<i>", "store_<i>", "equip_<слот>", "good_<id>", "sort",
+## "sort_store", "act_equip", "act_use", "act_form", "act_sell", "act_sell_all", "act_move", "act_move_cancel",
+## "act_drop", "act_drop_yes", "act_drop_no", "act_drop_minus", "act_drop_plus", "act_drop_all", "act_buy", "act_buy5",
+## "act_store", "act_store_all", "act_take", "act_take_all".
 
 ## Размеры — для «Среднего» размера интерфейса (умножаются на UiScale.k(); было окно 1240×680, ячейка 88).
 const WINDOW_SIZE := Vector2(1000, 580)
@@ -35,6 +39,10 @@ const SHOP_CARD_W := 290.0
 const BIG_ICON := 72.0
 ## Сколько штук покупается кнопкой «Купить ×N».
 const BUY_MANY := 5
+## Окно склада: ячейки склада и сумки (по COLS столбцов) и ширина карточки — поуже, чтобы две сетки поместились.
+const STORE_SIZE := Vector2(1040, 560)
+const STORE_CELL := 42.0
+const STORE_CARD_W := 240.0
 
 const GOLD := Color(1.0, 0.85, 0.3)
 const MUTED := Color(0.76, 0.78, 0.88)
@@ -54,12 +62,12 @@ const EQUIP_SLOTS := [
 
 var main: Node
 var economy: Node
-## Открытое окно: "" (закрыто), "bag" или "shop".
+## Открытое окно: "" (закрыто), "bag", "shop" или "storage" (склад).
 var mode := ""
 ## У кого открыта торговля (id NPC, NpcData).
 var seller := "merchant"
 ## Выбранное: sel_kind "cell" (ячейка сумки sel_index с предметом sel_id), "equip" (слот EQUIP_SLOTS[sel_index]),
-## "good" (товар sel_id), "" — ничего.
+## "good" (товар sel_id), "store" (ячейка склада sel_index с предметом sel_id), "" — ничего.
 var sel_kind := ""
 var sel_index := -1
 var sel_id := ""
@@ -81,7 +89,7 @@ func setup(m: Node, eco: Node) -> void:
 	economy = eco
 
 
-## Открыть окно kind ("bag" или "shop") заново, без выделения. who — продавец для "shop" ("" — прежний).
+## Открыть окно kind ("bag", "shop" или "storage") заново, без выделения. who — продавец для "shop" ("" — прежний).
 func open(kind: String, who: String = "") -> void:
 	mode = kind
 	if kind == "shop" and who != "":
@@ -128,6 +136,11 @@ func select_cell(i: int) -> void:
 	_on_cell("bag", i)
 
 
+## Выбрать ячейку склада (как касание; окно склада).
+func select_store(i: int) -> void:
+	_on_cell("store", i)
+
+
 ## Товары NPC who (NpcData.shop): продаётся (buy > 0), оружие — только подходящее классу героя class_id.
 static func goods(class_id: String, who: String = "merchant") -> Array:
 	var res: Array = []
@@ -148,7 +161,10 @@ func _build() -> void:
 	seen_gold = Game.gold
 	buttons.clear()
 	_validate_selection()
-	_body = main.hud.create_window("Сумка" if mode == "bag" else NpcData.shop_title(seller), WINDOW_SIZE)
+	var title := "Сумка" if mode == "bag" else NpcData.shop_title(seller)
+	if mode == "storage":
+		title = "Склад — %s" % NpcData.npc_name(Economy.STORAGE_NPC)
+	_body = main.hud.create_window(title, STORE_SIZE if mode == "storage" else WINDOW_SIZE)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", int(UiScale.px(10)))
 	_body.add_child(row)
@@ -169,6 +185,9 @@ func _build() -> void:
 	if mode == "shop":
 		_build_goods(left)
 		_build_bag(center, UiScale.px(SHOP_CELL))
+	elif mode == "storage":
+		_build_storage(left)
+		_build_bag(center, UiScale.px(STORE_CELL))
 	else:
 		_build_equipment(left)
 		_build_bag(center, UiScale.px(CELL))
@@ -177,14 +196,16 @@ func _build() -> void:
 
 ## Ширина карточки предмета (с масштабом интерфейса).
 func _card_w() -> float:
+	if mode == "storage":
+		return UiScale.px(STORE_CARD_W)
 	return UiScale.px(SHOP_CARD_W if mode == "shop" else CARD_W)
 
 
 ## Выделение после изменений: ячейка сумки следует за своим предметом (сортировка, продажа части стопки).
 func _validate_selection() -> void:
-	if sel_kind != "cell":
+	if sel_kind != "cell" and sel_kind != "store":
 		return
-	var inv: Inventory = Game.inventory
+	var inv: Inventory = Game.storage if sel_kind == "store" else Game.inventory
 	if String(inv.cell(sel_index).get("id", "")) == sel_id and sel_id != "":
 		return
 	var j := inv.find_cell(sel_id) if sel_id != "" else -1
@@ -218,6 +239,35 @@ func _build_goods(parent: VBoxContainer) -> void:
 		var b := _make_cell("good", i, id, str(price), UiScale.px(SHOP_CELL), sel_kind == "good" and sel_id == id)
 		grid.add_child(b)
 		buttons["good_" + id] = b
+
+
+## Склад (окно склада): «Склад», занятость «N/40», «Сортировать» и сетка ячеек Game.storage.
+func _build_storage(parent: VBoxContainer) -> void:
+	var st: Inventory = Game.storage
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", int(UiScale.px(10)))
+	parent.add_child(head)
+	var used := _label("На складе: %d/%d" % [st.used_cells(), Inventory.CAPACITY], UiScale.FONT_HEAD,
+		BAD if st.is_full() else MUTED)
+	used.name = "store_used_label"
+	used.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(used)
+	head.add_child(_button("Сортировать", "sort_store", _on_sort_store))
+	var grid := GridContainer.new()
+	grid.columns = COLS
+	grid.add_theme_constant_override("h_separation", int(UiScale.px(GAP)))
+	grid.add_theme_constant_override("v_separation", int(UiScale.px(GAP)))
+	parent.add_child(grid)
+	var list := st.cells()
+	var total := st.cell_count()
+	for i in total:
+		var c: Dictionary = list[i] if i < list.size() else {}
+		var id := String(c.get("id", ""))
+		var n := int(c.get("n", 0))
+		var b := _make_cell("store", i, id, str(n) if n > 1 else "", UiScale.px(STORE_CELL),
+			sel_kind == "store" and sel_index == i)
+		grid.add_child(b)
+		buttons["store_%d" % i] = b
 
 
 func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
@@ -258,6 +308,8 @@ func _make_cell(kind: String, index: int, id: String, corner: String, sz: float,
 	b.item_id = id
 	b.drop_fn = _on_drop
 	b.can_drop_fn = _can_drop
+	if mode == "storage":
+		b.take_fn = _on_take_drop
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(sz, sz)
 	b.name = "%s_%d" % [kind, index]
@@ -322,11 +374,15 @@ func _build_card(card: VBoxContainer) -> void:
 			_card_equip(card)
 		"good":
 			_card_good(card)
+		"store":
+			_card_store(card)
 		_:
 			card.add_child(_label("Предмет", UiScale.FONT_HEAD, GOLD))
 			var t := "Коснитесь предмета, чтобы увидеть описание и действия. Перетащите значок в другую ячейку, чтобы переложить."
 			if mode == "shop":
 				t = "Коснитесь товара слева, чтобы купить, или предмета в сумке, чтобы продать."
+			elif mode == "storage":
+				t = "Коснитесь вещи в сумке, чтобы положить её на склад, или вещи на складе, чтобы забрать. Значок можно перетащить. Надетое оружие на склад не кладётся."
 			card.add_child(_text(t, UiScale.FONT_TEXT, MUTED))
 
 
@@ -372,6 +428,12 @@ func _card_item(card: VBoxContainer) -> void:
 	var sub := "В ячейке: %d" % n if n > 1 else ""
 	_card_head(card, id, sub)
 	_card_body(card, id, Game.shield if ItemData.is_shield(id) else Game.weapon)
+	if mode == "storage":
+		var sa: Array = [["На склад", "act_store", _on_store.bind(false)]]
+		if n > 1:
+			sa.append(["На склад все", "act_store_all", _on_store.bind(true)])
+		card.add_child(_action_grid(sa))
+		return
 	var sell := int(ItemData.get_item(id).get("sell", 0))
 	if sell > 0:
 		var t := "Цена продажи: %d зол." % sell
@@ -443,6 +505,19 @@ func _card_equip(card: VBoxContainer) -> void:
 			UiScale.FONT_TEXT, MUTED))
 	else:
 		card.add_child(_text("Скоро: доспехи и украшения появятся вместе с экипировкой.", UiScale.FONT_TEXT, MUTED))
+
+
+## Карточка вещи на складе: «В сумку» / «В сумку все».
+func _card_store(card: VBoxContainer) -> void:
+	var c: Dictionary = Game.storage.cell(sel_index)
+	var id := sel_id
+	var n := int(c.get("n", 1))
+	_card_head(card, id, "На складе: %d" % n)
+	_card_body(card, id, "")
+	var acts: Array = [["В сумку", "act_take", _on_take.bind(false)]]
+	if n > 1:
+		acts.append(["В сумку все", "act_take_all", _on_take.bind(true)])
+	card.add_child(_action_grid(acts))
 
 
 func _card_good(card: VBoxContainer) -> void:
@@ -590,6 +665,14 @@ func _on_cell(kind: String, index: int) -> void:
 				sel_kind = "good"
 				sel_index = index
 				sel_id = String(list[index])
+		"store":
+			var sid := String(Game.storage.cell(index).get("id", ""))
+			if sid == "":
+				clear_selection()
+			else:
+				sel_kind = "store"
+				sel_index = index
+				sel_id = sid
 	refresh()
 
 
@@ -614,10 +697,24 @@ func _on_drop(kind: String, index: int, from: int) -> void:
 		_move_to(index)
 	elif kind == "equip" and index <= 1:
 		_equip_cell(from, index == 1)
+	elif kind == "store":
+		economy.deposit(from, -1)
+		clear_selection()
+	refresh()
+
+
+## Перетаскивание: ячейку склада from бросили на ячейку сумки — забрать стопку в сумку.
+func _on_take_drop(_index: int, from: int) -> void:
+	moving = false
+	drop_confirm = false
+	economy.withdraw(from, -1)
+	clear_selection()
 	refresh()
 
 
 func _can_drop(kind: String, index: int, from: int) -> bool:
+	if kind == "store":
+		return String(Game.inventory.cell(from).get("id", "")) != ""
 	if kind == "bag":
 		return index != from
 	if kind == "equip" and index <= 1:
@@ -683,6 +780,24 @@ func _on_use() -> void:
 ## «Сформировать»: существо из карты с душой — в коллекцию питомцев (Taming.form).
 func _on_form() -> void:
 	main.taming.form(sel_id)
+	refresh()
+
+
+## «На склад» (all — всю стопку).
+func _on_store(all: bool) -> void:
+	economy.deposit(sel_index, -1 if all else 1)
+	refresh()
+
+
+## «В сумку» со склада (all — всю стопку).
+func _on_take(all: bool) -> void:
+	economy.withdraw(sel_index, -1 if all else 1)
+	refresh()
+
+
+func _on_sort_store() -> void:
+	Game.storage.sort()
+	clear_selection()
 	refresh()
 
 
@@ -793,9 +908,10 @@ func _button(text: String, node_name: String, cb: Callable) -> Button:
 	return b
 
 
-## Ячейка-кнопка с перетаскиванием значка: из сумки — в другую ячейку или (оружие) в слот «Оружие».
+## Ячейка-кнопка с перетаскиванием значка: из сумки — в другую ячейку, (оружие) в слот «Оружие» или на склад;
+## со склада — в сумку.
 class Cell extends Button:
-	## "bag" (ячейка сумки), "equip" (слот экипировки), "good" (товар торговца).
+	## "bag" (ячейка сумки), "equip" (слот экипировки), "good" (товар торговца), "store" (ячейка склада).
 	var kind := ""
 	var index := -1
 	var item_id := ""
@@ -803,9 +919,11 @@ class Cell extends Button:
 	var drop_fn: Callable
 	## (kind: String, index: int, from: int) -> bool — можно ли бросить.
 	var can_drop_fn: Callable
+	## (index: int, from: int) — на эту ячейку сумки бросили ячейку склада from (окно склада).
+	var take_fn: Callable
 
 	func _get_drag_data(_at_position: Vector2) -> Variant:
-		if kind != "bag" or item_id == "":
+		if (kind != "bag" and kind != "store") or item_id == "":
 			return null
 		var holder := Control.new()
 		var ic := ItemIcon.make(item_id, size.x * 0.9)
@@ -818,18 +936,25 @@ class Cell extends Button:
 			set_drag_preview(holder)
 		else:
 			holder.free()
-		return {"inv_cell": index}
+		return {"store_cell": index} if kind == "store" else {"inv_cell": index}
 
 	func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
-		if not (data is Dictionary) or not can_drop_fn.is_valid():
+		if not (data is Dictionary):
 			return false
 		var d: Dictionary = data
-		if not d.has("inv_cell"):
+		if d.has("store_cell"):
+			return kind == "bag" and take_fn.is_valid()
+		if not can_drop_fn.is_valid() or not d.has("inv_cell"):
 			return false
 		return bool(can_drop_fn.call(kind, index, int(d["inv_cell"])))
 
 	func _drop_data(_at_position: Vector2, data: Variant) -> void:
-		if not (data is Dictionary) or not drop_fn.is_valid():
+		if not (data is Dictionary):
 			return
 		var d: Dictionary = data
-		drop_fn.call(kind, index, int(d.get("inv_cell", -1)))
+		if d.has("store_cell"):
+			if kind == "bag" and take_fn.is_valid():
+				take_fn.call(index, int(d["store_cell"]))
+			return
+		if drop_fn.is_valid():
+			drop_fn.call(kind, index, int(d.get("inv_cell", -1)))

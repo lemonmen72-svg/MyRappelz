@@ -291,14 +291,18 @@ func run_step() -> void:
 			check(not hud.is_button_visible("talk"), "вдали кнопки «Говорить» нет")
 			# Старое сохранение без заданий
 			game.from_dict({"name": "Старый", "race": "dark_elf", "class": "assassin", "level": 4, "gold": 30})
-			check(game.quests_active.is_empty() and game.quests_done.is_empty() and game.quest_tracked == "",
-				"старое сохранение: заданий нет")
+			check(game.quests_active.is_empty() and game.quest_tracked == "", "старое сохранение: взятых заданий нет")
+			# Наёмник старой версии: всё до профессии считается сделанным (староста, мудрец, охотница, доклад)
+			for id in QuestData.PRE_JOB:
+				check(q.is_done(String(id)), "старое сохранение с профессией: «%s» сдано" % QuestData.quest_name(String(id)))
+			check(q.is_done(QuestData.JOB_QUEST) and not q.is_done("kirk_first_card"), "профессия — задание на неё сдано, Кирк — нет")
 			npcs.refresh_marks()
 			check(kirk.mark_text() == "!", "старое сохранение: над Кирком «!»")
 			# Сохранение с неизвестным заданием и кривым прогрессом
-			game.from_dict({"name": "Х", "race": "dark_elf", "class": "assassin", "level": 2,
+			game.from_dict({"version": 2, "name": "Х", "race": "dark_elf", "class": "assassin", "level": 2,
 				"quests": {"active": {"no_such_quest": {"progress": [1]}, "kirk_soul": {"progress": [5.0, 3]}},
-					"done": {"kirk_first_card": 1.0, "nope": 2}, "tracked": "no_such_quest"}})
+					"done": {"kirk_first_card": 1.0, "nope": 2, "sage_town_tour": 1}, "tracked": "no_such_quest",
+					"chain": QuestData.CHAIN_VERSION}})
 			check(game.quests_active.size() == 1 and q.goal_progress("kirk_soul", 0) == 1 and
 				(game.quests_active["kirk_soul"]["progress"] as Array).size() == 1, "неизвестное задание отброшено")
 			check(game.quests_done.size() == 1 and q.times_done("kirk_first_card") == 1, "сданные: только известные")
@@ -310,22 +314,31 @@ func run_step() -> void:
 # ---------- Проверки ----------
 
 func _unit_data() -> void:
+	var race0: String = game.race_id
 	for k in QuestData.QUESTS:
 		var id := String(k)
-		var d: Dictionary = QuestData.QUESTS[k]
 		check(NpcData.has_npc(QuestData.giver(id)) and NpcData.has_npc(QuestData.turn_in(id)), "%s: NPC есть" % id)
-		for f in ["name", "desc", "offer", "progress", "done"]:
-			check(String(d.get(f, "")) != "", "%s: текст %s" % [id, f])
-		var prev := String(d.get("prev", ""))
-		check(prev == "" or QuestData.has_quest(prev), "%s: предыдущее задание есть" % id)
+		# Тексты — у каждой расы (у старост свои)
+		for r in ClassData.RACES:
+			game.race_id = String(r)
+			for f in QuestData.TEXT_FIELDS:
+				check(QuestData.text(id, String(f)) != "", "%s (%s): текст %s" % [id, r, f])
+		game.race_id = race0
+		for prev in QuestData.prereqs(id):
+			check(QuestData.has_quest(String(prev)), "%s: предыдущее задание %s есть" % [id, prev])
 		check(not QuestData.goals(id).is_empty(), "%s: есть цели" % id)
 		for g in QuestData.goals(id):
-			check(QuestData.GOAL_TYPES.has(String((g as Dictionary).get("type", ""))), "%s: вид цели" % id)
+			var gd: Dictionary = g
+			check(QuestData.GOAL_TYPES.has(String(gd.get("type", ""))), "%s: вид цели" % id)
+			var tg := String(gd.get("target", ""))
+			check(tg == "" or MobData.TYPES.has(tg), "%s: зверь цели %s" % [id, tg])
+			for it in gd.get("items", []):
+				check(not ItemData.get_item(String(it)).is_empty(), "%s: предмет цели %s" % [id, it])
 		for it in QuestData.reward_items(id):
 			check(not ItemData.get_item(String(it)).is_empty(), "%s: предмет награды %s" % [id, it])
-		# Опыт награды: заметно (30–70 % уровня, с которого задание доступно), но не ломает баланс
+		# Опыт награды: заметно (30–70 % уровня, под который подобрана награда), но не ломает баланс
 		var xp := int(QuestData.rewards(id).get("xp", 0))
-		var need: int = game.xp_to_next(int(d.get("level", 1)))
+		var need: int = game.xp_to_next(QuestData.xp_level(id))
 		check(xp >= need * 0.3 and xp <= need * 0.7, "%s: опыт %d — %d%% уровня" % [id, xp, roundi(100.0 * xp / need)])
 	var last := 0
 	for id in CHAIN:
@@ -340,6 +353,12 @@ func _unit_data() -> void:
 	check(QuestData.reward_text("kirk_soul").contains("Зеркальная карта ×1"), "награда строкой: " + QuestData.reward_text("kirk_soul"))
 	check(QuestData.goal_text({"type": "kill", "target": "wolf", "n": 3}) == "Победить зверей: Волк", "подпись цели kill")
 	check(QuestData.goal_text({"type": "level", "n": 5}) == "Достичь 5 уровня", "подпись цели level")
+	check(QuestData.goal_text({"type": "sell", "items": [], "npc": "merchant", "n": 3}) == "Продать вещи торговцу Гордею",
+		"подпись цели sell: " + QuestData.goal_text({"type": "sell", "items": [], "npc": "merchant", "n": 3}))
+	check(QuestData.goal_text({"type": "use", "items": ["hp_potion"], "n": 1}) == "Использовать: Зелье здоровья", "подпись цели use")
+	check(QuestData.goal_text({"type": "store", "n": 1}) == "Положить вещь на склад", "подпись цели store")
+	check(QuestData.prereqs("sage_to_hunter").size() == 3 and QuestData.prereqs("kirk_first_card").is_empty(),
+		"предыдущие задания: строка или список")
 	# Торговля: у Кирка карты существ, у торговца — нет
 	var kg := InventoryWindow.goods("assassin", "kirk")
 	check(kg == ["card_panther", "card_pheasant", "card_turtle", "mirror_card"], "товары Кирка: %s" % [kg])

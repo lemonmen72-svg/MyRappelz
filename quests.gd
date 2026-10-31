@@ -5,8 +5,11 @@ extends Node
 ## задание). Модуль принимает события игры и двигает прогресс целей:
 ##   убийство зверя (main._on_mob_gone → on_mob_killed: цели kill и pet_kill — если призван живой питомец),
 ##   душа поймана (Taming.soul_caught → tame), существо сформировано (Taming.formed → form),
-##   питомец призван (PetManager.summoned → summon), покупка у NPC (Economy.bought → buy),
-##   разговор с NPC (Npcs → on_talk → talk), сумка и уровень (Inventory.changed, Game.changed → collect, level).
+##   питомец призван (PetManager.summoned → summon), покупка у NPC (Economy.bought → buy), продажа NPC
+##   (Economy.sold → sell), выпито зелье (Economy.used → use), вещь положена на склад (Economy.stored → store),
+##   разговор с NPC (Npcs → on_talk → talk), сумка, уровень и умения (Inventory.changed, Game.changed → collect,
+##   level, skill). Квестовая добыча: пока цель collect с drop_from не выполнена, Economy кладёт её предмет
+##   в мешочек с каждого такого зверя (quest_loot).
 ## Сообщает на экране («Задание обновлено: Поймать душу 1/1», «… выполнено — вернитесь к Учителю Кирку»).
 ## Сдача (complete) — у NPC-сдающего: награды — опыт героя (Player.gain_xp: уровни и доля JP), золото, предметы
 ## (если не помещаются — «Освободите место в сумке», задание остаётся взятым), JP героя; предметы целей collect
@@ -46,6 +49,9 @@ func setup(m: Node) -> void:
 		main.pets.summoned.connect(on_summoned)
 	if main.get("economy") != null:
 		main.economy.bought.connect(on_bought)
+		main.economy.sold.connect(on_sold)
+		main.economy.used.connect(on_used)
+		main.economy.stored.connect(on_stored)
 	window = QuestWindow.new()
 	window.name = "QuestWindow"
 	add_child(window)
@@ -88,11 +94,13 @@ func accept_block(id: String) -> String:
 		return "Задание уже взято"
 	if int(Game.quests_done.get(id, 0)) > 0 and not bool(q.get("repeatable", false)):
 		return "Задание уже выполнено"
-	var prev := String(q.get("prev", ""))
-	if prev != "" and int(Game.quests_done.get(prev, 0)) <= 0:
-		return "Сначала выполните задание «%s»" % QuestData.quest_name(prev)
+	for p in QuestData.prereqs(id):
+		if not prereq_done(String(p)):
+			return "Сначала выполните задание «%s»" % QuestData.quest_name(String(p))
 	if bool(q.get("wanderer_only", false)) and not ClassData.is_wanderer(Game.class_id):
 		return "Профессия уже выбрана"
+	if bool(q.get("job_only", false)) and ClassData.is_wanderer(Game.class_id):
+		return "Сначала выберите профессию"
 	var lvl := int(q.get("level", 1))
 	if Game.level < lvl:
 		return "Задание доступно с %d уровня" % lvl
@@ -104,12 +112,22 @@ func level_locked(id: String) -> bool:
 	if state(id) != "locked":
 		return false
 	var q := QuestData.get_quest(id)
-	var prev := String(q.get("prev", ""))
-	if prev != "" and int(Game.quests_done.get(prev, 0)) <= 0:
-		return false
+	for p in QuestData.prereqs(id):
+		if not prereq_done(String(p)):
+			return false
 	if bool(q.get("wanderer_only", false)) and not ClassData.is_wanderer(Game.class_id):
 		return false
+	if bool(q.get("job_only", false)) and ClassData.is_wanderer(Game.class_id):
+		return false
 	return Game.level < int(q.get("level", 1))
+
+
+## Условие «сначала сдать задание id» выполнено. Задание на профессию засчитано и у героя, получившего профессию
+## иначе (админ-панель, автотесты, старые сохранения) — цепочка после профессии не застревает.
+func prereq_done(id: String) -> bool:
+	if is_done(id):
+		return true
+	return id == QuestData.JOB_QUEST and Game.job_changed and not ClassData.is_wanderer(Game.class_id)
 
 
 func is_active(id: String) -> bool:
@@ -218,6 +236,16 @@ func accept(id: String) -> bool:
 	if why != "":
 		_msg(why)
 		return false
+	# Выдать при взятии то, без чего задание не сделать (зелье для «выпей зелье»), если в сумке меньше
+	var given: Array = []
+	var give: Dictionary = QuestData.get_quest(id).get("give", {})
+	for k in give:
+		var gid := String(k)
+		var miss := int(give[k]) - Game.inventory.count(gid)
+		if miss > 0:
+			Game.inventory.add(gid, miss)
+			given.append("%s ×%d" % [ItemData.item_name(gid), miss])
+	var talking := _talking_to()
 	var goals := QuestData.goals(id)
 	var prog: Array = []
 	for gi in goals.size():
@@ -227,12 +255,17 @@ func accept(id: String) -> bool:
 			v = _state_value(g)
 		elif bool(g.get("counts_existing", false)):
 			v = _existing(g)
+		elif String(g.get("type", "")) == "talk" and talking != "" and QuestData.goal_npc(g) == talking:
+			# Задание взято в разговоре с тем, с кем нужно поговорить
+			v = 1
 		prog.append(mini(v, QuestData.goal_need(g)))
 	Game.quests_active[id] = {"progress": prog}
 	if Game.quest_tracked == "" or not Game.quests_active.has(Game.quest_tracked):
 		Game.quest_tracked = id
 	if is_ready(id):
 		_msg_ready(id)
+	elif not given.is_empty():
+		_msg("Новое задание: «%s». Получено: %s" % [QuestData.quest_name(id), ", ".join(PackedStringArray(given))])
 	else:
 		_msg("Новое задание: «%s»" % QuestData.quest_name(id))
 	_changed()
@@ -344,11 +377,38 @@ func on_summoned(species: String) -> void:
 
 ## Куплено n штук id у NPC seller.
 func on_bought(id: String, n: int, seller: String) -> void:
-	var fits := func(g: Dictionary) -> bool:
-		var npc := String(g.get("npc", ""))
-		var items: Array = g.get("items", [])
-		return items.has(id) and (npc == "" or npc == seller)
-	_event("buy", fits, n)
+	_event("buy", func(g: Dictionary) -> bool: return _trade_ok(g, id, seller), n)
+
+
+## Продано n штук id NPC buyer.
+func on_sold(id: String, n: int, buyer: String) -> void:
+	_event("sell", func(g: Dictionary) -> bool: return _trade_ok(g, id, buyer), n)
+
+
+## Использован предмет id (выпито зелье).
+func on_used(id: String) -> void:
+	_event("use", func(g: Dictionary) -> bool: return _item_ok(g, id))
+
+
+## На склад положено n штук id.
+func on_stored(id: String, n: int) -> void:
+	_event("store", func(g: Dictionary) -> bool: return _item_ok(g, id), n)
+
+
+## Квестовая добыча со зверя вида species: {id: 1} для каждой невыполненной цели collect с drop_from == species
+## (первый предмет цели; Economy кладёт его в мешочек, если обычный бросок его не дал).
+func quest_loot(species: String) -> Dictionary:
+	var res: Dictionary = {}
+	for k in Game.quests_active.keys():
+		for g in QuestData.goals(String(k)):
+			var gd: Dictionary = g
+			if String(gd.get("type", "")) != "collect" or String(gd.get("drop_from", "")) != species:
+				continue
+			var items: Array = gd.get("items", [])
+			if items.is_empty() or _state_value(gd) >= QuestData.goal_need(gd):
+				continue
+			res[String(items[0])] = 1
+	return res
 
 
 ## Разговор с NPC npc_id (открыт диалог).
@@ -556,7 +616,25 @@ func _state_value(g: Dictionary) -> int:
 			return n
 		"level":
 			return Game.level
+		"skill":
+			return learned_skills()
 	return 0
+
+
+## Сколько умений профессии герой изучил сам (стартовые бесплатные умения 1-го уровня не в счёт).
+static func learned_skills() -> int:
+	var n := 0
+	var src: Variant = Game.hero.get("skills", {})
+	if not (src is Dictionary):
+		return 0
+	var d: Dictionary = src
+	for k in d:
+		var lv := int(d[k])
+		if bool(HeroSkills.get_skill(String(k), Game.class_id).get("start", false)):
+			lv -= 1
+		if lv > 0:
+			n += 1
+	return n
 
 
 ## Сколько уже сделано до взятия (counts_existing): tame — карты с душой вида в сумке и существа вида
@@ -595,6 +673,31 @@ func _existing(g: Dictionary) -> int:
 static func _species_ok(g: Dictionary, species: String) -> bool:
 	var t := String(g.get("target", ""))
 	return t == "" or t == species
+
+
+## Предмет подходит цели: items пусто — любой.
+static func _item_ok(g: Dictionary, id: String) -> bool:
+	var items: Array = g.get("items", [])
+	return items.is_empty() or items.has(id)
+
+
+## Покупка или продажа подходит цели: предмет (items пусто — любой) и NPC (npc "" — любой).
+static func _trade_ok(g: Dictionary, id: String, who: String) -> bool:
+	var npc := String(g.get("npc", ""))
+	return _item_ok(g, id) and (npc == "" or npc == who)
+
+
+## С кем сейчас открыт разговор ("" — ни с кем).
+func _talking_to() -> String:
+	if main == null:
+		return ""
+	var n: Node = main.get("npcs")
+	if n == null:
+		return ""
+	var npcs := n as Npcs
+	if npcs == null or not npcs.is_dialog_open():
+		return ""
+	return npcs.dialog_npc
 
 
 ## Призван живой питомец.
