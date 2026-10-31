@@ -6,7 +6,7 @@ type="PackedScene"
 
 [deps]
 
-source_file="res://assets/characters/hero_dark_elf_m.glb"
+source_file="res://assets/characters/hero_swordsman_m.glb"
 
 [params]
 

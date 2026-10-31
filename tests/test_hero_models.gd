@@ -5,10 +5,10 @@ extends "res://tests/test_base.gd"
 ## шаг и бег включаются по скорости, поза покоя по костям — голова наверху, стопы у земли, кисти не выше головы.
 
 const HEROES := [
-	"res://assets/characters/hero_dark_elf_m.glb",
-	"res://assets/characters/hero_light_elf_f.glb",
-	"res://assets/characters/hero_human_m.glb",
-	"res://assets/characters/hero_light_elf_m.glb",
+	"res://assets/characters/hero_assassin_m.glb",
+	"res://assets/characters/hero_swordsman_f.glb",
+	"res://assets/characters/hero_warrior_m.glb",
+	"res://assets/characters/hero_swordsman_m.glb",
 ]
 ## Клипы героя (имена в нижнем регистре): перенесённые из Quaternius UAL — как у героини, плюс шаг, бег и взмах рукой.
 const CLIPS := ["idle", "walking", "running", "wave", "sword_idle", "sword_slash", "sword_attack", "sword_combo",

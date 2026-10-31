@@ -36,9 +36,10 @@
 
 Новый герой: модель Meshy с авто-ригом в T-позе (персонаж, «Rig» без анимаций), затем из корня репозитория:
   python3 -I tools/prepare_hero.py --ual1 <UAL1_Standard.glb> --ual2 <UAL2_Standard.glb> \\
-      hero_dark_elf_f=<файл.glb> [hero_human_f=<…> …] [--preview <папка>] [--height 1.75]
-  id: hero_<раса>_<пол>[_starter] (пол m/f задаёт рост), npc_<id> для жителей. Повторный запуск перезаписывает GLB,
-  PNG и JSON. --preview — картинки-проверки (поза покоя и кадры клипов, оружие линиями) для просмотра глазами.
+      hero_assassin_f=<файл.glb> [hero_warrior_f=<…> …] [--preview <папка>] [--height 1.75]
+  Слева от «=» — имя выходного файла (без расширения): hero_<профессия>_<пол> (модель в экипировке воинской профессии
+  своей расы), hero_<раса>_<пол>_starter (Бродяга), npc_<id> для жителей; пол m/f в конце имени задаёт рост.
+  Повторный запуск перезаписывает GLB, PNG и JSON. --preview — картинки-проверки (поза покоя и кадры клипов, оружие линиями) для просмотра глазами.
 UAL: https://quaternius.itch.io/universal-animation-library и …-library-2 → «…[Standard].zip»,
   файлы Unreal-Godot/UAL1_Standard.glb и UAL2_Standard.glb (без _RM).
 Зависимости: numpy, Pillow, meshoptimizer (как у prepare_creatures.py). Входные GLB — чужие данные: Python с -I.
@@ -614,7 +615,7 @@ def write_preview(out: str, cid: str, rt, rig, mesh: dict, tex, clips: list, gr:
 
 def main() -> None:
 	ap = argparse.ArgumentParser(description="Герой из Meshy (авто-риг, T-поза) → игровая модель с клипами UAL")
-	ap.add_argument("sources", nargs="+", help="id=путь к GLB из Meshy (hero_<раса>_<m|f>[_starter], npc_<id>)")
+	ap.add_argument("sources", nargs="+", help="имя=путь к GLB из Meshy; имя — выходной файл: hero_<профессия>_<m|f>, hero_<раса>_<m|f>_starter, npc_<id>")
 	ap.add_argument("--ual1", required=True, help="UAL1_Standard.glb (Quaternius)")
 	ap.add_argument("--ual2", required=True, help="UAL2_Standard.glb (Quaternius)")
 	ap.add_argument("--out", default=os.path.join(ROOT, "assets", "characters"), help="куда писать")

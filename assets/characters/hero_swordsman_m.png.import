@@ -5,7 +5,7 @@ type="CompressedTexture2D"
 
 [deps]
 
-source_file="res://assets/characters/hero_light_elf_m.png"
+source_file="res://assets/characters/hero_swordsman_m.png"
 
 [params]
 

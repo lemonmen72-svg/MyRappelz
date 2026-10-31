@@ -15,9 +15,9 @@ const SHOWCASE_SKILLS := [
 
 var _create: Node = null
 ## Герои в ряд (кадр 86): прежняя героиня и герои из Meshy (tools/prepare_hero.py).
-const HERO_ROW := ["res://assets/characters/dark_elf_wanderer.glb", "res://assets/characters/hero_dark_elf_m.glb",
-	"res://assets/characters/hero_light_elf_f.glb", "res://assets/characters/hero_human_m.glb",
-	"res://assets/characters/hero_light_elf_m.glb"]
+const HERO_ROW := ["res://assets/characters/dark_elf_wanderer.glb", "res://assets/characters/hero_assassin_m.glb",
+	"res://assets/characters/hero_swordsman_f.glb", "res://assets/characters/hero_warrior_m.glb",
+	"res://assets/characters/hero_swordsman_m.glb"]
 var _heroes: Node3D = null
 var _top: Camera3D = null
 var _row: Node3D = null

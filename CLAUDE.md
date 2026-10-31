@@ -109,10 +109,12 @@
   hand_l, hips, root, foot_*, руки, ноги, пальцы), хват оружия в пространстве кисти (`grip_r`/`grip_l`: pos, dir),
   поворот арбалета `crossbow_rot`, метка лица `face`, клипы. `CharacterModel.asset_rig(путь)` читает его, кости для
   оружия и меток берутся по ролям; нет `.json` — по именам Mixamo и `GRIP_*` (прежняя героиня). `.json` попадают в APK
-  (`include_filter` в `export_presets.cfg`). Готовы `hero_dark_elf_m`, `hero_light_elf_f`, `hero_human_m`,
-  `hero_light_elf_m` (по эскизам Максима). Следующий герой (`hero_dark_elf_f` — замена героини, `hero_human_f`, версии
-  Бродяги `…_starter`, жители `npc_<id>`): GLB Meshy (персонаж + Rig, T-поза, без анимаций), затем
-  `python3 -I tools/prepare_hero.py --ual1 <UAL1_Standard.glb> --ual2 <UAL2_Standard.glb> hero_dark_elf_f=<файл.glb>`
+  (`include_filter` в `export_presets.cfg`). Имена файлов (решение Максима): модель в экипировке — для воинской
+  профессии своей расы, `hero_<профессия>_<пол>.glb`; Бродяга — `hero_<раса>_<пол>_starter.glb`. Готовы (по эскизам
+  Максима) `hero_assassin_m` (тёмный эльф, Наёмник), `hero_swordsman_f` и `hero_swordsman_m` (светлые эльфы, Мечник),
+  `hero_warrior_m` (человек, Воин). Следующий герой (другие профессии, версии Бродяги `…_starter`, жители `npc_<id>`):
+  GLB Meshy (персонаж + Rig, T-поза, без анимаций), затем — имя выходного файла слева от «=»:
+  `python3 -I tools/prepare_hero.py --ual1 <UAL1_Standard.glb> --ual2 <UAL2_Standard.glb> hero_assassin_f=<файл.glb>`
   (`--preview <папка>` — картинки-проверки: поза покоя и кадры клипов, оружие линиями). Тест `tests/test_hero_models.gd`
   (добавить новый файл в `HEROES`), кадр 86 в `tests/shots.gd`.
 - Звери из файлов: `assets/creatures/<id>.glb` + `<id>.png` (пантера `panther`, черепаха `turtle`, фазан `pheasant`,
