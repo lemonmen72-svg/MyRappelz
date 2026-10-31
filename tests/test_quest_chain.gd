@@ -448,7 +448,7 @@ func _hunter(first: bool) -> void:
 	order.reverse()
 	for k in order:
 		check(q.state("hunter_bosses_done") == "locked", "«Победа над вожаками» ещё закрыта")
-		var mirrors := game.inventory.count("mirror_card")
+		var mirrors: int = game.inventory.count("mirror_card")
 		check(q.complete(String(k)), "сдано: %s" % k)
 		var items := QuestData.reward_items(String(k))
 		check(game.inventory.count("mirror_card") == mirrors + int(items.get("mirror_card", 0)), "зеркальные карты за вожака")
