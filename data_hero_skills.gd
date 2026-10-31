@@ -308,8 +308,11 @@ const STATUS_NAMES := {
 ## Пассивные (kind "passive") и переключаемые ("toggle"): bonus — {ключ: массив по уровням}, ключи BONUS_NAMES
 ##   (у Player.recalc_stats: атака/защита/HP/MP в долях и числах, уклонение, крит, скорость, блок, перезарядка,
 ##   7 статов "str"…"luck" — прибавка к статам до формул); у переключаемых ещё mp (включение) и upkeep
-##   (MP за UPKEEP_PERIOD с); aura — "both" (герою и питомцу) / "pet" (только питомцу, герою бонус не идёт;
-##   питомцу — этап 2: PetManager читает HeroSkills.pet_aura_bonuses); group — одно умение группы за раз.
+##   (MP за UPKEEP_PERIOD с); aura — "both" (герою и питомцу) / "pet" (только питомцу, герою бонус не идёт; у
+##   пассивок питомца — тоже "pet"): питомцу — PetBond (HeroSkills.pet_aura_bonuses → Pet._apply_stats, значок
+##   "hero:<id>" у полоски HP питомца; ключи питомца — PetBond.BONUS_KEYS: pet_stats, pet_xp, pet_regen, threat,
+##   pet_light, mdef_pct; герою — pass_dmg «Общая боль», life_thread «Нить жизни»); group — одно умение группы за
+##   раз; bond — "merge" / "form": связь с питомцем (PetBond.set_mode, нужен призванный питомец рядом).
 ## Активные (kind "active"): use — как выбирается цель: "melee" (удар оружием по цели рядом), "ranged" (снаряд
 ##   оружия), "magic" (заклинание по цели до range м; proj = true — летит сгусток, эффекты при попадании),
 ##   "near" (цель в radius м), "self" (без цели), "pet" (призванный питомец); anim — "attack" | "cast" | "bash" |
@@ -322,8 +325,9 @@ const STATUS_NAMES := {
 ##   {"do": "dot", "mult", "flat", "time", "no_regen"} — урон в секунду;
 ##   {"do": "knock", "dist"} — отбросить;
 ##   {"do": "buff", "who": "self" | "pet" | "both", "time", "bonus": {ключ: массив}} — усиление на время
-##     (значок у полоски HP, Player.timed_bonus; питомцу — этап 2);
-##   {"do": "special", "handler": "<имя>"} — особая механика: метод sp_<имя>(sid, n, target, e) в HeroSkillFx.
+##     (значок у полоски HP, Player.timed_bonus; питомцу — Pet.apply_hero_buff, значок "hero_buff:<id>");
+##   {"do": "special", "handler": "<имя>", …числа} — особая механика: sp_<имя> в HeroSkillFx или special() файла
+##     профессии (HeroSkillFx.JOB_FX_FILES; общие питомцевые — PetBond через job_fx_beastmaster.gd).
 ##   Числа эффектов — массивы по уровням умения (или одно число).
 ## Наёмник (SKILLS выше) — прежний формат активных (target, mult, flat, hits, crit, heal, sleep, fear, knock, root,
 ##   dot, buff), его применяет Player._cast_hero.
@@ -507,7 +511,7 @@ static func kind_name(id: String) -> String:
 		"both":
 			t += " (аура: герой и питомец)"
 		"pet":
-			t += " (аура питомца)"
+			t += " (питомцу)" if kind(id) == "passive" else " (аура питомца)"
 	return t
 
 
@@ -752,7 +756,7 @@ static func bonuses(rec: Dictionary, class_id: String, weapon_kind: String, shie
 	return _sum_bonuses(rec, class_id, weapon_kind, shield, false)
 
 
-## Бонусы питомцу от аур героя (aura "both" и "pet") — для этапа 2 (PetManager / Pet).
+## Бонусы питомцу от аур и пассивок героя (aura "both" и "pet") — их применяет PetBond (Pet._apply_stats).
 static func pet_aura_bonuses(rec: Dictionary, class_id: String, weapon_kind: String, shield: bool = false) -> Dictionary:
 	return _sum_bonuses(rec, class_id, weapon_kind, shield, true)
 
@@ -805,6 +809,9 @@ static func _num(v: float) -> String:
 
 
 static func bonus_text(key: String, v: float) -> String:
+	# Бонусы питомцу и связи с ним («Наставник зверя», «Общая боль»…) — тексты PetBond
+	if PetBond.BONUS_KEYS.has(key):
+		return PetBond.bonus_text(key, v)
 	var sg := "+" if v >= 0.0 else "−"
 	match key:
 		"eva", "crit", "atk_pct", "hp_pct", "speed_pct", "aspd", "basic_pct", "def_pct", "matk_pct", "mp_pct", "block", "cast":

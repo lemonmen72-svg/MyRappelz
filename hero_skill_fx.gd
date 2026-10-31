@@ -26,6 +26,9 @@ const ANIMS := ["attack", "cast", "bash", "spin", "buff", "dash"]
 const JOB_FX_FILES := [
 	"res://job_fx_warrior.gd",
 	"res://job_fx_shaman.gd",
+	"res://job_fx_beastmaster.gd",
+	"res://job_fx_adept.gd",
+	"res://job_fx_conjurer.gd",
 ]
 
 var p: Player
@@ -165,7 +168,7 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 					p.add_timed_bonus(sid, sec, bonus)
 				if buff_who == "pet" or buff_who == "both":
 					var pet := p._active_pet()
-					# Питомец: усиления от героя — этап 2 (метод apply_hero_buff у Pet)
+					# Питомец: усиления от героя (Pet.apply_hero_buff — PetBond: показатели питомца, значок у его полоски HP)
 					if pet != null and pet.has_method("apply_hero_buff"):
 						pet.call("apply_hero_buff", sid, sec, bonus)
 			"special":

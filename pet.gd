@@ -176,6 +176,7 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if is_instance_valid(owner_node):
 		owner_node.clear_pet_aura(self)
+		PetBond.pet_gone(self)
 
 
 ## Атаковать заданного зверя (команда «Атакуй»).
@@ -219,6 +220,9 @@ func _physics_process(delta: float) -> void:
 		_pending_left -= delta
 		if _pending_left <= 0.0:
 			_land_attack()
+	# Связь с героем (PetBond): усиления, слияние, облик, «Гнев духов» — кадр может быть занят ею
+	if _tick_bond(delta):
+		return
 
 	var to_o := owner_node.global_position - global_position
 	to_o.y = 0.0
@@ -377,7 +381,7 @@ func _do_attack(t: Mob) -> void:
 		_miss_text(t)
 		_bump()
 		return
-	var dmg := _roll(1.0)
+	var dmg := PetBond.pet_basic_hit(self, t, _roll(1.0))
 	match role:
 		"mage":
 			_shoot(t, dmg, fx)
@@ -637,6 +641,7 @@ func _update_aura() -> void:
 	if not is_instance_valid(owner_node):
 		return
 	_sync_toggle_effects()
+	PetBond.sync_aura_icons(self)
 	if is_down:
 		owner_node.clear_pet_aura(self)
 		return
@@ -899,7 +904,8 @@ func _area_fx(center: Vector3, radius: float, c: Color) -> void:
 # ---------- Здоровье, опыт ----------
 
 func take_damage(amount: int, attacker: Node3D) -> void:
-	if is_down:
+	# В слиянии или облике героя (PetBond) питомца в мире нет — урон не проходит
+	if is_down or bond_mode != "":
 		return
 	# Уклонение — только от ударов зверей (урон без источника не уклоняется)
 	if attacker != null and randf() * 100.0 < evasion:
@@ -909,11 +915,15 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 	# Удар зверя уже прошёл через защиту питомца (Combat.damage у зверя); прочий урон — по-старому
 	if not (attacker is Mob):
 		amount = maxi(1, amount - int(defense * 0.5))
+	amount = PetBond.pet_incoming(self, amount)
 	hp -= amount
 	_calm = 0.0
 	Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.5, 0), str(amount), Color(1, 0.5, 0.3))
 	Vfx.hit_spark(get_parent(), global_position + Vector3(0, _height * 0.55, 0), Color(1.0, 0.55, 0.4), 0.7)
 	if hp <= 0:
+		# «Нить жизни» героя поднимает питомца
+		if PetBond.save_from_death(self):
+			return
 		hp = 0
 		_die()
 		return
@@ -993,6 +1003,7 @@ func _die() -> void:
 	visible = false
 	remove_from_group("pets")
 	_update_aura()
+	PetBond.pet_died(self)
 	if is_inside_tree():
 		Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.5, 0), "Погиб", Color(1, 0.4, 0.4))
 		Vfx.death_puff(get_parent(), global_position + Vector3(0, _height * 0.4, 0), maxf(_scale, 0.7))
@@ -1016,7 +1027,10 @@ func _regen(delta: float) -> void:
 
 
 func _apply_stats() -> void:
-	var s := PetData.stats_for(species, level, skills, toggles)
+	# Бонусы от героя (ауры, пассивки и усиления «питомцевых» профессий — PetBond): статы — в формулы, остальное поверх
+	var hb := PetBond.pet_bonuses(self)
+	var s := PetStats.derived(species, level, skills, toggles, PetBond.stat_extra(hb))
+	PetBond.apply_to_pet(self, s, hb)
 	stats = s
 	max_hp = int(s["max_hp"])
 	max_mp = int(s["max_mp"])
@@ -1196,6 +1210,156 @@ func _flash() -> void:
 func _update_label() -> void:
 	if _label != null:
 		_label.text = "%s  Ур.%d\n%d/%d" % [pet_name, level, hp, max_hp]
+
+
+# ---------- Связь с героем (PetBond: ауры, усиления, «Нить жизни», жертвы, слияние и облик — этап 2) ----------
+
+## Усиления от умений героя {id умения: {"left": с, "bonus": {ключ HeroSkills.BONUS_NAMES: число}}} (apply_hero_buff);
+## особые ключи: spirit_dps — «сырой» урон силой духов в секунду зверям в spirit_r м вокруг питомца, hold — стоит.
+var hero_buffs: Dictionary = {}
+## Значки эффектов от героя со своим таймером {id эффекта: осталось, с} (лечение со временем, перезарядка «Нити»).
+var hero_fx: Dictionary = {}
+## Связь с героем: "" — обычный питомец, "merge" — «Слияние душ» (внутри героя), "form" — «Звериный облик».
+var bond_mode := ""
+## Урон по питомцу ниже на эту долю («Оберег», «Гнев стаи»…); доля обычного удара — добавочный урон светом.
+var bond_guard := 0.0
+var bond_light := 0.0
+## Хэш бонусов героя, из которых посчитаны характеристики (пересчёт — только при смене).
+var bond_hash := 0
+## «Нить жизни» перезаряжается, с.
+var life_thread_cd := 0.0
+var _spirit_acc := 0.0
+
+
+## Усиление от умения героя sid на sec секунд: bonus — {ключ: число} (атака, крит, скорость атаки, защита…).
+## Значок "hero_buff:<sid>" у полоски HP питомца. Повтор продлевает.
+func apply_hero_buff(sid: String, sec: float, bonus: Dictionary) -> void:
+	if is_down or sec <= 0.0:
+		return
+	hero_buffs[sid] = {"left": sec, "bonus": bonus.duplicate()}
+	effects.add("hero_buff:" + sid, sec, StatusEffects.effect_info("buff", StatusEffects.source_hero_skill(sid)))
+	refresh_skills()
+	if is_inside_tree():
+		var c: Color = HeroSkills.get_skill(sid).get("color", Color(1.0, 0.85, 0.4))
+		Vfx.magic_burst(get_parent(), global_position + Vector3(0, _height * 0.6, 0), c, 1.1 * maxf(_scale, 0.8), 0.35)
+
+
+## Значок эффекта id от героя на sec секунд (info — StatusEffects.effect_info): лечение со временем и т. п.
+func hero_effect(id: String, sec: float, info: Dictionary) -> void:
+	if is_down or sec <= 0.0:
+		return
+	hero_fx[id] = maxf(sec, float(hero_fx.get(id, 0.0)))
+	effects.add(id, sec, info)
+
+
+## Бонусы героя могли смениться (ауры, пассивки, оружие): пересчитать, если правда сменились; значки аур — всегда.
+func refresh_hero_bonuses() -> void:
+	if PetBond.pet_bonuses(self).hash() != bond_hash:
+		refresh_skills()
+	else:
+		PetBond.sync_aura_icons(self)
+
+
+## HP изменилось умением героя (жертва частью HP, «Нить жизни»): запись, подпись, HUD.
+func bond_hp_changed() -> void:
+	hp = clampi(hp, 0, max_hp)
+	_write_record()
+	_update_label()
+	stats_changed.emit()
+
+
+## Питомец жертвует собой ради героя (PetBond.sacrifice): погибает, нужно воскрешение.
+func bond_sacrifice() -> void:
+	if is_down:
+		return
+	hp = 0
+	_die()
+
+
+## Подпись над питомцем (в «Зверином облике» скрыта: это герой).
+func set_label_visible(on: bool) -> void:
+	if _label != null:
+		_label.visible = on
+
+
+## Снять ослабления (значки-дебафы, кроме перезарядки «Нити жизни»). Возвращает, сколько снято.
+func cleanse_debuffs() -> int:
+	var ids: Array[String] = []
+	for e in effects.entries():
+		var id := String(e["id"])
+		if bool(e.get("debuff", false)) and not id.begins_with("hero_cd:"):
+			ids.append(id)
+	for id in ids:
+		effects.remove(id)
+		hero_fx.erase(id)
+	return ids.size()
+
+
+## Таймеры связи и её поведение. true — кадр занят (слияние, облик, стойка «Гнева духов»): обычный ИИ не работает.
+func _tick_bond(delta: float) -> bool:
+	life_thread_cd = maxf(0.0, life_thread_cd - delta)
+	if not hero_fx.is_empty():
+		for id in hero_fx.keys():
+			var left := float(hero_fx[id]) - delta
+			effects.sync(String(id), left)
+			if left <= 0.0:
+				hero_fx.erase(id)
+			else:
+				hero_fx[id] = left
+	var spirit_dps := 0.0
+	var spirit_r := 0.0
+	var hold := false
+	if not hero_buffs.is_empty():
+		var expired := false
+		for id in hero_buffs.keys():
+			var e: Dictionary = hero_buffs[id]
+			e["left"] = float(e["left"]) - delta
+			effects.sync("hero_buff:" + String(id), float(e["left"]))
+			if float(e["left"]) <= 0.0:
+				hero_buffs.erase(id)
+				expired = true
+				continue
+			var b: Dictionary = e["bonus"]
+			spirit_dps += float(b.get("spirit_dps", 0.0))
+			spirit_r = maxf(spirit_r, float(b.get("spirit_r", 0.0)))
+			hold = hold or float(b.get("hold", 0.0)) > 0.0
+		if expired:
+			refresh_skills()
+	if PetBond.tick_pet(self, delta):
+		return true
+	if spirit_dps > 0.0:
+		_spirit_acc += delta
+		if _spirit_acc >= PetBond.SPIRIT_TICK:
+			_spirit_acc -= PetBond.SPIRIT_TICK
+			_spirit_pulse(spirit_dps * PetBond.SPIRIT_TICK, maxf(spirit_r, 3.0))
+	else:
+		_spirit_acc = 0.0
+	if not hold:
+		return false
+	# Стойка: питомец стоит на месте и бьёт тех, кто подошёл
+	velocity.x = 0.0
+	velocity.z = 0.0
+	velocity.y = -1.0 if is_on_floor() else velocity.y - 25.0 * delta
+	move_and_slide()
+	_pick_target()
+	if target != null and attack_cd <= 0.0 and _cast_left <= 0.0:
+		var reach := attack_range + 0.35 * target.body_scale
+		if global_position.distance_to(target.global_position) <= reach + 0.3:
+			attack_cd = attack_time
+			_attack(target)
+	return true
+
+
+## «Гнев духов»: урон силой духов (как магия героя: Combat, маг. защита зверя) всем зверям вокруг питомца.
+func _spirit_pulse(raw: float, r: float) -> void:
+	if not is_inside_tree() or not is_instance_valid(owner_node):
+		return
+	var c := Color(0.95, 0.75, 0.35)
+	CreatureModels.spawn_ring(get_parent(), global_position, r, c, 0.4)
+	for m in _mobs_near(global_position, r):
+		var d := Combat.damage(raw, float(owner_node.cur_matk()), float(m.mdef), Game.level, m.level)
+		Vfx.hit_spark(get_parent(), m.mid_point(), c, 0.8)
+		m.take_damage(d, self, false, true)
 
 
 ## Снаряд мага или лекаря: летит в цель и наносит урон при попадании.
