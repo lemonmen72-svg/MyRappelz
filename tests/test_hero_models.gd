@@ -9,6 +9,14 @@ const HEROES := [
 	"res://assets/characters/hero_swordsman_f.glb",
 	"res://assets/characters/hero_warrior_m.glb",
 	"res://assets/characters/hero_swordsman_m.glb",
+	"res://assets/characters/hero_assassin_f.glb",
+	"res://assets/characters/hero_warrior_f.glb",
+	"res://assets/characters/hero_human_m_starter.glb",
+	"res://assets/characters/hero_human_f_starter.glb",
+	"res://assets/characters/hero_dark_elf_m_starter.glb",
+	"res://assets/characters/hero_dark_elf_f_starter.glb",
+	"res://assets/characters/hero_light_elf_m_starter.glb",
+	"res://assets/characters/hero_light_elf_f_starter.glb",
 ]
 ## Клипы героя (имена в нижнем регистре): перенесённые из Quaternius UAL — как у героини, плюс шаг, бег и взмах рукой.
 const CLIPS := ["idle", "walking", "running", "wave", "sword_idle", "sword_slash", "sword_attack", "sword_combo",
@@ -52,7 +60,7 @@ func run_step() -> void:
 				var p := String(HEROES[i])
 				check(ResourceLoader.exists(p), "%s: файл есть" % p)
 				var w := "crossbow" if i == 3 else "dual_swords"
-				models.append(_spawn(p, w, -5.0 + 2.5 * float(i)))
+				models.append(_spawn(p, w, -5.0 + 2.0 * float(i)))
 			for i in models.size():
 				_check_model(models[i], String(HEROES[i]))
 			for m in models:
@@ -156,7 +164,8 @@ func _check_model(m: CharacterModel, who: String) -> void:
 		var p := CharacterModel._rig_vec(g, "pos", Vector3(9, 9, 9))
 		check(absf(d.length() - 1.0) < 0.01 and p.length() < 0.15, "%s: хват %s (%s, %s)" % [who, k, p, d])
 	# Рост и бюджет меша
-	var female := who.get_file().get_basename().ends_with("_f")
+	# Пол — в конце имени (у Бродяги перед «_starter»): hero_warrior_f, hero_human_f_starter
+	var female := who.get_file().get_basename().trim_suffix("_starter").ends_with("_f")
 	var lo := 1.65 if female else 1.75
 	var hi := 1.75 if female else 1.85
 	var tris := 0

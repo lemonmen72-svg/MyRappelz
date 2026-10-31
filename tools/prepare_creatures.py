@@ -3436,16 +3436,26 @@ def biped_yaw(src: dict) -> float:
 	return -math.pi * 0.5 if d[0] > 0 else math.pi * 0.5
 
 
-def biped_roles(names: list, parent: np.ndarray, gpos: np.ndarray, height: float) -> dict:
-	"""Роли костей гуманоида Meshy (морда в +Z, X — влево): ноги — две ветки у земли; таз — их общий родитель;
-	путь к макушке — позвоночник, грудь — первая кость на нём с двумя боковыми ветками (руки), дальше шея и голова
-	(последняя кость пути — макушка HeadEnd, перед ней — Head). Рука: ключица, плечо, предплечье, кисть, дальше концы."""
-	B = len(parent)
+def _single_chain(ch: list, b: int) -> list:
+	"""Цепочка от b вниз, пока у кости ровно один ребёнок."""
+	c = [b]
+	while len(ch[c[-1]]) == 1:
+		c.append(ch[c[-1]][0])
+	return c
+
+
+def biped_arm_like(ch: list, gpos: np.ndarray, b: int, x0: float, height: float) -> bool:
+	"""Ветка похожа на руку: цепочка без развилок не короче 4 костей (ключица, плечо, предплечье, кисть) и
+	уходит в сторону от оси тела дальше 0.12 роста. Короткие боковые ветки груди (грудь у женских ригов Meshy,
+	ремни, подвески) рукой не считаются."""
+	if len(_single_chain(ch, b)) < 4:
+		return False
+	return float(np.abs(gpos[subtree(ch, b), 0] - x0).max()) >= 0.12 * height
+
+
+def _biped_axis(parent: np.ndarray, gpos: np.ndarray, height: float) -> tuple:
+	"""Ноги, таз, кости ног и путь от корня к макушке (самой высокой кости тела)."""
 	ch = children_of(parent)
-	roots = [b for b in range(B) if parent[b] < 0]
-	if len(roots) != 1:
-		raise ValueError("ждём один корень скелета, найдено %d" % len(roots))
-	root = roots[0]
 	legs = biped_leg_chains(parent, gpos, 0.0, height)
 	pelvis = int(parent[legs["L"][0]])
 	if int(parent[legs["R"][0]]) != pelvis:
@@ -3453,31 +3463,78 @@ def biped_roles(names: list, parent: np.ndarray, gpos: np.ndarray, height: float
 	leg_set = set()
 	for c in legs.values():
 		leg_set.update(subtree(ch, c[0]))
-	body = [b for b in range(B) if b not in leg_set]
+	body = [b for b in range(len(parent)) if b not in leg_set]
 	top = max(body, key=lambda b: gpos[b, 1])
 	path = path_to(parent, top)
 	if pelvis not in path:
 		raise ValueError("двуногий: таз не на пути к макушке")
-	ip = path.index(pelvis)
-	ic = None
-	for k in range(ip, len(path) - 1):
-		side = [c for c in ch[path[k]] if c not in leg_set and c != path[k + 1]]
+	return ch, legs, pelvis, leg_set, path
+
+
+def _arm_carrier(ch: list, gpos: np.ndarray, path: list, start: int, leg_set: set, height: float, last: bool) -> tuple:
+	"""Первая кость пути (от start) с двумя ветками-руками: (номер на пути, руки R/L) или (None, None).
+	last — смотреть и последнюю кость пути (макушку)."""
+	end = len(path) if last else len(path) - 1
+	for k in range(start, end):
+		nxt = path[k + 1] if k + 1 < len(path) else -1
+		side = [c for c in ch[path[k]] if c not in leg_set and c != nxt
+			and biped_arm_like(ch, gpos, c, float(gpos[path[k], 0]), height)]
 		if len(side) >= 2:
-			ic = k
-			break
+			side.sort(key=lambda c: gpos[c, 0])
+			return k, {"R": side[0], "L": side[-1]}
+	return None, None
+
+
+def biped_regraft_arms(parent: np.ndarray, gpos: np.ndarray, height: float) -> tuple:
+	"""Риг Meshy иногда вешает руки на кость выше плеч (бывает на макушке головы: Bone_016 повёрнута вниз, из неё
+	растут руки и лицо) — тогда поворот головы таскал бы плечи, а грудь без рук роли не находила. Если кость с
+	руками выше линии плеч (корней рук) больше чем на 0.05 роста, руки и всё, что висит ниже линии плеч на костях
+	между грудью и этой костью (грудь у женских ригов), переносятся на грудь — самую высокую кость позвоночника не
+	выше линии плеч. Позы покоя (мировые) не меняются, меняется только родитель. Возвращает (parent, перенесённые).
+	У обычного рига ничего не делает."""
+	ch, _legs, pelvis, leg_set, path = _biped_axis(parent, gpos, height)
+	ip = path.index(pelvis)
+	k, arms = _arm_carrier(ch, gpos, path, ip, leg_set, height, True)
+	if k is None:
+		return parent, []
+	sh_y = float(np.mean([gpos[arms["R"], 1], gpos[arms["L"], 1]]))
+	if float(gpos[path[k], 1]) <= sh_y + 0.05 * height:
+		return parent, []
+	below = [j for j in range(ip + 1, k) if float(gpos[path[j], 1]) <= sh_y]
+	if not below:
+		raise ValueError("двуногий: руки на кости выше плеч, а груди ниже плеч нет")
+	jc = below[-1]
+	chest = path[jc]
+	on_path = set(path)
+	out = np.array(parent).copy()
+	moved = []
+	for j in range(jc + 1, k + 1):
+		for c in ch[path[j]]:
+			if c in on_path or c in leg_set:
+				continue
+			if c in arms.values() or float(gpos[c, 1]) < sh_y:
+				out[c] = chest
+				moved.append(int(c))
+	return out, moved
+
+
+def biped_roles(names: list, parent: np.ndarray, gpos: np.ndarray, height: float) -> dict:
+	"""Роли костей гуманоида Meshy (морда в +Z, X — влево): ноги — две ветки у земли; таз — их общий родитель;
+	путь к макушке — позвоночник, грудь — первая кость на нём с двумя боковыми ветками (руки), дальше шея и голова
+	(последняя кость пути — макушка HeadEnd, перед ней — Head). Рука: ключица, плечо, предплечье, кисть, дальше концы."""
+	B = len(parent)
+	roots = [b for b in range(B) if parent[b] < 0]
+	if len(roots) != 1:
+		raise ValueError("ждём один корень скелета, найдено %d" % len(roots))
+	root = roots[0]
+	ch, legs, pelvis, leg_set, path = _biped_axis(parent, gpos, height)
+	ip = path.index(pelvis)
+	# Грудь — первая кость пути с двумя ветками-руками (короткие боковые ветки — не руки)
+	ic, arm_roots = _arm_carrier(ch, gpos, path, ip, leg_set, height, False)
 	if ic is None:
 		raise ValueError("двуногий: не нашёл груди с руками")
 	chest = path[ic]
-	side = sorted([c for c in ch[chest] if c != path[ic + 1]], key=lambda c: gpos[c, 0])
-	arm_roots = {"R": side[0], "L": side[-1]}
-	arms = {}
-	for s, r in arm_roots.items():
-		c = [r]
-		while len(ch[c[-1]]) == 1:
-			c.append(ch[c[-1]][0])
-		if len(c) < 4:
-			raise ValueError("двуногий: короткая рука %s" % s)
-		arms[s] = c
+	arms = {s: _single_chain(ch, r) for s, r in arm_roots.items()}
 	after = path[ic + 1:]
 	roles = {"kind": "biped", "root": root, "hips": pelvis, "chest": chest, "legs": legs, "arms": arms,
 		"spine": path[ip + 1:ic + 1], "pre": path[:ip]}

@@ -195,9 +195,12 @@ func run_step() -> void:
 
 
 ## Главный герой из файла: загрузка, материалы, метки, меч, клипы, бёдра без смещения по земле.
+## Здесь — прежняя героиня со скелетом Mixamo (кости ищутся по именам Mixamo); герои из Meshy с родным скелетом
+## (в т. ч. hero_warrior_f, которую теперь выбирает hero_asset для людей-Воинов) — в tests/test_hero_models.gd.
 func _hero_start() -> void:
 	var spec := CharacterModel.spec_for("human", "warrior")
 	check(spec.get("asset", "") == CharacterModel.hero_asset("human", "f", "warrior"), "модель героя по расе и полу")
+	spec["asset"] = CharacterModel.MAIN_ASSET
 	hero = CharacterModel.new()
 	hero.setup(spec)
 	main.add_child(hero)
