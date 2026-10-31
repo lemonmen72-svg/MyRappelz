@@ -102,6 +102,11 @@ func run_step() -> void:
 				pet.gain_xp(PetData.xp_to_next(pet.level) - pet.xp)
 			check(pet.stage == 2 and pet.model_id == "centaur_3" and pet._asset != null and pet._asset.species == "centaur_3",
 				"3-я стадия: модель centaur_3 (%s)" % pet.model_id)
+			# Старые модели освобождаются отложенно (queue_free) — считаем через несколько кадров
+			wait = 5
+			step = 5
+		5:
+			var pet: Pet = pm.active_pet
 			var models := 0
 			for c in pet.get_children():
 				if c is Node3D and CreatureModels.asset_of(c as Node3D) != null:
