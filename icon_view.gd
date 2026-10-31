@@ -201,7 +201,7 @@ func _draw() -> void:
 
 
 ## Простые рисунки кнопок HUD: меч (атака без оружия), облачко речи, мешочек с монетами.
-func _draw_shape(shp: String, c: Color, r: float, col: Color) -> void:
+func _draw_shape(shp: String, c: Vector2, r: float, col: Color) -> void:
 	var ink := Color(0.08, 0.06, 0.12, 0.95)
 	match shp:
 		"sword":
