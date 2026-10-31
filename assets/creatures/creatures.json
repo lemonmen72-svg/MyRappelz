@@ -1821,6 +1821,464 @@
 		},
 		"source": "Meshy_AI_Character_output (14).glb"
 	},
+	"centaur": {
+		"height": 2.25,
+		"length": 1.655,
+		"width": 0.798,
+		"bounds": [
+			[
+				-0.4,
+				0.0,
+				-0.825
+			],
+			[
+				0.399,
+				2.25,
+				0.83
+			]
+		],
+		"walk_speed": 0.849,
+		"run_speed": 3.922,
+		"attack_hit_time": 0.42,
+		"cast_time": 0.45,
+		"clips": {
+			"Idle": {
+				"length": 3.0,
+				"loop": true
+			},
+			"Walk": {
+				"length": 0.95,
+				"loop": true,
+				"speed": 0.849,
+				"stride": 0.5,
+				"duty": 0.62
+			},
+			"Run": {
+				"length": 0.6,
+				"loop": true,
+				"speed": 3.922,
+				"stride": 0.8,
+				"duty": 0.34
+			},
+			"Attack": {
+				"length": 0.9,
+				"loop": false
+			},
+			"Hit": {
+				"length": 0.4,
+				"loop": false
+			},
+			"Death": {
+				"length": 1.4,
+				"loop": false
+			},
+			"Cast": {
+				"length": 0.9,
+				"loop": false
+			}
+		},
+		"head_rest": [
+			-0.066,
+			1.894,
+			0.497
+		],
+		"tris": 8497,
+		"verts": 9597,
+		"bones": {
+			"root": "Root",
+			"hips": "Root",
+			"chest": "Chest",
+			"head": "Head",
+			"spine": [
+				"Spine1",
+				"Chest"
+			],
+			"back": [],
+			"neck": [
+				"Neck"
+			],
+			"tail": [
+				"Tail1",
+				"Tail2",
+				"Tail3",
+				"Tail4"
+			],
+			"legs": {
+				"BL": [
+					"LegBL1",
+					"LegBL2",
+					"LegBL3",
+					"LegBL4"
+				],
+				"BR": [
+					"LegBR1",
+					"LegBR2",
+					"LegBR3",
+					"LegBR4"
+				],
+				"FL": [
+					"LegFL1",
+					"LegFL2",
+					"LegFL3",
+					"LegFL4"
+				],
+				"FR": [
+					"LegFR1",
+					"LegFR2",
+					"LegFR3",
+					"LegFR4"
+				]
+			},
+			"feet": {
+				"BL": "LegBL4",
+				"BR": "LegBR4",
+				"FL": "LegFL4",
+				"FR": "LegFR4"
+			},
+			"toes": {},
+			"ears": {},
+			"wings": {},
+			"other": [
+				"HeadX1_1"
+			],
+			"torso": [
+				"Waist",
+				"Torso1",
+				"Torso2"
+			],
+			"arms": {
+				"L": [
+					"ArmL1",
+					"ArmL2",
+					"ArmL3",
+					"ArmL4"
+				],
+				"R": [
+					"ArmR1",
+					"ArmR2",
+					"ArmR3",
+					"ArmR4"
+				]
+			},
+			"spear": "Spear"
+		},
+		"source": "c15.glb"
+	},
+	"centaur_2": {
+		"height": 2.25,
+		"length": 1.871,
+		"width": 0.823,
+		"bounds": [
+			[
+				-0.41,
+				0.0,
+				-0.933
+			],
+			[
+				0.414,
+				2.25,
+				0.938
+			]
+		],
+		"walk_speed": 0.849,
+		"run_speed": 3.922,
+		"attack_hit_time": 0.42,
+		"cast_time": 0.45,
+		"clips": {
+			"Idle": {
+				"length": 3.0,
+				"loop": true
+			},
+			"Walk": {
+				"length": 0.95,
+				"loop": true,
+				"speed": 0.849,
+				"stride": 0.5,
+				"duty": 0.62
+			},
+			"Run": {
+				"length": 0.6,
+				"loop": true,
+				"speed": 3.922,
+				"stride": 0.8,
+				"duty": 0.34
+			},
+			"Attack": {
+				"length": 0.9,
+				"loop": false
+			},
+			"Hit": {
+				"length": 0.4,
+				"loop": false
+			},
+			"Death": {
+				"length": 1.4,
+				"loop": false
+			},
+			"Cast": {
+				"length": 0.9,
+				"loop": false
+			}
+		},
+		"head_rest": [
+			-0.022,
+			1.868,
+			0.523
+		],
+		"tris": 8498,
+		"verts": 11671,
+		"bones": {
+			"root": "Root",
+			"hips": "Root",
+			"chest": "Chest",
+			"head": "Head",
+			"spine": [
+				"Spine1",
+				"Chest"
+			],
+			"back": [],
+			"neck": [
+				"Neck"
+			],
+			"tail": [
+				"Tail1",
+				"Tail2",
+				"Tail3",
+				"Tail4"
+			],
+			"legs": {
+				"BL": [
+					"LegBL1",
+					"LegBL2",
+					"LegBL3",
+					"LegBL4"
+				],
+				"BR": [
+					"LegBR1",
+					"LegBR2",
+					"LegBR3",
+					"LegBR4"
+				],
+				"FL": [
+					"LegFL1",
+					"LegFL2",
+					"LegFL3",
+					"LegFL4"
+				],
+				"FR": [
+					"LegFR1",
+					"LegFR2",
+					"LegFR3",
+					"LegFR4"
+				]
+			},
+			"feet": {
+				"BL": "LegBL4",
+				"BR": "LegBR4",
+				"FL": "LegFL4",
+				"FR": "LegFR4"
+			},
+			"toes": {},
+			"ears": {},
+			"wings": {},
+			"other": [
+				"HeadX1_1"
+			],
+			"torso": [
+				"Waist",
+				"Torso1",
+				"Torso2"
+			],
+			"arms": {
+				"L": [
+					"ArmL1",
+					"ArmL2",
+					"ArmL3",
+					"ArmL4",
+					"ArmL5"
+				],
+				"R": [
+					"ArmR1",
+					"ArmR2",
+					"ArmR3",
+					"ArmR4",
+					"ArmR5"
+				]
+			},
+			"spear": "Spear"
+		},
+		"source": "c16.glb"
+	},
+	"centaur_3": {
+		"height": 2.25,
+		"length": 1.896,
+		"width": 1.028,
+		"bounds": [
+			[
+				-0.514,
+				0.0,
+				-0.947
+			],
+			[
+				0.514,
+				2.25,
+				0.949
+			]
+		],
+		"walk_speed": 0.849,
+		"run_speed": 3.922,
+		"attack_hit_time": 0.42,
+		"cast_time": 0.45,
+		"clips": {
+			"Idle": {
+				"length": 3.0,
+				"loop": true
+			},
+			"Walk": {
+				"length": 0.95,
+				"loop": true,
+				"speed": 0.849,
+				"stride": 0.5,
+				"duty": 0.62
+			},
+			"Run": {
+				"length": 0.6,
+				"loop": true,
+				"speed": 3.922,
+				"stride": 0.8,
+				"duty": 0.34
+			},
+			"Attack": {
+				"length": 0.9,
+				"loop": false
+			},
+			"Hit": {
+				"length": 0.4,
+				"loop": false
+			},
+			"Death": {
+				"length": 1.4,
+				"loop": false
+			},
+			"Cast": {
+				"length": 0.9,
+				"loop": false
+			}
+		},
+		"head_rest": [
+			-0.04,
+			1.865,
+			0.534
+		],
+		"tris": 8400,
+		"verts": 6847,
+		"bones": {
+			"root": "Root",
+			"hips": "Root",
+			"chest": "Chest",
+			"head": "Head",
+			"spine": [
+				"Spine1",
+				"Chest"
+			],
+			"back": [],
+			"neck": [
+				"Neck"
+			],
+			"tail": [
+				"Tail1",
+				"Tail2",
+				"Tail3",
+				"Tail4"
+			],
+			"legs": {
+				"BL": [
+					"LegBL1",
+					"LegBL2",
+					"LegBL3",
+					"LegBL4"
+				],
+				"BR": [
+					"LegBR1",
+					"LegBR2",
+					"LegBR3",
+					"LegBR4"
+				],
+				"FL": [
+					"LegFL1",
+					"LegFL2",
+					"LegFL3",
+					"LegFL4"
+				],
+				"FR": [
+					"LegFR1",
+					"LegFR2",
+					"LegFR3",
+					"LegFR4"
+				]
+			},
+			"feet": {
+				"BL": "LegBL4",
+				"BR": "LegBR4",
+				"FL": "LegFL4",
+				"FR": "LegFR4"
+			},
+			"toes": {},
+			"ears": {},
+			"wings": {},
+			"other": [
+				"HeadX1_1",
+				"HeadX1_2",
+				"HeadX2_1",
+				"HeadX2_2",
+				"HeadX3_1",
+				"HeadX3_2",
+				"HeadX3_3",
+				"HeadX3_4",
+				"HeadX3_5",
+				"ArmLX1_1",
+				"ArmLX1_2",
+				"ArmLX2_1",
+				"ArmLX2_2",
+				"ArmLX3_1",
+				"ArmRX1_1",
+				"ArmRX1_2",
+				"ArmRX2_1",
+				"ArmRX3_1",
+				"ArmRX3_2",
+				"ArmRX3_3"
+			],
+			"torso": [
+				"Waist",
+				"Torso1",
+				"Torso2"
+			],
+			"arms": {
+				"L": [
+					"ArmL1",
+					"ArmL2",
+					"ArmL3",
+					"ArmL4",
+					"ArmL5",
+					"ArmL6",
+					"ArmL7",
+					"ArmL8"
+				],
+				"R": [
+					"ArmR1",
+					"ArmR2",
+					"ArmR3",
+					"ArmR4",
+					"ArmR5",
+					"ArmR6",
+					"ArmR7",
+					"ArmR8"
+				]
+			},
+			"spear": "Spear"
+		},
+		"source": "c17.glb"
+	},
 	"flyfish": {
 		"height": 1.836,
 		"length": 1.001,
