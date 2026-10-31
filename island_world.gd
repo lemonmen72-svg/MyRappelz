@@ -11,7 +11,7 @@ extends Node3D
 ##
 ## Запросы для других модулей через IslandWorld.current:
 ## height_at(x, z), is_walkable(x, z), in_safe_zone(pos), road_distance(x, z), water_distance(x, z),
-## zone_tint_at(x, z), spawn_point(race), mob_slots(rng), poi(id), pois_of_type(type).
+## zone_tint_at(x, z), forest_at(x, z), spawn_point(race), mob_slots(rng), poi(id), pois_of_type(type).
 
 const CONFIG_PATH := "res://world/training_island.json"
 ## Размер участка меша рельефа, клеток.
@@ -22,6 +22,9 @@ const FAR := 16.0
 const MAX_STEP := 0.9
 ## «Не вода» для _raster_segment.
 const NO_LEVEL := -1000.0
+## Лесная подстилка: шаг сетки веса леса, м, и радиус пятна под деревом, м.
+const FOREST_STEP := 2.0
+const FOREST_RADIUS := 5.5
 
 static var current: IslandWorld = null
 
@@ -45,6 +48,10 @@ var river_level := -2.2
 var terrain_material: ShaderMaterial = null
 ## Мосты: {"a": Vector3, "b": Vector3, "width": float}
 var bridges: Array[Dictionary] = []
+## Вес леса 0..1 на сетке FOREST_STEP (лесная подстилка под деревьями; bake_forest).
+var forest_w := PackedFloat32Array()
+var forest_nx := 0
+var forest_nz := 0
 
 var _coast := PackedByteArray()
 var _coast_w := 0
@@ -78,12 +85,14 @@ func build(rng: RandomNumberGenerator) -> void:
 	_find_bridges()
 	_compute_walkable()
 	WorldBuilder._build_environment(self)
-	_build_terrain_mesh()
 	_build_collision()
 	_build_bridges()
 	IslandWater.build(self)
 	IslandPois.build(self, rng)
+	# Растительность до меша рельефа: она расставляет деревья и запекает вес леса (bake_forest),
+	# который меш рельефа пишет в UV2.x вершин (лесная подстилка в island_terrain.gdshader)
 	IslandVegetation.build(self, rng)
+	_build_terrain_mesh()
 
 
 # ---------- Конфиг и сетка ----------
@@ -421,12 +430,14 @@ func _build_terrain_mesh() -> void:
 
 
 ## Участок рельефа. Вершины: цвет — оттенок травы и вес площадки (_ground_color),
-## UV — (расстояние до дороги, уровень ближайшей воды); остальное считает шейдер по пикселям.
+## UV — (расстояние до дороги, уровень ближайшей воды), UV2.x — вес леса (без площадок построек);
+## остальное считает шейдер по пикселям.
 func _chunk_mesh(i0: int, j0: int, i1: int, j1: int) -> ArrayMesh:
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
 	var uvs := PackedVector2Array()
+	var uv2s := PackedVector2Array()
 	var idx := PackedInt32Array()
 	var w := i1 - i0 + 1
 	for j in range(j0, j1 + 1):
@@ -441,6 +452,7 @@ func _chunk_mesh(i0: int, j0: int, i1: int, j1: int) -> ArrayMesh:
 			if water_d[k] < FAR and absf(wl - river_level) < 0.001:
 				wl = lerpf(sea_level, river_level, smoothstep(1.5, 12.0, coast_distance(p.x, p.y)))
 			uvs.append(Vector2(road_d[k], wl))
+			uv2s.append(Vector2(forest_at(p.x, p.y) * (1.0 - clampf(_flat_w[k], 0.0, 1.0)), 0.0))
 	for j in range(j1 - j0):
 		for i in range(i1 - i0):
 			var a := j * w + i
@@ -452,6 +464,7 @@ func _chunk_mesh(i0: int, j0: int, i1: int, j1: int) -> ArrayMesh:
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_COLOR] = colors
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
 	arrays[Mesh.ARRAY_INDEX] = idx
 	var m := ArrayMesh.new()
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
@@ -578,6 +591,44 @@ func in_safe_zone(pos: Vector3) -> bool:
 		if Vector2(pos.x, pos.z).distance_to(v2(sz["center"])) < float(sz.get("radius", 10.0)):
 			return true
 	return false
+
+
+## Лесная подстилка: по точкам деревьев (низ ствола) — сумма мягких пятен радиуса FOREST_RADIUS
+## на сетке FOREST_STEP, сжатая в 0..1: одиночное дерево даёт пятно листвы у ствола, роща — сплошной
+## покров. Вызывает IslandVegetation после расстановки деревьев, до меша рельефа.
+func bake_forest(trees: Array[Vector3]) -> void:
+	forest_nx = int(ceilf(float(nx - 1) * step / FOREST_STEP)) + 1
+	forest_nz = int(ceilf(float(nz - 1) * step / FOREST_STEP)) + 1
+	forest_w.resize(forest_nx * forest_nz)
+	forest_w.fill(0.0)
+	var cells := int(ceilf(FOREST_RADIUS / FOREST_STEP))
+	for t in trees:
+		var gi := roundi((t.x - origin.x) / FOREST_STEP)
+		var gj := roundi((t.z - origin.y) / FOREST_STEP)
+		for j in range(maxi(gj - cells, 0), mini(gj + cells, forest_nz - 1) + 1):
+			for i in range(maxi(gi - cells, 0), mini(gi + cells, forest_nx - 1) + 1):
+				var d := Vector2(origin.x + float(i) * FOREST_STEP - t.x, origin.y + float(j) * FOREST_STEP - t.z).length()
+				if d < FOREST_RADIUS:
+					forest_w[j * forest_nx + i] += 1.0 - smoothstep(1.2, FOREST_RADIUS, d)
+	for k in forest_w.size():
+		forest_w[k] = smoothstep(0.15, 1.1, forest_w[k])
+
+
+## Вес леса в точке (билинейно, 0..1); до bake_forest — 0.
+func forest_at(x: float, z: float) -> float:
+	if forest_w.is_empty():
+		return 0.0
+	var u := clampf((x - origin.x) / FOREST_STEP, 0.0, float(forest_nx - 1))
+	var v := clampf((z - origin.y) / FOREST_STEP, 0.0, float(forest_nz - 1))
+	var i0 := int(floorf(u))
+	var j0 := int(floorf(v))
+	var i1 := mini(i0 + 1, forest_nx - 1)
+	var j1 := mini(j0 + 1, forest_nz - 1)
+	var fu := u - float(i0)
+	var fv := v - float(j0)
+	var a := lerpf(forest_w[j0 * forest_nx + i0], forest_w[j0 * forest_nx + i1], fu)
+	var b := lerpf(forest_w[j1 * forest_nx + i0], forest_w[j1 * forest_nx + i1], fu)
+	return lerpf(a, b, fv)
 
 
 ## Оттенок травы по зонам деревень: золотистый у светлых эльфов, холодный у тёмных, тёплый у людей.

@@ -558,7 +558,8 @@ func _marker(parent: Node3D, poi: Dictionary) -> void:
 
 # ---------- Ограды ----------
 
-## Деревянная ограда по кругу (центр c, радиус r): столбики через ~step м и две жерди.
+## Деревянная ограда по кругу (центр c, радиус r): столбики через ~step м и две жерди — брёвна
+## с корой (столбики — WorldTextures.BARK, волокна вертикальны; жерди — LOG, волокна вдоль жерди).
 ## gaps — углы проёмов (рад), gap_half — полуширина проёма (рад). Жерди над дорогой не ставятся.
 ## Коллизия — бокс на каждый пролёт (одно тело на всю ограду), модель — в меш построек зоны.
 func _fence_ring(parent: Node3D, c: Vector2, r: float, gaps: Array, gap_half: float, post_h: float,
@@ -571,8 +572,6 @@ func _fence_ring(parent: Node3D, c: Vector2, r: float, gaps: Array, gap_half: fl
 	var body := _body(node, Vector3.ZERO, 0.0)
 	body.name = "FenceBody"
 	var k := PoiModels.Kit.new()
-	# Столбики темнее палитры (darkened) — текстура досок задаётся явно
-	k.tex = WorldTextures.WOOD
 	var n := maxi(8, int(ceilf(TAU * r / step)))
 	var pts: Array[Vector3] = []
 	var ok: Array[bool] = []
@@ -592,18 +591,12 @@ func _fence_ring(parent: Node3D, c: Vector2, r: float, gaps: Array, gap_half: fl
 		var p0 := pts[i]
 		var p1 := pts[j]
 		if ok[i]:
-			k.box(p0 + Vector3(0, post_h * 0.5, 0), Vector3(0.18, post_h, 0.18), dark)
-			k.cyl(p0 + Vector3(0, post_h + 0.1, 0), 0.13, 0.0, 0.2, dark, 4, Vector3(0, PI * 0.25, 0))
+			PoiModels.fence_post(k, p0, post_h, dark)
 		if not (ok[i] and ok[j]):
 			continue
+		var yaw := PoiModels.fence_rails(k, p0, p1, post_h, color)
 		var mid := (p0 + p1) * 0.5
-		var flat := Vector2(p1.x - p0.x, p1.z - p0.z)
-		var length := flat.length()
-		var yaw := atan2(-flat.y, flat.x)
-		var pitch := atan2(p1.y - p0.y, length)
-		for hy in [0.45, 0.9]:
-			var yy: float = float(hy) * post_h
-			k.box(mid + Vector3(0, yy, 0), Vector3(length + 0.1, 0.12, 0.08), color, Vector3(0, yaw, pitch))
+		var length := Vector2(p1.x - p0.x, p1.z - p0.z).length()
 		_box_shape(body, Vector3(length, post_h, 0.25), mid + Vector3(0, post_h * 0.5, 0), yaw)
 	_put_kit(node, k)
 
@@ -1261,12 +1254,16 @@ func _pier(h: Node3D, poi: Dictionary) -> void:
 			continue
 		var top := 0.35
 		var bottom := ground - 0.4
+		k.tex = WorldTextures.BARK
 		k.cyl(Vector3(lp.x, (top + bottom) * 0.5, lp.z), 0.15, 0.15, top - bottom, PoiModels.WOOD_DARK, 6)
 		k.cyl(Vector3(lp.x, top + 0.02, lp.z), 0.17, 0.12, 0.08, PoiModels.WOOD, 6)
+		k.tex = -1
 	# Тумбы для швартовки и фонарь на площадке
 	for zb in [length * 0.45, length * 0.75]:
 		for s in [-1.0, 1.0]:
+			k.tex = WorldTextures.BARK
 			k.cyl(Vector3(float(s) * (width * 0.5 - 0.25), 0.25, float(zb)), 0.14, 0.12, 0.5, PoiModels.WOOD_DARK, 6)
+			k.tex = -1
 	k.box(Vector3(head_w * 0.5 - 0.4, 1.5, length - 0.4), Vector3(0.16, 3.0, 0.16), PoiModels.WOOD_DARK)
 	k.box(Vector3(head_w * 0.5 - 0.4, 3.05, length - 0.4), Vector3(0.3, 0.36, 0.3), PoiModels.WIN_WARM, Vector3.ZERO, "glow")
 	k.cyl(Vector3(head_w * 0.5 - 0.4, 3.35, length - 0.4), 0.3, 0.02, 0.25, PoiModels.ROOF_ORANGE, 4, Vector3(0, PI * 0.25, 0))
@@ -1376,7 +1373,9 @@ func _cave(h: Node3D, poi: Dictionary) -> void:
 	# Факелы по сторонам входа
 	for s in [-1.0, 1.0]:
 		var x: float = float(s) * 1.75
+		kit.tex = WorldTextures.BARK
 		kit.cyl(Vector3(x, 1.0, 0.45), 0.07, 0.06, 2.0, PoiModels.WOOD_DARK, 5)
+		kit.tex = -1
 		kit.cyl(Vector3(x, 2.05, 0.45), 0.14, 0.1, 0.16, PoiModels.STONE_DARK, 6)
 	_put_kit(body, kit)
 	for s in [-1.0, 1.0]:
@@ -1491,10 +1490,14 @@ func _bridge_rails() -> void:
 				var end := i == 0 or i == n
 				var ps := 0.24 if end else 0.14
 				var ph := 1.25 if end else 1.0
+				k.tex = WorldTextures.BARK
 				k.box(Vector3(x, y + ph * 0.5, z), Vector3(ps, ph, ps), PoiModels.WOOD_DARK)
+				k.tex = -1
 				if end:
 					k.ball(Vector3(x, y + ph + 0.1, z), Vector3(0.16, 0.16, 0.16), PoiModels.WOOD, 6, 3)
 			var ymid := 0.05 + (a.y + e.y) * 0.5 - mid.y
+			k.tex = WorldTextures.LOG
 			k.box(Vector3(x, ymid + 0.95, 0), Vector3(0.12, 0.12, length), PoiModels.WOOD, Vector3(pitch, 0, 0))
 			k.box(Vector3(x, ymid + 0.5, 0), Vector3(0.08, 0.08, length), PoiModels.WOOD, Vector3(pitch, 0, 0))
+			k.tex = -1
 		_put_kit(holder, k, _xf(mid, yaw))

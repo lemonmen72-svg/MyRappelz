@@ -365,6 +365,54 @@ func run_step() -> void:
 		41:
 			# Трекер справа вверху под меню; над Кирком серый «?»
 			shot("38_quest_tracker")
+			# Текстуры локации крупно («Высокое»): деревня людей — колодец (кладка, ворот-бревно),
+			# цоколи домов (кладка), доски, черепица и солома
+			main.hud.visible = false
+			_top = Camera3D.new()
+			main.add_child(_top)
+			_top.current = true
+			_look_from(Vector2(82.5, 27.5), 2.0, Vector2(94.0, 17.3), 1.6)
+			wait = 40
+			step = 42
+		42:
+			shot("39_village_close")
+			# Загон: ограда из брёвен (столбики — кора, жерди — лежачее бревно)
+			_look_from(Vector2(95.5, 43.5), 1.5, Vector2(90.0, 37.0), 0.6)
+			wait = 30
+			step = 43
+		43:
+			shot("40_fence_close")
+			# Мост: настил из досок, столбики перил — кора, поручни — бревно
+			var w := IslandWorld.current
+			if w != null and not w.bridges.is_empty():
+				var a: Vector3 = w.bridges[0]["a"]
+				var e: Vector3 = w.bridges[0]["b"]
+				var mid := (a + e) * 0.5
+				var side := Vector2(-(e.z - a.z), e.x - a.x).normalized()
+				var from := Vector2(mid.x, mid.z) + side * 5.0 + Vector2(e.x - a.x, e.z - a.z).normalized() * 2.0
+				_top.global_position = Vector3(from.x, maxf(w.height_at(from.x, from.y), mid.y) + 1.8, from.y)
+				_top.look_at(mid + Vector3(0, 0.4, 0))
+			wait = 30
+			step = 44
+		44:
+			shot("41_bridge_close")
+			# Лес светлых эльфов: лесная подстилка под деревьями (листья, мох), граница с травой
+			var p := _forest_spot(Vector2(-50.0, -54.0), 26.0)
+			_look_from(p + Vector2(0.0, 7.0), 3.4, p, 0.0)
+			wait = 40
+			step = 45
+		45:
+			shot("42_forest_floor")
+			# Лес тёмных эльфов (мёртвая роща): та же подстилка с холодным оттенком зоны
+			var p := _forest_spot(Vector2(38.0, -56.0), 26.0)
+			_look_from(p + Vector2(0.0, 7.0), 3.4, p, 0.0)
+			wait = 40
+			step = 46
+		46:
+			shot("43_dead_grove_floor")
+			_top.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
 			ok_done()
 
 
@@ -377,6 +425,38 @@ func _kirk_view() -> void:
 	main.cam_yaw = atan2(to_c.x, to_c.z) + 0.35
 	main.cam_pitch = 0.33
 	main.cam_dist = 6.5
+
+
+## Камера _top из точки from (x, z) на высоте h над землёй смотрит на точку to на высоте th над землёй.
+func _look_from(from: Vector2, h: float, to: Vector2, th: float) -> void:
+	var w := IslandWorld.current
+	var fy := w.height_at(from.x, from.y) if w != null else 0.0
+	var ty := w.height_at(to.x, to.y) if w != null else 0.0
+	_top.global_position = Vector3(from.x, fy + h, from.y)
+	_top.look_at(Vector3(to.x, ty + th, to.y))
+
+
+## Точка с самым густым лесом (вес леса IslandWorld.forest_at) в круге r вокруг c, подальше от стволов.
+func _forest_spot(c: Vector2, r: float) -> Vector2:
+	var w := IslandWorld.current
+	var best := c
+	var best_v := -1.0
+	if w == null:
+		return best
+	var y := -r
+	while y <= r:
+		var x := -r
+		while x <= r:
+			var q := c + Vector2(x, y)
+			if Vector2(x, y).length() <= r and w.is_walkable(q.x, q.y) and w.road_distance(q.x, q.y) > 3.0:
+				var v := w.forest_at(q.x, q.y)
+				if v > best_v:
+					best_v = v
+					best = q
+			x += 2.0
+		y += 2.0
+	print("  лес у %s: вес %.2f в %s" % [c, best_v, best])
+	return best
 
 
 ## Камера спереди на героя (как кадры 09–11), HUD скрыт.

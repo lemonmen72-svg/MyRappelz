@@ -11,11 +11,17 @@
 // или tex_layer у всего материала. Текстура — «детальная маска» (среднее 0.5): цвет × tex × 2.
 // У склеенных мешей нет UV, поэтому проекция по мировым координатам (render_mode world_vertex_coords:
 // VERTEX и NORMAL в vertex() уже мировые — передаём их во fragment через varying):
-// - стены, доски, камень, скалы: одна проекция по главной оси нормали («Среднее») или triplanar
-//   (tex_triplanar, «Высокое»; оси с малым весом пропускаются — у боксов это всё равно 1 выборка);
+// - стены, доски, кладка, скалы, стоячие брёвна (кора): одна проекция по главной оси нормали
+//   («Среднее») или triplanar (tex_triplanar, «Высокое»; оси с малым весом пропускаются — у боксов
+//   это всё равно 1 выборка); на боковых гранях v = −y — доски и ряды кладки горизонтальны,
+//   волокна коры вертикальны;
 // - крыши (черепица, солома): проекция вдоль ската — ряды черепицы идут вдоль конька при любом
-//   повороте дома, низ текстуры — к карнизу; 1 выборка.
+//   повороте дома, низ текстуры — к карнизу; 1 выборка;
+// - лежачие брёвна (кора, LOG): волокна вдоль бревна — ось бревна перпендикулярна горизонтальной
+//   части нормали (у жердей ограды под любым углом); 1 выборка.
 // Выборки — textureGrad с производными, посчитанными до ветвлений.
+// Сэмплеров 8 (albedo_texture + 7) — предел для GL Compatibility на телефонах с 16 блоками
+// (верхние 8 блоков Godot держит под тени, небо, отражения и экран), см. WorldTextures.
 shader_type spatial;
 render_mode cull_disabled, depth_draw_opaque, world_vertex_coords;
 
@@ -53,18 +59,21 @@ uniform bool tex_triplanar = false;
 // Номер текстуры для всего материала (WorldTextures.WOOD...); −1 — из альфы цвета вершин.
 uniform int tex_layer = -1;
 uniform sampler2D tex_wood : hint_default_white, filter_linear_mipmap, repeat_enable;
-uniform sampler2D tex_stone : hint_default_white, filter_linear_mipmap, repeat_enable;
+uniform sampler2D tex_masonry : hint_default_white, filter_linear_mipmap, repeat_enable;
 uniform sampler2D tex_plaster : hint_default_white, filter_linear_mipmap, repeat_enable;
 uniform sampler2D tex_tiles : hint_default_white, filter_linear_mipmap, repeat_enable;
 uniform sampler2D tex_thatch : hint_default_white, filter_linear_mipmap, repeat_enable;
 uniform sampler2D tex_rock : hint_default_white, filter_linear_mipmap, repeat_enable;
-// Метров на повтор текстуры.
-uniform float wood_tile = 2.0;
-uniform float stone_tile = 2.5;
+uniform sampler2D tex_bark : hint_default_white, filter_linear_mipmap, repeat_enable;
+// Метров на повтор текстуры (рисунки Максима: ~9 досок по 0.2 м, ~9 рядов кладки по 0.18 м
+// с блоками ~0.5 м, ~4 ряда черепицы по 0.3 м, ~2.5 ряда снопов соломы, ~7 полос коры).
+uniform float wood_tile = 1.8;
+uniform float masonry_tile = 1.6;
 uniform float plaster_tile = 3.0;
-uniform float tiles_tile = 2.0;
-uniform float thatch_tile = 2.0;
+uniform float tiles_tile = 1.3;
+uniform float thatch_tile = 1.5;
 uniform float rock_tile = 3.0;
+uniform float bark_tile = 1.0;
 // Сила текстуры: 0 — нет, 1 — полная.
 uniform float tex_strength : hint_range(0.0, 1.0) = 0.8;
 
@@ -133,6 +142,27 @@ vec3 tex_roof(sampler2D t, vec3 p, vec3 n, vec3 dx, vec3 dy, float s) {
 	return textureGrad(t, vec2(u, v) * s, vec2(gux, gvx) * s, vec2(guy, gvy) * s).rgb;
 }
 
+// Лежачее бревно: волокна (вертикаль текстуры) — вдоль оси бревна. Ось — горизонталь,
+// перпендикулярная горизонтальной части нормали (у боковых граней жерди и цилиндра-полена она
+// одна и та же; знак приведён к одному, чтобы на коньке бревна не было шва). Поперёк — высота
+// на боковых гранях, горизонталь поперёк оси на верхних и нижних. 1 выборка.
+vec3 tex_log(sampler2D t, vec3 p, vec3 n, vec3 dx, vec3 dy, float s) {
+	float h = length(n.xz);
+	vec2 ax = h > 0.001 ? vec2(-n.z, n.x) / h : vec2(1.0, 0.0);
+	if (dot(ax, vec2(1.0, 0.001)) < 0.0) {
+		ax = -ax;
+	}
+	vec2 side = vec2(-ax.y, ax.x);
+	float v = dot(p.xz, ax);
+	float gvx = dot(dx.xz, ax);
+	float gvy = dot(dy.xz, ax);
+	bool lies = abs(n.y) > h;
+	float u = lies ? dot(p.xz, side) : -p.y;
+	float gux = lies ? dot(dx.xz, side) : -dx.y;
+	float guy = lies ? dot(dy.xz, side) : -dy.y;
+	return textureGrad(t, vec2(u, v) * s, vec2(gux, gvx) * s, vec2(guy, gvy) * s).rgb;
+}
+
 void vertex() {
 	v_color = use_vertex_color ? COLOR.rgb : vec3(1.0);
 	v_glow = uv2_glow ? UV2.y : 0.0;
@@ -164,7 +194,7 @@ void fragment() {
 		if (layer == 1) {
 			d = tex_box(tex_wood, v_wpos, n, dpx, dpy, 1.0 / wood_tile, tex_triplanar);
 		} else if (layer == 2) {
-			d = tex_box(tex_stone, v_wpos, n, dpx, dpy, 1.0 / stone_tile, tex_triplanar);
+			d = tex_box(tex_masonry, v_wpos, n, dpx, dpy, 1.0 / masonry_tile, tex_triplanar);
 		} else if (layer == 3) {
 			d = tex_box(tex_plaster, v_wpos, n, dpx, dpy, 1.0 / plaster_tile, tex_triplanar);
 		} else if (layer == 4) {
@@ -173,6 +203,10 @@ void fragment() {
 			d = tex_roof(tex_thatch, v_wpos, n, dpx, dpy, 1.0 / thatch_tile);
 		} else if (layer == 6) {
 			d = tex_box(tex_rock, v_wpos, n, dpx, dpy, 1.0 / rock_tile, tex_triplanar);
+		} else if (layer == 7) {
+			d = tex_box(tex_bark, v_wpos, n, dpx, dpy, 1.0 / bark_tile, tex_triplanar);
+		} else if (layer == 8) {
+			d = tex_log(tex_bark, v_wpos, n, dpx, dpy, 1.0 / bark_tile);
 		}
 		ALBEDO *= mix(vec3(1.0), d * 2.0, tex_strength);
 	}

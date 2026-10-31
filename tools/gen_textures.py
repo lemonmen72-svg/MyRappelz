@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Рисованные бесшовные текстуры окружения острова (аниме cel-стиль, свои, без внешних источников).
 
+ВНИМАНИЕ: это больше НЕ источник текстур в assets/textures/. Сейчас там текстуры, нарисованные Максимом
+в ChatGPT и нарезанные из листов скриптом tools/import_texture_sheet.py (см. assets/LICENSES.md).
+Запуск без флагов пишет только НЕДОСТАЮЩИЕ файлы (готовые не трогает); с --force перезапишет все девять
+текстур ниже процедурными и затрёт текстуры Максима — только если это действительно нужно.
+
 Выход: assets/textures/*.png, 512×512, RGB. Рядом лежат .png.import (VRAM-сжатие, мипмапы).
 
 Текстуры — «детальные маски»: почти серые, среднее каждого канала ровно 0.5 (128), с лёгким оттенком
@@ -24,9 +29,10 @@
 | thatch.png  | солома ярусами                       | соломенные крыши, сено, манекены           |
 | plaster.png | штукатурка / побелка                 | стены домов, башни                         |
 
-Запуск из корня репозитория: python3 tools/gen_textures.py  (нужны numpy и Pillow)
+Запуск из корня репозитория: python3 tools/gen_textures.py [--force]  (нужны numpy и Pillow)
 """
 import os
+import sys
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
@@ -497,8 +503,13 @@ def plaster():
 
 
 def main() -> None:
+	force = "--force" in sys.argv[1:]
 	os.makedirs(OUT, exist_ok=True)
 	for f in (grass, dirt, sand, rock, stone, wood, tiles, thatch, plaster):
+		path = os.path.join(OUT, f.__name__ + ".png")
+		if os.path.exists(path) and not force:
+			print("%-12s уже есть — пропуск (перезаписать процедурной: --force)" % (f.__name__ + ".png"))
+			continue
 		f()
 
 
