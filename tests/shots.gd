@@ -22,8 +22,8 @@ const HERO_SKILLS := [["blade_mastery", 2], ["charge_stab", 2], ["dark_strike", 
 	["concentration", 1], ["crossbow_mastery", 1], ["dual_shot", 1]]
 ## Предметы для кадров сумки и торговца (27–30): [id, количество]. Карты существ: пустые, с душой, зеркальная.
 const BAG_ITEMS := [
-	["daggers_steel", 1], ["crossbow_heavy", 1], ["card_panther", 4], ["card_wolf", 1], ["card_golem", 1],
-	["card_panther_soul", 1], ["card_golem_soul", 1], ["mirror_card", 2], ["boar_tusk", 7],
+	["daggers_steel", 1], ["crossbow_heavy", 1], ["card_panther", 4], ["card_wolf", 1], ["card_turtle", 1],
+	["card_panther_soul", 1], ["card_wolf_soul", 1], ["mirror_card", 2], ["boar_tusk", 7],
 	["wolf_pelt", 3], ["panther_fang", 2], ["pheasant_feather", 4], ["shell_plate", 2], ["golem_shard", 1],
 	["hp_potion", 12],
 ]
@@ -305,8 +305,8 @@ func run_step() -> void:
 		33:
 			shot("30_bag_card")
 			main.hud.close_window()
-			# Панель цели со значком приручения: кабан, карта кабана в сумке — зелёный значок
-			var m := find_mob("boar")
+			# Панель цели со значком приручения: волк, карта волка в сумке — зелёный значок
+			var m := find_mob("wolf")
 			if m != null:
 				stand_near(m, 4.0)
 				player._set_target(m)
@@ -314,6 +314,15 @@ func run_step() -> void:
 			step = 34
 		34:
 			shot("31_target_tame")
+			# Кабана приручить нельзя — фиолетовый значок
+			var m := find_mob("boar")
+			if m != null:
+				stand_near(m, 4.0)
+				player._set_target(m)
+			wait = 20
+			step = 35
+		35:
+			shot("32_target_no_tame")
 			ok_done()
 
 

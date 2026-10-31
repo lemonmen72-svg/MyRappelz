@@ -1,8 +1,9 @@
 extends "res://tests/test_base.gd"
 ## Роли питомцев: танк провоцирует, лекарь лечит, маг бьёт снарядами и по площади, боец делает рывок.
 ## Новые виды: черепаха — танк, фазан — лекарь, пантера — маг (модели из файлов или запасные).
-## Удар по площади каменного стража, карта существа своего вида, приручение при полной коллекции (карта с душой
-## ждёт в сумке, формирование — отказ), снятие метки со зверя, ушедшего домой.
+## Удар по площади каменного стража, карта существа своего вида (у кабана и стража карт нет — нельзя приручить,
+## но уже прирученные кабан и страж призываются), приручение при полной коллекции (карта с душой ждёт в сумке,
+## формирование — отказ), снятие метки со зверя, ушедшего домой.
 
 const SPECIES := ["turtle", "pheasant", "panther", "wolf", "golem"]
 
@@ -16,6 +17,7 @@ func before_start() -> void:
 		game.add_pet(sp, PetData.stage_name(sp, 1), 1)
 	game.active_pet = 0
 	game.inventory.add("card_pheasant", 1)
+	game.inventory.add("card_wolf", 1)
 
 
 func run_step() -> void:
@@ -123,15 +125,21 @@ func run_step() -> void:
 			if timer > 60 * 20:
 				fail("страж не применяет удар по площади")
 		11:
-			# Карта существа — своя у каждого вида
-			check(ItemData.card_for("boar") == "card_boar" and ItemData.card_for("golem") == "card_golem", "карты видов")
-			check(Taming.badge_state("boar") == Taming.BADGE_READY, "карта кабана в сумке (подарок новичку)")
-			check(Taming.badge_state("golem") == Taming.BADGE_NEED_CARD, "карты стража нет")
-			# Полная коллекция: метка ставится (душа ляжет в карту), а формировать некуда
+			# Карта существа — своя у каждого вида; кабана и стража приручить нельзя
+			check(ItemData.card_for("wolf") == "card_wolf" and ItemData.card_for("pheasant") == "card_pheasant", "карты видов")
+			check(ItemData.card_for("boar") == "" and ItemData.card_for("golem") == "", "у кабана и стража карт нет")
+			check(Taming.badge_state("wolf") == Taming.BADGE_READY, "карта волка в сумке")
+			check(Taming.badge_state("panther") == Taming.BADGE_NEED_CARD, "карты пантеры нет")
+			check(Taming.badge_state("boar") == Taming.BADGE_NO and Taming.badge_state("golem") == Taming.BADGE_NO,
+				"кабан и страж — фиолетовый значок «нельзя приручить»")
+			# Полная коллекция (прирученный в старой версии кабан тоже в ней): метка ставится (душа ляжет в карту),
+			# а формировать некуда
 			game.add_pet("boar", PetData.stage_name("boar", 1), 1)
 			check(game.pets.size() == Game.MAX_PETS, "коллекция полна")
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан")
+			check(pm.summon(game.pets.size() - 1) and pm.active_pet != null and pm.active_pet.species == "boar", "прежний кабан-питомец призывается")
+			pm.recall()
+			mob = find_mob("wolf")
+			check(mob != null, "найден волк")
 			stand_near(mob)
 			player.current_target = mob
 			tm.cooldown = 0.0

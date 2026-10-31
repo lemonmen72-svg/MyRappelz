@@ -81,8 +81,6 @@ func new_character(n: String, race: String, cls: String) -> void:
 	race_id = race
 	class_id = cls
 	gold = 50
-	# Подарок новичку: карты кабана (кабаны водятся у деревень; дальше карты кабана только выпадают из кабанов)
-	inventory.add("card_boar", 3)
 	inventory.add("hp_potion", 3)
 	inventory.add("revive_scroll", 1)
 	hero = HeroSkills.new_record(cls, 1)
@@ -192,7 +190,8 @@ func from_dict(d: Dictionary) -> void:
 	level = int(d.get("level", 1))
 	xp = int(d.get("xp", 0))
 	gold = int(d.get("gold", 0))
-	# Кристаллы души старых версий заменены картами (ItemData.RENAMED), за редкий — доплата золотом
+	# Кристаллы души старых версий заменены зеркальными картами (ItemData.RENAMED), за редкий и древний —
+	# доплата золотом; убранные карты кабана и стража — тоже зеркальные карты
 	var old_inv: Dictionary = d.get("inventory", {})
 	gold += ItemData.legacy_gold(old_inv)
 	var legacy_note := _legacy_note(old_inv)
@@ -271,12 +270,25 @@ static func _load_toggles(src: Variant) -> Dictionary:
 	return res
 
 
-## Сообщение о замене кристаллов души картами ("" — кристаллов не было).
+## Сообщение о замене кристаллов души и убранных карт (кабана, стража) зеркальными картами
+## ("" — заменять было нечего).
 static func _legacy_note(src: Dictionary) -> String:
+	var crystals := false
+	var cards := false
 	for k in src:
-		if String(k).begins_with("crystal_") and int(src[k]) > 0:
-			return "Кристаллы души заменены картами: теперь зверей приручают картами существ"
-	return ""
+		var id := String(k)
+		if int(src[k]) <= 0:
+			continue
+		if id.begins_with("crystal_"):
+			crystals = true
+		elif id.begins_with("card_boar") or id.begins_with("card_golem"):
+			cards = true
+	var parts: Array = []
+	if crystals:
+		parts.append("Кристаллы души заменены картами: теперь зверей приручают картами существ")
+	if cards:
+		parts.append("Кабана и каменного стража больше нельзя приручить: их карты стали зеркальными")
+	return ". ".join(PackedStringArray(parts))
 
 
 ## Сумка из сохранения с прежними id предметов (bear_claw и т. п.) → новые id, количества складываются.

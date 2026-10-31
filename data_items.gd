@@ -30,17 +30,9 @@ const ITEMS := {
 		"name": "Карта существа: Фазан", "type": "card", "species": "pheasant", "icon": "card", "stack": 20,
 		"buy": 25, "sell": 8, "color": Color(0.9, 0.58, 0.3), "desc": "Чистая карта: ловит дух фазана.",
 	},
-	"card_boar": {
-		"name": "Карта существа: Кабан", "type": "card", "species": "boar", "icon": "card", "stack": 20,
-		"buy": 0, "sell": 10, "color": Color(0.72, 0.5, 0.32), "desc": "Чистая карта: ловит дух кабана.",
-	},
 	"card_wolf": {
 		"name": "Карта существа: Волк", "type": "card", "species": "wolf", "icon": "card", "stack": 20,
 		"buy": 0, "sell": 12, "color": Color(0.66, 0.68, 0.74), "desc": "Чистая карта: ловит дух волка.",
-	},
-	"card_golem": {
-		"name": "Карта существа: Каменный страж", "type": "card", "species": "golem", "icon": "card", "stack": 20,
-		"buy": 0, "sell": 100, "color": Color(0.7, 0.7, 0.62), "desc": "Чистая карта: ловит дух каменного стража.",
 	},
 	"card_panther_soul": {
 		"name": "Карта пантеры (с душой)", "type": "card", "species": "panther", "soul": true, "icon": "card",
@@ -54,18 +46,9 @@ const ITEMS := {
 		"name": "Карта фазана (с душой)", "type": "card", "species": "pheasant", "soul": true, "icon": "card",
 		"stack": 1, "buy": 0, "sell": 15, "color": Color(0.9, 0.58, 0.3), "desc": "В карте спит пойманная душа фазана.",
 	},
-	"card_boar_soul": {
-		"name": "Карта кабана (с душой)", "type": "card", "species": "boar", "soul": true, "icon": "card",
-		"stack": 1, "buy": 0, "sell": 15, "color": Color(0.72, 0.5, 0.32), "desc": "В карте спит пойманная душа кабана.",
-	},
 	"card_wolf_soul": {
 		"name": "Карта волка (с душой)", "type": "card", "species": "wolf", "soul": true, "icon": "card",
 		"stack": 1, "buy": 0, "sell": 18, "color": Color(0.66, 0.68, 0.74), "desc": "В карте спит пойманная душа волка.",
-	},
-	"card_golem_soul": {
-		"name": "Карта каменного стража (с душой)", "type": "card", "species": "golem", "soul": true, "icon": "card",
-		"stack": 1, "buy": 0, "sell": 150, "color": Color(0.7, 0.7, 0.62),
-		"desc": "В карте спит пойманная душа каменного стража.",
 	},
 	"mirror_card": {
 		"name": "Зеркальная карта", "type": "card", "icon": "card", "stack": 20, "buy": 60, "sell": 20,
@@ -133,13 +116,16 @@ const STARTER_WEAPONS := {
 }
 
 ## Прежние id предметов → новые (старые сохранения переводит Game.from_dict). Кристаллы души заменены картами:
-## базовый и редкий кристалл — зеркальная карта (за редкий ещё LEGACY_GOLD), древний (ловил стража) — карта стража.
+## каждый кристалл — зеркальная карта (за редкий и древний ещё LEGACY_GOLD). Карт кабана и каменного стража
+## больше нет (их нельзя приручить) — если они остались в сумке, становятся зеркальными картами.
 const RENAMED := {
 	"bear_claw": "panther_fang", "fairy_dust": "pheasant_feather", "spark_core": "shell_plate",
-	"crystal_common": "mirror_card", "crystal_rare": "mirror_card", "crystal_unique": "card_golem",
+	"crystal_common": "mirror_card", "crystal_rare": "mirror_card", "crystal_unique": "mirror_card",
+	"card_boar": "mirror_card", "card_boar_soul": "mirror_card", "card_golem": "mirror_card", "card_golem_soul": "mirror_card",
 }
-## Доплата золотом за каждый прежний предмет при переводе (редкий кристалл дороже зеркальной карты по продаже).
-const LEGACY_GOLD := {"crystal_rare": 30}
+## Доплата золотом за каждый прежний предмет при переводе: цена продажи прежнего кристалла (редкий — 30,
+## древний — 100), зеркальная карта идёт сверху.
+const LEGACY_GOLD := {"crystal_rare": 30, "crystal_unique": 100}
 
 
 static func get_item(id: String) -> Dictionary:
@@ -231,7 +217,7 @@ const RARITIES := {
 const STACK := 99
 ## Тиры карт существ (как в руководстве: цвет карты по группе зверя): название, цвет, ранг (сортировка).
 ## Базовая (коричневая) — обычные звери; редкая (синяя) — боссы поверхности и чемпионы; особая (фиолетовая);
-## уникальная (жёлтая) — боссы. Синих и фиолетовых пока нет (нет таких зверей).
+## уникальная (жёлтая) — боссы. Пока есть только базовые (уникального стража приручить нельзя).
 const CARD_TIERS := {
 	"basic": {"name": "базовая", "color_name": "коричневая", "rank": 0, "color": Color(0.8, 0.56, 0.32)},
 	"rare": {"name": "редкая", "color_name": "синяя", "rank": 1, "color": Color(0.36, 0.58, 1.0)},

@@ -21,15 +21,17 @@ const RARITY_NAMES := {"common": "Базовый", "rare": "Редкий", "uniq
 const RENAMED := {"bear": "panther", "sparkbug": "turtle", "fairy": "pheasant"}
 
 ## loot: [id предмета, шанс 0..1, мин., макс.]. gold: [мин., макс.].
-## gen — название в родительном падеже («душа пантеры», «выпадает из кабана»).
-## Приручение: tameable (по умолчанию true; false — фиолетовый значок «нельзя приручить» на панели цели),
-## card — тир карты существа ("basic" | "rare" | "special" | "unique"; по умолчанию — по редкости).
+## gen — название в родительном падеже («душа пантеры», «выпадает из волка»).
+## Приручение: tameable (по умолчанию true; false — фиолетовый значок «нельзя приручить» на панели цели,
+## карт вида нет), card — тир карты существа ("basic" | "rare" | "special" | "unique"; по умолчанию — по редкости).
 ## Пустая карта вида — предмет card_<id>, заполненная — card_<id>_soul (ItemData).
+## Кабана и каменного стража приручить нельзя (решение Максима); их вид питомца (PetData) остаётся
+## для уже прирученных в старых версиях.
 const TYPES := {
 	"boar": {
 		"name": "Кабан", "gen": "кабана", "level": 1, "hp": 30, "atk": 5, "speed": 3.0, "xp": 12, "gold": [2, 5],
-		"color": Color(0.55, 0.35, 0.2), "scale": 0.9, "rarity": "common",
-		"loot": [["boar_tusk", 0.6, 1, 1], ["hp_potion", 0.08, 1, 1], ["card_boar", 0.04, 1, 1]],
+		"color": Color(0.55, 0.35, 0.2), "scale": 0.9, "rarity": "common", "tameable": false,
+		"loot": [["boar_tusk", 0.6, 1, 1], ["hp_potion", 0.08, 1, 1]],
 	},
 	"wolf": {
 		"name": "Волк", "gen": "волка", "level": 3, "hp": 50, "atk": 9, "speed": 4.4, "xp": 25, "gold": [4, 9],
@@ -54,8 +56,8 @@ const TYPES := {
 	},
 	"golem": {
 		"name": "Каменный страж", "gen": "каменного стража", "level": 10, "hp": 400, "atk": 24, "speed": 2.6, "xp": 250, "gold": [60, 120],
-		"color": Color(0.5, 0.5, 0.45), "scale": 2.0, "rarity": "unique",
-		"loot": [["golem_shard", 1.0, 1, 3], ["mirror_card", 0.3, 1, 1], ["card_golem", 0.15, 1, 1]],
+		"color": Color(0.5, 0.5, 0.45), "scale": 2.0, "rarity": "unique", "tameable": false,
+		"loot": [["golem_shard", 1.0, 1, 3], ["mirror_card", 0.3, 1, 1]],
 	},
 }
 
