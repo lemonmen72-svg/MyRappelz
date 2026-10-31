@@ -144,8 +144,8 @@ static func xp_for(base: int, mob_lvl: int, lvl: int) -> int:
 
 # ---------- Оценка силы (баланс, тесты) ----------
 
-## Профиль бойца для оценки силы: level, max_hp, atk (главная атака), magic, def, mdef, acc, avoid,
-## eva и crit (0..1), interval (с между ударами), crit_mult, block (0..1).
+## Профиль бойца (героя, зверя или питомца) для оценки силы: level, max_hp, atk (главная атака), magic, def, mdef,
+## acc, avoid, eva и crit (0..1), interval (с между ударами), crit_mult, block (0..1).
 static func profile_of(n: Object) -> Dictionary:
 	if n is Player:
 		var p := n as Player
@@ -161,6 +161,13 @@ static func profile_of(n: Object) -> Dictionary:
 			"level": m.level, "max_hp": m.max_hp, "atk": m.atk, "magic": m.magic, "def": m.pdef, "mdef": m.mdef,
 			"acc": m.acc, "avoid": m.avoid, "eva": 0.0, "crit": m.crit / 100.0, "interval": m.attack_every,
 			"crit_mult": MOB_CRIT_MULT, "block": 0.0,
+		}
+	if n is Pet:
+		var pt := n as Pet
+		return {
+			"level": pt.level, "max_hp": pt.max_hp, "atk": pt.atk, "magic": PetStats.is_magic(pt.species),
+			"def": pt.defense, "mdef": pt.mdef, "acc": pt.accuracy, "avoid": pt.avoid, "eva": pt.evasion / 100.0,
+			"crit": pt.crit / 100.0, "interval": pt.attack_time, "crit_mult": PetStats.CRIT_MULT, "block": 0.0,
 		}
 	return {}
 
@@ -178,7 +185,8 @@ static func expected_dps(a: Dictionary, b: Dictionary) -> float:
 
 
 ## «Эффективная сила» зверя m относительно героя h (профили): (HP × урон в секунду) зверя / то же у героя.
-## < 1 — герой сильнее (бой 1×1 выигрышный), равный уровень ≈ 0.8 (зверь слабее на ~20 %).
+## < 1 — герой сильнее (бой 1×1 выигрышный), равный уровень ≈ 0.8 (зверь слабее на ~20 %). Вместо героя может
+## быть питомец (profile_of(pet), PetStats.combat_profile): питомец своего уровня тоже побеждает зверя своего уровня.
 static func power_ratio(h: Dictionary, m: Dictionary) -> float:
 	var dh := expected_dps(h, m)
 	var dm := expected_dps(m, h)

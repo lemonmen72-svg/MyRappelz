@@ -1,18 +1,14 @@
 extends "res://tests/test_base.gd"
 ## Характеристики и умения питомцев (PetStats, PetSkills) и окно существа (CreatureWindow):
-## статы по уровням и стадиям (рост, скачок на эволюции, обмен статов под роль), баланс против прежних формул,
+## статы по уровням и стадиям (рост, скачок на эволюции, обмен статов под роль), сила против зверей мира своего уровня,
 ## данные умений и бюджет JP, изучение (уровень, стадия, пререквизит, JP), пассивки меняют характеристики,
 ## JP за опыт, активные умения в бою (MP, перезарядка, урон, оглушение, замедление, морок), переключаемые
 ## (MP при включении и поддержка, бонус хозяину, выключение без MP), окно существа (обе вкладки, древо умений
 ## SkillTree: ярусы, пререквизиты, значки, карточка с кнопками), сохранение и загрузка умений, старые сохранения.
 
-## Прежние формулы PetData (до системы статов): [HP, HP за ур., атака, атака за ур.] и множители стадий.
-const OLD := {
-	"boar": [60, 11.0, 8, 2.0], "wolf": [55, 10.0, 9, 2.2], "panther": [52, 9.0, 9, 2.3],
-	"pheasant": [45, 8.0, 4, 1.0], "turtle": [115, 21.0, 5, 1.2], "golem": [150, 26.0, 9, 1.8],
-}
-const OLD_BONUS := [1.0, 1.15, 1.35]
 const BASIC := ["panther", "turtle", "pheasant"]
+## Виды, которых можно приручить (у них проверяется сила против зверей мира).
+const TAMEABLE := ["wolf", "centaur", "panther", "turtle", "pheasant"]
 
 var mob: Mob = null
 var timer := 0
@@ -100,10 +96,11 @@ func run_step() -> void:
 		3:
 			# Эффекты умений напрямую: урон, оглушение и угроза, замедление, морок
 			var pet: Pet = pm.active_pet
-			# Зверь уровня питомца (по зверю намного выше уровнем умения мажут — Combat.skill_hit_chance)
+			# Зверь уровня питомца (по зверю намного выше уровнем умения мажут — Combat.skill_hit_chance); вожак анатем
+			# («Редкий», HP ×1.3) переживает все три умения подряд даже с критами
 			var gp: Vector3 = player.global_position + Vector3(4.0, 0.0, 0.0)
-			var g: Mob = main.spawn_mob("anathema", pet.level, IslandWorld.current.ground(gp.x, gp.z))
-			check(g != null and g.level == pet.level and g.slot == -1, "поставлена анатема %d ур. (main.spawn_mob)" % pet.level)
+			var g: Mob = main.spawn_mob("anathema_chief", pet.level, IslandWorld.current.ground(gp.x, gp.z))
+			check(g != null and g.level == pet.level and g.slot == -1, "поставлен вожак анатем %d ур. (main.spawn_mob)" % pet.level)
 			var hp_g := g.hp
 			pet._apply_skill("shadow_fang", g)
 			check(g.hp < hp_g, "«Клык полуночи» ранил: %d → %d" % [hp_g, g.hp])
@@ -358,27 +355,34 @@ func _stat_sum(id: String, lvl: int) -> int:
 	return t
 
 
-## HP и атака близки к прежним формулам (без умений).
+## Питомец своего уровня против зверей мира своего уровня (MobStats; Combat.power_ratio — HP × урон в секунду
+## зверя / то же у питомца, без умений): побеждает, как герой (у героя ≈ 0.8; лекарь — помощник, у него
+## до 1.15), но и после эволюции не многократно сильнее зверей своего уровня.
 func _check_balance() -> void:
-	for sp in OLD:
-		var o: Array = OLD[sp]
-		var worst := ""
-		for lvl in range(1, PetData.MAX_LEVEL + 1):
-			var b := float(OLD_BONUS[PetData.stage_for(lvl)])
-			var old_hp := (float(o[0]) + float(o[1]) * float(lvl - 1)) * b
-			var old_atk := (float(o[2]) + float(o[3]) * float(lvl - 1)) * b
-			var d := PetStats.derived(String(sp), lvl)
-			var pw := MobData.power(String(sp))
-			var rh := float(d["max_hp"]) / (old_hp * pw)
-			var ra := float(d["atk"]) / (old_atk * pw)
-			var early := lvl < 15
-			var hp_ok := rh >= (0.75 if early else 0.7) and rh <= (1.35 if early else 1.65)
-			var atk_ok := ra >= (0.8 if early else 0.75) and ra <= (1.25 if early else 1.4)
-			if not (hp_ok and atk_ok):
-				worst += " ур.%d HP×%.2f атака×%.2f" % [lvl, rh, ra]
-		check(worst == "", "%s: HP и атака близки к прежнему балансу%s" % [sp, worst])
-		var d10 := PetStats.derived(String(sp), 10)
-		print("  %s ур.10: HP %d, атака %d, защита %d, MP %d" % [sp, int(d10["max_hp"]), int(d10["atk"]),
+	for sp in TAMEABLE:
+		var id := String(sp)
+		var lo := 99.0
+		var hi := 0.0
+		var row := ""
+		for lvl in range(1, 31):
+			var pp := PetStats.combat_profile(id, lvl)
+			var sum := 0.0
+			for mid in BASIC:
+				var m := Mob.new()
+				m.setup(String(mid), -1, Vector3.ZERO, lvl)
+				sum += Combat.power_ratio(pp, Combat.profile_of(m))
+				m.free()
+			var r := sum / float(BASIC.size())
+			lo = minf(lo, r)
+			hi = maxf(hi, r)
+			if [1, 5, 10, 14, 15, 20, 29, 30].has(lvl):
+				row += " %d:%.2f" % [lvl, r]
+		var lim := 1.15 if PetData.role(id) == "healer" else 1.0
+		check(hi < lim and lo > 0.4, "%s побеждает зверей своего уровня (1–30): их сила %.2f–%.2f от силы питомца, предел %.2f"
+			% [id, lo, hi, lim])
+		print("  %s, сила зверя своего уровня:%s" % [id, row])
+		var d10 := PetStats.derived(id, 10)
+		print("  %s ур.10: HP %d, атака %d, защита %d, MP %d" % [id, int(d10["max_hp"]), int(d10["atk"]),
 			int(d10["def"]), int(d10["max_mp"])])
 
 
