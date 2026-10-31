@@ -193,7 +193,7 @@ const WEAPON_KINDS := {
 	"mace_1h": {"name": "одноручная булава", "hands": 1, "attack": "melee", "model": "mace", "stats": ["atk", "matk"],
 		"aspd": -10},
 	"mace_2h": {"name": "двуручная булава", "hands": 2, "attack": "melee", "model": "mace", "stats": ["atk", "matk"],
-		"aspd": -25},
+		"aspd": -20},
 	"axe_1h": {"name": "одноручный топор", "hands": 1, "attack": "melee", "model": "axe", "pair": "dual_axes",
 		"stats": ["atk", "matk"], "aspd": -10},
 	"axe_2h": {"name": "двуручный топор", "hands": 2, "attack": "melee", "model": "axe", "stats": ["atk", "matk"],

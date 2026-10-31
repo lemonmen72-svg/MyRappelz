@@ -23,7 +23,7 @@ const R1 := ["weapon_sword_1h_r1", "weapon_sword_2h_r1", "weapon_dagger_r1", "we
 	"crossbow_starter", "weapon_bow_r1"]
 ## Скорость атаки вида, % (Максим; булавы — как топоры).
 const ASPD := {"sword_2h": -15, "sword_1h": -5, "dagger": 25, "axe_1h": -10, "axe_2h": -25, "crossbow": -20, "bow": -40,
-	"mace_1h": -10, "mace_2h": -25, "staff_1h": 0, "staff_2h": 0}
+	"mace_1h": -10, "mace_2h": -20, "staff_1h": 0, "staff_2h": 0}
 ## Скорость каста, %.
 const CAST := {"staff_1h": 20, "staff_2h": 10}
 ## Какие атаки даёт вид.
