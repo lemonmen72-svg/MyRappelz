@@ -1,7 +1,8 @@
 class_name PoiModels
 extends RefCounted
-## Низкополигональные модели построек и декора острова (заглушки из примитивов; позже их можно
-## заменить настоящими ассетами — одна функция = один тип объекта, см. get_kit()/get_mesh()).
+## Низкополигональные модели построек и декора острова из примитивов — запас: если у вида есть модель
+## из файла (PropAsset, assets/props — модели Meshy), IslandPois ставит её (одна функция = один тип объекта,
+## см. get_kit()/get_mesh()). Ограды, мост, причал, пламя, колосья — только отсюда.
 ## Модель собирается в Kit: поверхности по материалам (toon-цвет из вершин, кристаллы, ткань...).
 ## Свечение (окна, огни) — вершины toon-поверхности с флагом UV2.y = 1 (см. toon.gdshader),
 ## поэтому дом — 1–2 поверхности. IslandPois склеивает неподвижные модели зоны в общие меши
@@ -487,6 +488,7 @@ static func outline_material() -> ShaderMaterial:
 static func apply_quality() -> void:
 	var t := material("toon_ol") as ShaderMaterial
 	t.next_pass = outline_material() if Quality.outlines() else null
+	PropAsset.apply_quality()
 
 
 ## Материал эффекта-ореола (аддитивное мягкое пятно, всегда лицом к камере).
@@ -615,6 +617,14 @@ static func get_kit(kind: String) -> Kit:
 			k.ball(Vector3.ZERO, Vector3.ONE, ROCK_DARK, 6, 4)
 		"weapon_rack":
 			weapon_rack(k)
+		"dock_crates":
+			# Груз на причале: два ящика и бочка
+			crate(k)
+			k.base = Transform3D(Basis.IDENTITY, Vector3(0.85, 0, 0.1))
+			crate(k)
+			k.base = Transform3D(Basis.IDENTITY, Vector3(0.4, 0.8, 0.0))
+			barrel(k)
+			k.base = Transform3D.IDENTITY
 		_:
 			k.box(Vector3(0, 1, 0), Vector3(2, 2, 2), Color(0.8, 0.6, 0.4))
 	_kits[kind] = k

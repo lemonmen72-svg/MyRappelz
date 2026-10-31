@@ -40,14 +40,18 @@ func run_step() -> void:
 			check(bad_safe == 0, "в безопасных зонах нет деревьев, кустов и камней (плохих: %d)" % bad_safe)
 			check(bad_road == 0, "на дорогах нет деревьев, кустов и камней (плохих: %d)" % bad_road)
 			check(bad_flat == 0, "на площадках построек нет деревьев, кустов и камней (плохих: %d)" % bad_flat)
-			# Тёмные земли — мёртвые деревья, светлые — без мёртвых (участки Decor<группа>_x_z)
+			# Тёмные земли — мёртвые деревья, светлые — без мёртвых (участки Decor<группа>_x_z: процедурные
+			# мёртвые — своя группа G_DEAD, из файлов — модель tree_dead в meta "props" участка)
 			var dead_dark := false
 			var dead_light := false
 			var vd := IslandWorld.v2(w.poi("dark_elf_village")["center"])
 			var vl := IslandWorld.v2(w.poi("light_elf_village")["center"])
 			for n in get_tree().get_nodes_in_group("veg_trees"):
 				var mi := n as MeshInstance3D
-				if mi == null or not String(mi.name).begins_with("Decor%d_" % IslandVegetation.G_DEAD):
+				if mi == null:
+					continue
+				var ids: Array = mi.get_meta("props", [])
+				if not String(mi.name).begins_with("Decor%d_" % IslandVegetation.G_DEAD) and not ids.has("tree_dead"):
 					continue
 				var q := Vector2(mi.position.x, mi.position.z)
 				if q.distance_to(vd) < 70.0:

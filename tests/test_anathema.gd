@@ -168,7 +168,9 @@ func _unit_world() -> void:
 	check(find_mob("boar") == null and find_mob("golem") == null, "кабанов и стражей в мире нет")
 	check(Taming.habitat_text("anathema").contains("Западные скалы"), "где водится анатема: " + Taming.habitat_text("anathema"))
 	var pois := w.get_node("Pois")
-	check(pois.find_child("Sheep", true, false) == null, "овец в загоне нет")
+	# Овцы из примитивов не ставятся (в загоне — только овцы-модели Максима из файла, PenSheep)
+	var sheep := pois.find_child("Sheep", true, false)
+	check(pois.find_child("Bodies", true, false) == null and (sheep == null or sheep is PenSheep), "овец из примитивов нет")
 	# Новички: на лугах 1–2 ур. — фазаны и волки, не сильнее прежних кабанов (кабан 2-го ур.: 38 HP, атака 6)
 	for id in ["pheasant", "wolf"]:
 		var m := Mob.new()

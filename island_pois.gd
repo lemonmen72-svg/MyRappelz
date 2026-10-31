@@ -6,15 +6,18 @@ extends RefCounted
 ## каждое место проверяется: не на дороге, не в воде и у обрыва, не на точке старта, не на другой
 ## постройке. В центре города свободен круг TOWN_FREE (торговец, точка старта, тесты).
 ##
-## Модели — заглушки из примитивов (PoiModels, одна функция = один тип), материалы — toon.gdshader
-## и crystal.gdshader. Постройки — StaticBody3D (слой 1) с простыми боксами/цилиндрами; клетки под
+## Модели — из файлов (PropAsset: модели Meshy от Максима, assets/props, материал prop.gdshader — атлас
+## страницы), если файла нет — заглушки из примитивов (PoiModels, одна функция = один тип; материалы —
+## toon.gdshader и crystal.gdshader). Ограды, мост, причал, пламя, флажки, колосья — всегда процедурные.
+## Постройки — StaticBody3D (слой 1) с простыми боксами/цилиндрами; клетки под
 ## ними помечаются непроходимыми (звери и растительность туда не попадут), настил причала — проходимым.
 ## Следы построек для других модулей: world.get_meta("poi_footprints") — [{"c": Vector2, "r": float}].
 ##
 ## Отрисовка (телефон: важно число вызовов). Всё неподвижное склеивается по зонам (город, деревня с
 ## мельницей, полями и загоном, порт с маяком и причалом, пещера с лагерями, ...): у зоны два меша —
 ## «Static» (постройки, ограды, отбрасывают тень, видны всегда) и «Props» (мелочи, кристаллы, ореолы,
-## туман; без теней, до NEAR_RANGE) — по одной поверхности на материал. Тела StaticBody3D остаются
+## туман; без теней, до NEAR_RANGE) — по одной поверхности на материал; модели из файлов — по одной
+## поверхности на страницу атласа (SurfaceTool.append_from общих мешей PropAsset). Тела StaticBody3D остаются
 ## (коллизия, группа poi_buildings), но мешей в них нет. Отдельно — только анимированное: крылья
 ## мельницы, луч маяка, корабль и огни (MultiMesh), полотнища флажков; частицы и подписи.
 
@@ -55,6 +58,9 @@ class Zone:
 	var near := PoiModels.Kit.new()
 	## Огни (MultiMesh, мерцают) в координатах мешей зоны.
 	var flames: Array[Transform3D] = []
+	## Модели из файлов: страница атласа → [[Mesh, Transform3D], ...] (постройки и мелочи).
+	var far_props := {}
+	var near_props := {}
 
 
 var w: IslandWorld
@@ -378,9 +384,16 @@ func _mesh(parent: Node3D, mesh: Mesh, pos: Vector3, yaw: float = 0.0, range_end
 
 ## Постройка: тело с коллизией-боксом size (по центру основания), модель kind — в меш зоны.
 ## Фасад (+Z) смотрит на face. cyl_r > 0 — коллизия цилиндром этого радиуса.
+## У модели из файла коллизия — по её габаритам (_model_box).
 func _building(parent: Node3D, kind: String, p: Vector2, face: Vector2, size: Vector3, r_place: float,
 		cyl_r: float = 0.0) -> StaticBody3D:
 	var yaw := _yaw_to(p, face)
+	var pid := PropAsset.for_kind(kind)
+	if pid != "":
+		var ms := _model_box(pid, PropAsset.kind_scale(kind))
+		if cyl_r > 0.0:
+			cyl_r = minf(ms.x, ms.z) * 0.5
+		size = ms
 	var body := _body(parent, Vector3(p.x, _floor_y(p, maxf(size.x, size.z) * 0.45), p.y), yaw)
 	body.name = kind
 	_put(body, kind)
@@ -391,6 +404,12 @@ func _building(parent: Node3D, kind: String, p: Vector2, face: Vector2, size: Ve
 		_box_shape(body, size, Vector3(0, size.y * 0.5, 0))
 		_occupy(p, r_place, Vector2(size.x, size.z) * 0.5 - Vector2(0.3, 0.3), yaw)
 	return body
+
+
+## Коллизия модели из файла: стены без свесов крыши и выступов (85 % габарита), высота — вся.
+static func _model_box(id: String, s: float) -> Vector3:
+	var ms := PropAsset.size(id) * s
+	return Vector3(ms.x * 0.85, ms.y, ms.z * 0.85)
 
 
 ## Мелкий предмет (в меш мелочей зоны) без коллизии или с маленьким цилиндром col_r > 0.
@@ -472,8 +491,27 @@ func _zone_at(p: Vector2, node: Node3D) -> Zone:
 
 ## Модель kind в меш текущей зоны: parent — узел-опора (тело постройки, ограда...), local —
 ## положение относительно него; near — в меш мелочей (без теней, до NEAR_RANGE), иначе построек.
+## Если у вида есть модель из файла (PropAsset) — она, иначе процедурная PoiModels.
 func _put(parent: Node3D, kind: String, local: Transform3D = Transform3D.IDENTITY, near: bool = false) -> void:
+	var pid := PropAsset.for_kind(kind)
+	if pid != "":
+		var s := PropAsset.kind_scale(kind)
+		_put_prop(parent, pid, local * Transform3D(Basis.from_scale(Vector3(s, s, s)), Vector3.ZERO), near)
+		return
 	_put_kit(parent, PoiModels.get_kit(kind), local, near)
+
+
+## Модель из файла id (PropAsset) в меш текущей зоны: склеивается с другими моделями своей страницы атласа.
+func _put_prop(parent: Node3D, id: String, local: Transform3D = Transform3D.IDENTITY, near: bool = false) -> void:
+	var m := PropAsset.mesh(id)
+	if m == null:
+		return
+	var wx := _world_xf(parent) * local
+	var layer: Dictionary = _zone.near_props if near else _zone.far_props
+	var pg := PropAsset.page(id)
+	if not layer.has(pg):
+		layer[pg] = []
+	(layer[pg] as Array).append([m, _zone.inv * wx])
 
 
 func _put_kit(parent: Node3D, kit: PoiModels.Kit, local: Transform3D = Transform3D.IDENTITY,
@@ -486,8 +524,8 @@ func _put_kit(parent: Node3D, kit: PoiModels.Kit, local: Transform3D = Transform
 ## Собирает меши зон: «Static» (постройки) и «Props» (мелочи), огни — MultiMesh «Flames».
 func _finish_zones() -> void:
 	for z in zones:
-		_zone_mesh(z, z.far, "Static", false)
-		_zone_mesh(z, z.near, "Props", true)
+		_zone_mesh(z, z.far, z.far_props, "Static", false)
+		_zone_mesh(z, z.near, z.near_props, "Props", true)
 		if z.flames.is_empty():
 			continue
 		var mm := MultiMesh.new()
@@ -507,12 +545,27 @@ func _finish_zones() -> void:
 			anim.flicker_mm(mmi, i, z.flames[i])
 
 
-func _zone_mesh(z: Zone, kit: PoiModels.Kit, mesh_name: String, near: bool) -> void:
-	if kit.is_empty():
+func _zone_mesh(z: Zone, kit: PoiModels.Kit, props: Dictionary, mesh_name: String, near: bool) -> void:
+	var mesh: ArrayMesh = ArrayMesh.new() if kit.is_empty() else kit.to_mesh()
+	# Модели из файлов: по поверхности на страницу атласа
+	for pg in props:
+		var items: Array = props[pg]
+		if items.is_empty():
+			continue
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for it in items:
+			var e: Array = it
+			var xf: Transform3D = e[1]
+			st.append_from(e[0] as Mesh, 0, xf)
+		st.commit(mesh)
+		var mat: Material = PropAsset.near_material(String(pg)) if near else PropAsset.material(String(pg))
+		mesh.surface_set_material(mesh.get_surface_count() - 1, mat)
+	if mesh.get_surface_count() == 0:
 		return
 	var mi := MeshInstance3D.new()
 	mi.name = mesh_name
-	mi.mesh = kit.to_mesh()
+	mi.mesh = mesh
 	mi.position = z.origin
 	mi.set_meta("no_outline", true)
 	if near:
@@ -651,6 +704,14 @@ func _gate_arch(parent: Node3D, c: Vector2, r: float, ang: float, half_w: float)
 	var yaw := _yaw_to(p, c)
 	var body := _body(parent, Vector3(p.x, w.height_at(p.x, p.y) - 0.05, p.y), yaw)
 	body.name = "Gate"
+	if PropAsset.has("town_gate"):
+		# Ворота из файла: ширина — проезд и столбы (столбы модели — примерно на 0.39 ширины от центра)
+		var gs := PropAsset.size("town_gate")
+		var sc := (half_w * 2.0 + 0.9) / gs.x
+		_put_prop(body, "town_gate", Transform3D(Basis.from_scale(Vector3(sc, sc, sc)), Vector3.ZERO))
+		for sd in [-1.0, 1.0]:
+			_box_shape(body, Vector3(0.6, gs.y * sc * 0.7, 0.6), Vector3(float(sd) * gs.x * sc * 0.39, gs.y * sc * 0.35, 0))
+		return
 	var k := PoiModels.Kit.new()
 	var wood := PoiModels.WOOD
 	var dark := PoiModels.WOOD_DARK
@@ -721,6 +782,16 @@ func _town(h: Node3D, poi: Dictionary) -> void:
 			_put(bb, "notice_board")
 			_box_shape(bb, Vector3(2.2, 2.6, 0.4), Vector3(0, 1.3, 0))
 			_occupy(bp, 1.4)
+	# Торговый прилавок (только модель из файла, процедурного нет)
+	if PropAsset.for_kind("merchant_stall") != "":
+		var sp := _spot(c, 15.0, 13.5, 1.9, inner)
+		if sp.is_finite():
+			var sb := _body(h, Vector3(sp.x, _floor_y(sp, 1.4), sp.y), _yaw_to(sp, c))
+			sb.name = "MarketStall"
+			_put(sb, "merchant_stall")
+			var ss := _model_box("merchant_stall", 1.0)
+			_box_shape(sb, ss, Vector3(0, ss.y * 0.5, 0))
+			_occupy(sp, 1.9)
 	# Фонари по кругу вокруг площади
 	for i in 8:
 		var lp := _spot(c, 22.5 + 45.0 * float(i), 10.6, 0.45, inner, 0.4)
@@ -732,7 +803,15 @@ func _town(h: Node3D, poi: Dictionary) -> void:
 
 func _lantern(parent: Node3D, kind: String, p: Vector2, glow: Color) -> void:
 	var body := _prop(parent, kind, p, rng.randf() * TAU, 0.25, 3.2)
-	_halo(body, Vector3(0, 2.95, 0), Color(glow, 0.55), 1.3)
+	_halo(body, _lamp(kind, Vector3(0, 2.95, 0)), Color(glow, 0.55), 1.3)
+
+
+## Где у модели вида kind огонёк (ореол): точка «lamp» модели из файла, иначе def.
+static func _lamp(kind: String, def: Vector3) -> Vector3:
+	var pid := PropAsset.for_kind(kind)
+	if pid == "":
+		return def
+	return PropAsset.marker(pid, "lamp", PropAsset.marker(pid, "glow", def)) * PropAsset.kind_scale(kind)
 
 
 ## Мелочи (ящики, бочки, сено) в случайных свободных местах кольца r0..r1 вокруг c.
@@ -922,8 +1001,8 @@ func _dark_elf_village(h: Node3D, poi: Dictionary) -> void:
 	for i in 4:
 		var bp := _spot(c, 45.0 + 90.0 * float(i), 6.0, 0.5, 0.0, 0.4)
 		if bp.is_finite():
-			var b := _prop(h, "brazier_dark", bp, 0.0, 0.4, 2.2)
-			_halo(b, Vector3(0, 2.3, 0), Color(0.75, 0.4, 1.0, 0.5), 1.4)
+			var b := _prop(h, "brazier_dark", bp, 0.0, 0.55, 2.2)
+			_halo(b, _lamp("brazier_dark", Vector3(0, 2.0, 0)) + Vector3(0, 0.3, 0), Color(0.75, 0.4, 1.0, 0.5), 1.4)
 	_dark_fog(h, c, r)
 
 
@@ -1013,7 +1092,15 @@ func _windmill(h: Node3D, poi: Dictionary) -> void:
 	body.name = "Windmill"
 	_put(body, "windmill")
 	_cyl_shape(body, 2.4, 9.0, Vector3.ZERO)
-	var sails := _mesh(body, PoiModels.get_mesh("windmill_sails"), Vector3(0, 7.4, 2.35))
+	var sails: MeshInstance3D
+	if PropAsset.has("windmill_sails") and PropAsset.for_kind("windmill") != "":
+		# Ступица — самая передняя точка башни из файла, крылья (толщина — по Z) прямо перед ней
+		var hub := PropAsset.marker("windmill_tower", "front", Vector3(0, 7.4, 2.0))
+		hub.z += PropAsset.size("windmill_sails").z * 0.5
+		sails = _mesh(body, PropAsset.mesh("windmill_sails"), hub)
+		sails.material_override = PropAsset.material(PropAsset.page("windmill_sails"))
+	else:
+		sails = _mesh(body, PoiModels.get_mesh("windmill_sails"), Vector3(0, 7.4, 2.35))
 	sails.name = "Sails"
 	anim.spin(sails, Vector3.BACK, 0.7)
 	footprints.append({"c": c, "r": 3.3})
@@ -1071,8 +1158,9 @@ func _wheat_field(h: Node3D, poi: Dictionary) -> void:
 	_prop(h, "scarecrow", c + Vector2(size.x * 0.12, 0.0).rotated(-rot), rng.randf() * TAU, 0.3, 2.4)
 
 
-## Загон: круглая ограда с калиткой к деревне, кормушка и сено. Овец (модели из примитивов) на острове больше нет —
-## на острове только существа Максима; модель овцы (PoiModels sheep_body/sheep_head, PoiAnimator.graze_mm) — в запасе.
+## Загон: круглая ограда с калиткой к деревне, кормушка и сено, три овцы — модель Максима из файла (PenSheep,
+## CreatureAsset «sheep»: бродят шагом и щиплют траву). Овец из примитивов (PoiModels sheep_body/sheep_head,
+## PoiAnimator.graze_mm) на острове нет — они в запасе.
 func _sheep_pen(h: Node3D, poi: Dictionary) -> void:
 	var c := _center(poi)
 	var r := float(poi.get("radius", 5.0))
@@ -1083,6 +1171,12 @@ func _sheep_pen(h: Node3D, poi: Dictionary) -> void:
 	_prop(h, "trough", back, _yaw_to(back, c) + PI * 0.5, 0.0)
 	var hay := c + Vector2(cos(to_v + 1.6), sin(to_v + 1.6)) * (r - 1.4)
 	_prop(h, "hay", hay, rng.randf() * TAU)
+	for i in 3:
+		var sh := PenSheep.create(w, c, r - 1.3, 4100 + i)
+		if sh == null:
+			break
+		sh.name = "Sheep"
+		h.add_child(sh)
 
 
 # ---------- Порт ----------
@@ -1098,7 +1192,7 @@ func _port(h: Node3D, poi: Dictionary) -> void:
 			var road_pt := _toward_road(p)
 			_building(h, "town_house_b", p, road_pt if road_pt.is_finite() else c, Vector3(6.4, 5.4, 4.8), 3.1)
 			break
-	_scatter(h, c, ["crate", "crate", "barrel", "barrel", "crate"], 3.0, r, 0.6)
+	_scatter(h, c, ["dock_crates", "crate", "barrel", "barrel", "crate"], 3.0, r, 0.9)
 	for a in [0.0, 120.0, 240.0]:
 		var lp := _spot(c, a, r * 0.5, 0.45, 0.0, 0.4)
 		if lp.is_finite():
@@ -1130,8 +1224,8 @@ func _lighthouse(h: Node3D, poi: Dictionary) -> void:
 	_cyl_shape(body, 2.3, 14.5, Vector3.ZERO)
 	footprints.append({"c": c, "r": 2.8})
 	_mark_walk(c, Vector2(1.8, 1.8), 0.0, 0)
-	# Огонь и вращающийся луч
-	var top := 0.8 + 11.0 + 0.95
+	# Огонь и вращающийся луч (у модели из файла — на её фонаре)
+	var top := _lamp("lighthouse", Vector3(0, 0.8 + 11.0 + 0.95, 0)).y
 	_halo(body, Vector3(0, top, 0), Color(1.0, 0.85, 0.5, 0.8), 5.0)
 	var beam := Node3D.new()
 	beam.name = "Beam"
@@ -1227,19 +1321,32 @@ func _pier(h: Node3D, poi: Dictionary) -> void:
 		k.cyl(Vector3(lp.x, (top + bottom) * 0.5, lp.z), 0.15, 0.15, top - bottom, PoiModels.WOOD_DARK, 6)
 		k.cyl(Vector3(lp.x, top + 0.02, lp.z), 0.17, 0.12, 0.08, PoiModels.WOOD, 6)
 		k.tex = -1
-	# Тумбы для швартовки и фонарь на площадке
+	# Тумбы для швартовки, фонарь и груз на площадке (модели из файлов, если есть)
+	var lamp := Vector3(head_w * 0.5 - 0.4, 3.05, length - 0.4)
 	for zb in [length * 0.45, length * 0.75]:
 		for s in [-1.0, 1.0]:
-			k.tex = WorldTextures.BARK
-			k.cyl(Vector3(float(s) * (width * 0.5 - 0.25), 0.25, float(zb)), 0.14, 0.12, 0.5, PoiModels.WOOD_DARK, 6)
-			k.tex = -1
-	k.box(Vector3(head_w * 0.5 - 0.4, 1.5, length - 0.4), Vector3(0.16, 3.0, 0.16), PoiModels.WOOD_DARK)
-	k.box(Vector3(head_w * 0.5 - 0.4, 3.05, length - 0.4), Vector3(0.3, 0.36, 0.3), PoiModels.WIN_WARM, Vector3.ZERO, "glow")
-	k.cyl(Vector3(head_w * 0.5 - 0.4, 3.35, length - 0.4), 0.3, 0.02, 0.25, PoiModels.ROOF_ORANGE, 4, Vector3(0, PI * 0.25, 0))
-	k.box(Vector3(-head_w * 0.5 + 0.8, 0.4, length - 1.0), Vector3(0.8, 0.8, 0.8), PoiModels.WOOD_LIGHT)
-	k.cyl(Vector3(-head_w * 0.5 + 1.8, 0.45, length - 0.8), 0.34, 0.34, 0.9, PoiModels.WOOD, 8)
+			var bp := Vector3(float(s) * (width * 0.5 - 0.3), 0.0, float(zb))
+			if PropAsset.for_kind("bollard") != "":
+				_put(node, "bollard", _xf(bp, float(s) * 1.3, Vector3(0.7, 0.7, 0.7)), true)
+			else:
+				k.tex = WorldTextures.BARK
+				k.cyl(bp + Vector3(0, 0.25, 0), 0.14, 0.12, 0.5, PoiModels.WOOD_DARK, 6)
+				k.tex = -1
+	if PropAsset.for_kind("lantern_town") != "":
+		var lt := Vector3(head_w * 0.5 - 0.6, 0.0, length - 0.6)
+		_put(node, "lantern_town", _xf(lt, PI * 0.75), true)
+		lamp = lt + Basis(Vector3.UP, PI * 0.75) * _lamp("lantern_town", Vector3(0, 3.05, 0))
+	else:
+		k.box(Vector3(head_w * 0.5 - 0.4, 1.5, length - 0.4), Vector3(0.16, 3.0, 0.16), PoiModels.WOOD_DARK)
+		k.box(lamp, Vector3(0.3, 0.36, 0.3), PoiModels.WIN_WARM, Vector3.ZERO, "glow")
+		k.cyl(Vector3(head_w * 0.5 - 0.4, 3.35, length - 0.4), 0.3, 0.02, 0.25, PoiModels.ROOF_ORANGE, 4, Vector3(0, PI * 0.25, 0))
+	if PropAsset.for_kind("dock_crates") != "":
+		_put(node, "dock_crates", _xf(Vector3(-head_w * 0.5 + 1.4, 0.0, length - 1.0), PI), true)
+	else:
+		k.box(Vector3(-head_w * 0.5 + 0.8, 0.4, length - 1.0), Vector3(0.8, 0.8, 0.8), PoiModels.WOOD_LIGHT)
+		k.cyl(Vector3(-head_w * 0.5 + 1.8, 0.45, length - 0.8), 0.34, 0.34, 0.9, PoiModels.WOOD, 8)
 	_put_kit(node, k)
-	_halo(node, Vector3(head_w * 0.5 - 0.4, 3.05, length - 0.4), Color(1.0, 0.85, 0.5, 0.5), 1.4)
+	_halo(node, lamp, Color(1.0, 0.85, 0.5, 0.5), 1.4)
 	# Коллизия настила и площадки
 	_box_shape(node, Vector3(width, 0.3, length), Vector3(0, -0.15, length * 0.5))
 	_box_shape(node, Vector3(head_w, 0.3, head_l), Vector3(0, -0.15, length - head_l * 0.5))
@@ -1277,7 +1384,11 @@ func _ship(h: Node3D, poi: Dictionary) -> void:
 	node.position = Vector3(spot.x, w.sea_level, spot.y)
 	node.rotation.y = yaw
 	h.add_child(node)
-	_mesh(node, PoiModels.get_mesh("ship"), Vector3.ZERO)
+	if PropAsset.has("ship"):
+		var sm := _mesh(node, PropAsset.mesh("ship"), Vector3.ZERO)
+		sm.material_override = PropAsset.material(PropAsset.page("ship"))
+	else:
+		_mesh(node, PoiModels.get_mesh("ship"), Vector3.ZERO)
 	anim.bob(node, 0.12, 0.045, 0.02, 1.0)
 	footprints.append({"c": spot, "r": 4.5})
 
@@ -1298,6 +1409,12 @@ func _cave(h: Node3D, poi: Dictionary) -> void:
 	# на дорогу; из подходящих — ближайшее к «вниз по склону»
 	var checks := [[Vector2(0, -3.6), 2.4], [Vector2(-2.5, -0.6), 1.5], [Vector2(2.5, -0.4), 1.5],
 		[Vector2(-4.5, -3.6), 0.3], [Vector2(4.5, -3.6), 0.3]]
+	var model := PropAsset.has("cave_entrance")
+	if model:
+		# Скала из файла глубже (8 м): её задняя часть тоже не должна лечь на дорогу
+		checks.append([Vector2(0, -6.5), 1.5])
+		checks.append([Vector2(-3.8, -5.5), 0.8])
+		checks.append([Vector2(3.8, -5.5), 0.8])
 	var best := down
 	var best_score := -INF
 	for k in 16:
@@ -1315,6 +1432,9 @@ func _cave(h: Node3D, poi: Dictionary) -> void:
 	var base_y := w.height_at(c.x, c.y)
 	var body := _body(h, Vector3(c.x, base_y, c.y), yaw)
 	body.name = "Cave"
+	if model:
+		_cave_model(body, c, best, yaw)
+		return
 	var kit := PoiModels.Kit.new()
 	var rocks := [
 		[Vector3(-2.5, 1.5, -0.6), Vector3(1.5, 2.2, 1.6), PoiModels.ROCK],
@@ -1371,6 +1491,32 @@ func _cave(h: Node3D, poi: Dictionary) -> void:
 		var sz := s * rng.randf_range(0.9, 1.3)
 		# Крупные — в меш построек (с тенью), мелкие — в меш мелочей
 		_put(h, kind, _xf(rpos, ryaw, Vector3(sx, s, sz)), s <= 0.7)
+
+
+## Пещера из файла: скала со входом (вход на +Z модели) отодвинута назад — проём примерно там же, где
+## у процедурной; огни — на факелах модели; коллизия — скала и закрытый проём.
+func _cave_model(body: StaticBody3D, c: Vector2, f: Vector2, yaw: float) -> void:
+	var back := -3.0
+	_put_prop(body, "cave_entrance", Transform3D(Basis.IDENTITY, Vector3(0, 0, back)))
+	var front := back + PropAsset.size("cave_entrance").z * 0.5
+	for x in [-2.0, 2.3]:
+		var p := Vector3(float(x), 2.35, front - 0.3)
+		_flame(body, _xf(p, 0.0, Vector3(0.5, 0.6, 0.5)))
+		_halo(body, p + Vector3(0, 0.3, 0), Color(1.0, 0.6, 0.25, 0.6), 1.6)
+	var sz := PropAsset.size("cave_entrance")
+	_box_shape(body, Vector3(sz.x * 0.85, sz.y, sz.z * 0.8 - 1.0), Vector3(0, sz.y * 0.5, back - 0.5))
+	_box_shape(body, Vector3(3.2, 3.2, 1.0), Vector3(0, 1.6, front - 1.2))
+	_occupy(c + _local_to_world(Vector2(0, back), f), 5.0, Vector2(sz.x * 0.45, sz.z * 0.45), yaw)
+	# Камни вокруг (без коллизии): крупные — в меш построек, мелкие — в меш мелочей
+	var h := body.get_parent() as Node3D
+	for i in 14:
+		var a := rng.randf() * TAU
+		var p := c + Vector2(cos(a), sin(a)) * rng.randf_range(6.5, 13.5)
+		if w.road_distance(p.x, p.y) < road_half + 0.8 or not _free(p, 0.8):
+			continue
+		var kind := "rock" if rng.randf() < 0.6 else "rock_dark"
+		var s := rng.randf_range(0.35, 0.9)
+		_put(h, kind, _xf(w.ground(p.x, p.y, -0.1 * s), rng.randf() * TAU, Vector3(s, s * 0.85, s)), s <= 0.6)
 
 
 ## Локальная точка (x — вправо, y — вперёд по f) в мировое смещение.

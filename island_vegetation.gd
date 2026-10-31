@@ -20,7 +20,11 @@ extends RefCounted
 ## - трава и цветы — MultiMesh участками GRASS_CHUNK×GRASS_CHUNK, плотность и дальность из Quality;
 ##   вдали пучки плавно уходят в землю (шейдер), участки дальше дальности отсекаются visibility_range_end;
 ## - деревья, кусты, камни и кристаллы сливаются в один меш на участок DECOR_CHUNK×DECOR_CHUNK и группу
-##   материала (5 общих материалов на весь остров); коллизия — цилиндры в одном StaticBody3D (слой 1).
+##   материала (7 общих материалов на весь остров); коллизия — цилиндры в одном StaticBody3D (слой 1).
+## Модели из файлов (PropAsset, страница атласа «nature»: деревья tree_oak / tree_pine / tree_elf / tree_dead,
+## куст bush, камни rock / rock_dark — модели Meshy от Максима) — свои группы G_PTREE и G_PSMALL (материал —
+## атлас, prop.gdshader, контур по нормалям); нет файла — процедурные, как раньше. Колючие кусты тёмных земель,
+## кристаллы — процедурные.
 ## Качество: apply_quality(tree) меняет дальность, тени и контуры мелочей без перезапуска;
 ## плотность травы и цветов задаётся при построении (смена — при следующем запуске).
 
@@ -69,7 +73,13 @@ const G_DEAD := 1
 const G_BUSH := 2
 const G_ROCK := 3
 const G_GLOW := 4
-const GROUP_NAMES := ["veg_trees", "veg_trees", "veg_small", "veg_small", "veg_glow"]
+## Модели из файлов (PropAsset): деревья и мелочи (кусты, камни).
+const G_PTREE := 5
+const G_PSMALL := 6
+const GROUP_NAMES := ["veg_trees", "veg_trees", "veg_small", "veg_small", "veg_glow", "veg_trees", "veg_small"]
+## Модель из файла для вида дерева (T_ROUND...) и её масштаб (сады — деревья поменьше).
+const TREE_PROP := ["tree_oak", "tree_pine", "tree_elf", "tree_elf", "tree_oak", "tree_dead", "tree_dead"]
+const TREE_PROP_SCALE := [1.0, 1.0, 0.95, 1.0, 0.72, 1.0, 0.92]
 
 static var _outline_shader: Shader = null
 
@@ -89,6 +99,8 @@ class Ctx:
 	var blocked: Array = []
 	## Vector3i(участок x, участок z, группа) -> [[Mesh, Transform3D], ...]
 	var decor := {}
+	## Vector3i(участок x, участок z, группа) -> id моделей из файлов в участке (для тестов: meta "props").
+	var decor_ids := {}
 	## Коллизии: [Vector3 основание, float радиус, float высота]
 	var colliders: Array = []
 	## Точки деревьев, кустов и камней (для проверок и тестов).
@@ -147,7 +159,7 @@ static func build(world: IslandWorld, rng: RandomNumberGenerator) -> void:
 	c.stats["grass"] = _build_grass(c, holder)
 	c.stats["flowers"] = _build_flowers(c, holder)
 
-	holder.set_meta("small_mats", [mats[G_BUSH], mats[G_ROCK]])
+	holder.set_meta("small_mats", [mats[G_BUSH], mats[G_ROCK], mats[G_PSMALL]])
 	holder.set_meta("stats", c.stats)
 	holder.set_meta("solid_points", c.solids)
 	holder.set_meta("built_level", Quality.level())
@@ -175,7 +187,7 @@ static func apply_quality(tree: SceneTree) -> void:
 			far = true
 		var small: Array = holder.get_meta("small_mats", [])
 		for m in small:
-			var sm := m as StandardMaterial3D
+			var sm := m as Material
 			if sm == null or not sm.has_meta("outline"):
 				continue
 			if outlines:
@@ -378,11 +390,17 @@ static func _spot_ok(c: Ctx, x: float, z: float, road_gap: float, water_gap: flo
 	return true
 
 
-static func _decor_add(c: Ctx, group: int, mesh: Mesh, xf: Transform3D) -> void:
+static func _decor_add(c: Ctx, group: int, mesh: Mesh, xf: Transform3D, prop_id: String = "") -> void:
 	var key := Vector3i(floori(xf.origin.x / DECOR_CHUNK), floori(xf.origin.z / DECOR_CHUNK), group)
 	if not c.decor.has(key):
 		c.decor[key] = []
 	(c.decor[key] as Array).append([mesh, xf])
+	if prop_id != "":
+		if not c.decor_ids.has(key):
+			c.decor_ids[key] = []
+		var ids: Array = c.decor_ids[key]
+		if not ids.has(prop_id):
+			ids.append(prop_id)
 
 
 static func _yaw_scale(rng: RandomNumberGenerator, s: float) -> Basis:
@@ -441,7 +459,12 @@ static func _add_tree(c: Ctx, kits: Array, kind: int, x: float, z: float, s: flo
 	var kit: Array = kits[kind]
 	var mesh: Mesh = kit[c.rng.randi() % kit.size()]
 	var pos := Vector3(x, c.w.height_at(x, z) - 0.12, z)
-	_decor_add(c, G_DEAD if kind >= T_DEAD else G_TREES, mesh, Transform3D(_yaw_scale(c.rng, s), pos))
+	var pid: String = TREE_PROP[kind]
+	if PropAsset.has(pid):
+		var ps: float = TREE_PROP_SCALE[kind]
+		_decor_add(c, G_PTREE, PropAsset.mesh(pid), Transform3D(_yaw_scale(c.rng, s * ps), pos), pid)
+	else:
+		_decor_add(c, G_DEAD if kind >= T_DEAD else G_TREES, mesh, Transform3D(_yaw_scale(c.rng, s), pos))
 	var tr: float = TRUNK_R[kind]
 	c.colliders.append([pos, tr * s, 3.0])
 	c.trees.append(pos)
@@ -705,7 +728,12 @@ static func _place_bushes(c: Ctx, kits: Array) -> void:
 		var kit: Array = kits[b]
 		var mesh: Mesh = kit[c.rng.randi() % kit.size()]
 		var pos := Vector3(q.x, c.w.height_at(q.x, q.y) - 0.05, q.y)
-		_decor_add(c, G_BUSH, mesh, Transform3D(_yaw_scale(c.rng, c.rng.randf_range(0.75, 1.3)), pos))
+		var bs := c.rng.randf_range(0.75, 1.3)
+		if b != B_DARK and PropAsset.has("bush"):
+			# Куст из файла (1.6 м) чуть мельче процедурного; колючие тёмных земель — процедурные
+			_decor_add(c, G_PSMALL, PropAsset.mesh("bush"), Transform3D(_yaw_scale(c.rng, bs * 0.85), pos), "bush")
+		else:
+			_decor_add(c, G_BUSH, mesh, Transform3D(_yaw_scale(c.rng, bs), pos))
 		c.solids.append(pos)
 		c.stats["bushes"] = int(c.stats["bushes"]) + 1
 
@@ -823,7 +851,14 @@ static func _add_rock(c: Ctx, kits: Array, b: int, x: float, z: float, s: float)
 	var kit: Array = kits[b]
 	var mesh: Mesh = kit[c.rng.randi() % kit.size()]
 	var pos := Vector3(x, c.w.height_at(x, z) - 0.12 * s, z)
-	_decor_add(c, G_ROCK, mesh, Transform3D(_yaw_scale(c.rng, s), pos))
+	var pid := "rock_dark" if b == B_DARK else "rock"
+	# Камешки у дорог (мельче 0.5) — процедурные: модель из файла для них слишком подробная
+	if s >= 0.5 and PropAsset.has(pid):
+		# Камень из файла: ниже и шире (как процедурный — валун, вросший в землю)
+		var rb := Basis(Vector3.UP, c.rng.randf() * TAU) * Basis.from_scale(Vector3(s, s * 0.75, s))
+		_decor_add(c, G_PSMALL, PropAsset.mesh(pid), Transform3D(rb, pos), pid)
+	else:
+		_decor_add(c, G_ROCK, mesh, Transform3D(_yaw_scale(c.rng, s), pos))
 	if s > 1.1 and c.w.is_walkable(x, z):
 		c.colliders.append([pos, 0.85 * s, 1.0 * s])
 	c.solids.append(pos)
@@ -987,6 +1022,8 @@ static func _materials() -> Array:
 		_vc_mat(Color(0.1, 0.18, 0.08), 0.018),  # кусты
 		_vc_mat(Color(0.18, 0.17, 0.2), 0.018),  # камни
 		glow,  # кристаллы
+		PropAsset.material("nature", Color(0.09, 0.12, 0.07), 0.022),  # деревья из файлов
+		PropAsset.material("nature", Color(0.12, 0.13, 0.1), 0.018),  # кусты и камни из файлов
 	]
 
 
@@ -1016,6 +1053,7 @@ static func _build_decor(c: Ctx, holder: Node3D, mats: Array) -> void:
 		mi.position = center
 		mi.material_override = mats[k.z]
 		mi.set_meta("no_outline", true)
+		mi.set_meta("props", c.decor_ids.get(k, []))
 		mi.add_to_group(GROUP_NAMES[k.z])
 		if k.z == G_GLOW:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

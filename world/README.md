@@ -12,6 +12,7 @@
 | Ядро (рельеф, коллизия, проходимость, зоны, спауны) | `island_world.gd` (`IslandWorld`) |
 | Вода, берег | `island_water.gd` (`IslandWater`) |
 | Постройки и точки интереса | `island_pois.gd` (`IslandPois`) |
+| Модели построек, декора и природы из файлов (Meshy) | `assets/props/`, `prop_asset.gd` (`PropAsset`), `prop.gdshader`, делает `tools/prepare_props.py`; нет файла — процедурные `poi_models.gd` |
 | Растительность, качество, постобработка | `island_vegetation.gd`, `quality.gd`, `postfx.gd` |
 | Рисованные текстуры земли и построек | `world_textures.gd`, `assets/textures/` (делает `tools/gen_textures.py`) |
 
