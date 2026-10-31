@@ -443,7 +443,9 @@ func _layout_tracker() -> void:
 	var vw := tracker.get_viewport_rect().size.x
 	# Под меню HUD: высота кнопок меню зависит от шрифта, поэтому берём её край, а не только константу
 	var top := TRACKER_TOP
-	var hud := main.get("hud") as HUD if main != null else null
+	var hud: HUD = null
+	if main != null:
+		hud = main.get("hud") as HUD
 	if hud != null:
 		top = maxf(top, hud.menu_rect().end.y + 8.0)
 	tracker.position = Vector2(vw - TRACKER_W - 16.0, top)
