@@ -163,8 +163,8 @@ func _check_model(m: CharacterModel, who: String) -> void:
 	var h := 0.0
 	for n in m._asset.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
-		# Только тело героя (меш со скином): оружие в руках — отдельные меши со своим материалом
-		if mi.mesh == null or mi.skin == null:
+		# Только тело героя: оружие в руках (под BoneAttachment3D) — отдельные меши со своим материалом
+		if mi.mesh == null or _on_bone(mi, m._asset):
 			continue
 		h = maxf(h, mi.mesh.get_aabb().size.y)
 		for s in mi.mesh.get_surface_count():
@@ -207,3 +207,13 @@ func _check_pose(m: CharacterModel, who: String) -> void:
 	for k in ["hand_l", "hand_r"]:
 		var y := _bone_y(m, skel, String(bones.get(k, "")))
 		check(y > 0.5 and y < head + 0.15, "%s: кисть %s не выше головы (%.2f м)" % [who, k, y])
+
+
+## Меш висит на кости (оружие, метки) — где-то между ним и корнем модели есть BoneAttachment3D.
+func _on_bone(n: Node, top: Node) -> bool:
+	var p := n.get_parent()
+	while p != null and p != top:
+		if p is BoneAttachment3D:
+			return true
+		p = p.get_parent()
+	return false
