@@ -50,10 +50,10 @@ func run_step() -> void:
 			for e in bases:
 				var it: Array = e
 				var xf: Transform3D = it[1]
-				var pts := PropAsset.base_points(String(it[0]))
+				var bpts := PropAsset.base_points(String(it[0]))
 				var top := -INF
-				for i in pts.size():
-					var p := xf * pts[i]
+				for i in bpts.size():
+					var p := xf * bpts[i]
 					top = maxf(top, p.y - w.height_at(p.x, p.z))
 				worst = maxf(worst, top)
 				if top > 0.05:
