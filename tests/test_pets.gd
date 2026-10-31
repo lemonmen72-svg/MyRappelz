@@ -1,6 +1,6 @@
 extends "res://tests/test_base.gd"
-## Питомцы: приручение кабана картой существа (метка → победить → карта с душой → «Сформировать»), уникальный
-## страж без своей карты, призыв/отзыв
+## Питомцы: приручение волка картой существа (метка → победить → карта с душой → «Сформировать»), кабана
+## и уникального стража приручить нельзя, призыв/отзыв
 ## через окно, помощь в бою и опыт, эволюция, смерть, воскрешение свитком, отпускание, сохранение
 ## коллекции, перевод старых видов и предметов (медведь, искрожук, фея) в новые при загрузке.
 
@@ -15,7 +15,7 @@ var hp_saved := 0
 
 
 func before_start() -> void:
-	game.inventory.add("card_boar", 17)
+	game.inventory.add("card_wolf", 17)
 	game.inventory.add("revive_scroll", 1)
 
 
@@ -44,7 +44,11 @@ func run_step() -> void:
 				for e in MobData.get_type(id)["loot"]:
 					var it := String(e[0])
 					check(not ItemData.get_item(it).is_empty(), "добыча %s есть в предметах: %s" % [id, it])
-			check(ItemData.card_tier("card_golem") == "unique", "карта стража — уникальная (жёлтая)")
+			for id in ["boar", "golem"]:
+				check(not MobData.tameable(id) and ItemData.card_for(id) == "" and ItemData.soul_card_for(id) == "",
+					"%s не приручается, карт нет" % id)
+				check(PetData.SPECIES.has(id), "вид питомца %s остался (для уже прирученных)" % id)
+			check(MobData.tameable("wolf") and ItemData.card_tier("card_wolf") == "basic", "волк приручается базовой картой")
 			check(MobData.rarity_label("unique") == "Уникальный", "редкость стража — «Уникальный»")
 			check(PetData.role("boar") == "fighter" and PetData.role("wolf") == "fighter", "кабан и волк — бойцы")
 			check(PetData.stage_for(1) == 0 and PetData.stage_for(14) == 0, "стадия 1 до 15 уровня")
@@ -55,43 +59,42 @@ func run_step() -> void:
 			check(PetData.stage_scale("boar", 30) > PetData.stage_scale("boar", 1), "старшая стадия крупнее")
 			step = 1
 		1:
-			# Уникального стража без его карты не приручить
+			# Уникального стража приручить нельзя
 			mob = find_mob("golem")
 			check(mob != null, "найден каменный страж")
 			stand_near(mob, 3.0)
 			player.current_target = mob
 			main._on_action("tame")
-			check(tm.marked == null and not mob.tame_marked, "без карты стража метка не ставится")
+			check(tm.marked == null and not mob.tame_marked, "на стража метка не ставится")
 			var msg: String = main.hud._msg_label.text
-			check(msg.contains("Нужна карта существа: Каменный страж"), "сообщение о нужной карте: " + msg)
-			check(msg.contains("выпадает из каменного стража"), "в сообщении — где взять карту: " + msg)
+			check(msg.contains("Этого зверя нельзя приручить"), "сообщение: " + msg)
 			player.current_target = null
 			player.global_position = Vector3(0, 0.1, 2)
 			mob.target = null
 			mob.returning = true
 			step = 2
 		2:
-			# Приручение кабана: метка → победить → повторять до успеха (шанс настоящий), затем «Сформировать»
-			if game.inventory.has("card_boar_soul"):
+			# Приручение волка: метка → победить → повторять до успеха (шанс настоящий), затем «Сформировать»
+			if game.inventory.has("card_wolf_soul"):
 				check(tm.attempts == tries, "каждая попытка засчитана: %d" % tries)
 				check(game.pets.is_empty(), "до формирования питомца в коллекции нет")
-				check(tm.form("card_boar_soul"), "существо сформировано из карты с душой")
-				check(not game.inventory.has("card_boar_soul"), "карта с душой израсходована")
-				check(String(game.pets[0]["species"]) == "boar", "приручен кабан за %d попыток" % tries)
-				check(String(game.pets[0]["name"]) == PetData.stage_name("boar", 1), "имя питомца = название стадии 1")
+				check(tm.form("card_wolf_soul"), "существо сформировано из карты с душой")
+				check(not game.inventory.has("card_wolf_soul"), "карта с душой израсходована")
+				check(String(game.pets[0]["species"]) == "wolf", "приручен волк за %d попыток" % tries)
+				check(String(game.pets[0]["name"]) == PetData.stage_name("wolf", 1), "имя питомца = название стадии 1")
 				step = 3
 				return
 			if tries >= MAX_TRIES:
-				fail("кабан не приручен за %d попыток" % tries)
+				fail("волк не приручен за %d попыток" % tries)
 				return
-			mob = find_mob("boar")
+			mob = find_mob("wolf")
 			if mob == null:
 				return
 			stand_near(mob)
 			player.current_target = mob
 			tm.cooldown = 0.0
 			main._on_action("tame")
-			check(tm.marked == mob and mob.tame_marked, "метка приручения на кабане")
+			check(tm.marked == mob and mob.tame_marked, "метка приручения на волке")
 			var used: int = tm.attempts
 			mob.take_damage(mob.hp + 5, player)
 			tries += 1
@@ -146,7 +149,7 @@ func run_step() -> void:
 			pet.xp = PetData.xp_to_next(14) - 1
 			pet.gain_xp(5)
 			check(pet.level == 15, "питомец достиг 15 уровня")
-			check(pet.stage == 1 and pet.pet_name == PetData.stage_name("boar", 15), "эволюция: %s" % pet.pet_name)
+			check(pet.stage == 1 and pet.pet_name == PetData.stage_name("wolf", 15), "эволюция: %s" % pet.pet_name)
 			check(pet.max_hp > old_max, "характеристики выросли: %d > %d" % [pet.max_hp, old_max])
 			check(int(game.pets[0]["level"]) == 15 and String(game.pets[0]["name"]) == pet.pet_name, "уровень и имя записаны в коллекцию")
 			check(main.hud._pet_label.text.contains(pet.pet_name), "панель питомца обновлена")
@@ -202,8 +205,8 @@ func run_step() -> void:
 			check(game.load_game(), "игра загружена")
 			check(game.pets.size() == 1, "в коллекции 1 питомец")
 			var r: Dictionary = game.pets[0]
-			check(String(r["species"]) == "boar" and int(r["level"]) == 15, "вид и уровень восстановлены")
-			check(String(r["name"]) == PetData.stage_name("boar", 15), "имя восстановлено")
+			check(String(r["species"]) == "wolf" and int(r["level"]) == 15, "вид и уровень восстановлены")
+			check(String(r["name"]) == PetData.stage_name("wolf", 15), "имя восстановлено")
 			check(int(r["hp"]) == hp_saved and not bool(r["dead"]), "HP восстановлен")
 			check(game.active_pet == 0, "призванный питомец восстановлен")
 			_check_old_save()

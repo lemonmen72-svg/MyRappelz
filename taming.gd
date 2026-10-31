@@ -7,6 +7,7 @@ extends Node
 ## ломается она, а карта существа остаётся. Формирование (form): карта с душой расходуется, в коллекции
 ## Game.pets появляется существо 1-го уровня (если в коллекции есть место).
 ## Метка одна, держится 30 с или пока зверь жив и не ушёл домой. Перезарядка умения 3 с.
+## Не всех зверей можно приручить (MobData.tameable: кабан и каменный страж — нельзя, карт у них нет).
 ## Описание карты для карточки предмета (где водится вид, уровни, тир, где взять) — card_lines.
 
 ## Дальность умения, м.
@@ -64,7 +65,7 @@ func try_tame() -> bool:
 		return false
 	var card := ItemData.card_for(mob.type_id)
 	if not MobData.tameable(mob.type_id) or card == "":
-		_msg("Зверя «%s» нельзя приручить" % mob.mob_name)
+		_msg("Этого зверя нельзя приручить: «%s»" % mob.mob_name)
 		return false
 	if not Game.inventory.has(card):
 		_msg("Нужна карта существа: %s — %s" % [String(MobData.get_type(mob.type_id)["name"]), where_to_get(card)])
@@ -145,7 +146,7 @@ static func badge_state(type_id: String) -> String:
 	return BADGE_READY if Game.inventory.has(card) else BADGE_NEED_CARD
 
 
-## Где взять карту: «продаётся у торговца» или «выпадает из кабана» (по добыче MobData).
+## Где взять карту: «продаётся у торговца» или «выпадает из волка» (по добыче MobData).
 static func where_to_get(card_id: String) -> String:
 	if int(ItemData.get_item(card_id).get("buy", 0)) > 0:
 		return "продаётся у торговца"

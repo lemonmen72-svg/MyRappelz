@@ -3,9 +3,12 @@ extends "res://tests/test_base.gd"
 ## покупка карты у торговца, «Приручить» без карты — отказ с подсказкой, где взять; с картой — метка, победа,
 ## успех (карта с душой), «Сформировать» из карточки в сумке и из окна «Питомцы»; неудача без зеркальной карты —
 ## карта ломается, с зеркальной — ломается зеркальная; значок приручения на панели цели; карта с душой при полной
-## сумке; перевод кристаллов души из старого сохранения.
+## сумке; кабана и каменного стража приручить нельзя (карт нет, фиолетовый значок, «Приручить» отказывает);
+## перевод кристаллов души и убранных карт кабана и стража из старого сохранения.
 
-const SPECIES := ["panther", "turtle", "pheasant", "boar", "wolf", "golem"]
+const SPECIES := ["panther", "turtle", "pheasant", "wolf"]
+## Звери, которых нельзя приручить (решение Максима).
+const NO_TAME := ["boar", "golem"]
 
 var mob: Mob = null
 
@@ -24,8 +27,11 @@ func run_step() -> void:
 			_unit_items()
 			_unit_lines()
 			_unit_full_bag()
-			check(inv.count("card_boar") == 3, "подарок новичку: 3 карты кабана")
+			for sp in SPECIES:
+				check(not inv.has("card_" + String(sp)), "карт существ у нового героя нет: %s" % sp)
 			check(not inv.has("crystal_common"), "кристаллов души у нового героя нет")
+			check(game.gold >= int(ItemData.get_item("card_panther")["buy"]), "стартового золота хватает на карту: %d"
+				% game.gold)
 			player.global_position = Vector3(0, 0.1, -1.5)
 			wait = 3
 			step = 1
@@ -37,8 +43,8 @@ func run_step() -> void:
 			var win: InventoryWindow = eco.window
 			for id in ["card_panther", "card_turtle", "card_pheasant", "mirror_card"]:
 				check(win.buttons.has("good_" + id), "торговец продаёт: %s" % ItemData.item_name(id))
-			for id in ["card_boar", "card_wolf", "card_golem", "card_panther_soul"]:
-				check(not win.buttons.has("good_" + id), "не продаётся: %s" % ItemData.item_name(id))
+			for id in ["card_wolf", "card_panther_soul", "card_boar", "card_golem"]:
+				check(not win.buttons.has("good_" + id), "не продаётся: %s" % id)
 			game.gold = 100
 			_press("good_card_pheasant")
 			_press("act_buy")
@@ -119,55 +125,93 @@ func run_step() -> void:
 			# Зеркальная карта могла выпасть из фазана — убираем
 			inv.remove(ItemData.MIRROR_CARD, inv.count(ItemData.MIRROR_CARD))
 			check(not inv.has(ItemData.MIRROR_CARD), "зеркальных карт нет")
-			var cards := inv.count("card_boar")
-			mob = find_mob("boar")
-			check(mob != null, "найден кабан")
+			inv.add("card_wolf", 2)
+			var cards := inv.count("card_wolf")
+			mob = find_mob("wolf")
+			check(mob != null, "найден волк")
 			stand_near(mob, 3.0)
 			player._set_target(mob)
 			tm.cooldown = 0.0
 			main._on_action("tame")
-			check(tm.marked == mob, "метка на кабане")
+			check(tm.marked == mob, "метка на волке")
 			tm.force_roll = 0.99
 			mob.take_damage(mob.hp + 5, player)
-			check(inv.count("card_boar") == cards - 1 and not inv.has("card_boar_soul"), "карта кабана сломалась")
+			check(inv.count("card_wolf") == cards - 1 and not inv.has("card_wolf_soul"), "карта волка сломалась")
 			check(hud._msg_label.text.contains("Карта существа сломалась"), "сообщение: " + hud._msg_label.text)
 			# Неудача с зеркальной картой: ломается она, карта существа цела
 			inv.add(ItemData.MIRROR_CARD, 2)
-			cards = inv.count("card_boar")
-			mob = find_mob("boar")
-			check(mob != null, "найден второй кабан")
+			cards = inv.count("card_wolf")
+			mob = find_mob("wolf")
+			check(mob != null, "найден второй волк")
 			stand_near(mob, 3.0)
 			player._set_target(mob)
 			tm.cooldown = 0.0
 			main._on_action("tame")
-			check(tm.marked == mob, "метка на втором кабане")
+			check(tm.marked == mob, "метка на втором волке")
 			mob.take_damage(mob.hp + 5, player)
 			tm.force_roll = -1.0
-			check(inv.count(ItemData.MIRROR_CARD) == 1 and inv.count("card_boar") == cards, "сломалась зеркальная карта")
+			check(inv.count(ItemData.MIRROR_CARD) == 1 and inv.count("card_wolf") == cards, "сломалась зеркальная карта")
 			check(hud._msg_label.text.contains("Зеркальная карта сломалась, карта существа цела"),
 				"сообщение: " + hud._msg_label.text)
 			check(game.pets.size() == 2, "неудачи не добавляют питомцев")
 			player.global_position = Vector3(0, 0.1, 2)
 			step = 6
 		6:
-			# Нельзя приручить (неизвестный вид — фиолетовый значок)
+			# Кабана и стража приручить нельзя: фиолетовый значок, «Приручить» отказывает
 			check(Taming.badge_state("no_such_beast") == Taming.BADGE_NO, "неизвестного зверя приручить нельзя")
-			check(MobData.tameable("golem") and Taming.badge_state("golem") == Taming.BADGE_NEED_CARD, "стража можно, нужна карта")
-			# Перевод старого сохранения: кристаллы души → карты (+ золото за редкий)
+			for sp in NO_TAME:
+				mob = find_mob(String(sp))
+				check(mob != null, "найден зверь %s" % sp)
+				if mob == null:
+					continue
+				stand_near(mob, 3.0)
+				player._set_target(mob)
+				check(hud.target_tame_state == Taming.BADGE_NO and hud.target_card_tier == "",
+					"значок %s: нельзя приручить (%s)" % [sp, hud.target_tame_state])
+				check(hud._tame_badge.visible and not hud._tame_tier.visible, "значок виден, квадратика тира нет: %s" % sp)
+				tm.cooldown = 0.0
+				var used: int = tm.attempts
+				check(not tm.try_tame(), "«Приручить» на %s отказывает" % sp)
+				main._on_action("tame")
+				check(tm.marked == null and not mob.tame_marked, "метка на %s не ставится" % sp)
+				check(hud._msg_label.text.contains("Этого зверя нельзя приручить"), "сообщение: " + hud._msg_label.text)
+				mob.take_damage(mob.hp + 5, player)
+				check(tm.attempts == used, "победа над %s — не попытка приручения" % sp)
+				player._set_target(null)
+			player.global_position = Vector3(0, 0.1, 2)
+			# Перевод старого сохранения: кристаллы души → зеркальные карты (+ золото за редкий и древний)
 			game.from_dict({
 				"name": "Старый", "race": "dark_elf", "class": "assassin", "level": 3, "gold": 10,
 				"inventory": {"crystal_common": 2, "crystal_rare": 1, "crystal_unique": 1, "hp_potion": 1},
 				"bag": [{"id": "crystal_common", "n": 2}, {"id": "hp_potion", "n": 1}, {}, {"id": "crystal_unique", "n": 1}],
-				"pets": [{"species": "boar", "name": "Хрюня", "level": 4}],
+				"pets": [{"species": "boar", "name": "Хрюня", "level": 4}, {"species": "golem", "name": "Глыба", "level": 12}],
 			})
-			check(inv.count("mirror_card") == 3 and inv.count("card_golem") == 1, "кристаллы стали картами: %s" % [inv.to_dict()])
+			check(inv.count("mirror_card") == 4 and inv.count("hp_potion") == 1, "кристаллы стали зеркальными картами: %s"
+				% [inv.to_dict()])
 			check(not inv.has("crystal_common") and not inv.has("crystal_rare") and not inv.has("crystal_unique"),
 				"кристаллов не осталось")
-			check(game.gold == 40, "за редкий кристалл +30 зол.: %d" % game.gold)
-			check(String(inv.cell(0).get("id", "")) == "mirror_card" and String(inv.cell(3).get("id", "")) == "card_golem",
+			check(not inv.has("card_golem") and not inv.has("card_boar"), "карт стража и кабана нет")
+			check(game.gold == 140, "за редкий кристалл +30 зол., за древний +100 зол.: %d" % game.gold)
+			check(String(inv.cell(0).get("id", "")) == "mirror_card" and String(inv.cell(3).get("id", "")) == "mirror_card",
 				"раскладка сумки сохранена с новыми id")
 			check(game.load_note.contains("Кристаллы души заменены картами"), "сообщение игроку: " + game.load_note)
-			check(game.pets.size() == 1 and String(game.pets[0]["name"]) == "Хрюня", "прирученные питомцы не тронуты")
+			check(game.pets.size() == 2 and String(game.pets[0]["name"]) == "Хрюня" and String(game.pets[0]["species"]) == "boar"
+				and String(game.pets[1]["species"]) == "golem", "прирученные кабан и страж не тронуты")
+			# Карты кабана и стража из сохранения прошлой версии → зеркальные карты
+			game.from_dict({
+				"name": "Старый", "race": "dark_elf", "class": "assassin", "level": 3, "gold": 10,
+				"inventory": {"card_boar": 2, "card_boar_soul": 1, "card_golem": 1, "card_golem_soul": 1, "card_wolf": 1},
+				"bag": [{"id": "card_boar", "n": 2}, {"id": "card_wolf", "n": 1}, {"id": "card_golem_soul", "n": 1}],
+			})
+			check(inv.count("mirror_card") == 5 and inv.count("card_wolf") == 1, "карты кабана и стража стали зеркальными: %s"
+				% [inv.to_dict()])
+			for id in ["card_boar", "card_boar_soul", "card_golem", "card_golem_soul"]:
+				check(not inv.has(id), "в сумке нет %s" % id)
+			check(String(inv.cell(0).get("id", "")) == "mirror_card" and String(inv.cell(1).get("id", "")) == "card_wolf",
+				"раскладка сумки с новыми id")
+			check(game.gold == 10, "за карты золото не доплачивается: %d" % game.gold)
+			check(game.load_note.contains("Кабана и каменного стража больше нельзя приручить")
+				and not game.load_note.contains("Кристаллы"), "сообщение игроку: " + game.load_note)
 			game.load_note = ""
 			ok_done()
 
@@ -185,9 +229,26 @@ func _unit_items() -> void:
 		check(ItemData.frame_color(e) == ItemData.card_tier_color(ItemData.card_tier(e)), "рамка %s — цвет тира" % e)
 	check(ItemData.item_name("card_panther") == "Карта существа: Пантера", "название пустой карты")
 	check(ItemData.item_name("card_panther_soul") == "Карта пантеры (с душой)", "название карты с душой")
-	for sp in ["panther", "turtle", "pheasant", "boar", "wolf"]:
-		check(ItemData.card_tier("card_" + sp) == "basic", "карта %s — коричневая (базовая)" % sp)
-	check(ItemData.card_tier("card_golem") == "unique", "карта стража — жёлтая (уникальная)")
+	for sp in SPECIES:
+		check(ItemData.card_tier("card_" + String(sp)) == "basic", "карта %s — коричневая (базовая)" % sp)
+	# Кабан и страж не приручаются: их карт нет ни в предметах, ни в добыче, ни у торговца, ни значков
+	for sp in NO_TAME:
+		var c := "card_" + String(sp)
+		check(not MobData.tameable(String(sp)), "%s — нельзя приручить" % sp)
+		check(Taming.badge_state(String(sp)) == Taming.BADGE_NO, "значок %s — «нельзя приручить»" % sp)
+		check(ItemData.get_item(c).is_empty() and ItemData.get_item(c + "_soul").is_empty(), "предметов %s нет" % c)
+		check(ItemData.card_for(String(sp)) == "" and ItemData.soul_card_for(String(sp)) == "", "у %s нет карт" % sp)
+		check(not InventoryWindow.goods("assassin").has(c), "%s не продаётся" % c)
+		check(not ResourceLoader.exists(ItemData.icon_path(c)) and not ResourceLoader.exists(ItemData.icon_path(c + "_soul")),
+			"значков %s нет" % c)
+		check(PetData.SPECIES.has(sp), "вид питомца %s остался (для уже прирученных)" % sp)
+	for k in MobData.TYPES:
+		var id := String(k)
+		check(MobData.tameable(id) == (ItemData.card_for(id) != ""), "у приручаемого %s есть карта, у прочих нет" % id)
+		for e in MobData.get_type(id)["loot"]:
+			var it := String(e[0])
+			check(ItemData.card_species(it) == "" or MobData.tameable(ItemData.card_species(it)),
+				"из %s не выпадает карта неприручаемого зверя: %s" % [id, it])
 	check(ItemData.card_tier_label("unique") == "жёлтая (уникальная)", "подпись тира: " + ItemData.card_tier_label("unique"))
 	for t in ["basic", "rare", "special", "unique"]:
 		check(ItemData.CARD_TIERS.has(t) and Taming.CHANCE.has(t), "тир %s описан" % t)
@@ -199,7 +260,7 @@ func _unit_items() -> void:
 	check(ItemData.frame_color(ItemData.MIRROR_CARD) == ItemData.MIRROR_COLOR, "зеркальная — серебряная рамка")
 	check(int(ItemData.get_item(ItemData.MIRROR_CARD)["buy"]) > int(ItemData.get_item("card_panther")["buy"]),
 		"зеркальная карта дороже базовой")
-	for sp in ["boar", "wolf", "golem"]:
+	for sp in ["wolf"]:
 		var c := "card_" + String(sp)
 		check(int(ItemData.get_item(c)["buy"]) == 0, "%s не продаётся" % c)
 		var dropped := false
@@ -210,8 +271,8 @@ func _unit_items() -> void:
 	for k in MobData.TYPES:
 		for e in MobData.get_type(String(k))["loot"]:
 			check(not ItemData.get_item(String(e[0])).is_empty(), "добыча %s есть в предметах: %s" % [k, e[0]])
-	var ic := ItemIcon.make("card_golem_soul", 64.0)
-	check(ic.item_id == "card_golem_soul", "значок карты создаётся")
+	var ic := ItemIcon.make("card_wolf_soul", 64.0)
+	check(ic.item_id == "card_wolf_soul", "значок карты создаётся")
 	ic.free()
 
 
@@ -224,32 +285,33 @@ func _unit_lines() -> void:
 	check(t.contains("Примените «Приручить» к зверю, затем победите его"), "что делать с картой")
 	t = "\n".join(PackedStringArray(Taming.card_lines("card_wolf")))
 	check(t.contains("Восточный лагерь") and t.contains("выпадает из волка"), "карта волка: " + t)
-	t = "\n".join(PackedStringArray(Taming.card_lines("card_golem")))
-	check(t.contains("Логово стража (ур. 10)") and t.contains("жёлтая (уникальная)") and t.contains("25%"), "карта стража: " + t)
-	t = "\n".join(PackedStringArray(Taming.card_lines("card_boar_soul")))
+	t = "\n".join(PackedStringArray(Taming.card_lines("card_turtle")))
+	check(t.contains("Мёртвая роща (ур. 5–6)") and t.contains("коричневая (базовая)"), "карта черепахи: " + t)
+	check(Taming.card_lines("card_golem").is_empty() and Taming.card_lines("card_boar").is_empty(), "карт стража и кабана нет")
+	t = "\n".join(PackedStringArray(Taming.card_lines("card_wolf_soul")))
 	check(t.contains("Сформируйте существо в окне «Питомцы» или кнопкой «Сформировать»"), "карта с душой: " + t)
 	t = "\n".join(PackedStringArray(Taming.card_lines(ItemData.MIRROR_CARD)))
 	check(t.contains("зеркальная карта") and t.contains("продаётся у торговца"), "зеркальная карта: " + t)
-	check(Taming.where_to_get("card_golem") == "выпадает из каменного стража", "карта стража — из стража")
+	check(Taming.where_to_get("card_wolf") == "выпадает из волка", "карта волка — из волка")
 
 
 ## Карта с душой при полной сумке: заменяет пустую в той же ячейке; если пустых в стопке больше — ничего не теряется.
 func _unit_full_bag() -> void:
 	var a := Inventory.new()
-	a.add("card_boar", 1)
+	a.add("card_wolf", 1)
 	a.add("dual_swords_steel", Inventory.CAPACITY - 1)
-	a.move(a.find_cell("card_boar"), 7)
-	check(a.is_full() and String(a.cell(7).get("id", "")) == "card_boar", "сумка полна, карта в ячейке 7")
-	check(a.replace_one("card_boar", "card_boar_soul"), "карта заменена")
-	check(String(a.cell(7).get("id", "")) == "card_boar_soul" and a.cell_count() == Inventory.CAPACITY,
+	a.move(a.find_cell("card_wolf"), 7)
+	check(a.is_full() and String(a.cell(7).get("id", "")) == "card_wolf", "сумка полна, карта в ячейке 7")
+	check(a.replace_one("card_wolf", "card_wolf_soul"), "карта заменена")
+	check(String(a.cell(7).get("id", "")) == "card_wolf_soul" and a.cell_count() == Inventory.CAPACITY,
 		"карта с душой легла в ту же ячейку")
 	var b := Inventory.new()
-	b.add("card_boar", 2)
+	b.add("card_wolf", 2)
 	b.add("dual_swords_steel", Inventory.CAPACITY - 1)
-	check(b.replace_one("card_boar", "card_boar_soul"), "карта из стопки заменена")
-	check(b.count("card_boar") == 1 and b.count("card_boar_soul") == 1 and b.cell_count() == Inventory.CAPACITY + 1,
+	check(b.replace_one("card_wolf", "card_wolf_soul"), "карта из стопки заменена")
+	check(b.count("card_wolf") == 1 and b.count("card_wolf_soul") == 1 and b.cell_count() == Inventory.CAPACITY + 1,
 		"полная сумка: карта с душой сверх вместимости, ничего не пропало")
-	check(not b.replace_one("card_wolf", "card_wolf_soul"), "без пустой карты замены нет")
+	check(not b.replace_one("card_turtle", "card_turtle_soul"), "без пустой карты замены нет")
 
 
 func _press(node_name: String) -> void:
