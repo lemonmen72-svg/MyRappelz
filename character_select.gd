@@ -43,8 +43,8 @@ func _ready() -> void:
 	var who := "Аккаунт: %s · персонажей до %d" % [Accounts.current, Accounts.SLOTS]
 	if Accounts.is_admin():
 		who += " · администратор"
-	# С переносом: строка не должна раздвигать экран шире 1280 px на «Крупном»
-	root.add_child(MenuKit.label(who, UiScale.FONT_TEXT, MenuKit.MUTED, true))
+	# Без переноса (перенос в контейнере считает высоту по самой узкой ширине и раздувает экран); строка короткая
+	root.add_child(MenuKit.label(who, UiScale.FONT_TEXT, MenuKit.MUTED))
 	_info = MenuKit.label(note, UiScale.FONT_TEXT, MenuKit.GOOD, true)
 	root.add_child(_info)
 
