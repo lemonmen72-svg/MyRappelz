@@ -9,7 +9,8 @@ extends Node
 ## Питомец вида species призван (слушают задания — Quests).
 signal summoned(species: String)
 
-const WINDOW_SIZE := Vector2(1040, 600)
+## Окно питомцев — для «Среднего» размера интерфейса (умножается на UiScale.k(); было 1040×600).
+const WINDOW_SIZE := Vector2(900, 540)
 ## Радиус поиска цели для команды «Атакуй», если у игрока нет цели.
 const ATTACK_RANGE := 12.0
 
@@ -222,7 +223,7 @@ func open_window() -> void:
 		hint.text = "Питомцев пока нет. Возьмите карту существа нужного вида (базовые продаёт Учитель Кирк в центре города, другие " \
 			+ "выпадают из зверей), нажмите «Приручить» рядом со зверем и победите его. Из карты с душой сформируйте существо."
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		hint.custom_minimum_size = Vector2(WINDOW_SIZE.x - 60.0, 0)
+		hint.custom_minimum_size = Vector2(UiScale.px(WINDOW_SIZE.x - 60.0), 0)
 		body.add_child(hint)
 		return
 	for i in Game.pets.size():
@@ -249,12 +250,14 @@ func _add_forming(body: VBoxContainer) -> void:
 		var id := String(c)
 		var sp := ItemData.card_species(id)
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
+		row.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 		body.add_child(row)
-		var ic := ItemIcon.make(id, 44.0)
+		var ic := ItemIcon.make(id, UiScale.px(36))
 		row.add_child(ic)
 		var info := Label.new()
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		info.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT))
 		var n: int = Game.inventory.count(id)
 		info.text = "%s%s → «%s» (%s, ур. 1)" % [ItemData.item_name(id), " ×%d" % n if n > 1 else "",
 			PetData.stage_name(sp, 1), PetData.role_name(sp)]
@@ -277,10 +280,11 @@ func _add_row(body: VBoxContainer, i: int) -> void:
 	var active := i == Game.active_pet and not dead
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
+	row.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	body.add_child(row)
 	var info := Label.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT))
 	var status: String = "погиб" if dead else "HP %d/%d" % [cur, mhp]
 	info.text = "%s%s\n%s · %s, ур. %d, %s, JP %d" % [
 		String(rec.get("name", "Питомец")), "  [призван]" if active else "",
@@ -306,6 +310,8 @@ func _add_button(row: HBoxContainer, key: String, text: String, cb: Callable) ->
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(0, UiScale.button_h())
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	b.pressed.connect(cb)
 	row.add_child(b)
 	window_buttons[key] = b

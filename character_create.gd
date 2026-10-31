@@ -5,7 +5,7 @@ extends CanvasLayer
 ## справа — карточка класса: описание, характеристики 1-го уровня (у Наёмника ещё 7 статов) и два умения.
 ## Пока доступна одна профессия — тёмная эльфийка-Наёмник (ClassData.is_playable): остальные расы и классы
 ## видны, но затемнены с подписью «скоро» и не выбираются.
-## Рассчитан на 1280×720 и касания пальцем.
+## Рассчитан на 1280×720 и касания пальцем; размеры шрифтов и кнопок — UiScale (настройка «Размер интерфейса»).
 
 signal created(char_name: String, race_id: String, class_id: String)
 
@@ -48,27 +48,27 @@ func _ready() -> void:
 	var band := ColorRect.new()
 	band.color = Color(0.1, 0.12, 0.17)
 	band.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	band.custom_minimum_size = Vector2(0, 90)
+	band.custom_minimum_size = Vector2(0, UiScale.px(64))
 	add_child(band)
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	margin.theme = Util.ui_theme()
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + String(side), 22)
+		margin.add_theme_constant_override("margin_" + String(side), int(UiScale.px(16)))
 	add_child(margin)
 
 	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 12)
+	root.add_theme_constant_override("separation", int(UiScale.px(10)))
 	margin.add_child(root)
 
-	var title := _label("Создание персонажа", 34, GOLD)
+	var title := _label("Создание персонажа", UiScale.FONT_TITLE + 4, GOLD)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(title)
 
 	var cols := HBoxContainer.new()
 	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	cols.add_theme_constant_override("separation", 18)
+	cols.add_theme_constant_override("separation", int(UiScale.px(14)))
 	root.add_child(cols)
 
 	cols.add_child(_build_left())
@@ -83,38 +83,38 @@ func _build_left() -> PanelContainer:
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_stretch_ratio = 1.0
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 8)
+	v.add_theme_constant_override("separation", int(UiScale.px(6)))
 	panel.add_child(v)
 
-	v.add_child(_label("Имя", 20, MUTED))
+	v.add_child(_label("Имя", UiScale.FONT_TEXT, MUTED))
 	_name_edit = LineEdit.new()
 	_name_edit.placeholder_text = "Имя персонажа"
 	_name_edit.text = "Герой"
 	_name_edit.max_length = 16
-	_name_edit.custom_minimum_size = Vector2(0, 54)
+	_name_edit.custom_minimum_size = Vector2(0, UiScale.button_h())
 	v.add_child(_name_edit)
 
-	v.add_child(_label("Раса", 20, MUTED))
+	v.add_child(_label("Раса", UiScale.FONT_TEXT, MUTED))
 	var race_box := VBoxContainer.new()
-	race_box.add_theme_constant_override("separation", 6)
+	race_box.add_theme_constant_override("separation", int(UiScale.px(5)))
 	v.add_child(race_box)
 	for rid in ClassData.RACES:
-		var b := _choice_button(String(ClassData.race(rid)["name"]), 50)
+		var b := _choice_button(String(ClassData.race(rid)["name"]), UiScale.BUTTON_H - 4)
 		if not ClassData.race_playable(String(rid)):
 			_soon(b)
 		b.pressed.connect(_select_race.bind(String(rid)))
 		race_box.add_child(b)
 		_race_btns[rid] = b
-	_race_desc = _label("", 18, Color(0.88, 0.88, 0.9))
+	_race_desc = _label("", UiScale.FONT_BODY, Color(0.88, 0.88, 0.9))
 	_race_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_race_desc.custom_minimum_size = Vector2(0, 50)
+	_race_desc.custom_minimum_size = Vector2(0, UiScale.px(40))
 	v.add_child(_race_desc)
 
-	v.add_child(_label("Класс", 20, MUTED))
+	v.add_child(_label("Класс", UiScale.FONT_TEXT, MUTED))
 	_class_box = HBoxContainer.new()
-	_class_box.add_theme_constant_override("separation", 8)
+	_class_box.add_theme_constant_override("separation", int(UiScale.px(6)))
 	v.add_child(_class_box)
-	var only := _label("Пока доступна одна профессия — Наёмник. Остальные появятся позже.", 16, MUTED)
+	var only := _label("Пока доступна одна профессия — Наёмник. Остальные появятся позже.", UiScale.FONT_SMALL, MUTED)
 	only.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(only)
 
@@ -124,8 +124,8 @@ func _build_left() -> PanelContainer:
 
 	var start := Button.new()
 	start.text = "Начать игру"
-	start.custom_minimum_size = Vector2(0, 64)
-	start.add_theme_font_size_override("font_size", 30)
+	start.custom_minimum_size = Vector2(0, UiScale.px(UiScale.BUTTON_H + 8))
+	start.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TITLE))
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(0.2, 0.5, 0.25) if state != "pressed" else Color(0.3, 0.65, 0.3)
@@ -133,8 +133,8 @@ func _build_left() -> PanelContainer:
 			sb.bg_color = Color(0.24, 0.56, 0.3)
 		sb.border_color = GOLD
 		sb.set_border_width_all(2)
-		sb.set_corner_radius_all(10)
-		sb.set_content_margin_all(12)
+		sb.set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
+		sb.set_content_margin_all(UiScale.px(8))
 		start.add_theme_stylebox_override(state, sb)
 	start.pressed.connect(_on_start)
 	v.add_child(start)
@@ -146,9 +146,9 @@ func _build_preview() -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_stretch_ratio = 0.9
-	panel.custom_minimum_size = Vector2(240, 0)
+	panel.custom_minimum_size = Vector2(UiScale.px(220), 0)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 4)
+	v.add_theme_constant_override("separation", int(UiScale.px(4)))
 	panel.add_child(v)
 
 	var svc := SubViewportContainer.new()
@@ -204,7 +204,7 @@ func _build_preview() -> PanelContainer:
 	_preview_pivot.rotation.y = PI - 0.45
 	vp.add_child(_preview_pivot)
 
-	_preview_caption = _label("", 18, MUTED)
+	_preview_caption = _label("", UiScale.FONT_BODY, MUTED)
 	_preview_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(_preview_caption)
 	return panel
@@ -257,44 +257,44 @@ func _build_right() -> PanelContainer:
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_stretch_ratio = 1.3
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 6)
+	v.add_theme_constant_override("separation", int(UiScale.px(5)))
 	panel.add_child(v)
 
 	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 12)
+	head.add_theme_constant_override("separation", int(UiScale.px(10)))
 	v.add_child(head)
 	_class_stripe = ColorRect.new()
-	_class_stripe.custom_minimum_size = Vector2(12, 0)
+	_class_stripe.custom_minimum_size = Vector2(UiScale.px(8), 0)
 	head.add_child(_class_stripe)
 	var hv := VBoxContainer.new()
 	hv.add_theme_constant_override("separation", 0)
 	head.add_child(hv)
-	_class_title = _label("", 30, Color.WHITE)
+	_class_title = _label("", UiScale.FONT_NAME, Color.WHITE)
 	hv.add_child(_class_title)
-	_class_sub = _label("", 18, MUTED)
+	_class_sub = _label("", UiScale.FONT_BODY, MUTED)
 	hv.add_child(_class_sub)
 
-	_class_desc = _label("", 20, Color(0.9, 0.9, 0.92))
+	_class_desc = _label("", UiScale.FONT_TEXT, Color(0.9, 0.9, 0.92))
 	_class_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_class_desc)
 
 	v.add_child(HSeparator.new())
-	v.add_child(_label("Характеристики (1-й уровень)", 20, GOLD))
+	v.add_child(_label("Характеристики (1-й уровень)", UiScale.FONT_TEXT, GOLD))
 	var grid := GridContainer.new()
 	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 4)
+	grid.add_theme_constant_override("h_separation", int(UiScale.px(10)))
+	grid.add_theme_constant_override("v_separation", int(UiScale.px(3)))
 	v.add_child(grid)
 	for row in STAT_ROWS:
 		var key: String = row[0]
-		var name_l := _label(String(row[1]), 18, Color(0.9, 0.9, 0.92))
-		name_l.custom_minimum_size = Vector2(110, 0)
+		var name_l := _label(String(row[1]), UiScale.FONT_BODY, Color(0.9, 0.9, 0.92))
+		name_l.custom_minimum_size = Vector2(UiScale.px(90), 0)
 		grid.add_child(name_l)
 		var bar := ProgressBar.new()
 		bar.show_percentage = false
 		bar.min_value = 0.0
 		bar.max_value = 1.0
-		bar.custom_minimum_size = Vector2(90, 16)
+		bar.custom_minimum_size = UiScale.v2(80, 12)
 		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		var back := StyleBoxFlat.new()
@@ -303,27 +303,28 @@ func _build_right() -> PanelContainer:
 		bar.add_theme_stylebox_override("background", back)
 		grid.add_child(bar)
 		_stat_bars[key] = bar
-		var val := _label("", 18, Color.WHITE)
-		val.custom_minimum_size = Vector2(140, 0)
+		var val := _label("", UiScale.FONT_BODY, Color.WHITE)
+		val.custom_minimum_size = Vector2(UiScale.px(120), 0)
 		grid.add_child(val)
 		_stat_vals[key] = val
 
-	_class_stats7 = _label("", 17, Color(0.85, 0.86, 0.9))
+	_class_stats7 = _label("", UiScale.FONT_BODY, Color(0.85, 0.86, 0.9))
 	_class_stats7.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_class_stats7)
 
 	v.add_child(HSeparator.new())
-	v.add_child(_label("Умения", 20, GOLD))
+	v.add_child(_label("Умения", UiScale.FONT_TEXT, GOLD))
 	_skills_box = VBoxContainer.new()
-	_skills_box.add_theme_constant_override("separation", 6)
+	_skills_box.add_theme_constant_override("separation", int(UiScale.px(5)))
 	v.add_child(_skills_box)
 	return panel
 
 
+## Подпись; font_size — для «Среднего» размера интерфейса (UiScale.FONT_*).
 func _label(text: String, font_size: int, col: Color) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_font_size_override("font_size", UiScale.fs(font_size))
 	l.add_theme_color_override("font_color", col)
 	return l
 
@@ -333,16 +334,17 @@ func _soon(b: Button) -> void:
 	b.text += " — скоро"
 	b.disabled = true
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", 17)
+	b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_BODY))
 
 
-func _choice_button(text: String, height: float = 54.0) -> Button:
+## Кнопка выбора; height — для «Среднего» размера интерфейса (по умолчанию UiScale.BUTTON_H).
+func _choice_button(text: String, height: float = 44.0) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.toggle_mode = true
-	b.custom_minimum_size = Vector2(0, height)
+	b.custom_minimum_size = Vector2(0, UiScale.px(height))
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.add_theme_font_size_override("font_size", 20)
+	b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT + 1))
 	return b
 
 
@@ -382,7 +384,7 @@ func _select_race(rid: String) -> void:
 			b.text = String(ClassData.cls(cid)["name"]) + "\nскоро"
 			b.disabled = true
 			b.focus_mode = Control.FOCUS_NONE
-			b.add_theme_font_size_override("font_size", 17)
+			b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_BODY))
 		b.pressed.connect(_select_class.bind(String(cid)))
 		_class_box.add_child(b)
 	_select_class(_class)
@@ -441,11 +443,11 @@ func _select_class(cid: String) -> void:
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", 0)
 		var top := HBoxContainer.new()
-		top.add_theme_constant_override("separation", 10)
-		top.add_child(_label(String(sk.get("name", sid)), 22, Color(1, 0.85, 0.5)))
-		top.add_child(_label("перезарядка %s с" % _num(float(sk.get("cd", 0.0))), 17, MUTED))
+		top.add_theme_constant_override("separation", int(UiScale.px(8)))
+		top.add_child(_label(String(sk.get("name", sid)), UiScale.FONT_HEAD, Color(1, 0.85, 0.5)))
+		top.add_child(_label("перезарядка %s с" % _num(float(sk.get("cd", 0.0))), UiScale.FONT_BODY, MUTED))
 		box.add_child(top)
-		var d := _label(String(sk.get("desc", "")), 17, Color(0.85, 0.86, 0.9))
+		var d := _label(String(sk.get("desc", "")), UiScale.FONT_BODY, Color(0.85, 0.86, 0.9))
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(d)
 		_skills_box.add_child(box)

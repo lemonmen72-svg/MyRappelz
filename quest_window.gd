@@ -8,9 +8,10 @@ extends Node
 ## Кнопки открытого окна для тестов (buttons): "tab_active", "tab_done", "q_<id>", "track", "abandon",
 ## "abandon_yes", "abandon_no".
 
-const WINDOW_SIZE := Vector2(1140, 640)
-const LIST_W := 330.0
-const ICON := 40.0
+## Размеры — для «Среднего» размера интерфейса (умножаются на UiScale.k(); было 1140×640, список 330).
+const WINDOW_SIZE := Vector2(900, 560)
+const LIST_W := 260.0
+const ICON := 30.0
 const GOLD := Color(1.0, 0.85, 0.3)
 const MUTED := Color(0.76, 0.78, 0.88)
 const GOOD := Color(0.55, 1.0, 0.6)
@@ -84,31 +85,31 @@ func _build() -> void:
 		selected = String(ids[0]) if not ids.is_empty() else ""
 	_body = main.hud.create_window("Задания", WINDOW_SIZE)
 	var tabs := HBoxContainer.new()
-	tabs.add_theme_constant_override("separation", 10)
+	tabs.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	_body.add_child(tabs)
 	tabs.add_child(_tab_button("Активные (%d)" % quests.active_ids().size(), "tab_active", "active"))
 	tabs.add_child(_tab_button("Выполненные (%d)" % quests.done_ids().size(), "tab_done", "done"))
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
+	row.add_theme_constant_override("separation", int(UiScale.px(10)))
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_body.add_child(row)
 	var list := VBoxContainer.new()
-	list.custom_minimum_size = Vector2(LIST_W, 0)
-	list.add_theme_constant_override("separation", 6)
+	list.custom_minimum_size = Vector2(UiScale.px(LIST_W), 0)
+	list.add_theme_constant_override("separation", int(UiScale.px(5)))
 	row.add_child(list)
 	var card_panel := PanelContainer.new()
 	card_panel.add_theme_stylebox_override("panel", _card_style())
 	card_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(card_panel)
 	var card := VBoxContainer.new()
-	card.add_theme_constant_override("separation", 6)
+	card.add_theme_constant_override("separation", int(UiScale.px(5)))
 	card_panel.add_child(card)
 	if ids.is_empty():
 		var t := "Активных заданий нет. Учитель Кирк в центре города подскажет, с чего начать." if tab == "active" \
 			else "Вы ещё не сдали ни одного задания."
-		list.add_child(_text(t, 19, MUTED))
-		card.add_child(_label("Журнал заданий", 24, GOLD))
-		card.add_child(_text("Задания выдают жители: над головой у них золотой «!». Золотой «?» — задание можно сдать, серый «?» — задание взято, но ещё не выполнено.", 18, MUTED))
+		list.add_child(_text(t, UiScale.FONT_TEXT, MUTED))
+		card.add_child(_label("Журнал заданий", UiScale.FONT_HEAD, GOLD))
+		card.add_child(_text("Задания выдают жители: над головой у них золотой «!». Золотой «?» — задание можно сдать, серый «?» — задание взято, но ещё не выполнено.", UiScale.FONT_BODY, MUTED))
 		return
 	for k in ids:
 		var id := String(k)
@@ -134,7 +135,7 @@ func _quest_button(id: String) -> Button:
 	b.button_pressed = id == selected
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.clip_text = true
-	b.custom_minimum_size = Vector2(LIST_W, 52)
+	b.custom_minimum_size = Vector2(UiScale.px(LIST_W), UiScale.button_h())
 	if id == Game.quest_tracked and tab == "active":
 		b.add_theme_color_override("font_color", Color(0.45, 0.28, 0.02))
 	return b
@@ -142,7 +143,7 @@ func _quest_button(id: String) -> Button:
 
 func _build_card(card: VBoxContainer, id: String) -> void:
 	var q := QuestData.get_quest(id)
-	var title := _label(QuestData.quest_name(id), 26, GOLD)
+	var title := _label(QuestData.quest_name(id), UiScale.FONT_NAME, GOLD)
 	title.name = "quest_title"
 	card.add_child(title)
 	var giver := QuestData.giver(id)
@@ -150,29 +151,29 @@ func _build_card(card: VBoxContainer, id: String) -> void:
 	var who := "Выдаёт: " + NpcData.npc_name(giver)
 	if to != giver:
 		who += " · сдать: " + NpcData.npc_name(to)
-	card.add_child(_text(who, 17, MUTED))
+	card.add_child(_text(who, UiScale.FONT_BODY, MUTED))
 	var active := quests.is_active(id)
 	if active and quests.is_ready(id):
-		card.add_child(_text("Все цели выполнены — вернитесь к %s." % NpcData.name_dat(to), 18, GOOD))
-	card.add_child(_text(String(q.get("desc", "")), 19, Color.WHITE))
+		card.add_child(_text("Все цели выполнены — вернитесь к %s." % NpcData.name_dat(to), UiScale.FONT_BODY, GOOD))
+	card.add_child(_text(String(q.get("desc", "")), UiScale.FONT_TEXT, Color.WHITE))
 	if not active:
 		var said := String(q.get("done", ""))
 		if said != "":
-			card.add_child(_text("%s: «%s»" % [NpcData.npc_name(to), said], 17, MUTED))
-	card.add_child(_label("Цели", 21, GOLD))
+			card.add_child(_text("%s: «%s»" % [NpcData.npc_name(to), said], UiScale.FONT_BODY, MUTED))
+	card.add_child(_label("Цели", UiScale.FONT_TEXT, GOLD))
 	var goals := QuestData.goals(id)
 	for gi in goals.size():
 		var g: Dictionary = goals[gi]
 		card.add_child(goal_row(g, quests.goal_progress(id, gi), quests.goal_done(id, gi) or not active))
-	card.add_child(_label("Награда" if active else "Получено", 21, GOLD))
+	card.add_child(_label("Награда" if active else "Получено", UiScale.FONT_TEXT, GOLD))
 	card.add_child(reward_row(id))
 	if active:
 		var acts := HBoxContainer.new()
-		acts.add_theme_constant_override("separation", 8)
+		acts.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 		card.add_child(acts)
 		if abandon_confirm:
 			card.add_child(_text("Отказаться от «%s»? Прогресс пропадёт, взять задание можно будет снова." %
-				QuestData.quest_name(id), 18, BAD))
+				QuestData.quest_name(id), UiScale.FONT_BODY, BAD))
 			acts.add_child(_button("Отказаться", "abandon_yes", _on_abandon_yes))
 			acts.add_child(_button("Отмена", "abandon_no", _on_abandon_no))
 		else:
@@ -184,16 +185,16 @@ func _build_card(card: VBoxContainer, id: String) -> void:
 ## Строка цели: галочка, подпись и прогресс «x/n» (у выполненного — зелёным).
 static func goal_row(g: Dictionary, have: int, done: bool) -> HBoxContainer:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
+	row.add_theme_constant_override("separation", int(UiScale.px(6)))
 	var ch := Check.new()
 	ch.done = done
-	ch.custom_minimum_size = Vector2(22, 22)
+	ch.custom_minimum_size = UiScale.v2(18, 18)
 	ch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ch)
 	var need := QuestData.goal_need(g)
 	var l := Label.new()
 	l.text = "%s   %d/%d" % [QuestData.goal_text(g), mini(have, need) if not done else need, need]
-	l.add_theme_font_size_override("font_size", 19)
+	l.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT))
 	l.add_theme_color_override("font_color", GOOD if done else Color.WHITE)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -205,8 +206,8 @@ static func goal_row(g: Dictionary, have: int, done: bool) -> HBoxContainer:
 ## Награды задания: опыт, золото, JP — подписями, предметы — значком и названием.
 static func reward_row(id: String) -> HFlowContainer:
 	var flow := HFlowContainer.new()
-	flow.add_theme_constant_override("h_separation", 16)
-	flow.add_theme_constant_override("v_separation", 6)
+	flow.add_theme_constant_override("h_separation", int(UiScale.px(14)))
+	flow.add_theme_constant_override("v_separation", int(UiScale.px(5)))
 	var r := QuestData.rewards(id)
 	if int(r.get("xp", 0)) > 0:
 		flow.add_child(_chip("Опыт: %d" % int(r["xp"]), Color(0.6, 0.9, 1.0)))
@@ -216,9 +217,9 @@ static func reward_row(id: String) -> HFlowContainer:
 	for k in items:
 		var item_id := String(k)
 		var box := HBoxContainer.new()
-		box.add_theme_constant_override("separation", 6)
+		box.add_theme_constant_override("separation", int(UiScale.px(5)))
 		box.name = "reward_" + item_id
-		var ic := ItemIcon.make(item_id, ICON)
+		var ic := ItemIcon.make(item_id, UiScale.px(ICON))
 		box.add_child(ic)
 		var l := _chip("%s ×%d" % [ItemData.item_name(item_id), int(items[k])], ItemData.frame_color(item_id).lerp(Color.WHITE, 0.45))
 		box.add_child(l)
@@ -231,7 +232,7 @@ static func reward_row(id: String) -> HFlowContainer:
 static func _chip(text: String, color: Color) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", 19)
+	l.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT))
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
 	l.add_theme_constant_override("outline_size", 4)
@@ -283,15 +284,16 @@ func _card_style() -> StyleBoxFlat:
 	sb.bg_color = Color(0.06, 0.07, 0.17, 0.75)
 	sb.border_color = Color(0.98, 0.88, 0.6, 0.5)
 	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(14)
-	sb.set_content_margin_all(14)
+	sb.set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
+	sb.set_content_margin_all(UiScale.px(UiScale.PAD))
 	return sb
 
 
+## Подпись; font_size — для «Среднего» размера интерфейса (UiScale.FONT_*).
 func _label(text: String, font_size: int, color: Color) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_font_size_override("font_size", UiScale.fs(font_size))
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
 	l.add_theme_constant_override("outline_size", 4)
@@ -312,8 +314,8 @@ func _button(text: String, node_name: String, cb: Callable) -> Button:
 	b.text = text
 	b.name = node_name
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(0, 52)
-	b.add_theme_font_size_override("font_size", 20)
+	b.custom_minimum_size = Vector2(0, UiScale.button_h())
+	b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT))
 	b.pressed.connect(cb)
 	buttons[node_name] = b
 	return b

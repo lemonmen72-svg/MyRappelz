@@ -142,7 +142,7 @@ func _ready() -> void:
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.no_depth_test = true
-	_label.pixel_size = 0.01
+	_label.pixel_size = UiScale.world_px(0.01)
 	_label.font_size = 40
 	_label.outline_size = 10
 	_label.modulate = Color(0.6, 0.9, 1.0)

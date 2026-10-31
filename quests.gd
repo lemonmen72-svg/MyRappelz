@@ -17,9 +17,10 @@ extends Node
 ## Задание взято, сдано, прогресс изменился.
 signal updated
 
-## Ширина трекера на экране и отступ сверху (под кнопками меню), px.
-const TRACKER_W := 330.0
-const TRACKER_TOP := 84.0
+## Ширина трекера на экране и отступ сверху (под кнопками меню), px — для «Среднего» размера интерфейса
+## (умножаются на UiScale.k(); было 330 / 84).
+const TRACKER_W := 270.0
+const TRACKER_TOP := 60.0
 const GOLD := Color(1.0, 0.85, 0.3)
 const DONE_COLOR := Color(0.55, 1.0, 0.6)
 const MUTED := Color(0.8, 0.82, 0.9)
@@ -364,7 +365,7 @@ func refresh_tracker() -> void:
 		tracker.visible = false
 		return
 	tracker.visible = true
-	var title := _label(QuestData.quest_name(id), 20, GOLD)
+	var title := _label(QuestData.quest_name(id), UiScale.FONT_TEXT, GOLD)
 	title.name = "TrackerTitle"
 	title.clip_text = true
 	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -374,24 +375,24 @@ func refresh_tracker() -> void:
 		var g: Dictionary = goals[gi]
 		var done := goal_done(id, gi)
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
+		row.add_theme_constant_override("separation", int(UiScale.px(5)))
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var ch := QuestWindow.Check.new()
 		ch.done = done
-		ch.custom_minimum_size = Vector2(16, 16)
+		ch.custom_minimum_size = UiScale.v2(13, 13)
 		ch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(ch)
 		# Подпись в одну строку (длинная — с многоточием), прогресс справа: высота трекера постоянна
-		var l := _label(QuestData.goal_text(g), 16, DONE_COLOR if done else Color.WHITE)
+		var l := _label(QuestData.goal_text(g), UiScale.FONT_SMALL, DONE_COLOR if done else Color.WHITE)
 		l.clip_text = true
 		l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(l)
-		var n := _label("%d/%d" % [goal_progress(id, gi), QuestData.goal_need(g)], 16, DONE_COLOR if done else GOLD)
+		var n := _label("%d/%d" % [goal_progress(id, gi), QuestData.goal_need(g)], UiScale.FONT_SMALL, DONE_COLOR if done else GOLD)
 		row.add_child(n)
 		_tracker_box.add_child(row)
 	if is_ready(id):
-		_tracker_box.add_child(_label("Сдать: " + NpcData.npc_name(QuestData.turn_in(id)), 17, GOLD))
+		_tracker_box.add_child(_label("Сдать: " + NpcData.npc_name(QuestData.turn_in(id)), UiScale.FONT_BODY, GOLD))
 	_layout_tracker()
 
 
@@ -418,22 +419,32 @@ func _build_tracker() -> void:
 	sb.bg_color = Color(0.06, 0.07, 0.16, 0.58)
 	sb.border_color = Color(0.98, 0.88, 0.6, 0.55)
 	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(12)
-	sb.content_margin_left = 12
-	sb.content_margin_right = 12
-	sb.content_margin_top = 8
-	sb.content_margin_bottom = 8
 	tracker.add_theme_stylebox_override("panel", sb)
 	tracker.mouse_filter = Control.MOUSE_FILTER_STOP
-	tracker.custom_minimum_size = Vector2(TRACKER_W, 0)
 	tracker.gui_input.connect(_on_tracker_input)
 	_tracker_box = VBoxContainer.new()
-	_tracker_box.add_theme_constant_override("separation", 2)
 	_tracker_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tracker.add_child(_tracker_box)
 	tracker.visible = false
+	_size_tracker()
 	main.hud.add_child(tracker)
 	main.hud.add_blocker(tracker)
+	main.hud.scale_changed.connect(func() -> void:
+		_size_tracker()
+		refresh_tracker())
+
+
+## Поля, скругление и ширина трекера по размеру интерфейса (UiScale).
+func _size_tracker() -> void:
+	var sb := tracker.get_theme_stylebox("panel") as StyleBoxFlat
+	if sb != null:
+		sb.set_corner_radius_all(int(UiScale.px(10)))
+		sb.content_margin_left = UiScale.px(9)
+		sb.content_margin_right = UiScale.px(9)
+		sb.content_margin_top = UiScale.px(5)
+		sb.content_margin_bottom = UiScale.px(5)
+	tracker.custom_minimum_size = Vector2(UiScale.px(TRACKER_W), 0)
+	_tracker_box.add_theme_constant_override("separation", int(UiScale.px(1)))
 
 
 ## Трекер — справа вверху под кнопками меню; высота — по содержимому (каждый кадр: размер окна мог измениться).
@@ -442,14 +453,15 @@ func _layout_tracker() -> void:
 		return
 	var vw := tracker.get_viewport_rect().size.x
 	# Под меню HUD: высота кнопок меню зависит от шрифта, поэтому берём её край, а не только константу
-	var top := TRACKER_TOP
+	var top := UiScale.px(TRACKER_TOP)
 	var hud: HUD = null
 	if main != null:
 		hud = main.get("hud") as HUD
 	if hud != null:
-		top = maxf(top, hud.menu_rect().end.y + 8.0)
-	tracker.position = Vector2(vw - TRACKER_W - 16.0, top)
-	tracker.size = Vector2(TRACKER_W, 0.0)
+		top = maxf(top, hud.menu_rect().end.y + UiScale.px(6))
+	var w := UiScale.px(TRACKER_W)
+	tracker.position = Vector2(vw - w - UiScale.px(12), top)
+	tracker.size = Vector2(w, 0.0)
 
 
 func _process(_delta: float) -> void:
@@ -611,12 +623,13 @@ func _msg(t: String, sec: float = 3.5) -> void:
 		main.hud.show_message(t, sec)
 
 
+## Подпись трекера; font_size — для «Среднего» размера интерфейса (UiScale.FONT_*).
 func _label(text: String, font_size: int, color: Color) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_font_size_override("font_size", UiScale.fs(font_size))
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
-	l.add_theme_constant_override("outline_size", 5)
+	l.add_theme_constant_override("outline_size", 4)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l

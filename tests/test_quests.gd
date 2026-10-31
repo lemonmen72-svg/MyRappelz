@@ -404,7 +404,7 @@ func _check_hud_layout() -> void:
 	var mr := hud.menu_rect()
 	check(mr.position.x >= 0.0 and mr.end.x <= view.x, "меню помещается по ширине: %s (экран %s)" % [mr, view])
 	var tr := hud.target_rect()
-	check(not tr.intersects(mr) and tr.position.x >= 370.0, "панель цели не под меню и не на панели игрока: %s / %s"
+	check(not tr.intersects(mr) and tr.position.x >= hud.player_rect().end.x, "панель цели не под меню и не на панели игрока: %s / %s"
 		% [tr, mr])
 	print("  меню: %s, панель цели: %s" % [mr, tr])
 

@@ -5,21 +5,17 @@ extends RefCounted
 static var _theme: Theme
 
 
-## Общая тема окон и кнопок: крупный шрифт и кнопки под палец.
+## Общая тема окон и кнопок. Размеры (шрифт, поля, скругления) — из UiScale, после смены размера
+## интерфейса их обновляет refresh_theme() в том же объекте темы (открытые окна и кнопки меню меняются сразу).
 static func ui_theme() -> Theme:
 	if _theme != null:
 		return _theme
 	_theme = Theme.new()
-	_theme.default_font_size = 24
 	# Аниме-фэнтези: полупрозрачный тёмно-синий фон, светлая золотистая окантовка, мягкая тень
 	var panel := StyleBoxFlat.new()
 	panel.bg_color = Color(0.1, 0.12, 0.24, 0.9)
 	panel.border_color = Color(0.98, 0.88, 0.6)
-	panel.set_border_width_all(3)
-	panel.set_corner_radius_all(18)
-	panel.set_content_margin_all(20)
 	panel.shadow_color = Color(0, 0, 0, 0.35)
-	panel.shadow_size = 8
 	_theme.set_stylebox("panel", "PanelContainer", panel)
 	_theme.set_stylebox("panel", "Panel", panel)
 	_theme.set_color("font_color", "Label", Color(0.98, 0.96, 0.9))
@@ -36,15 +32,36 @@ static func ui_theme() -> Theme:
 		else:
 			sb.border_color = Color(0.85, 0.68, 0.32)
 			sb.set_border_width_all(2)
-		sb.set_corner_radius_all(14)
-		sb.set_content_margin_all(12)
 		_theme.set_stylebox(state, "Button", sb)
 	# Тёмный текст на светлых кнопках
 	for c in ["font_color", "font_hover_color", "font_focus_color", "font_hover_pressed_color"]:
 		_theme.set_color(c, "Button", Color(0.18, 0.16, 0.28))
 	_theme.set_color("font_pressed_color", "Button", Color(0.3, 0.18, 0.05))
 	_theme.set_color("font_disabled_color", "Button", Color(0.8, 0.8, 0.85))
+	refresh_theme()
 	return _theme
+
+
+## Размеры темы по текущему UiScale (шрифт по умолчанию, поля и скругления окон и кнопок).
+static func refresh_theme() -> void:
+	if _theme == null:
+		return
+	_theme.default_font_size = UiScale.fs(UiScale.FONT)
+	var panel := _theme.get_stylebox("panel", "PanelContainer") as StyleBoxFlat
+	if panel != null:
+		panel.set_border_width_all(maxi(2, roundi(UiScale.px(2.5))))
+		panel.set_corner_radius_all(int(UiScale.px(UiScale.RADIUS)))
+		panel.set_content_margin_all(UiScale.px(UiScale.PAD))
+		panel.shadow_size = int(UiScale.px(6))
+	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+		var sb := _theme.get_stylebox(state, "Button") as StyleBoxFlat
+		if sb == null:
+			continue
+		sb.set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
+		sb.content_margin_left = UiScale.px(UiScale.BTN_PAD_X)
+		sb.content_margin_right = UiScale.px(UiScale.BTN_PAD_X)
+		sb.content_margin_top = UiScale.px(UiScale.BTN_PAD_Y)
+		sb.content_margin_bottom = UiScale.px(UiScale.BTN_PAD_Y)
 
 
 ## Материал в аниме-стиле (cel-shading): ступенчатый свет и блик, подсветка краёв (rim).
@@ -176,6 +193,7 @@ static var _float_font: FontVariation
 ## Всплывающий текст в аниме-стиле (урон, опыт, названия умений): жирный шрифт, цветная тёмная
 ## обводка, «выпрыгивает» с увеличением и улетает вверх, тая. Числа (урон, лечение) крупнее
 ## и чуть разбросаны в стороны, чтобы не слипались. size: множитель размера (крит — 1.4–1.6).
+## Общий размер — UiScale.world_px (настройка «Размер интерфейса»).
 static func float_text(parent: Node, pos: Vector3, text: String, color: Color, size: float = 1.0) -> void:
 	if parent == null or not is_instance_valid(parent) or not parent.is_inside_tree():
 		return
@@ -200,7 +218,8 @@ static func float_text(parent: Node, pos: Vector3, text: String, color: Color, s
 	l.no_depth_test = true
 	l.render_priority = 2
 	l.outline_render_priority = 1
-	var px := 0.012 * size
+	# Размер на экране — прежний × UiScale.WORLD × множитель размера интерфейса (компактно для телефона)
+	var px := UiScale.world_px(0.012) * size
 	l.pixel_size = px * 0.3
 	parent.add_child(l)
 	var start := pos

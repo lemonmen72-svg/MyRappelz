@@ -57,8 +57,8 @@ func _ready() -> void:
 	_label.text = NpcData.npc_name(npc_id)
 	_label.modulate = Color(1.0, 0.85, 0.35)
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	# Имя компактное (~0.25 м высотой), чтобы имена соседних жителей не сливались
-	_label.pixel_size = 0.006
+	# Имя компактное (~0.17 м высотой на «Среднем», UiScale.world_px), чтобы имена соседних жителей не сливались
+	_label.pixel_size = UiScale.world_px(0.006)
 	_label.font_size = 44
 	_label.outline_size = 10
 	_label.position.y = LABEL_Y
@@ -67,7 +67,7 @@ func _ready() -> void:
 	_mark = Label3D.new()
 	_mark.name = "QuestMark"
 	_mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_mark.pixel_size = 0.008
+	_mark.pixel_size = UiScale.world_px(0.008)
 	_mark.font_size = 96
 	_mark.outline_size = 18
 	_mark.outline_modulate = Color(0.25, 0.14, 0.02)

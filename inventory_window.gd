@@ -19,19 +19,20 @@ extends Node
 ## "act_use", "act_form", "act_sell", "act_sell_all", "act_move", "act_move_cancel", "act_drop", "act_drop_yes", "act_drop_no",
 ## "act_drop_minus", "act_drop_plus", "act_drop_all", "act_buy", "act_buy5".
 
-const WINDOW_SIZE := Vector2(1240, 680)
+## Размеры — для «Среднего» размера интерфейса (умножаются на UiScale.k(); было окно 1240×680, ячейка 88).
+const WINDOW_SIZE := Vector2(1000, 580)
 ## Сетка сумки: столбцов, размер ячейки в окне сумки и в окне торговца, зазор.
 const COLS := 8
-const CELL := 88.0
-const SHOP_CELL := 72.0
-const GAP := 6
+const CELL := 64.0
+const SHOP_CELL := 54.0
+const GAP := 5.0
 ## Товары торговца: столбцов.
 const SHOP_COLS := 3
-const EQUIP_CELL := 76.0
+const EQUIP_CELL := 58.0
 ## Ширина карточки предмета (окно сумки / окно торговца).
-const CARD_W := 336.0
-const SHOP_CARD_W := 316.0
-const BIG_ICON := 92.0
+const CARD_W := 300.0
+const SHOP_CARD_W := 290.0
+const BIG_ICON := 72.0
 ## Сколько штук покупается кнопкой «Купить ×N».
 const BUY_MANY := 5
 
@@ -147,13 +148,13 @@ func _build() -> void:
 	_validate_selection()
 	_body = main.hud.create_window("Сумка" if mode == "bag" else NpcData.shop_title(seller), WINDOW_SIZE)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
+	row.add_theme_constant_override("separation", int(UiScale.px(10)))
 	_body.add_child(row)
 	var left := VBoxContainer.new()
-	left.add_theme_constant_override("separation", GAP)
+	left.add_theme_constant_override("separation", int(UiScale.px(GAP)))
 	row.add_child(left)
 	var center := VBoxContainer.new()
-	center.add_theme_constant_override("separation", 8)
+	center.add_theme_constant_override("separation", int(UiScale.px(6)))
 	row.add_child(center)
 	var card_panel := PanelContainer.new()
 	card_panel.add_theme_stylebox_override("panel", _card_style())
@@ -161,19 +162,20 @@ func _build() -> void:
 	card_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(card_panel)
 	var card := VBoxContainer.new()
-	card.add_theme_constant_override("separation", 6)
+	card.add_theme_constant_override("separation", int(UiScale.px(5)))
 	card_panel.add_child(card)
 	if mode == "shop":
 		_build_goods(left)
-		_build_bag(center, SHOP_CELL)
+		_build_bag(center, UiScale.px(SHOP_CELL))
 	else:
 		_build_equipment(left)
-		_build_bag(center, CELL)
+		_build_bag(center, UiScale.px(CELL))
 	_build_card(card)
 
 
+## Ширина карточки предмета (с масштабом интерфейса).
 func _card_w() -> float:
-	return SHOP_CARD_W if mode == "shop" else CARD_W
+	return UiScale.px(SHOP_CARD_W if mode == "shop" else CARD_W)
 
 
 ## Выделение после изменений: ячейка сумки следует за своим предметом (сортировка, продажа части стопки).
@@ -194,24 +196,24 @@ func _build_equipment(parent: VBoxContainer) -> void:
 	for i in EQUIP_SLOTS.size():
 		var slot_id := String(EQUIP_SLOTS[i][0])
 		var id: String = Game.weapon if slot_id == "weapon" else ""
-		var b := _make_cell("equip", i, id, "", EQUIP_CELL, sel_kind == "equip" and sel_index == i,
+		var b := _make_cell("equip", i, id, "", UiScale.px(EQUIP_CELL), sel_kind == "equip" and sel_index == i,
 			String(EQUIP_SLOTS[i][1]))
 		parent.add_child(b)
 		buttons["equip_" + slot_id] = b
 
 
 func _build_goods(parent: VBoxContainer) -> void:
-	parent.add_child(_label("Товары", 22, GOLD))
+	parent.add_child(_label("Товары", UiScale.FONT_HEAD, GOLD))
 	var grid := GridContainer.new()
 	grid.columns = SHOP_COLS
-	grid.add_theme_constant_override("h_separation", GAP)
-	grid.add_theme_constant_override("v_separation", GAP)
+	grid.add_theme_constant_override("h_separation", int(UiScale.px(GAP)))
+	grid.add_theme_constant_override("v_separation", int(UiScale.px(GAP)))
 	parent.add_child(grid)
 	var list := goods(Game.class_id, seller)
 	for i in list.size():
 		var id := String(list[i])
 		var price := int(ItemData.get_item(id).get("buy", 0))
-		var b := _make_cell("good", i, id, str(price), SHOP_CELL, sel_kind == "good" and sel_id == id)
+		var b := _make_cell("good", i, id, str(price), UiScale.px(SHOP_CELL), sel_kind == "good" and sel_id == id)
 		grid.add_child(b)
 		buttons["good_" + id] = b
 
@@ -219,10 +221,10 @@ func _build_goods(parent: VBoxContainer) -> void:
 func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 	var inv: Inventory = Game.inventory
 	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 14)
+	head.add_theme_constant_override("separation", int(UiScale.px(10)))
 	parent.add_child(head)
-	head.add_child(_label("Золото: %d" % Game.gold, 22, GOLD))
-	var used := _label("Занято: %d/%d" % [inv.used_cells(), Inventory.CAPACITY], 22,
+	head.add_child(_label("Золото: %d" % Game.gold, UiScale.FONT_HEAD, GOLD))
+	var used := _label("Занято: %d/%d" % [inv.used_cells(), Inventory.CAPACITY], UiScale.FONT_HEAD,
 		BAD if inv.is_full() else MUTED)
 	used.name = "used_label"
 	used.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -230,8 +232,8 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 	head.add_child(_button("Сортировать", "sort", _on_sort))
 	var grid := GridContainer.new()
 	grid.columns = COLS
-	grid.add_theme_constant_override("h_separation", GAP)
-	grid.add_theme_constant_override("v_separation", GAP)
+	grid.add_theme_constant_override("h_separation", int(UiScale.px(GAP)))
+	grid.add_theme_constant_override("v_separation", int(UiScale.px(GAP)))
 	parent.add_child(grid)
 	var list := inv.cells()
 	var total := inv.cell_count()
@@ -245,6 +247,7 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 
 
 ## Ячейка: рамка цвета редкости или типа, значок, число в углу (стопка или цена), подпись (слот экипировки).
+## sz — размер ячейки на экране (уже с масштабом UiScale).
 func _make_cell(kind: String, index: int, id: String, corner: String, sz: float, selected: bool,
 		caption: String = "") -> Cell:
 	var b := Cell.new()
@@ -265,32 +268,35 @@ func _make_cell(kind: String, index: int, id: String, corner: String, sz: float,
 		if id != "":
 			sb.bg_color = sb.bg_color.lerp(frame, 0.12)
 		sb.border_color = SEL_COLOR if selected else frame
-		sb.set_border_width_all(4 if selected else 2)
-		sb.set_corner_radius_all(10)
+		sb.set_border_width_all(3 if selected else 2)
+		sb.set_corner_radius_all(int(sz * 0.12))
 		sb.anti_aliasing = true
 		b.add_theme_stylebox_override(st, sb)
 	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	var icon_sz := sz - 12.0
-	var icon_y := 6.0
+	var pad := roundf(sz * 0.08)
+	var icon_sz := sz - pad * 2.0
+	var icon_y := pad
 	if caption != "":
-		icon_sz = sz - 30.0
-		icon_y = 4.0
+		icon_sz = roundf(sz * 0.64)
+		icon_y = roundf(sz * 0.06)
 	if id != "":
 		var ic := ItemIcon.make(id, icon_sz)
 		ic.position = Vector2((sz - icon_sz) * 0.5, icon_y)
 		b.add_child(ic)
 	if caption != "":
-		var cap := _label(caption if id != "" or index == 0 else caption + "\nскоро", 13, MUTED if id != "" else EMPTY_FRAME.lightened(0.3))
+		var cap := _label(caption if id != "" or index == 0 else caption + "\nскоро", UiScale.FONT_TINY, MUTED if id != "" else EMPTY_FRAME.lightened(0.3))
 		cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		cap.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM if id != "" else VERTICAL_ALIGNMENT_CENTER
 		cap.position = Vector2(0, 0)
 		cap.size = Vector2(sz, sz - 3.0)
 		b.add_child(cap)
 	if corner != "":
-		var l := _label(corner, 17 if sz >= CELL else 15, GOLD if kind == "good" else Color.WHITE)
+		var cf := UiScale.FONT_SMALL if sz >= UiScale.px(CELL) else UiScale.FONT_TINY
+		var lh := float(UiScale.fs(cf)) * 1.4
+		var l := _label(corner, cf, GOLD if kind == "good" else Color.WHITE)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		l.position = Vector2(2, sz - 25.0)
-		l.size = Vector2(sz - 8.0, 22)
+		l.position = Vector2(2, sz - lh - 1.0)
+		l.size = Vector2(sz - 7.0, lh)
 		b.add_child(l)
 	b.pressed.connect(_on_cell.bind(kind, index))
 	return b
@@ -304,7 +310,7 @@ func _build_card(card: VBoxContainer) -> void:
 		var t := "Коснитесь ячейки, куда положить предмет. Тот же предмет сложится в стопку, другой поменяется местами."
 		if ItemData.is_weapon(sel_id):
 			t += " Слот «Оружие» — надеть."
-		card.add_child(_text(t, 19, Color.WHITE))
+		card.add_child(_text(t, UiScale.FONT_TEXT, Color.WHITE))
 		card.add_child(_action_grid([["Отмена", "act_move_cancel", _on_move_cancel]]))
 		return
 	match sel_kind:
@@ -315,44 +321,45 @@ func _build_card(card: VBoxContainer) -> void:
 		"good":
 			_card_good(card)
 		_:
-			card.add_child(_label("Предмет", 24, GOLD))
+			card.add_child(_label("Предмет", UiScale.FONT_HEAD, GOLD))
 			var t := "Коснитесь предмета, чтобы увидеть описание и действия. Перетащите значок в другую ячейку, чтобы переложить."
 			if mode == "shop":
 				t = "Коснитесь товара слева, чтобы купить, или предмета в сумке, чтобы продать."
-			card.add_child(_text(t, 19, MUTED))
+			card.add_child(_text(t, UiScale.FONT_TEXT, MUTED))
 
 
 ## Заголовок карточки: крупный значок в рамке, название цветом редкости, тип и редкость, строка sub.
 func _card_head(card: VBoxContainer, id: String, sub: String) -> void:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
+	row.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	card.add_child(row)
+	var big := UiScale.px(BIG_ICON)
 	var frame := Panel.new()
-	frame.custom_minimum_size = Vector2(BIG_ICON, BIG_ICON)
+	frame.custom_minimum_size = Vector2(big, big)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = CELL_BG
 	sb.border_color = ItemData.frame_color(id) if id != "" else EMPTY_FRAME
 	sb.set_border_width_all(3)
-	sb.set_corner_radius_all(12)
+	sb.set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
 	frame.add_theme_stylebox_override("panel", sb)
 	if id != "":
-		var ic := ItemIcon.make(id, BIG_ICON - 12.0)
+		var ic := ItemIcon.make(id, big - 10.0)
 		ic.name = "card_icon"
-		ic.position = Vector2(6, 6)
+		ic.position = Vector2(5, 5)
 		frame.add_child(ic)
 	row.add_child(frame)
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 2)
+	info.add_theme_constant_override("separation", int(UiScale.px(2)))
 	row.add_child(info)
 	if id != "":
-		var title := _text(ItemData.item_name(id), 22, _name_color(id))
+		var title := _text(ItemData.item_name(id), UiScale.FONT_HEAD, _name_color(id))
 		title.name = "card_title"
 		info.add_child(title)
-		info.add_child(_text("%s · %s" % [ItemData.type_name(id), ItemData.grade_name(id)], 17, MUTED))
+		info.add_child(_text("%s · %s" % [ItemData.type_name(id), ItemData.grade_name(id)], UiScale.FONT_BODY, MUTED))
 	if sub != "":
-		info.add_child(_text(sub, 17, GOLD))
+		info.add_child(_text(sub, UiScale.FONT_BODY, GOLD))
 
 
 func _card_item(card: VBoxContainer) -> void:
@@ -368,7 +375,7 @@ func _card_item(card: VBoxContainer) -> void:
 		var t := "Цена продажи: %d зол." % sell
 		if n > 1:
 			t += " (все: %d)" % (sell * n)
-		card.add_child(_text(t, 18, GOLD))
+		card.add_child(_text(t, UiScale.FONT_BODY, GOLD))
 	if drop_confirm:
 		_drop_confirm_ui(card, id, n)
 		return
@@ -392,15 +399,15 @@ func _card_item(card: VBoxContainer) -> void:
 func _drop_confirm_ui(card: VBoxContainer, id: String, n: int) -> void:
 	drop_count = clampi(drop_count, 1, maxi(1, n))
 	var q := "Выбросить «%s»%s? Предмет пропадёт." % [ItemData.item_name(id), " ×%d" % drop_count if n > 1 else ""]
-	card.add_child(_text(q, 19, BAD))
+	card.add_child(_text(q, UiScale.FONT_TEXT, BAD))
 	if n > 1:
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
+		row.add_theme_constant_override("separation", int(UiScale.px(6)))
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
 		card.add_child(row)
 		row.add_child(_button("−", "act_drop_minus", _on_drop_count.bind(-1)))
-		var l := _label(str(drop_count), 24, Color.WHITE)
-		l.custom_minimum_size = Vector2(56, 0)
+		var l := _label(str(drop_count), UiScale.FONT_HEAD, Color.WHITE)
+		l.custom_minimum_size = Vector2(UiScale.px(44), 0)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		row.add_child(l)
 		row.add_child(_button("+", "act_drop_plus", _on_drop_count.bind(1)))
@@ -414,14 +421,14 @@ func _card_equip(card: VBoxContainer) -> void:
 	if slot_id == "weapon" and Game.weapon != "":
 		_card_head(card, Game.weapon, "Надето · слот «%s»" % slot_name)
 		_card_body(card, Game.weapon, "")
-		card.add_child(_text("Сменить: коснитесь другого оружия в сумке и «Надеть» или перетащите его сюда.", 17, MUTED))
+		card.add_child(_text("Сменить: коснитесь другого оружия в сумке и «Надеть» или перетащите его сюда.", UiScale.FONT_BODY, MUTED))
 		return
 	_card_head(card, "", "")
-	card.add_child(_label(slot_name, 24, GOLD))
+	card.add_child(_label(slot_name, UiScale.FONT_HEAD, GOLD))
 	if slot_id == "weapon":
-		card.add_child(_text("Оружие героя задано классом.", 19, MUTED))
+		card.add_child(_text("Оружие героя задано классом.", UiScale.FONT_TEXT, MUTED))
 	else:
-		card.add_child(_text("Скоро: доспехи и украшения появятся вместе с экипировкой.", 19, MUTED))
+		card.add_child(_text("Скоро: доспехи и украшения появятся вместе с экипировкой.", UiScale.FONT_TEXT, MUTED))
 
 
 func _card_good(card: VBoxContainer) -> void:
@@ -429,7 +436,7 @@ func _card_good(card: VBoxContainer) -> void:
 	var price := int(ItemData.get_item(id).get("buy", 0))
 	_card_head(card, id, "В сумке: %d" % Game.inventory.count(id))
 	_card_body(card, id, Game.weapon)
-	var pl := _text("Цена: %d зол." % price, 20, GOLD if Game.gold >= price else BAD)
+	var pl := _text("Цена: %d зол." % price, UiScale.FONT_TEXT, GOLD if Game.gold >= price else BAD)
 	pl.name = "price_label"
 	card.add_child(pl)
 	var acts: Array = [["Купить", "act_buy", _on_buy.bind(1)]]
@@ -442,17 +449,17 @@ func _card_good(card: VBoxContainer) -> void:
 func _card_body(card: VBoxContainer, id: String, cmp: String) -> void:
 	var desc := String(ItemData.get_item(id).get("desc", ""))
 	if desc != "":
-		card.add_child(_text(desc, 18, Color.WHITE))
+		card.add_child(_text(desc, UiScale.FONT_BODY, Color.WHITE))
 	match ItemData.item_type(id):
 		"weapon":
 			_weapon_stats(card, id, cmp)
 		"card":
 			for line in Taming.card_lines(id):
-				card.add_child(_text(String(line), 17, MUTED))
+				card.add_child(_text(String(line), UiScale.FONT_BODY, MUTED))
 		"trophy":
-			card.add_child(_text("Продаётся торговцу в городе.", 17, MUTED))
+			card.add_child(_text("Продаётся торговцу в городе.", UiScale.FONT_BODY, MUTED))
 	if id == "hp_potion":
-		card.add_child(_text("Пить можно и кнопкой «Зелье» на экране (Q). После глотка — перезарядка.", 17, MUTED))
+		card.add_child(_text("Пить можно и кнопкой «Зелье» на экране (Q). После глотка — перезарядка.", UiScale.FONT_BODY, MUTED))
 
 
 func _weapon_stats(card: VBoxContainer, id: String, cmp: String) -> void:
@@ -460,12 +467,12 @@ func _weapon_stats(card: VBoxContainer, id: String, cmp: String) -> void:
 	var has_cmp := cmp != "" and cmp != id and ItemData.is_weapon(cmp)
 	var ot := ItemData.get_item(cmp) if has_cmp else {}
 	var kind := ItemData.weapon_kind_name(ItemData.weapon_kind(id))
-	card.add_child(_text("Вид: %s" % kind, 17, MUTED))
+	card.add_child(_text("Вид: %s" % kind, UiScale.FONT_BODY, MUTED))
 	if not ItemData.weapon_fits(id, Game.class_id):
-		card.add_child(_text("Не подходит вашему классу", 17, BAD))
+		card.add_child(_text("Не подходит вашему классу", UiScale.FONT_BODY, BAD))
 	var g := GridContainer.new()
 	g.columns = 2
-	g.add_theme_constant_override("h_separation", 14)
+	g.add_theme_constant_override("h_separation", int(UiScale.px(12)))
 	g.add_theme_constant_override("v_separation", 0)
 	card.add_child(g)
 	_stat(g, "Атака", float(it.get("atk", 0)), float(ot.get("atk", 0)), has_cmp, "+%.0f", "%.0f", true)
@@ -474,13 +481,13 @@ func _weapon_stats(card: VBoxContainer, id: String, cmp: String) -> void:
 	_stat(g, "Крит", float(it.get("crit", 0.0)) * 100.0, float(ot.get("crit", 0.0)) * 100.0, has_cmp,
 		"+%.0f%%", "%.0f%%", true)
 	if has_cmp:
-		card.add_child(_text("В скобках — разница с надетым: %s" % ItemData.item_name(cmp), 15, MUTED))
+		card.add_child(_text("В скобках — разница с надетым: %s" % ItemData.item_name(cmp), UiScale.FONT_SMALL, MUTED))
 
 
 ## Строка характеристики: значение и (если есть с чем сравнить) разница — лучше зелёным, хуже красным.
 func _stat(g: GridContainer, title: String, v: float, other: float, cmp: bool, fmt: String, dfmt: String,
 		higher_better: bool) -> void:
-	g.add_child(_label(title, 18, MUTED))
+	g.add_child(_label(title, UiScale.FONT_BODY, MUTED))
 	var text := fmt % v
 	var col := Color.WHITE
 	if cmp:
@@ -488,15 +495,15 @@ func _stat(g: GridContainer, title: String, v: float, other: float, cmp: bool, f
 		if absf(d) > 0.0001:
 			col = GOOD if (d > 0.0) == higher_better else BAD
 			text += "  (%s%s)" % ["+" if d > 0.0 else "−", dfmt % absf(d)]
-	g.add_child(_label(text, 18, col))
+	g.add_child(_label(text, UiScale.FONT_BODY, col))
 
 
 ## Кнопки действий в два столбца: [текст, имя, обработчик, (выключена)].
 func _action_grid(acts: Array) -> GridContainer:
 	var g := GridContainer.new()
 	g.columns = 2
-	g.add_theme_constant_override("h_separation", 8)
-	g.add_theme_constant_override("v_separation", 8)
+	g.add_theme_constant_override("h_separation", int(UiScale.px(6)))
+	g.add_theme_constant_override("v_separation", int(UiScale.px(6)))
 	for a in acts:
 		var e: Array = a
 		var b := _button(String(e[0]), String(e[1]), e[2])
@@ -700,15 +707,16 @@ func _card_style() -> StyleBoxFlat:
 	sb.bg_color = Color(0.06, 0.07, 0.17, 0.75)
 	sb.border_color = Color(0.98, 0.88, 0.6, 0.5)
 	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(14)
-	sb.set_content_margin_all(12)
+	sb.set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
+	sb.set_content_margin_all(UiScale.px(10))
 	return sb
 
 
+## Подпись; font_size — для «Среднего» размера интерфейса (UiScale.FONT_*).
 func _label(text: String, font_size: int, color: Color) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_font_size_override("font_size", UiScale.fs(font_size))
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
 	l.add_theme_constant_override("outline_size", 4)
@@ -730,8 +738,8 @@ func _button(text: String, node_name: String, cb: Callable) -> Button:
 	b.text = text
 	b.name = node_name
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(0, 54)
-	b.add_theme_font_size_override("font_size", 20)
+	b.custom_minimum_size = Vector2(0, UiScale.button_h())
+	b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT))
 	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	b.pressed.connect(cb)
 	buttons[node_name] = b
