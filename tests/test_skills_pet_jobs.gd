@@ -182,7 +182,9 @@ func _toggle(sid: String, on: bool) -> void:
 	check(err == "", "«%s» %s %s" % [nm, "включено" if on else "выключено", err])
 	if on:
 		var cost := HeroSkills.mp_cost(sid, HeroSkills.skill_level(game.hero, sid))
-		check(cost > 0 and player.mp == mp0 - cost, "«%s»: включение — %d MP" % [nm, cost])
+		# Смена умения группы (созвучие Мудрости → Интеллекта) может уменьшить макс. MP — MP обрезается до него
+		var expect := mini(mp0 - cost, player.max_mp)
+		check(cost > 0 and player.mp == expect, "«%s»: включение — %d MP (MP %d → %d, ждали %d)" % [nm, cost, mp0, player.mp, expect])
 		check(HeroSkills.toggle_on(game.hero, sid), "«%s» включено в записи героя" % nm)
 
 
