@@ -1,7 +1,7 @@
 extends "res://tests/test_base.gd"
 ## Перевод старого сохранения: герой «Люди · Воин» 6-го уровня (как у Максима на телефоне) загружается
-## при запуске игры и становится тёмной эльфийкой-Бродягой. Уровень, опыт, золото, сумка и питомцы на месте,
-## выдан набор оружия Бродяги и надеты парные мечи, JP — как будто копились с 1 уровня, стартовые умения на
+## при запуске игры и становится тёмной эльфийкой-Наёмником. Уровень, опыт, золото, сумка и питомцы на месте,
+## выдан набор оружия Наёмника и надеты парные мечи, JP — как будто копились с 1 уровня, стартовые умения на
 ## кнопках, есть MP и 7 статов, сообщение игроку при входе; окно героя — вкладки древа со значками из
 ## assets/icons/skills (загрузка через ResourceLoader — так же, как в APK). Повторная загрузка — без сообщения.
 
@@ -36,7 +36,7 @@ func run_step() -> void:
 	match step:
 		0:
 			check(game.has_character and game.char_name == "Максим", "старое сохранение загружено при запуске")
-			check(game.race_id == "dark_elf" and game.class_id == "assassin", "воин стал Бродягой (тёмные эльфы)")
+			check(game.race_id == "dark_elf" and game.class_id == "assassin", "воин стал Наёмником (тёмные эльфы)")
 			check(game.level == OLD_LEVEL and game.xp == OLD_XP and game.gold == OLD_GOLD, "уровень, опыт и золото сохранены")
 			var inv: Inventory = game.inventory
 			check(inv.count("hp_potion") == 4 and inv.count("crystal_common") == 2 and inv.count("boar_tusk") == 5,
@@ -49,7 +49,7 @@ func run_step() -> void:
 			var rec: Dictionary = game.hero
 			check(int(rec["jp"]) == HeroSkills.default_jp(OLD_LEVEL), "JP как будто копились с 1 уровня: %d" % int(rec["jp"]))
 			check(HeroSkills.skill_level(rec, "backstab") == 1 and HeroSkills.skill_level(rec, "shadow_step") == 1
-				and HeroSkills.skill_level(rec, "cleave") == 0, "стартовые умения Бродяги, умений воина нет")
+				and HeroSkills.skill_level(rec, "cleave") == 0, "стартовые умения Наёмника, умений воина нет")
 			check(player.skill_id("skill1") == "backstab" and player.skill_id("skill2") == "shadow_step",
 				"на кнопках «Удар в спину» и «Шаг тени»")
 			check(main.hud.button_text("skill1") == "Удар в спину" and not main.hud.is_blocked("skill1"),
@@ -57,9 +57,9 @@ func run_step() -> void:
 			check(player.max_mp > 0 and main.hud._mp_bar.visible, "MP %d и полоска MP в HUD" % player.max_mp)
 			var d := HeroStats.derived("assassin", OLD_LEVEL)
 			check(player.max_hp == int(d["max_hp"]) and player.eva > 0.0 and player.accuracy > 0,
-				"статы Бродяги %d ур.: HP %d, уклонение %.1f%%, точность %d" % [OLD_LEVEL, player.max_hp,
+				"статы Наёмника %d ур.: HP %d, уклонение %.1f%%, точность %d" % [OLD_LEVEL, player.max_hp,
 				player.eva * 100.0, player.accuracy])
-			check(main.hud._msg_label.text.contains("Бродяг") and game.load_note == "",
+			check(main.hud._msg_label.text.contains("Наёмников") and game.load_note == "",
 				"сообщение при входе: %s" % main.hud._msg_label.text)
 			check(player.global_position.distance_to(main.world.spawn_point("dark_elf")) < 3.0, "старт в деревне тёмных эльфов")
 			step = 1
@@ -90,7 +90,7 @@ func run_step() -> void:
 			var txt := FileAccess.get_file_as_string(game.save_path)
 			var saved: Variant = JSON.parse_string(txt)
 			check(saved is Dictionary and String((saved as Dictionary).get("class", "")) == "assassin",
-				"в сохранении — Бродяга")
+				"в сохранении — Наёмник")
 			check(game.load_game() and game.load_note == "" and game.class_id == "assassin", "повторная загрузка без перевода")
 			check(int(game.hero["jp"]) == HeroSkills.default_jp(OLD_LEVEL), "JP после повторной загрузки те же")
 			ok_done()

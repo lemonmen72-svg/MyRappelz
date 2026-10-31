@@ -17,7 +17,7 @@ var _create: Node = null
 var _top: Camera3D = null
 var _row: Node3D = null
 var _frames := 0
-## Умения Бродяги для кадров окна героя [id, уровень].
+## Умения Наёмника для кадров окна героя [id, уровень].
 const HERO_SKILLS := [["blade_mastery", 2], ["charge_stab", 2], ["dark_strike", 1], ["evasion_expert", 2],
 	["concentration", 1], ["crossbow_mastery", 1], ["dual_shot", 1]]
 ## Предметы для кадров сумки и торговца (27, 28): [id, количество].
@@ -206,7 +206,7 @@ func run_step() -> void:
 		20:
 			shot("18_creature_skills")
 			main.hud.close_window()
-			# Бродяга: окно героя (вкладка «Герой» с 7 характеристиками и боевыми показателями, древо «Мечи и кинжалы»)
+			# Наёмник: окно героя (вкладка «Герой» с 7 характеристиками и боевыми показателями, древо «Мечи и кинжалы»)
 			main.pets.recall()
 			game.race_id = "dark_elf"
 			game.class_id = "assassin"

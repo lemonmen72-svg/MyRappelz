@@ -23,7 +23,7 @@ func run_step() -> void:
 			_unit_layout()
 			step = 1
 		1:
-			# Новый Бродяга: надетые парные мечи в ячейке не лежат
+			# Новый Наёмник: надетые парные мечи в ячейке не лежат
 			check(game.weapon == "dual_swords_starter", "надеты парные мечи")
 			check(inv.equipped == game.weapon, "сумка знает надетое оружие")
 			check(inv.find_cell(game.weapon) == -1, "надетое оружие не занимает ячейку")
@@ -192,7 +192,7 @@ func run_step() -> void:
 			main._on_action("shop")
 			check(eco.is_shop_open(), "окно торговца открыто")
 			check(win.buttons.has("good_crystal_common") and win.buttons.has("good_hp_potion"), "товары: кристалл, зелье")
-			check(win.buttons.has("good_daggers_steel"), "оружие Бродяги в товарах")
+			check(win.buttons.has("good_daggers_steel"), "оружие Наёмника в товарах")
 			check(not win.buttons.has("good_boar_tusk"), "трофеи не продаются")
 			check(win.buttons.has("cell_0"), "сумка в окне торговца")
 			_press("good_hp_potion")

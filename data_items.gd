@@ -32,7 +32,7 @@ const ITEMS := {
 		"name": "Свиток воскрешения", "type": "consumable", "icon": "scroll", "buy": 30, "sell": 10,
 		"color": Color(0.95, 0.9, 0.6), "desc": "Воскрешает погибшего питомца.",
 	},
-	# ---------- Оружие Бродяги: стартовый набор (выдаётся новому и прежнему Бродяге) ----------
+	# ---------- Оружие Наёмника: стартовый набор (выдаётся новому и прежнему Наёмнику) ----------
 	"daggers_starter": {
 		"name": "Парные кинжалы", "type": "weapon", "icon": "daggers", "weapon": "daggers", "class": "assassin",
 		"atk": 1, "cd": 0.45, "range": 2.2, "crit": 0.05, "buy": 0, "sell": 5,
@@ -79,7 +79,7 @@ const WEAPON_KINDS := {
 	"dual_swords": {"name": "парные мечи", "group": "blades"},
 	"crossbow": {"name": "арбалет", "group": "crossbow"},
 }
-## Стартовый набор оружия класса и что надето сразу (старые сохранения Бродяги — парные мечи).
+## Стартовый набор оружия класса и что надето сразу (старые сохранения Наёмника — парные мечи).
 const STARTER_WEAPONS := {
 	"assassin": ["dual_swords_starter", "daggers_starter", "crossbow_starter"],
 }

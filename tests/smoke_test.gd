@@ -52,9 +52,9 @@ func run_step() -> void:
 			check(game.level == lvl and game.gold == gold, "уровень и золото восстановлены")
 			check(game.inventory.count("crystal_common") == 3, "сумка восстановлена")
 			check(game.char_name == "Тест", "персонаж восстановлен")
-			# Герой игрока — всегда Бродяга: сохранённый воин (класс автотеста) переведён при загрузке
+			# Герой игрока — всегда Наёмник: сохранённый воин (класс автотеста) переведён при загрузке
 			check(game.race_id == "dark_elf" and game.class_id == "assassin" and game.load_note != "",
-				"воин из сохранения стал Бродягой: %s" % game.load_note)
+				"воин из сохранения стал Наёмником: %s" % game.load_note)
 			check(game.weapon == "dual_swords_starter", "переведённому герою надеты парные мечи")
 			player.apply_class()
 			check(player.max_mp > 0 and not player.hero_stats.is_empty(), "у переведённого героя MP и 7 статов")

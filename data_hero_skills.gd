@@ -1,6 +1,6 @@
 class_name HeroSkills
 extends RefCounted
-## Умения героя и их древо. У Бродяги (id класса "assassin") — полное древо по образцу профессии Strider
+## Умения героя и их древо. У Наёмника (id класса "assassin") — полное древо по образцу профессии Strider
 ## из Rappelz (механика и числа — из вики, названия, описания и значки свои; справка —
 ## tools/rappelz_strider_reference.md). У остальных классов в древе их два умения из ClassData (один ярус,
 ## изучены сразу, без JP). Умение изучается и повышается за очки умений героя (JP) в окне героя
@@ -37,7 +37,7 @@ const SLOTS := 4
 const FLAT_SCALE := 0.06
 const KIND_NAMES := {"active": "активное", "passive": "пассивное", "toggle": "переключаемое"}
 const WEAPON_NAMES := {"blades": "кинжалы или мечи", "crossbow": "арбалет"}
-## Вкладки древа Бродяги.
+## Вкладки древа Наёмника.
 const TABS := [["common", "Общие"], ["blades", "Мечи и кинжалы"], ["crossbow", "Арбалет"]]
 ## Значки: картинка 128×128 (прозрачные углы) — res://assets/icons/skills/<id>.png; нет файла — кружок с буквой.
 const ICON_DIR := "res://assets/icons/skills/"
@@ -49,7 +49,7 @@ const BOLT := Color(0.78, 0.55, 0.25)
 
 const SKILLS := {
 	# ---------- Общие ----------
-	"shadow_step": {  # стартовое умение Бродяги (своё, без вики)
+	"shadow_step": {  # стартовое умение Наёмника (своё, без вики)
 		"name": "Шаг тени", "kind": "active", "tab": "common", "weapon": "", "glyph": "Ш", "color": SHADE,
 		"desc": "Мгновенный рывок сквозь тень к выбранному зверю.",
 		"req": [1, 4, 8], "jp": [0, 2, 3], "start": true,
@@ -106,7 +106,7 @@ const SKILLS := {
 		"jlv": [35, 35], "jp": [3, 4], "bonus": {"hp_from_eva": [0.6, 0.8], "mp_from_eva": [0.3, 0.4]},
 	},
 	# ---------- Мечи и кинжалы ----------
-	"backstab": {  # стартовое умение Бродяги (своё, без вики)
+	"backstab": {  # стартовое умение Наёмника (своё, без вики)
 		"name": "Удар в спину", "kind": "active", "tab": "blades", "weapon": "blades", "glyph": "У", "color": BLADE,
 		"desc": "Удар клинком в незащищённое место — всегда крит.",
 		"req": [1, 4, 8], "jp": [0, 2, 3], "start": true,
@@ -287,7 +287,7 @@ static func has_tree(class_id: String) -> bool:
 	return CLASS_TREES.has(class_id)
 
 
-## id умений класса (у Бродяги — всё древо, у других — два умения класса).
+## id умений класса (у Наёмника — всё древо, у других — два умения класса).
 static func list_for(class_id: String) -> Array:
 	if CLASS_TREES.has(class_id):
 		return CLASS_TREES[class_id]

@@ -1,5 +1,5 @@
 extends "res://tests/test_base.gd"
-## Умения и оружие героя (Бродяга): данные древа (HeroSkills) и темп JP, стартовый набор оружия,
+## Умения и оружие героя (Наёмник): данные древа (HeroSkills) и темп JP, стартовый набор оружия,
 ## смена оружия (ближняя атака / выстрел болтом, дальность, скорость, модель: клинки в обеих руках / арбалет),
 ## строгая привязка умений к оружию (кнопки HUD затемнены, use_skill отказывает, переключаемые выключаются
 ## при смене оружия, пассивки владения — только со своим оружием), изучение за JP (уровень, пререквизит, JP),
@@ -7,7 +7,7 @@ extends "res://tests/test_base.gd"
 ## переключаемые (MP, поддержка, выключение без MP), сон / страх / отбрасывание / урон со временем у зверей,
 ## JP за опыт, окно героя (вкладка «Герой»: 7 характеристик и боевые показатели, выбор оружия; древо по вкладкам,
 ## карточка, «+ JP», «На кнопку»), 7 статов героя и производные (HeroStats: калибровка 1-го уровня, рост, точность
-## и промахи, атака арбалета от Меткости), сохранение и загрузка, старые сохранения (воин → Бродяга),
+## и промахи, атака арбалета от Меткости), сохранение и загрузка, старые сохранения (воин → Наёмник),
 ## древо других классов.
 
 const MainScript := preload("res://main.gd")
@@ -226,7 +226,7 @@ func run_step() -> void:
 ## Данные древа: поля, уровни, пререквизиты, тексты, темп JP.
 func _check_data() -> void:
 	var ids := HeroSkills.list_for("assassin")
-	check(ids.size() >= 20, "у Бродяги %d умений в древе" % ids.size())
+	check(ids.size() >= 20, "у Наёмника %d умений в древе" % ids.size())
 	var bad := ""
 	var names: Dictionary = {}
 	for id in ids:
@@ -282,7 +282,7 @@ func _check_data() -> void:
 		"требования к оружию: арбалетные / клинковые / общие")
 
 
-## Новый Бродяга: стартовые умения и кнопки, JP, оружие, MP.
+## Новый Наёмник: стартовые умения и кнопки, JP, оружие, MP.
 func _check_start(player: Player) -> void:
 	var rec: Dictionary = game.hero
 	check(HeroSkills.skill_level(rec, "backstab") == 1 and HeroSkills.skill_level(rec, "shadow_step") == 1,
@@ -293,15 +293,15 @@ func _check_start(player: Player) -> void:
 	check(game.weapon == "dual_swords_starter", "надеты парные мечи")
 	for id in ItemData.STARTER_WEAPONS["assassin"]:
 		check(game.inventory.has(String(id)), "в сумке %s" % ItemData.item_name(String(id)))
-	check(player.max_mp > 0 and player.mp == player.max_mp, "у Бродяги есть MP: %d" % player.max_mp)
+	check(player.max_mp > 0 and player.mp == player.max_mp, "у Наёмника есть MP: %d" % player.max_mp)
 	check(main.hud._mp_bar.visible, "полоска MP в HUD")
-	check(player.eva > 0.0, "у Бродяги есть уклонение: %d%%" % roundi(player.eva * 100.0))
+	check(player.eva > 0.0, "у Наёмника есть уклонение: %d%%" % roundi(player.eva * 100.0))
 
 
-## 7 статов героя (HeroStats) и производные: калибровка 1-го уровня под прежние числа Бродяги, рост с уровнем
+## 7 статов героя (HeroStats) и производные: калибровка 1-го уровня под прежние числа Наёмника, рост с уровнем
 ## (близко к прежнему ClassData), точность и промахи, атака арбалета от Меткости, общий код со статами питомцев.
 func _check_stats(player: Player) -> void:
-	check(HeroStats.has_stats("assassin") and not HeroStats.has_stats("warrior"), "статы — у Бродяги")
+	check(HeroStats.has_stats("assassin") and not HeroStats.has_stats("warrior"), "статы — у Наёмника")
 	var s1 := HeroStats.base_stats("assassin", 1)
 	check(s1 == {"str": 21, "vit": 22, "agi": 25, "int": 18, "wis": 18, "dex": 25, "luck": 12},
 		"статы 1-го уровня (асура, Strider ур. проф. 3): %s" % [s1])
@@ -470,7 +470,7 @@ func _check_window(player: Player) -> void:
 	var t := _window_text()
 	for w in ["Характеристики", "Боевые показатели", "Макс. HP", "Макс. MP", "Физ. атака", "Маг. атака", "Физ. защита",
 			"Маг. защита", "Точность", "Уклонение", "Шанс крита", "Скорость атаки", "Восст. HP", "Восст. MP", "Дальность",
-			"Оружие", "JP", "Бродяга", "MP %d / %d" % [player.mp, player.max_mp]]:
+			"Оружие", "JP", "Наёмник", "MP %d / %d" % [player.mp, player.max_mp]]:
 		check(t.contains(w), "во вкладке «Герой» есть «%s»" % w)
 	for k in Stats.STATS:
 		check(t.contains(String(Stats.STAT_NAMES[k])), "во вкладке «Герой» есть стат «%s»" % Stats.STAT_NAMES[k])
@@ -546,7 +546,7 @@ func _check_save(player: Player) -> void:
 	check(ok, "умения восстановлены: %s" % [r["skills"]])
 	check(r["slots"] == slots, "кнопки восстановлены: %s" % [r["slots"]])
 	check((r["toggles"] as Dictionary).keys() == toggles.keys(), "переключаемые восстановлены: %s" % [r["toggles"]])
-	# Старое сохранение Бродяги без оружия и умений героя
+	# Старое сохранение Наёмника без оружия и умений героя
 	game.from_dict({"name": "Старая", "race": "dark_elf", "class": "assassin", "level": 5, "inventory": {"hp_potion": 2}})
 	check(game.weapon == "dual_swords_starter", "старое сохранение: парные мечи")
 	for id in ItemData.STARTER_WEAPONS["assassin"]:
@@ -554,15 +554,15 @@ func _check_save(player: Player) -> void:
 	check(int(game.hero["jp"]) == HeroSkills.default_jp(5), "старое сохранение 5 ур.: %d JP" % int(game.hero["jp"]))
 	check(HeroSkills.skill_level(game.hero, "backstab") == 1 and (game.hero["slots"] as Array)[0] == "backstab",
 		"старое сохранение: стартовые умения на кнопках")
-	check(game.load_note == "", "старая Бродяга загружена без сообщения о переводе")
-	# Старый воин без умений героя: становится Бродягой (как сохранение Максима «Люди · Воин»)
+	check(game.load_note == "", "старая Наёмник загружена без сообщения о переводе")
+	# Старый воин без умений героя: становится Наёмником (как сохранение Максима «Люди · Воин»)
 	game.from_dict({"name": "Старый", "race": "human", "class": "warrior", "level": 3, "gold": 77})
-	check(game.race_id == "dark_elf" and game.class_id == "assassin", "старый воин стал Бродягой")
+	check(game.race_id == "dark_elf" and game.class_id == "assassin", "старый воин стал Наёмником")
 	check(game.level == 3 and game.gold == 77, "уровень и золото сохранены")
 	check(game.weapon == "dual_swords_starter" and (game.hero["slots"] as Array)[0] == "backstab",
 		"старый воин: парные мечи и «Удар в спину» на кнопке 1")
 	check(int(game.hero["jp"]) == HeroSkills.default_jp(3), "старый воин 3 ур.: %d JP" % int(game.hero["jp"]))
-	check(game.load_note.contains("Бродяг"), "сообщение игроку: %s" % game.load_note)
+	check(game.load_note.contains("Наёмников"), "сообщение игроку: %s" % game.load_note)
 	check(game.load_game(), "игра загружена снова")
 	player.apply_class()
 
