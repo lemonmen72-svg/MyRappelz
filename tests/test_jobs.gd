@@ -40,6 +40,7 @@ func run_step() -> void:
 		4:
 			check(Game.change_job("shaman") == -1 and game.job_change_block("shaman") != "", "повторно сменить профессию нельзя")
 			check(main.quests.state(QID) == "done" and main.quests.accept_block(QID) != "", "задание на профессию сдано")
+			main.npcs.refresh_marks()
 			check(main.npcs.npc("sage").mark_text() == "", "над мудрецом значка нет")
 			# Прогон 2: светлые эльфы, 15 ур. — Волшебник, +25 JP
 			_run_job("light_elf", 15, "wizard", 25)
