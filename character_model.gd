@@ -4,7 +4,8 @@ extends Node3D
 ## одежда и оружие по классу. Временная модель до замены на аватары из VRoid.
 ## Рост ~1.8 м, ноги на y = 0, лицом к -Z.
 ## Если в параметрах есть "asset" (путь к glTF), вместо примитивов берётся готовая модель из файла
-## со своим скелетом и анимациями (Meshy/Mixamo), см. раздел «Готовая модель из файла».
+## со своим скелетом и анимациями (Meshy/Mixamo), см. раздел «Готовая модель из файла». Герои и жители из Meshy
+## с родным скелетом (tools/prepare_hero.py) несут рядом <модель>.json — роли костей и хват оружия (asset_rig).
 ## Жители-NPC (npc_spec): своя внешность из примитивов для каждого (причёски short/long/ponytail/braid,
 ## борода beard / long_beard / beard_style "short" | "full", очки glasses, обруч circlet, шрам scar, одежда
 ## по образу); если есть assets/characters/npc_<id>.glb (npc_asset) — модель из файла без оружия в руках.
@@ -352,6 +353,8 @@ static var use_assets := true
 ## Пути моделей, у которых анимации уже подготовлены (зацикливание, без смещения по земле).
 static var _prepared: Dictionary = {}
 static var _asset_outline: ShaderMaterial
+## Роли костей моделей из файлов (asset_rig): путь GLB → словарь из <модель>.json.
+static var _rig_info: Dictionary = {}
 static var _sword: ArrayMesh
 static var _dagger: ArrayMesh
 static var _crossbow: ArrayMesh
@@ -1747,7 +1750,8 @@ func _reset_spin() -> void:
 # ---------- Готовая модель из файла (Meshy/Mixamo) ----------
 
 ## Загрузить модель из файла: свой материал (toon, контур, вспышка урона), меч в правой руке,
-## метки Head и Face на костях. false — файла нет, модель соберётся из примитивов.
+## метки Head и Face на костях (по ролям из <модель>.json, иначе по именам Mixamo). false — файла нет,
+## модель соберётся из примитивов.
 func _setup_asset(path: String) -> bool:
 	if not ResourceLoader.exists(path):
 		return false
@@ -1801,35 +1805,48 @@ func _setup_asset(path: String) -> bool:
 	if not skels.is_empty():
 		skel = skels[0] as Skeleton3D
 	if skel != null:
-		var head := _attach(skel, "Head", "Head")
+		# Кости по ролям из <модель>.json (tools/prepare_hero.py, родной скелет Meshy), иначе — имена Mixamo
+		var rig := asset_rig(path)
+		var bones: Dictionary = rig.get("bones", {})
+		var head := _attach(skel, String(bones.get("head", "Head")), "Head")
 		if head != null:
-			_node(head, "Face", Vector3(0, 0.08, 0.1))
-		var hand := _attach(skel, "RightHand", "GripR")
+			_node(head, "Face", _rig_vec(rig, "face", Vector3(0, 0.08, 0.1)))
+		var hand := _attach(skel, String(bones.get("hand_r", "RightHand")), "GripR")
 		var hand_l: BoneAttachment3D = null
 		var with_shield := bool(spec.get("shield", false)) and weapon_kind != ""
 		if weapon_kind == "dual_swords" or weapon_kind == "daggers" or with_shield:
-			hand_l = _attach(skel, "LeftHand", "GripL")
+			hand_l = _attach(skel, String(bones.get("hand_l", "LeftHand")), "GripL")
+		var grip_r: Dictionary = rig.get("grip_r", {})
+		var grip_l: Dictionary = rig.get("grip_l", {})
+		var pos_r := _rig_vec(grip_r, "pos", GRIP_POS)
+		var dir_r := _rig_vec(grip_r, "dir", GRIP_DIR)
+		var pos_l := _rig_vec(grip_l, "pos", GRIP_POS_L)
+		var dir_l := _rig_vec(grip_l, "dir", GRIP_DIR_L)
+		var cb := CROSSBOW_ROT
+		var cbv: Array = rig.get("crossbow_rot", [])
+		if cbv.size() == 4:
+			cb = Quaternion(float(cbv[0]), float(cbv[1]), float(cbv[2]), float(cbv[3]))
 		if hand != null and weapon_kind != "":
 			match weapon_kind:
 				"crossbow":
-					_hold(hand, "Crossbow", _crossbow_mesh(), Transform3D(Basis(CROSSBOW_ROT.normalized()), GRIP_POS))
+					_hold(hand, "Crossbow", _crossbow_mesh(), Transform3D(Basis(cb.normalized()), pos_r))
 				"daggers", "dagger":
-					_hold(hand, "DaggerR", _dagger_mesh(), _grip_xf(GRIP_DIR, GRIP_POS))
+					_hold(hand, "DaggerR", _dagger_mesh(), _grip_xf(dir_r, pos_r))
 				"staff":
-					_hold(hand, "Staff", _staff_mesh(), _grip_xf(GRIP_DIR, GRIP_POS))
+					_hold(hand, "Staff", _staff_mesh(), _grip_xf(dir_r, pos_r))
 				"axe":
-					_hold(hand, "Axe", _axe_mesh(), _grip_xf(GRIP_DIR, GRIP_POS))
+					_hold(hand, "Axe", _axe_mesh(), _grip_xf(dir_r, pos_r))
 				"mace":
-					_hold(hand, "Mace", _mace_mesh(), _grip_xf(GRIP_DIR, GRIP_POS))
+					_hold(hand, "Mace", _mace_mesh(), _grip_xf(dir_r, pos_r))
 				_:
-					_hold(hand, "Sword", _sword_mesh(), _grip_xf(GRIP_DIR, GRIP_POS))
+					_hold(hand, "Sword", _sword_mesh(), _grip_xf(dir_r, pos_r))
 		if hand_l != null:
 			if with_shield:
-				_hold(hand_l, "Shield", _shield_mesh(), _grip_xf(GRIP_DIR_L, GRIP_POS_L))
+				_hold(hand_l, "Shield", _shield_mesh(), _grip_xf(dir_l, pos_l))
 			elif weapon_kind == "daggers":
-				_hold(hand_l, "DaggerL", _dagger_mesh(), _grip_xf(GRIP_DIR_L, GRIP_POS_L))
+				_hold(hand_l, "DaggerL", _dagger_mesh(), _grip_xf(dir_l, pos_l))
 			else:
-				_hold(hand_l, "SwordL", _sword_mesh(), _grip_xf(GRIP_DIR_L, GRIP_POS_L))
+				_hold(hand_l, "SwordL", _sword_mesh(), _grip_xf(dir_l, pos_l))
 
 	var aps := _asset.find_children("*", "AnimationPlayer", true, false)
 	if not aps.is_empty():
@@ -1848,6 +1865,34 @@ func _setup_asset(path: String) -> bool:
 					a.loop_mode = Animation.LOOP_LINEAR
 				_pin_root(a, skel)
 	return true
+
+
+## Роли костей и хват оружия модели из файла: <путь без .glb>.json рядом с GLB (пишет tools/prepare_hero.py для
+## героев и жителей из Meshy с родным скелетом Bone_NNN): bones (head, hand_r, hand_l, hips, …), grip_r / grip_l
+## ({pos, dir} в пространстве кисти), crossbow_rot (кватернион в правой кисти), face (метка лица в пространстве
+## головы), clips. Нет файла — {} (прежняя героиня со скелетом Mixamo: кости по именам, хват — GRIP_*).
+static func asset_rig(path: String) -> Dictionary:
+	if _rig_info.has(path):
+		return _rig_info[path]
+	var info: Dictionary = {}
+	var jp := path.get_basename() + ".json"
+	if FileAccess.file_exists(jp):
+		var f := FileAccess.open(jp, FileAccess.READ)
+		if f != null:
+			var d: Variant = JSON.parse_string(f.get_as_text())
+			if d is Dictionary:
+				info = d
+	_rig_info[path] = info
+	return info
+
+
+## Vector3 из массива [x, y, z] словаря d по ключу key (нет — def).
+static func _rig_vec(d: Dictionary, key: String, def: Vector3) -> Vector3:
+	var v: Variant = d.get(key, null)
+	if v is Array and (v as Array).size() == 3:
+		var a: Array = v
+		return Vector3(float(a[0]), float(a[1]), float(a[2]))
+	return def
 
 
 ## Клинок в кулаке: ось клинка вдоль dir (в пространстве кости), рукоять в pos.

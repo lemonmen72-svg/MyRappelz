@@ -14,6 +14,11 @@ const SHOWCASE_SKILLS := [
 ]
 
 var _create: Node = null
+## Герои в ряд (кадр 86): прежняя героиня и герои из Meshy (tools/prepare_hero.py).
+const HERO_ROW := ["res://assets/characters/dark_elf_wanderer.glb", "res://assets/characters/hero_assassin_m.glb",
+	"res://assets/characters/hero_swordsman_f.glb", "res://assets/characters/hero_warrior_m.glb",
+	"res://assets/characters/hero_swordsman_m.glb"]
+var _heroes: Node3D = null
 var _top: Camera3D = null
 var _row: Node3D = null
 var _frames := 0
@@ -750,6 +755,14 @@ func run_step() -> void:
 			shot("82_bridge_pet")
 			main.pets.recall()
 			_top.queue_free()
+			# Герои из Meshy (tools/prepare_hero.py) и прежняя героиня в ряд, стойка покоя — кадр 86
+			_heroes_row()
+			wait = 60
+			step = 807
+		807:
+			shot("86_heroes_row")
+			_heroes.queue_free()
+			_top.queue_free()
 			main.cam.current = true
 			main.hud.visible = true
 			player.visible = true
@@ -760,8 +773,8 @@ func run_step() -> void:
 			cc._select_race("human")
 			cc._select_gender("m")
 			wait = 20
-			step = 807
-		807:
+			step = 808
+		808:
 			shot("83_create_race")
 			_create.queue_free()
 			# Бродяга 12 ур.: выбор профессии у мудреца (окно с тремя карточками, сверх-эволюция +10)
@@ -772,8 +785,8 @@ func run_step() -> void:
 			main.job_window.open("")
 			main.job_window._on_pick("swordsman")
 			wait = 20
-			step = 808
-		808:
+			step = 809
+		809:
 			shot("84_job_choice")
 			main.hud.close_window()
 			# HUD Бродяги: кнопок умений нет
@@ -782,22 +795,22 @@ func run_step() -> void:
 				stand_near(ph, 4.0)
 				player._set_target(ph)
 			wait = 30
-			step = 809
-		809:
+			step = 810
+		810:
 			shot("85_wanderer_hud")
 			# Древо новой профессии: Мечник, вкладка «Щит и булава»
 			game.change_job("swordsman")
 			player.apply_class()
 			main.hero_window.open("shield")
 			wait = 20
-			step = 810
-		810:
-			shot("86_job_tree")
+			step = 811
+		811:
+			shot("88_job_tree")
 			# Админ-панель (Настройки → Админ)
 			AdminPanel.open(main)
 			wait = 20
-			step = 811
-		811:
+			step = 812
+		812:
 			shot("87_admin_panel")
 			main.hud.close_window()
 			ok_done()
@@ -994,6 +1007,39 @@ func _anathema_row() -> void:
 	main.add_child(_top)
 	_top.global_position = base + Vector3(3.0, 2.0, 7.5)
 	_top.look_at(base + Vector3(3.0, 1.2, 0))
+	_top.current = true
+	main.hud.visible = false
+
+
+## Героиня (скелет Mixamo) и герои из Meshy с родным скелетом в ряд на площади города перед камерой (Idle, парные
+## мечи; у последнего — арбалет), игрок скрыт, HUD скрыт.
+func _heroes_row() -> void:
+	var player: Player = main.player
+	player.visible = false
+	# Площадь города (ровно, без воды); игрок скрыт там же
+	var base := Vector3(0.0, 0.0, 3.0)
+	if IslandWorld.current != null:
+		base.y = IslandWorld.current.height_at(base.x, base.z)
+	player.global_position = base + Vector3(0, 0.1, 0)
+	_heroes = Node3D.new()
+	_heroes.name = "HeroRow"
+	main.add_child(_heroes)
+	for i in HERO_ROW.size():
+		var spec := CharacterModel.spec_for("dark_elf", "assassin", "crossbow" if i == HERO_ROW.size() - 1 else "dual_swords")
+		spec["asset"] = String(HERO_ROW[i])
+		var m := CharacterModel.new()
+		m.setup(spec)
+		_heroes.add_child(m)
+		var gp := base + Vector3((float(i) - 2.0) * 1.25, 0, 0)
+		if IslandWorld.current != null:
+			gp.y = IslandWorld.current.height_at(gp.x, gp.z)
+		m.global_position = gp
+		# Модель смотрит в −Z, камера — с +Z; чуть вполоборота
+		m.rotation.y = PI + 0.25
+	_top = Camera3D.new()
+	main.add_child(_top)
+	_top.global_position = base + Vector3(0, 1.2, 4.6)
+	_top.look_at(base + Vector3(0, 0.95, 0))
 	_top.current = true
 	main.hud.visible = false
 
