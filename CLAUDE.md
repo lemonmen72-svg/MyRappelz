@@ -97,6 +97,24 @@
   `python3 -I tools/retarget_animations.py --ual1 <UAL1_Standard.glb> --ual2 <UAL2_Standard.glb> assets/characters/<герой>.glb`
   (`--check` — без записи; повторный запуск заменяет свои клипы). Какой клип играет какое действие —
   `ASSET_ACTIONS` / `ASSET_IDLE` в `character_model.gd`.
+  **Герои и жители из Meshy с родным скелетом** (один конвейер «модель Meshy с авто-ригом → игровой герой»):
+  `tools/prepare_hero.py` — скелет Meshy (SmartRigArmature, кости Bone_NNN) не перестраивается и не переименовывается,
+  роли костей ищутся как у анатем (`biped_roles` в `prepare_creatures.py`, плюс пальцы: большой — ближе к запястью,
+  остальные спереди назад), клипы UAL переносятся прямо на него (`HeroRetarget` = `BipedRetarget` + пальцы, поворот
+  кисти по линии «мизинец → указательный», корень Meshy вращается с тазом; IK ног, опорные стопы не скользят, клипы на
+  месте, Death — лёжа). Набор клипов (`HERO_CLIPS`) — с именами героини: все перенесённые клипы `retarget_animations.CLIPS`
+  + Walking/Running (Walk_Loop / Jog_Fwd_Loop, растянуты под `WALK_NATIVE`/`RUN_NATIVE` без проскальзывания) + Wave
+  (процедурный взмах рукой поверх Idle). Меш ~30 тыс. треуг. (meshoptimizer, швы UV целы), рост: мужчины 1.8 м, женщины
+  1.7 м (по `_m`/`_f` в id, `--height`), текстура 2048 PNG. Рядом `<id>.json` — роли костей (`bones`: head, hand_r,
+  hand_l, hips, root, foot_*, руки, ноги, пальцы), хват оружия в пространстве кисти (`grip_r`/`grip_l`: pos, dir),
+  поворот арбалета `crossbow_rot`, метка лица `face`, клипы. `CharacterModel.asset_rig(путь)` читает его, кости для
+  оружия и меток берутся по ролям; нет `.json` — по именам Mixamo и `GRIP_*` (прежняя героиня). `.json` попадают в APK
+  (`include_filter` в `export_presets.cfg`). Готовы `hero_dark_elf_m`, `hero_light_elf_f`, `hero_human_m`,
+  `hero_light_elf_m` (по эскизам Максима). Следующий герой (`hero_dark_elf_f` — замена героини, `hero_human_f`, версии
+  Бродяги `…_starter`, жители `npc_<id>`): GLB Meshy (персонаж + Rig, T-поза, без анимаций), затем
+  `python3 -I tools/prepare_hero.py --ual1 <UAL1_Standard.glb> --ual2 <UAL2_Standard.glb> hero_dark_elf_f=<файл.glb>`
+  (`--preview <папка>` — картинки-проверки: поза покоя и кадры клипов, оружие линиями). Тест `tests/test_hero_models.gd`
+  (добавить новый файл в `HEROES`), кадр 86 в `tests/shots.gd`.
 - Звери из файлов: `assets/creatures/<id>.glb` + `<id>.png` (пантера `panther`, черепаха `turtle`, фазан `pheasant`,
   волк `wolf`, кентавр `centaur`; модели 2-й и 3-й стадий эволюции `<вид>_2`, `<вид>_3` у всех пяти; летающие рыбы `flyfish*`; анатемы `anathema*`; Meshy AI, сделаны Максимом). Скрипт `tools/prepare_creatures.py` (numpy, Pillow, meshoptimizer) из GLB Meshy со скелетом
   без анимаций делает: меш ~7 тыс. треугольников, реальный размер (высота в `CREATURES`), морда в +Z, ноги на y = 0,
