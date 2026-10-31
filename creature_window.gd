@@ -330,8 +330,11 @@ func _build_preview(rec: Dictionary) -> Control:
 	env.ambient_light_color = Color(0.62, 0.64, 0.76)
 	env.ambient_light_energy = 0.6
 	var sc := PetData.stage_scale(sp, lvl)
-	var h := CreatureModels.height(sp, sc)
-	var r := CreatureModels.ring_radius(sp, sc)
+	var stage := PetData.stage_for(lvl)
+	# Своя модель стадии эволюции, если есть (CreatureAsset.model_for)
+	var mid := CreatureAsset.model_for(sp, stage)
+	var h := CreatureModels.height(mid, sc)
+	var r := CreatureModels.ring_radius(mid, sc)
 	var size := maxf(h, r * 2.2)
 	var cam := Camera3D.new()
 	cam.environment = env
@@ -367,8 +370,8 @@ func _build_preview(rec: Dictionary) -> Control:
 	vp.add_child(_pivot)
 	_holder = Node3D.new()
 	_pivot.add_child(_holder)
-	CreatureModels.build(_holder, sp, PetData.stage_color(sp, lvl), sc, PetData.asset_tint(sp, lvl))
-	CreatureModels.decorate_pet(_holder, sp, sc, PetData.stage_for(lvl), PetData.role(sp))
+	CreatureModels.build(_holder, sp, PetData.stage_color(sp, lvl), sc, PetData.asset_tint(sp, lvl), stage)
+	CreatureModels.decorate_pet(_holder, sp, sc, stage, PetData.role(sp))
 	return svc
 
 

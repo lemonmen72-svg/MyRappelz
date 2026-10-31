@@ -5,7 +5,7 @@ extends "res://tests/test_base.gd"
 
 const SHOTS_DIR := "user://shots/"
 
-## Новые звери (пантера, черепаха, фазан) крупно в ряд — кадры 15 и 16.
+## Новые звери (пантера, черепаха, фазан) крупно в ряд — кадры 15 и 16. Стадии эволюции питомцев — кадры 49–51.
 const ROW := ["panther", "turtle", "pheasant"]
 ## Окно существа (кадры 17 и 18): пантера 20 ур. (2-я стадия) с изученными умениями [id, уровень].
 const SHOWCASE_SKILLS := [
@@ -446,6 +446,25 @@ func run_step() -> void:
 			main.hud.close_window()
 			UiScale.set_level(UiScale.MEDIUM, false)
 			main.hud.apply_ui_scale()
+			# Стадии эволюции питомцев (модели из файлов <вид>, <вид>_2, <вид>_3) — в ряд, размер как у питомца
+			_build_stage_row([["panther", 0], ["panther", 1], ["panther", 2]])
+			wait = 40
+			step = 52
+		52:
+			_tick_stage_row()
+			shot("49_stages_panther")
+			_build_stage_row([["pheasant", 0], ["pheasant", 1], ["pheasant", 2], ["turtle", 0], ["turtle", 1], ["turtle", 2]])
+			wait = 40
+			step = 53
+		53:
+			_tick_stage_row()
+			shot("50_stages_pheasant_turtle")
+			_build_stage_row([["wolf", 0], ["wolf", 1], ["wolf", 2]])
+			wait = 40
+			step = 54
+		54:
+			_tick_stage_row()
+			shot("51_stages_wolf")
 			ok_done()
 
 
@@ -534,6 +553,69 @@ func _build_row() -> void:
 			CreatureModels.height(id, float(d["scale"]))])
 	_top.global_position = base + Vector3(0, 1.15, 3.9)
 	_top.look_at(base + Vector3(0, 0.5, 0))
+
+
+## Ряд питомцев по стадиям эволюции [[вид, стадия 0..2], …] перед своей камерой, игрок и питомец скрыты, HUD скрыт.
+## Модели — как у питомца: масштаб PetData.stage_scale, своя модель стадии (CreatureAsset.model_for) и украшения.
+func _build_stage_row(list: Array) -> void:
+	var player: Player = main.player
+	main.pets.recall()
+	player.visible = false
+	main.hud.visible = false
+	if is_instance_valid(_row):
+		_row.queue_free()
+	if not is_instance_valid(_top):
+		_top = Camera3D.new()
+		main.add_child(_top)
+	_top.current = true
+	var base := player.global_position
+	_row = Node3D.new()
+	_row.name = "StageRow"
+	main.add_child(_row)
+	var xs: Array[float] = []
+	var x := 0.0
+	for i in list.size():
+		var e: Array = list[i]
+		var id := String(e[0])
+		var st := int(e[1])
+		var lvl := int(PetData.STAGE_LEVELS[st])
+		var sc := PetData.stage_scale(id, lvl)
+		var mid := CreatureAsset.model_for(id, st)
+		var w := maxf(float(CreatureAsset.info_for(mid)["width"]), float(CreatureAsset.info_for(mid)["length"]) * 0.55) * sc
+		if i > 0:
+			x += w * 0.5 + 0.35
+		xs.append(x)
+		x += w * 0.5
+		var holder := Node3D.new()
+		holder.set_meta("species", id)
+		_row.add_child(holder)
+		CreatureModels.build(holder, id, PetData.stage_color(id, lvl), sc, PetData.asset_tint(id, lvl), st)
+		CreatureModels.decorate_pet(holder, id, sc, st, PetData.role(id))
+		print("  стадия %d %s: модель %s, высота %.2f м" % [st + 1, id, mid, CreatureModels.height(mid, sc)])
+	var half := x * 0.5
+	var top_h := 0.0
+	for i in _row.get_child_count():
+		var holder := _row.get_child(i) as Node3D
+		var gp := base + Vector3(xs[i] - half, 0, 0)
+		if IslandWorld.current != null:
+			gp.y = IslandWorld.current.height_at(gp.x, gp.z)
+		holder.global_position = gp
+		holder.rotation.y = PI + 0.6
+		var e: Array = list[i]
+		var id := String(e[0])
+		var mid := CreatureAsset.model_for(id, int(e[1]))
+		top_h = maxf(top_h, CreatureModels.height(mid, PetData.stage_scale(id, int(PetData.STAGE_LEVELS[int(e[1])]))))
+	var dist := maxf(x * 0.95, top_h * 2.2) + 1.2
+	_top.global_position = base + Vector3(0, top_h * 0.75 + 0.4, dist)
+	_top.look_at(base + Vector3(0, top_h * 0.45, 0))
+
+
+## Украшения над головой (самоцвет роли) — к голове модели.
+func _tick_stage_row() -> void:
+	for n in _row.get_children():
+		var ca := CreatureModels.asset_of(n as Node3D)
+		if ca != null:
+			ca.update(1.0 / 30.0, 0.0)
 
 
 func _animate_row(frame_i: int) -> void:

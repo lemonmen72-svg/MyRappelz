@@ -84,6 +84,8 @@ var skill_cd := 0.0
 var skill_uses := 0
 
 var _model: Node3D = null
+## Какая модель построена: вид или своя модель стадии эволюции («panther_2», CreatureAsset.model_for).
+var model_id := ""
 ## Модель из файла (или null — модель из примитивов).
 var _asset: CreatureAsset = null
 ## Атака ждёт момента удара в клипе модели из файла.
@@ -1018,15 +1020,17 @@ func _build_model() -> void:
 		_col.queue_free()
 	_model = Node3D.new()
 	add_child(_model)
-	_mat = CreatureModels.build(_model, species, _color, _scale, PetData.asset_tint(species, level))
+	# На 2-й и 3-й стадии — своя модель стадии, если её файл есть (иначе 1-я стадия с украшениями)
+	model_id = CreatureAsset.model_for(species, stage)
+	_mat = CreatureModels.build(_model, species, _color, _scale, PetData.asset_tint(species, level), stage)
 	_asset = CreatureModels.asset_of(_model)
 	CreatureModels.decorate_pet(_model, species, _scale, stage, role)
-	_col = CreatureModels.add_collision(self, species, _scale)
-	_height = CreatureModels.height(species, _scale)
+	_col = CreatureModels.add_collision(self, model_id, _scale)
+	_height = CreatureModels.height(model_id, _scale)
 	# Голубой круг под ногами: свой питомец, а не дикий зверь
 	var ring := MeshInstance3D.new()
 	var tm := TorusMesh.new()
-	tm.inner_radius = CreatureModels.ring_radius(species, _scale) + 0.15
+	tm.inner_radius = CreatureModels.ring_radius(model_id, _scale) + 0.15
 	tm.outer_radius = tm.inner_radius + 0.07
 	ring.mesh = tm
 	ring.position.y = 0.05

@@ -30,7 +30,9 @@
     («палочки» сбоку/сверху/спереди и меш по кадрам) для просмотра глазами.
 
 Новый зверь или стадия эволюции: добавить запись в CREATURES (высота, стиль клипов «cat»/«turtle»/«bird»,
-параметры шага) и запустить скрипт с его GLB. Если скелет Meshy окажется другим и роли не найдутся,
+параметры шага; стадия — stage_cfg(вид, высота, …)) и запустить скрипт с его GLB. Скелеты Meshy разные: лишняя
+нога-копия убирается (merge_twin_legs), у головы уши — самая высокая боковая ветка, прочие ветки — HeadX*, если хвост
+лежит на земле ниже лап — ноги ищутся как парные боковые концы (side_leg_roots). Если роли всё же не найдутся,
 скрипт скажет, какие кости без роли.
 
 Зависимости: numpy, Pillow, meshoptimizer (pip install numpy pillow meshoptimizer; обёртка Python 0.2.x,
@@ -57,6 +59,10 @@ import numpy as np
 # walk/run — шаг: T — длина цикла (с), duty — доля опорной фазы, stride — путь стопы за опору (м),
 # lift — подъём стопы (м), flex — сгиб кисти в переносе (рад), curl — поджатие пальцев, crouch — присед корпуса (м),
 # td — когда нога встаёт на землю (доля цикла). Скорость без проскальзывания = stride / (duty · T).
+# Поправки под неудобные скелеты Meshy (по умолчанию выключены): ground_fit — если кончики лап или низ тела в кадре
+# ушли в землю, тело приподнимается на недостачу; foot_rigid — подошва (вершины ниже лодыжки) целиком на кости стопы;
+# toe_tip — кость-опора на кончике пальцев у лап без костей пальцев; ground: "feet" — земля по лапам (хвост ниже лап
+# приподнимается в позе покоя).
 CREATURES = {
 	"panther": {
 		"height": 1.15, "tris": 7000, "style": "cat", "prox_swing": 0.5, "idle_T": 2.4,
@@ -87,7 +93,55 @@ CREATURES = {
 		"wings": {"shoulder": [0.12, 0.52, 0.16], "lat": [0.105, 0.15], "y": [0.27, 0.32, 0.58, 0.64],
 			"z": [-0.32, -0.24, 0.18, 0.24]},
 	},
+	"wolf": {
+		"height": 0.95, "tris": 7000, "style": "cat", "prox_swing": 0.5, "idle_T": 2.2, "ground_fit": True,
+		# шаг: диагональные пары; бег — галоп, как у пантеры, чуть короче и чаще. Лапы у волка в покое почти прямые —
+		# присед поглубже, чтобы им хватало длины
+		"walk": {"T": 0.9, "duty": 0.62, "stride": 0.36, "lift": 0.07, "flex": 0.8, "crouch": 0.045,
+			"td": {"FL": 0.0, "BR": 0.04, "FR": 0.5, "BL": 0.54}},
+		"run": {"T": 0.44, "duty": 0.30, "stride": 0.56, "lift": 0.13, "flex": 0.8, "crouch": 0.07,
+			"td": {"BL": 0.0, "BR": 0.07, "FL": 0.47, "FR": 0.54}},
+	},
 }
+
+
+def stage_cfg(base: str, height: float, **over) -> dict:
+	"""Стадия эволюции вида: стиль и шаг вида 1-й стадии; длины шага (stride, lift, crouch) — в пропорции высоты.
+	Высота стадии — «база» (как у 1-й стадии при масштабе 1): крупнее на старших стадиях модель делает игра
+	(PetData.STAGES scale), поэтому здесь она лишь выравнивает пропорции новой модели под вид."""
+	import copy
+	cfg = copy.deepcopy(CREATURES[base])
+	k = height / cfg["height"]
+	cfg["height"] = height
+	for g in ("walk", "run"):
+		for key in ("stride", "lift", "crouch"):
+			cfg[g][key] = round(cfg[g][key] * k, 3)
+	for key, v in over.items():
+		if key in ("walk", "run"):
+			cfg[key].update(v)  # частичная правка шага: {"crouch": …}
+		else:
+			cfg[key] = v
+	return cfg
+
+
+# Модели 2-й и 3-й стадий (Meshy, Максим). Высоты подобраны так, чтобы при масштабе 1 зверь был по объёму как
+# 1-я стадия (у льва-пантеры корпус выше и короче, поэтому база выше); рост стадии даёт игра.
+# У новых фазанов в скелете есть свои короткие кости плеч, но веса крыла на них не доходят до кончика —
+# крылья, как у 1-й стадии, добавляются (область — по меркам модели). У фазана 3-й стадии хвост лежит на
+# земле ниже лап: земля — по лапам, хвост в покое приподнимается (ground: "feet").
+CREATURES.update({
+	"panther_2": stage_cfg("panther", 1.3, ground_fit=True),
+	"panther_3": stage_cfg("panther", 1.3, ground_fit=True),
+	"turtle_2": stage_cfg("turtle", 0.85, foot_rigid=True, walk={"crouch": 0.05}, run={"crouch": 0.05}),
+	"turtle_3": stage_cfg("turtle", 0.85, foot_rigid=True, walk={"crouch": 0.05}, run={"crouch": 0.05}),
+	"pheasant_2": stage_cfg("pheasant", 0.9, wings={"shoulder": [0.13, 0.52, 0.22], "lat": [0.07, 0.12],
+		"y": [0.30, 0.36, 0.66, 0.72], "z": [-0.42, -0.32, 0.24, 0.30]}),
+	"pheasant_3": stage_cfg("pheasant", 0.9, ground="feet", toe_tip=True, run={"crouch": 0.0},
+		wings={"shoulder": [0.11, 0.50, 0.18], "lat": [0.06, 0.10], "y": [0.26, 0.32, 0.60, 0.66],
+		"z": [-0.30, -0.22, 0.20, 0.26]}),
+	"wolf_2": stage_cfg("wolf", 0.95),
+	"wolf_3": stage_cfg("wolf", 0.95),
+})
 
 
 # ---------- GLB: чтение ----------
@@ -376,6 +430,115 @@ def leg_roots(parent: np.ndarray, gpos: np.ndarray, ground_y: float) -> list:
 	return roots
 
 
+def side_leg_roots(parent: np.ndarray, gpos: np.ndarray, height: float) -> list:
+	"""Запасной поиск ног (когда у земли не 2 и не 4 ветки — например, хвост лежит на земле ниже лап):
+	концы в нижней трети высоты, сбоку от середины и с зеркальной парой; поднимаемся, пока все концы поддерева такие."""
+	ch = children_of(parent)
+	cand = {b for b in range(len(parent)) if not ch[b] and gpos[b, 1] < 0.3 * height and abs(gpos[b, 0]) > 0.02 * height}
+	mir = np.array([-1.0, 1.0, 1.0])
+	cand = {b for b in cand if any(np.linalg.norm(gpos[o] * mir - gpos[b]) < 0.05 * height for o in cand if o != b)}
+	leaves = {}
+
+	def lv(b):
+		if b not in leaves:
+			leaves[b] = [b] if not ch[b] else sum((lv(c) for c in ch[b]), [])
+		return leaves[b]
+
+	roots = []
+	for b in sorted(cand):
+		r = b
+		while parent[r] >= 0 and all(x in cand for x in lv(int(parent[r]))):
+			r = int(parent[r])
+		if r not in roots:
+			roots.append(r)
+	return roots
+
+
+def merge_twin_legs(g: dict, height: float) -> dict:
+	"""У скелета Meshy бывает лишняя «нога» — копия настоящей (те же суставы), прицепленная к другой кости
+	(у волка 3-й стадии — к основанию хвоста), а веса вершин поделены между ними. Копия убирается, её веса
+	переходят к соответствующим костям настоящей ноги. Настоящая — та, чей родитель общий с другими ногами."""
+	parent = g["parent"]
+	lr = leg_roots(parent, g["gpos"], 0.1 * height)
+	if len(lr) <= 4:
+		return g
+	ch = children_of(parent)
+	gp = g["gpos"]
+	drop, to = [], {}
+	for i, a in enumerate(lr):
+		for b in lr[i + 1:]:
+			sa, sb = subtree(ch, a), subtree(ch, b)
+			if a in drop or b in drop or len(sa) != len(sb):
+				continue
+			if float(np.mean(np.linalg.norm(gp[sa] - gp[sb], axis=1))) > 0.03 * height:
+				continue
+			share_a = sum(1 for r in lr if r != a and parent[r] == parent[a])
+			share_b = sum(1 for r in lr if r != b and parent[r] == parent[b])
+			keep, dup = (sa, sb) if share_a >= share_b else (sb, sa)
+			drop += dup
+			to.update({d: k for d, k in zip(dup, keep)})
+	if not drop:
+		return g
+	print("   лишняя нога-копия: %s → %s" % ([g["names"][b] for b in drop], [g["names"][to[b]] for b in drop]))
+	jn = g["joints"].copy()
+	wt = g["weights"].copy()
+	for d, k in to.items():
+		jn[jn == d] = k
+	for a in range(jn.shape[1]):  # одна кость дважды у вершины — веса складываются
+		for b in range(a + 1, jn.shape[1]):
+			same = (jn[:, a] == jn[:, b]) & (wt[:, b] > 0.0)
+			wt[same, a] += wt[same, b]
+			wt[same, b] = 0.0
+	keep = [b for b in range(len(parent)) if b not in drop]
+	inv = np.full(len(parent), -1, dtype=np.int64)
+	inv[keep] = np.arange(len(keep))
+	out = dict(g)
+	out["names"] = [g["names"][b] for b in keep]
+	out["parent"] = np.array([inv[parent[b]] if parent[b] >= 0 else -1 for b in keep])
+	out["grot"] = g["grot"][keep]
+	out["gpos"] = g["gpos"][keep]
+	out["joints"] = inv[jn]
+	out["weights"] = wt
+	return out
+
+
+def lift_tail_to_feet(g: dict, roles: dict, height: float) -> None:
+	"""ground: "feet" — земля по лапам, а не по низу меша: хвост, лежащий ниже лап, в позе покоя приподнимается
+	(как c.tail(lift), сильнее у основания), пока низ меша не окажется на уровне лап; меш и скелет — в новой позе покоя."""
+	legs = set()
+	for lg in roles["legs"].values():
+		legs.update(lg["chain"])
+		for t in lg["toes"]:
+			legs.update(t)
+	dom = g["joints"][np.arange(len(g["pos"])), np.argmax(g["weights"], 1)]
+	foot_y = float(g["pos"][np.isin(dom, list(legs)), 1].min())
+	if float(g["pos"][:, 1].min()) >= foot_y - 0.002:
+		return
+	rig = Rig(roles["names"], g["parent"], g["grot"], g["gpos"])
+	tail = roles["tail"]
+	n = len(tail)
+	best = None
+	for step in range(1, 91):
+		a = 0.02 * step
+		P = {"root_off": np.zeros(3), "trans": {}, "ik": {},
+			"rot": {b: body_rot(-a * 2.0 * (n - k) / (n * (n + 1))) for k, b in enumerate(tail)}}
+		_L, _T, Gr, Gp, _i = evaluate(rig, P)
+		v = skin_points(rig, g["pos"], g["joints"], g["weights"], Gr, Gp)
+		best = (a, Gr, Gp, v)
+		if float(v[:, 1].min()) >= foot_y - 0.002:
+			break
+	a, Gr, Gp, v = best
+	R = Gr @ rig.grot.transpose(0, 2, 1)
+	nrm = np.zeros_like(g["nrm"])
+	for k in range(g["joints"].shape[1]):
+		nrm += g["weights"][:, k:k + 1] * np.einsum("vij,vj->vi", R[g["joints"][:, k]], g["nrm"])
+	nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-9)
+	off = np.array([0.0, -foot_y, 0.0])
+	g["pos"], g["nrm"], g["grot"], g["gpos"] = v + off, nrm, Gr, Gp + off
+	print("   земля по лапам (было %.3f м ниже лап): хвост приподнят на %.0f°, низ меша %.3f" % (
+		foot_y, math.degrees(a), float(v[:, 1].min()) - foot_y))
+
+
 def to_game_space(src: dict, height: float) -> dict:
 	"""Поворот мордой в +Z, масштаб до нужной высоты, ноги на y = 0. Кости — без масштаба."""
 	yaw = facing_yaw(src)
@@ -403,6 +566,8 @@ def detect_roles(names: list, parent: np.ndarray, gpos: np.ndarray, height: floa
 		raise ValueError("ждём один корень скелета, найдено %d" % len(roots))
 	root = roots[0]
 	lr = leg_roots(parent, gpos, 0.1 * height)
+	if len(lr) not in (2, 4):
+		lr = side_leg_roots(parent, gpos, height)
 	leg_set = set()
 	for r in lr:
 		leg_set.update(subtree(ch, r))
@@ -466,6 +631,8 @@ def detect_roles(names: list, parent: np.ndarray, gpos: np.ndarray, height: floa
 	# Хвост: путь к самой задней кости тела
 	rear = min(body, key=lambda b: (gpos[b, 2], len(ch[b])))
 	tp = path_to(parent, rear)
+	while len(ch[tp[-1]]) == 1:  # хвост, загнутый вперёд (кончик не самый задний), — до конца цепочки
+		tp.append(ch[tp[-1]][0])
 	div = next((k for k, b in enumerate(tp) if b not in hp), len(tp))
 	tail_part = tp[div:]
 	if back_attach in tail_part:
@@ -506,12 +673,27 @@ def detect_roles(names: list, parent: np.ndarray, gpos: np.ndarray, height: floa
 	hx = bch(head)
 	roles["ears"] = {"L": [], "R": []}
 	roles["head_extra"] = []
-	if len(hx) >= 2:
+	lat = [c for c in hx if abs(gpos[c, 0] - gpos[head, 0]) > 0.01 * height]
+	if len(hx) >= 2 and lat:
+		# Уши — самая высокая боковая ветка с каждой стороны; прочие ветки (глаза, челюсть, нос, грива) — HeadX
+		ears = {}
+		for c in lat:
+			side = "L" if gpos[c, 0] > gpos[head, 0] else "R"
+			top = max(gpos[b, 1] for b in subtree(ch, c))
+			if side not in ears or top > ears[side][0]:
+				ears[side] = (top, c)
+		n_hx = 0
 		for c in hx:
 			side = "L" if gpos[c, 0] > gpos[head, 0] else "R"
-			for i, b in enumerate(subtree(ch, c)):
-				nm[b] = "Ear%s%d" % (side, i + 1)
-				roles["ears"][side].append(b)
+			if side in ears and ears[side][1] == c:
+				for i, b in enumerate(subtree(ch, c)):
+					nm[b] = "Ear%s%d" % (side, i + 1)
+					roles["ears"][side].append(b)
+			else:
+				n_hx += 1
+				for i, b in enumerate(subtree(ch, c)):
+					nm[b] = "HeadX%d_%d" % (n_hx, i + 1)
+					roles["head_extra"].append(b)
 	else:
 		for i, b in enumerate(sum((subtree(ch, c) for c in hx), [])):
 			nm[b] = "HeadEnd" if i == 0 else "HeadEnd%d" % (i + 1)
@@ -1443,6 +1625,46 @@ def add_wings(rig: Rig, roles: dict, mesh: dict, wc: dict) -> None:
 	mesh["joints"], mesh["weights"] = jn, wt
 
 
+def rigid_feet(rig: Rig, mesh: dict) -> None:
+	"""foot_rigid: подошва целиком на стопе. У Meshy низ толстой лапы (черепаха) бывает привязан к голени — при шаге
+	голень поворачивается и подошва уходит в землю. Вершины ниже лодыжки: доля костей ноги выше стопы → кость стопы."""
+	jn = mesh["joints"].copy()
+	wt = mesh["weights"].copy()
+	pos = mesh["pos"]
+	moved = 0
+	for leg in rig.legs.values():
+		upper = [b for b in leg.chain if b not in leg.distal]
+		low = pos[:, 1] < rig.gpos[leg.a, 1]
+		hit = np.zeros(len(pos), dtype=bool)
+		for k in range(jn.shape[1]):
+			m = low & np.isin(jn[:, k], upper) & (wt[:, k] > 0.0)
+			jn[m, k] = leg.a
+			hit |= m
+		moved += int(hit.sum())
+	for a in range(jn.shape[1]):
+		for b in range(a + 1, jn.shape[1]):
+			same = (jn[:, a] == jn[:, b]) & (wt[:, b] > 0.0)
+			wt[same, a] += wt[same, b]
+			wt[same, b] = 0.0
+	mesh["joints"], mesh["weights"] = jn, wt
+	print("   подошвы на стопах: %d вершин" % moved)
+
+
+def add_toe_tips(rig: Rig, roles: dict, mesh: dict) -> None:
+	"""toe_tip: у лапы без костей пальцев (фазан 3-й стадии) пальцы торчат вперёд за последней костью — при подъёме
+	пятки они уходили бы в землю. Добавляется кость без весов на кончике пальцев (ToeTip<нога>): она самая передняя
+	у земли и становится точкой опоры ноги."""
+	dom = mesh["joints"][np.arange(len(mesh["pos"])), np.argmax(mesh["weights"], 1)]
+	for key, lg in sorted(roles["legs"].items()):
+		if lg["toes"]:
+			continue
+		end = lg["chain"][-1]
+		sel = mesh["pos"][np.isin(dom, lg["chain"][-2:])]
+		low = sel[sel[:, 1] < sel[:, 1].min() + 0.012]
+		tip = low[np.argmax(low[:, 2])]
+		rig.add_bone("ToeTip" + key, end, np.array([tip[0], max(float(rig.gpos[end, 1]) - 0.004, 0.0), tip[2]]))
+
+
 def bake(c: Ctx, clip: dict) -> dict:
 	"""Клип по кадрам 30 к/с: локальные повороты (кватернионы) и сдвиги всех костей."""
 	rig = c.rig
@@ -1462,6 +1684,10 @@ def bake(c: Ctx, clip: dict) -> dict:
 			miny = float(v[:, 1].min())
 			dy = -miny if t >= clip["fit_after"] * T - 1e-6 else max(0.0, -miny)
 			Tr[c.root, 1] += dy
+		elif c.cfg.get("ground_fit"):
+			# Кончики лап или низ панциря чуть ушли в землю (сгиб кисти, присед) — тело приподнимается на недостачу
+			v = skin_points(rig, m["pos"], m["joints"], m["weights"], Gr, Gp)
+			Tr[c.root, 1] += max(0.0, -float(v[:, 1].min()))
 		short = max([short] + [i["short"] for i in info.values()])
 		for b in range(rig.B):
 			Q[f, b] = m_to_q(L[b])
@@ -1613,7 +1839,10 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 	src = load_source(src_path)
 	g = to_game_space(src, cfg["height"])
 	g = reorder(g, topo_order(g["parent"]))
+	g = merge_twin_legs(g, cfg["height"])
 	roles = detect_roles(g["names"], g["parent"], g["gpos"], cfg["height"], cfg)
+	if cfg.get("ground") == "feet":
+		lift_tail_to_feet(g, roles, cfg["height"])
 	print("   поворот %d°, масштаб %.4f, исходный меш %d треуг." % (g["yaw_deg"], g["scale"], len(g["tris"])))
 	mesh = simplify_mesh(g, cfg["tris"])
 	st = mesh_stats(mesh["pos"], mesh["tris"])
@@ -1627,6 +1856,8 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 	rig = Rig(roles["names"], g["parent"], g["grot"], g["gpos"])
 	if cfg.get("wings"):
 		add_wings(rig, roles, mesh, cfg["wings"])
+	if cfg.get("toe_tip"):
+		add_toe_tips(rig, roles, mesh)
 	for key, lg in sorted(roles["legs"].items()):
 		up = cfg.get("ik_upper", {}).get(key, pick_upper(rig, lg["chain"]))
 		leg = Leg(rig, key, lg["chain"], lg["toes"], up, cfg.get("prox_swing", 0.0))
@@ -1635,6 +1866,8 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 		print("   нога %s: %s; IK %s+%s, опора %s, длины %.3f+%.3f, вытянута в покое на %d%%" % (
 			key, " ".join(rig.names[b] for b in lg["chain"]), rig.names[leg.u], rig.names[leg.l], rig.names[leg.c],
 			leg.l1, leg.l2, round(leg.reach * 100)))
+	if cfg.get("foot_rigid"):
+		rigid_feet(rig, mesh)
 	c = Ctx(rig, roles, cfg)
 	c.mesh = mesh
 	clips = [bake(c, cl) for cl in (bird_clips(c) if cfg["style"] == "bird" else quad_clips(c))]

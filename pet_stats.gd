@@ -54,7 +54,8 @@ const TABLES := {
 }
 ## Обмен статов под нашу роль: пантера у нас маг (Сила ↔ Интеллект: урон от Интеллекта),
 ## фазан — лекарь (Меткость ↔ Мудрость: лечение от Мудрости). Черепаха — танк, как в оригинале.
-const SWAP := {"panther": ["str", "int"], "pheasant": ["dex", "wis"]}
+## Волк — боец-«существо ловкости» (Сила ↔ Ловкость): Ловкость главная — скорость атаки, уклонение, крит.
+const SWAP := {"panther": ["str", "int"], "pheasant": ["dex", "wis"], "wolf": ["str", "agi"]}
 ## Названия производных значений (порядок показа в окне существа).
 const DERIVED_NAMES := [
 	["max_hp", "Макс. HP"], ["max_mp", "Макс. MP"], ["patk", "Физ. атака"], ["matk", "Маг. атака"],
@@ -145,6 +146,11 @@ static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles:
 	var kd := float(k["def"])
 	var atk_mult := 1.0 + float(bon.get("atk_pct", 0.0))
 	var def_mult := 1.0 + float(bon.get("def_pct", 0.0))
+	# Сила редкости вида (MobData.power: базовые 1.0, «Обычный» волк 1.15…) — на HP, атаки, лечение и защиты
+	var pw := MobData.power(species)
+	kh *= pw
+	ka *= pw
+	kd *= pw
 	var r := {"stats": s}
 	var lf := float(lv)
 	r["max_hp"] = roundi(kh * Stats.raw_hp(s, lf) * (1.0 + float(bon.get("hp_pct", 0.0))))

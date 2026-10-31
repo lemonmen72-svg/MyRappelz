@@ -11,6 +11,10 @@ extends Node3D
 ##   toon, без металла, эмиссия для вспышки урона, контур по нормалям (если Quality.outlines()).
 ## - creatures.json: {id: {height, length, width, walk_speed, run_speed, attack_hit_time,
 ##   clips: {имя: длина}, bones: {...}}}. Нет файла или поля — значения из DEFAULTS.
+## - Стадии эволюции питомца: <вид>_2.glb, <вид>_3.glb (+ .png, запись в creatures.json) — своя модель 2-й и 3-й
+##   стадии (model_for). Её высота — «база» (как у 1-й стадии при масштабе 1), крупнее делает игра
+##   (PetData.stage_scale). Нет файла стадии — модель 1-й стадии с процедурными украшениями (decorate).
+##   Дикие звери в мире — всегда 1-я стадия.
 ##
 ## Узел масштабируется на s (питомцы и стадии эволюции). Для Mob и Pet:
 ## update(delta, скорость м/с) каждый кадр — Idle / Walk / Run (speed_scale = скорость / скорость клипа);
@@ -34,7 +38,11 @@ const DEFAULTS := {
 		"attack_hit_time": 0.5},
 	"pheasant": {"height": 0.85, "length": 1.1, "width": 0.4, "walk_speed": 1.0, "run_speed": 3.0,
 		"attack_hit_time": 0.35},
+	"wolf": {"height": 0.95, "length": 1.4, "width": 0.35, "walk_speed": 0.65, "run_speed": 4.2,
+		"attack_hit_time": 0.36},
 }
+## Окончания моделей стадий эволюции: стадия 1 (в коде 0..2) → "_2", стадия 2 → "_3".
+const STAGE_SUFFIX := ["", "_2", "_3"]
 const CLIPS := ["idle", "walk", "run", "attack", "hit", "death", "cast"]
 const LOOPED := ["idle", "walk", "run"]
 ## Цвет эмиссии в начале вспышки урона.
@@ -55,6 +63,8 @@ static var _prepared := {}
 static var _outline: ShaderMaterial
 
 var species := ""
+## Своя модель стадии эволюции (<вид>_2 / <вид>_3): процедурные украшения стадии ей не нужны.
+var stage_model := false
 ## Размеры и скорости вида (info_for).
 var info: Dictionary = {}
 var material: StandardMaterial3D
@@ -86,8 +96,27 @@ static func path_for(id: String) -> String:
 
 
 ## Вид, для которого предусмотрена модель из файла (есть размеры в DEFAULTS), даже если файла пока нет.
+## id модели стадии («panther_2») — по своему виду.
 static func is_asset_species(id: String) -> bool:
-	return DEFAULTS.has(id)
+	return DEFAULTS.has(species_of(id))
+
+
+## Вид по id модели: «panther_3» → «panther», «panther» → «panther».
+static func species_of(model_id: String) -> String:
+	for i in range(1, STAGE_SUFFIX.size()):
+		var suf := String(STAGE_SUFFIX[i])
+		if model_id.ends_with(suf) and DEFAULTS.has(model_id.trim_suffix(suf)):
+			return model_id.trim_suffix(suf)
+	return model_id
+
+
+## Модель вида на стадии эволюции stage (0..2): «<вид>_2» / «<вид>_3», если её файл есть, иначе сам вид
+## (модель 1-й стадии или запасная из примитивов).
+static func model_for(id: String, stage: int) -> String:
+	if stage <= 0 or stage >= STAGE_SUFFIX.size():
+		return id
+	var mid := id + String(STAGE_SUFFIX[stage])
+	return mid if has_asset(mid) else id
 
 
 ## Есть ли файл модели вида (и модели из файлов не выключены).
@@ -105,7 +134,7 @@ static func info_for(id: String) -> Dictionary:
 		return _infos[id]
 	_load_json()
 	var r: Dictionary = BASE_INFO.duplicate()
-	r.merge(DEFAULTS.get(id, {}), true)
+	r.merge(DEFAULTS.get(species_of(id), {}), true)
 	r["clips"] = {}
 	r["bones"] = {}
 	var j = _json.get(id)
@@ -160,6 +189,7 @@ static func clip_key(anim_name: String) -> String:
 ## текстуры (стадия питомца). false — файла нет или он не читается.
 func setup(id: String, s: float, color: Color = Color.WHITE, tint: Color = Color.WHITE) -> bool:
 	species = id
+	stage_model = species_of(id) != id
 	name = "Asset"
 	_s = s
 	info = info_for(id)
@@ -420,7 +450,10 @@ func set_sleeping(on: bool) -> void:
 
 ## Украшения питомца: самоцвет цвета роли над головой (все стадии), искорки цвета роли (со 2-й стадии),
 ## золотой нимб, сияние под ногами и золотые искорки (3-я стадия). Узлы: Charm, Sparkles, Halo, Aura.
+## У своей модели стадии (stage_model) — только самоцвет роли: стадию видно по самой модели.
 func decorate(stage: int, role: String) -> void:
+	if stage_model:
+		stage = 0
 	if _decor != null:
 		_decor.queue_free()
 	var rc := CreatureModels.role_color(role)

@@ -306,9 +306,11 @@ func _check_tables() -> void:
 			prev_d = d
 		var sp_d := PetData.get_species(id)
 		var d1 := PetStats.derived(id, 1)
-		check(int(d1["max_hp"]) == int(sp_d["hp"]) and int(d1["atk"]) == int(sp_d["atk"])
-			and int(d1["def"]) == int(sp_d["def"]), "%s: на 1 ур. HP/атака/защита как прежде (%d/%d/%d)"
-			% [id, int(d1["max_hp"]), int(d1["atk"]), int(d1["def"])])
+		# У базовых сила редкости 1.0 — числа как прежде; у «Обычного» волка — ×MobData.power
+		var pw := MobData.power(id)
+		check(int(d1["max_hp"]) == roundi(float(sp_d["hp"]) * pw) and int(d1["atk"]) == roundi(float(sp_d["atk"]) * pw)
+			and int(d1["def"]) == roundi(float(sp_d["def"]) * pw), "%s: на 1 ур. HP/атака/защита как прежде ×%.2f (%d/%d/%d)"
+			% [id, pw, int(d1["max_hp"]), int(d1["atk"]), int(d1["def"])])
 		for lvl in [14, 29]:
 			var a := _stat_sum(id, lvl)
 			var b := _stat_sum(id, lvl + 1)
@@ -361,8 +363,9 @@ func _check_balance() -> void:
 			var old_hp := (float(o[0]) + float(o[1]) * float(lvl - 1)) * b
 			var old_atk := (float(o[2]) + float(o[3]) * float(lvl - 1)) * b
 			var d := PetStats.derived(String(sp), lvl)
-			var rh := float(d["max_hp"]) / old_hp
-			var ra := float(d["atk"]) / old_atk
+			var pw := MobData.power(String(sp))
+			var rh := float(d["max_hp"]) / (old_hp * pw)
+			var ra := float(d["atk"]) / (old_atk * pw)
 			var early := lvl < 15
 			var hp_ok := rh >= (0.75 if early else 0.7) and rh <= (1.35 if early else 1.65)
 			var atk_ok := ra >= (0.8 if early else 0.75) and ra <= (1.25 if early else 1.4)

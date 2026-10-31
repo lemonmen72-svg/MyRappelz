@@ -71,7 +71,8 @@ func handle_action(id: String) -> bool:
 func on_mob_killed(mob: Mob) -> void:
 	var d := MobData.get_type(mob.type_id)
 	var gold_range: Array = d["gold"]
-	var g := randi_range(int(gold_range[0]), int(gold_range[1]))
+	# Золото — с силой редкости вида (MobData.power)
+	var g := roundi(float(randi_range(int(gold_range[0]), int(gold_range[1]))) * MobData.power(mob.type_id))
 	Game.gold += g
 	Util.float_text(main, mob.global_position + Vector3(0, 2.8, 0), "+%d зол." % g, GOLD_COLOR)
 	Game.changed.emit()
