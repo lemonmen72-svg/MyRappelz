@@ -137,13 +137,13 @@ PROPS = {
 	"crystal_purple": dict(src="Amethyst_Grove", fit=(2.0, 2.1, 2.0), tris=900, tex=512, rot=0, page="small",
 		glow=GLOW_PURPLE),
 	# Природа (IslandVegetation: склеиваются по участкам)
-	"tree_oak": dict(src="Whispering_Grove", fit=(6.0, 6.0, 6.0), tris=1100, tex=512, rot=0, page="nature"),
-	"tree_pine": dict(src="Whispering_Evergreen", fit=(5.0, 7.0, 5.0), tris=800, tex=512, rot=0, page="nature"),
-	"tree_elf": dict(src="Blushbloom_Tree", fit=(5.6, 6.0, 5.6), tris=1100, tex=512, rot=0, page="nature"),
-	"tree_dead": dict(src="Twisted_Elder", fit=(5.0, 5.2, 5.0), tris=1100, tex=512, rot=0, page="nature"),
-	"bush": dict(src="Verdant_Whimsy", fit=(1.8, 1.5, 1.8), tris=450, tex=512, rot=0, page="nature"),
-	"rock": dict(src="Mossy_Boulder", fit=(2.0, 1.6, 2.0), tris=400, tex=512, rot=0, page="nature"),
-	"rock_dark": dict(src="Shadowcrag_Bloom", fit=(1.7, 1.8, 1.7), tris=450, tex=512, rot=0, page="nature"),
+	"tree_oak": dict(src="Whispering_Grove", fit=(6.0, 6.0, 6.0), tris=700, tex=512, rot=0, page="nature"),
+	"tree_pine": dict(src="Whispering_Evergreen", fit=(5.0, 7.0, 5.0), tris=520, tex=512, rot=0, page="nature"),
+	"tree_elf": dict(src="Blushbloom_Tree", fit=(5.6, 6.0, 5.6), tris=700, tex=512, rot=0, page="nature"),
+	"tree_dead": dict(src="Twisted_Elder", fit=(5.0, 5.2, 5.0), tris=650, tex=512, rot=0, page="nature"),
+	"bush": dict(src="Verdant_Whimsy", fit=(1.8, 1.5, 1.8), tris=280, tex=512, rot=0, page="nature"),
+	"rock": dict(src="Mossy_Boulder", fit=(2.0, 1.6, 2.0), tris=260, tex=512, rot=0, page="nature"),
+	"rock_dark": dict(src="Shadowcrag_Bloom", fit=(1.7, 1.8, 1.7), tris=280, tex=512, rot=0, page="nature"),
 }
 
 GLB_IMPORT = """[remap]
