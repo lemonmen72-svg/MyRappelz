@@ -502,10 +502,12 @@ func _check_items() -> void:
 	check(game.inventory.count(weapon_id) == c1 + 10 and game.inventory.used_cells() <= Inventory.CAPACITY,
 		"+10 оружия: %d, занято %d" % [game.inventory.count(weapon_id), game.inventory.used_cells()])
 	# Очистка с подтверждением
+	var potions_before: int = game.inventory.count("hp_potion")
 	_press("clear_bag")
 	check(AdminPanel.buttons.has("clear_bag_yes") and AdminPanel.buttons.has("clear_bag_no"), "подтверждение очистки")
 	_press("clear_bag_no")
-	check(game.inventory.count("hp_potion") == 11 and AdminPanel.buttons.has("clear_bag"), "отмена — сумка цела")
+	check(game.inventory.count("hp_potion") == potions_before and potions_before > 0 and AdminPanel.buttons.has("clear_bag"),
+		"отмена — сумка цела (зелий %d)" % game.inventory.count("hp_potion"))
 	_press("clear_bag")
 	_press("clear_bag_yes")
 	check(game.inventory.count("hp_potion") == 0 and game.inventory.has(w) and game.weapon == w and game.inventory.used_cells() == 0,
