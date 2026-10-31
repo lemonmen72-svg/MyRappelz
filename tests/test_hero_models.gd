@@ -163,7 +163,8 @@ func _check_model(m: CharacterModel, who: String) -> void:
 	var h := 0.0
 	for n in m._asset.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
-		if mi.mesh == null:
+		# Только тело героя (меш со скином): оружие в руках — отдельные меши со своим материалом
+		if mi.mesh == null or mi.skin == null:
 			continue
 		h = maxf(h, mi.mesh.get_aabb().size.y)
 		for s in mi.mesh.get_surface_count():
