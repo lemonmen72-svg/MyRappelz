@@ -1,0 +1,14 @@
+[remap]
+
+importer="scene"
+importer_version=1
+type="PackedScene"
+
+[deps]
+
+source_file="res://assets/creatures/panther_2.glb"
+
+[params]
+
+gltf/embedded_image_handling=0
+meshes/generate_lods=true

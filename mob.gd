@@ -110,6 +110,13 @@ func setup(id: String, spawn_slot: int, pos: Vector3, lvl: int = -1) -> void:
 		atk = maxi(1, roundi(float(atk) * f))
 		xp_reward = maxi(1, roundi(float(xp_reward) * f))
 		level = lvl
+	# Сила редкости («Обычный» волк сильнее базовых зверей того же уровня): MobData.power
+	var pw := MobData.power(type_id)
+	if not is_equal_approx(pw, 1.0):
+		max_hp = maxi(1, roundi(float(max_hp) * pw))
+		hp = max_hp
+		atk = maxi(1, roundi(float(atk) * pw))
+		xp_reward = maxi(1, roundi(float(xp_reward) * pw))
 	home = pos
 	position = pos
 
@@ -135,11 +142,8 @@ func _ready() -> void:
 	_label.font_size = 40
 	_label.outline_size = 10
 	_label.position = Vector3(0, _height + 0.35, 0)
-	match rarity:
-		"rare":
-			_label.modulate = Color(0.6, 0.85, 1.0)
-		"unique":
-			_label.modulate = Color(1.0, 0.8, 0.3)
+	if rarity != "common":
+		_label.modulate = MobData.rarity_color(rarity)
 	add_child(_label)
 	_wander_to = home
 	_update_label()

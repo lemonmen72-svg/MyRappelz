@@ -123,14 +123,14 @@ func _check_asset(ca: CreatureAsset, id: String) -> void:
 	check(ca.anim == null or ca.anim.active, "проснувшийся %s: анимации идут" % id)
 
 
-## Запасные модели (файлов нет): пантера, черепаха, фазан из примитивов, высота и коллизия — по размерам вида.
+## Запасные модели (файлов нет): пантера, черепаха, фазан, волк из примитивов, высота и коллизия — по размерам вида.
 func _build_fallbacks() -> void:
 	check(CreatureAsset.clip_key("Armature|Walk") == "walk" and CreatureAsset.clip_key("lib/IDLE") == "idle",
 		"имена клипов распознаются без учёта регистра и приставок")
 	check(CreatureAsset.clip_key("Take 001") == "", "чужой клип не распознан")
 	CreatureAsset.use_assets = false
 	var x := -12.0
-	for id in ["panther", "turtle", "pheasant"]:
+	for id in ["panther", "turtle", "pheasant", "wolf"]:
 		var d := MobData.get_type(id)
 		var n := _holder(id, Vector3(x, 0, -4.0))
 		var m := CreatureModels.build(n, id, d["color"], 1.0)

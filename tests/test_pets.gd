@@ -50,7 +50,9 @@ func run_step() -> void:
 				check(not MobData.tameable(id) and ItemData.card_for(id) == "" and ItemData.soul_card_for(id) == "",
 					"%s не приручается, карт нет" % id)
 				check(PetData.SPECIES.has(id), "вид питомца %s остался (для уже прирученных)" % id)
-			check(MobData.tameable("wolf") and ItemData.card_tier("card_wolf") == "basic", "волк приручается базовой картой")
+			check(MobData.tameable("wolf") and ItemData.card_tier("card_wolf") == "rare", "волк приручается синей картой")
+			check(String(MobData.get_type("wolf")["rarity"]) == "uncommon" and MobData.rarity_name("wolf") == "Обычный",
+				"волк — «Обычный»")
 			check(MobData.rarity_label("unique") == "Уникальный", "редкость стража — «Уникальный»")
 			check(PetData.role("boar") == "fighter" and PetData.role("wolf") == "fighter", "кабан и волк — бойцы")
 			check(PetData.stage_for(1) == 0 and PetData.stage_for(14) == 0, "стадия 1 до 15 уровня")

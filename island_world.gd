@@ -697,9 +697,10 @@ func mob_slots(rng: RandomNumberGenerator) -> Array:
 			for n in int(entry[1]):
 				var pos := Vector3.ZERO
 				var found := false
-				for attempt in 40:
+				# Сначала в круге зоны; если там почти всё — вода или дорога, ищем шире (до 2.5 радиуса)
+				for attempt in 100:
 					var ang := rng.randf() * TAU
-					var rr := sqrt(rng.randf()) * r
+					var rr := sqrt(rng.randf()) * r * (1.0 if attempt < 40 else 2.5)
 					var x := c.x + cos(ang) * rr
 					var zz := c.y + sin(ang) * rr
 					pos = ground(x, zz)

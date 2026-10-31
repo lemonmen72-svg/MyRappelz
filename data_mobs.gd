@@ -2,7 +2,7 @@ class_name MobData
 extends RefCounted
 ## Звери мира: характеристики, редкость, приручение (карта существа и её тир), добыча.
 ## Где и какого уровня они появляются — mob_zones в world/training_island.json.
-## id зверя совпадает с id вида питомца (PetData; у летающих рыб вида питомца нет). Пантера, черепаха, фазан
+## id зверя совпадает с id вида питомца (PetData; у летающих рыб вида питомца нет). Пантера, черепаха, фазан, волк
 ## и летающие рыбы — модели из файлов (CreatureAsset, assets/creatures/), остальные — из примитивов (CreatureModels).
 ## flying: true — летающий зверь (парит на уровне головы героя, падает только после смерти).
 
@@ -10,14 +10,25 @@ extends RefCounted
 ## Источник правды — safe_zones в world/training_island.json; здесь — для кода без острова.
 const SAFE_RADIUS := 22.0
 
+## Редкости по возрастанию: «Базовый» (common), «Обычный» (uncommon), «Редкий» (rare), «Уникальный» (unique).
+## Новый вид другой редкости — одно поле "rarity" в TYPES: от неё ранг, тир карты, цвет подписи и сила (power).
 ## Ранг редкости (сортировка, сравнение).
-const RARITY_TIER := {"common": 1, "rare": 2, "unique": 3}
-## Тир карты существа по редкости зверя (если у вида нет поля "card"): базовая (коричневая) — обычные звери,
-## редкая (синяя) — боссы поверхности и чемпионы, особая (фиолетовая) — только полем "card", уникальная
-## (жёлтая) — боссы. Цвета и названия тиров — ItemData.CARD_TIERS, шанс приручения — Taming.CHANCE.
-const CARD_TIER_BY_RARITY := {"common": "basic", "rare": "rare", "unique": "unique"}
+const RARITY_TIER := {"common": 1, "uncommon": 2, "rare": 3, "unique": 4}
+## Тир карты существа по редкости зверя (если у вида нет поля "card"): базовые — коричневая, обычные — синяя,
+## редкие — фиолетовая, уникальные — жёлтая. Цвета и названия тиров — ItemData.CARD_TIERS, шанс приручения —
+## Taming.CHANCE.
+const CARD_TIER_BY_RARITY := {"common": "basic", "uncommon": "rare", "rare": "special", "unique": "unique"}
 ## Названия редкостей для игрока («common» — «Базовый»).
-const RARITY_NAMES := {"common": "Базовый", "rare": "Редкий", "unique": "Уникальный"}
+const RARITY_NAMES := {"common": "Базовый", "uncommon": "Обычный", "rare": "Редкий", "unique": "Уникальный"}
+## Цвет подписи редкости (имя зверя над головой, панель цели) — в тон карты существа.
+const RARITY_COLORS := {
+	"common": Color(1, 1, 1), "uncommon": Color(0.6, 0.8, 1.0), "rare": Color(0.82, 0.62, 1.0),
+	"unique": Color(1.0, 0.8, 0.3),
+}
+## Сила по редкости — множитель поверх чисел вида: у зверя мира HP, атака, опыт и золото (Mob, Economy),
+## у питомца HP, атаки, лечение и защиты (PetStats.derived). Поле вида "power" заменяет его (у стража числа
+## подобраны вручную — power 1.0).
+const RARITY_POWER := {"common": 1.0, "uncommon": 1.15, "rare": 1.3, "unique": 1.5}
 ## Прежние id зверей (и видов питомцев) → новые: старые сохранения переводит Game.from_dict.
 const RENAMED := {"bear": "panther", "sparkbug": "turtle", "fairy": "pheasant"}
 
@@ -34,9 +45,10 @@ const TYPES := {
 		"color": Color(0.55, 0.35, 0.2), "scale": 0.9, "rarity": "common", "tameable": false,
 		"loot": [["boar_tusk", 0.6, 1, 1], ["hp_potion", 0.08, 1, 1]],
 	},
+	# Волк — «Обычный»: числа на уровне базовых, сильнее их делает RARITY_POWER
 	"wolf": {
-		"name": "Волк", "gen": "волка", "level": 3, "hp": 50, "atk": 9, "speed": 4.4, "xp": 25, "gold": [4, 9],
-		"color": Color(0.5, 0.5, 0.55), "scale": 1.0, "rarity": "common",
+		"name": "Волк", "gen": "волка", "level": 3, "hp": 48, "atk": 8, "speed": 4.4, "xp": 20, "gold": [4, 8],
+		"color": Color(0.5, 0.5, 0.55), "scale": 1.0, "rarity": "uncommon",
 		"loot": [["wolf_pelt", 0.55, 1, 1], ["hp_potion", 0.1, 1, 1], ["card_wolf", 0.04, 1, 1]],
 	},
 	"panther": {
@@ -78,7 +90,7 @@ const TYPES := {
 	},
 	"golem": {
 		"name": "Каменный страж", "gen": "каменного стража", "level": 10, "hp": 400, "atk": 24, "speed": 2.6, "xp": 250, "gold": [60, 120],
-		"color": Color(0.5, 0.5, 0.45), "scale": 2.0, "rarity": "unique", "tameable": false,
+		"color": Color(0.5, 0.5, 0.45), "scale": 2.0, "rarity": "unique", "tameable": false, "power": 1.0,
 		"loot": [["golem_shard", 1.0, 1, 3], ["mirror_card", 0.3, 1, 1]],
 	},
 }
@@ -90,6 +102,16 @@ static func get_type(id: String) -> Dictionary:
 
 static func rarity_tier(id: String) -> int:
 	return int(RARITY_TIER.get(get_type(id)["rarity"], 1))
+
+
+## Сила вида по редкости (RARITY_POWER) или его поле "power": 1.0 у базовых.
+static func power(id: String) -> float:
+	var d := get_type(id)
+	return float(d.get("power", RARITY_POWER.get(String(d["rarity"]), 1.0)))
+
+
+static func rarity_color(rarity: String) -> Color:
+	return RARITY_COLORS.get(rarity, RARITY_COLORS["common"])
 
 
 ## Можно ли приручить зверя этого вида (неизвестный вид — нельзя).
@@ -114,7 +136,7 @@ static func name_gen(id: String) -> String:
 	return String(d.get("gen", String(d["name"]).to_lower()))
 
 
-## Редкость зверя для игрока: «Базовый», «Редкий», «Уникальный».
+## Редкость зверя для игрока: «Базовый», «Обычный», «Редкий», «Уникальный».
 static func rarity_name(id: String) -> String:
 	return rarity_label(String(get_type(id)["rarity"]))
 

@@ -163,10 +163,16 @@ class Acc extends RefCounted:
 ## Строит модель вида species в root. Возвращает материал тела (свой у каждого зверя): вспышка
 ## при ударе — CreatureModels.flash(узел, материал). tint — оттенок текстуры модели из файла
 ## (стадия питомца, PetData.asset_tint); у моделей из примитивов цвет задаёт color.
-static func build(root: Node3D, species: String, color: Color, s: float, tint: Color = Color.WHITE) -> Material:
-	if CreatureAsset.has_asset(species):
+## stage — стадия эволюции питомца (0..2): если у вида есть своя модель стадии (CreatureAsset.model_for),
+## строится она, без оттенка tint (дикие звери — stage 0).
+static func build(root: Node3D, species: String, color: Color, s: float, tint: Color = Color.WHITE,
+		stage: int = 0) -> Material:
+	var mid := CreatureAsset.model_for(species, stage)
+	if mid != species:
+		tint = Color.WHITE
+	if CreatureAsset.has_asset(mid):
 		var ca := CreatureAsset.new()
-		if ca.setup(species, s, color, tint):
+		if ca.setup(mid, s, color, tint):
 			root.add_child(ca)
 			root.set_meta("asset", ca)
 			return ca.material
@@ -226,7 +232,8 @@ static func flash(owner: Node, mat: Material) -> void:
 		te.tween_property(bm, "emission", Color.BLACK, 0.18)
 
 
-## Высота макушки модели над землёй (для подписи и значков над головой).
+## Высота макушки модели над землёй (для подписи и значков над головой). species — вид или id модели
+## стадии (CreatureAsset.model_for); то же у add_collision и ring_radius.
 static func height(species: String, s: float) -> float:
 	if CreatureAsset.is_asset_species(species):
 		return CreatureAsset.height_for(species, s)

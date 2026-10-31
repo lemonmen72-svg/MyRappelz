@@ -137,7 +137,7 @@ func _unit_data() -> void:
 		check(not MobData.tameable(id) and Taming.badge_state(id) == Taming.BADGE_NO, "%s нельзя приручить" % id)
 		check(ItemData.card_for(id) == "" and ItemData.soul_card_for(id) == "", "у %s нет карт" % id)
 		check(not PetData.SPECIES.has(id), "%s не бывает питомцем" % id)
-		check(MobData.rarity_tier(id) < 3, "%s не уникальный" % id)
+		check(MobData.rarity_tier(id) < int(MobData.RARITY_TIER["unique"]), "%s не уникальный" % id)
 		for e in MobData.get_type(id)["loot"]:
 			check(not ItemData.get_item(String(e[0])).is_empty(), "добыча %s есть в предметах: %s" % [id, e[0]])
 		check(CreatureAsset.has_asset(id), "модель %s из файла есть" % id)

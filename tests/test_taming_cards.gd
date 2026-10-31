@@ -63,8 +63,8 @@ func run_step() -> void:
 			check(mob != null, "найден волк")
 			stand_near(mob, 3.0)
 			player._set_target(mob)
-			check(hud.target_tame_state == Taming.BADGE_NEED_CARD and hud.target_card_tier == "basic",
-				"значок волка: нужна карта, коричневый тир (%s, %s)" % [hud.target_tame_state, hud.target_card_tier])
+			check(hud.target_tame_state == Taming.BADGE_NEED_CARD and hud.target_card_tier == "rare",
+				"значок волка: нужна карта, синий тир «Обычного» (%s, %s)" % [hud.target_tame_state, hud.target_card_tier])
 			check(hud._tame_badge.visible and hud._tame_tier.visible, "значок и квадратик тира видны")
 			tm.cooldown = 0.0
 			main._on_action("tame")
@@ -235,7 +235,14 @@ func _unit_items() -> void:
 	check(ItemData.item_name("card_panther") == "Карта существа: Пантера", "название пустой карты")
 	check(ItemData.item_name("card_panther_soul") == "Карта пантеры (с душой)", "название карты с душой")
 	for sp in SPECIES:
-		check(ItemData.card_tier("card_" + String(sp)) == "basic", "карта %s — коричневая (базовая)" % sp)
+		var want := "rare" if sp == "wolf" else "basic"
+		check(ItemData.card_tier("card_" + String(sp)) == want, "карта %s — %s" % [sp, ItemData.card_tier_label(want)])
+	# Тир карты — по редкости зверя: базовый — коричневая, обычный — синяя, редкий — фиолетовая, уникальный — жёлтая
+	check(MobData.CARD_TIER_BY_RARITY["common"] == "basic" and MobData.CARD_TIER_BY_RARITY["uncommon"] == "rare"
+		and MobData.CARD_TIER_BY_RARITY["rare"] == "special" and MobData.CARD_TIER_BY_RARITY["unique"] == "unique",
+		"тиры карт по редкостям")
+	check(ItemData.card_tier_label("rare") == "синяя (обычная)" and ItemData.card_tier_label("special") == "фиолетовая (редкая)",
+		"названия тиров — как у редкостей: %s, %s" % [ItemData.card_tier_label("rare"), ItemData.card_tier_label("special")])
 	# Кабан и страж не приручаются: их карт нет ни в предметах, ни в добыче, ни у торговца, ни значков
 	for sp in NO_TAME:
 		var c := "card_" + String(sp)
@@ -257,8 +264,8 @@ func _unit_items() -> void:
 	check(ItemData.card_tier_label("unique") == "жёлтая (уникальная)", "подпись тира: " + ItemData.card_tier_label("unique"))
 	for t in ["basic", "rare", "special", "unique"]:
 		check(ItemData.CARD_TIERS.has(t) and Taming.CHANCE.has(t), "тир %s описан" % t)
-	check(ItemData.card_tier_color("rare").b > ItemData.card_tier_color("rare").r, "редкая карта — синяя")
-	check(ItemData.card_tier_color("special").b > ItemData.card_tier_color("special").g, "особая карта — фиолетовая")
+	check(ItemData.card_tier_color("rare").b > ItemData.card_tier_color("rare").r, "обычная карта — синяя")
+	check(ItemData.card_tier_color("special").b > ItemData.card_tier_color("special").g, "редкая карта — фиолетовая")
 	check(Taming.CHANCE["basic"] > Taming.CHANCE["unique"], "базовую проще приручить, чем уникальную")
 	check(ItemData.item_type(ItemData.MIRROR_CARD) == "card" and ItemData.card_species(ItemData.MIRROR_CARD) == "",
 		"зеркальная карта без вида")
@@ -290,6 +297,7 @@ func _unit_lines() -> void:
 	check(t.contains("Примените «Приручить» к зверю, затем победите его"), "что делать с картой")
 	t = "\n".join(PackedStringArray(Taming.card_lines("card_wolf")))
 	check(t.contains("Восточный лагерь") and t.contains("выпадает из волка"), "карта волка: " + t)
+	check(t.contains("синяя (обычная)") and t.contains("45%"), "карта волка — синяя, 45%: " + t)
 	t = "\n".join(PackedStringArray(Taming.card_lines("card_turtle")))
 	check(t.contains("Мёртвая роща (ур. 5–6)") and t.contains("коричневая (базовая)"), "карта черепахи: " + t)
 	check(Taming.card_lines("card_golem").is_empty() and Taming.card_lines("card_boar").is_empty(), "карт стража и кабана нет")
