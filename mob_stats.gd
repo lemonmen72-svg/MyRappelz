@@ -11,10 +11,13 @@ extends RefCounted
 ##   HP_K, ATK_K (+ATK_FLAT — «природное оружие», ×(1 + ATK_LVL·(L − 1)) — рост по уровню), DEF_K, MDEF_K.
 ##   Профиль меняет облик (танк — HP и защита, маг — урон), но не силу: HP и атака каждого вида нормируются
 ##   к зверю с ровным профилем (с учётом скорости атаки).
-## • Калибровка: зверь равного уровня ≈ на 20 % слабее героя по «эффективной силе» HP × урон в секунду
-##   (Combat.power_ratio ≈ 0.77–0.83 у Бродяги с учебным мечом на всех уровнях 1–30; ATK_FLAT держит низкие
-##   уровни, ATK_LVL — высокие, где герой быстрее бьёт от Ловкости; расчёт — tools/rappelz_strider_reference.md,
-##   раздел «Звери мира»).
+## • Калибровка (решение Максима: «персонажа равным монстру равного уровня, и HP монстров ×3»): без прибавки HP
+##   зверь своего уровня равен герою по «эффективной силе» HP × урон в секунду (Combat.power_ratio ≈ 0.96–1.04 у
+##   Бродяги с учебным мечом на всех уровнях 1–30; ATK_FLAT держит низкие уровни, ATK_LVL — высокие, где герой быстрее
+##   бьёт от Ловкости), затем HP всех зверей × MOB_HP_MULT (3): зверь своего уровня ≈ втрое сильнее героя без умений,
+##   питомца и зелий — бой 1×1 проигрышный, с питомцем — уверенная победа. Вход новичка: у зверей 1–4 ур. прибавка
+##   HP меньше (MOB_HP_START), иначе Бродяга 1-го ур. без питомца и умений не одолел бы ни одного зверя.
+##   Расчёт — tools/rappelz_strider_reference.md, раздел «Звери мира».
 ## • Поверх: сила редкости MobData.power (HP, атака, опыт), защита вида MobData.defense (анатемы — ниже), темп ударов
 ##   MobData.attack_cd; боссы — BOSS_* (HP, атака, защита, опыт, размер).
 ## • Опыт за зверя — base_xp(уровень) × сила; кривая опыта героя — Game.xp_to_next (KILLS_*: сколько зверей своего
@@ -23,10 +26,16 @@ extends RefCounted
 ## Герой-ориентир калибровки (статы по уровню и множители HeroStats.calibration).
 const REF_CLASS := "wanderer"
 ## Множители зверей к калибровке героя: HP, атака (+ прибавка ATK_FLAT, рост ATK_LVL за уровень), физ. и маг. защита.
+## С ними зверь своего уровня равен герою (до MOB_HP_MULT).
 const HP_K := 1.0
-const ATK_K := 1.475
-const ATK_FLAT := 7.0
+const ATK_K := 1.765
+const ATK_FLAT := 9.0
 const ATK_LVL := 0.003
+## HP всех зверей мира (и боссов) × MOB_HP_MULT — решение Максима; одно место для настройки.
+const MOB_HP_MULT := 3.0
+## Вход новичка: множитель HP зверей 1-го, 2-го, 3-го, 4-го ур. вместо MOB_HP_MULT (Бродяга без питомца и умений:
+## зверь 1-го ур. ему равен, дальше всё тяжелее; луга новичков 1–3 ур.). Пустой массив — ×MOB_HP_MULT с 1-го ур.
+const MOB_HP_START := [1.0, 1.5, 2.0, 2.5]
 const DEF_K := 1.0
 const MDEF_K := 0.75
 ## Профили статов видов без питомца [Str, Vit, Agi, Int, Wis, Dex, Luck] (доли; масштаб задаёт уровень).
@@ -137,6 +146,14 @@ static func body_scale(type_id: String, lvl: int) -> float:
 	return s
 
 
+## Множитель HP зверя уровня lvl: MOB_HP_MULT, у зверей 1–4 ур. — меньше (MOB_HP_START).
+static func hp_mult(lvl: int) -> float:
+	var l := maxi(1, lvl)
+	if l <= MOB_HP_START.size():
+		return float(MOB_HP_START[l - 1])
+	return MOB_HP_MULT
+
+
 ## Опыт за зверя своего уровня lvl (до силы редкости и разницы уровней).
 static func base_xp(lvl: int) -> float:
 	var l := float(maxi(1, lvl))
@@ -144,7 +161,8 @@ static func base_xp(lvl: int) -> float:
 
 
 ## Опыт до следующего уровня героя уровня lvl: зверей своего уровня на уровень × base_xp (Game.xp_to_next).
-## 1 → 10 ур. ≈ 110 зверей (≈ 45–60 мин игры), 10 → 20 ≈ 270 (≈ 2.5 ч), дальше ещё круче.
+## 1 → 10 ур. ≈ 110 зверей своего уровня, 10 → 20 ≈ 270. С HP зверей ×3 опыт не менялся: с питомцем (он теперь на
+## равных со зверем) до 10 ур. ≈ 1 ч, до 20 ≈ 3.4–3.8 ч (модель — справка «Звери мира»).
 static func xp_to_next(lvl: int) -> int:
 	var l := maxi(1, lvl)
 	var kills := KILLS_BASE + KILLS_LVL * float(l) + KILLS_HIGH * pow(float(maxi(0, l - KILLS_HIGH_FROM)), 2.0)
@@ -165,7 +183,7 @@ static func derived(type_id: String, lvl: int) -> Dictionary:
 	var pw := MobData.power(type_id)
 	var boss := MobData.is_boss(type_id)
 	var dm := MobData.defense(type_id)
-	var hp_m := HP_K * n * pw * (BOSS_HP if boss else 1.0)
+	var hp_m := HP_K * hp_mult(lv) * n * pw * (BOSS_HP if boss else 1.0)
 	var atk_m := pw * (BOSS_ATK if boss else 1.0)
 	var def_m := DEF_K * dm * (BOSS_DEF if boss else 1.0)
 	var ka := float(k["atk"]) * ATK_K * n * (1.0 + ATK_LVL * float(lv - 1))
