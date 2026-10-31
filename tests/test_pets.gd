@@ -28,7 +28,9 @@ func run_step() -> void:
 			check(pm != null and tm != null, "модули питомцев и приручения созданы")
 			check(game.pets.is_empty() and pm.active_pet == null, "питомцев пока нет")
 			for id in MobData.TYPES:
-				check(PetData.SPECIES.has(id), "есть вид питомца для зверя %s" % id)
+				# Летающие рыбы — только звери мира, питомцами не бывают
+				check(PetData.SPECIES.has(id) != MobData.flying(id), "вид питомца для зверя %s: %s" % [id,
+					"нет (летающий)" if MobData.flying(id) else "есть"])
 			check(PetData.role("turtle") == "tank" and PetData.role("golem") == "tank", "черепаха и страж — танки")
 			check(PetData.role("pheasant") == "healer" and PetData.role("panther") == "mage", "фазан — лекарь, пантера — маг")
 			for id in ["bear", "sparkbug", "fairy"]:

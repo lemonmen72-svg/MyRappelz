@@ -17,6 +17,10 @@ var _create: Node = null
 var _top: Camera3D = null
 var _row: Node3D = null
 var _frames := 0
+## Рыба для кадра 54 (убитая падает на землю).
+var _fish: Variant = null
+## Летающие рыбы в ряд рядом с героем — кадр 52.
+const FISH_ROW := ["flyfish", "flyfish_sail", "flyfish_drake"]
 ## Умения Наёмника для кадров окна героя [id, уровень].
 const HERO_SKILLS := [["blade_mastery", 2], ["charge_stab", 2], ["dark_strike", 1], ["evasion_expert", 2],
 	["concentration", 1], ["crossbow_mastery", 1], ["dual_shot", 1]]
@@ -446,6 +450,34 @@ func run_step() -> void:
 			main.hud.close_window()
 			UiScale.set_level(UiScale.MEDIUM, false)
 			main.hud.apply_ui_scale()
+			step = 520
+		520:
+			# Летающие рыбы рядом с героем: парят на уровне его головы
+			_fish_row()
+			wait = 40
+			step = 521
+		521:
+			shot("52_flyfish_row")
+			_row.queue_free()
+			_top.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
+			_fish_view("flyfish_sail", 5.0)
+			wait = 60
+			step = 522
+		522:
+			shot("53_flyfish_world")
+			_fish = _fish_view("flyfish", 4.0)
+			wait = 30
+			step = 523
+		523:
+			# Убитая рыба падает на землю (клип Death)
+			if mob_ok(_fish):
+				(_fish as Mob).take_damage((_fish as Mob).hp + 5, main.player)
+			wait = 90
+			step = 524
+		524:
+			shot("54_flyfish_dead")
 			ok_done()
 
 
@@ -534,6 +566,49 @@ func _build_row() -> void:
 			CreatureModels.height(id, float(d["scale"]))])
 	_top.global_position = base + Vector3(0, 1.15, 3.9)
 	_top.look_at(base + Vector3(0, 0.5, 0))
+
+
+## Герой слева, три летающие рыбы в ряд справа (клип Idle), камера сбоку чуть сверху, HUD скрыт.
+func _fish_row() -> void:
+	var player: Player = main.player
+	main.pets.recall()
+	player.visible = true
+	var base := player.global_position
+	_row = Node3D.new()
+	_row.name = "FishRow"
+	main.add_child(_row)
+	for i in FISH_ROW.size():
+		var id := String(FISH_ROW[i])
+		var holder := Node3D.new()
+		holder.set_meta("species", id)
+		_row.add_child(holder)
+		var d := MobData.get_type(id)
+		CreatureModels.build(holder, id, d["color"], float(d["scale"]))
+		var gp := base + Vector3(1.4 + 2.4 * float(i), 0, 0)
+		if IslandWorld.current != null:
+			gp.y = IslandWorld.current.height_at(gp.x, gp.z)
+		holder.global_position = gp
+		holder.rotation.y = PI + 0.9
+	_top = Camera3D.new()
+	main.add_child(_top)
+	_top.global_position = base + Vector3(3.0, 1.9, 7.0)
+	_top.look_at(base + Vector3(3.0, 1.2, 0))
+	_top.current = true
+	main.hud.visible = false
+
+
+## Игрок в dist м от ближайшей рыбы вида id, рыба — цель, камера за игроком смотрит на рыбу. Возвращает рыбу.
+func _fish_view(id: String, dist: float) -> Mob:
+	var f := find_mob(id)
+	if f == null:
+		return null
+	stand_near(f, dist)
+	main.player._set_target(f)
+	var d: Vector3 = main.player.global_position - f.global_position
+	main.cam_yaw = atan2(d.x, d.z) + 0.3
+	main.cam_pitch = 0.22
+	main.cam_dist = 6.0
+	return f
 
 
 func _animate_row(frame_i: int) -> void:

@@ -22,8 +22,11 @@ const DIR := "res://assets/creatures/"
 const INFO_PATH := "res://assets/creatures/creatures.json"
 ## Значения по умолчанию: высота, длина, ширина (м, при s = 1), скорости, при которых клипы шага и бега
 ## идут без проскальзывания (м/с), момент удара в клипе Attack (с от начала).
+## hover — у летающих (рыбы) высота оси тела над землёй: модель парит уже в файле (поза покоя и все клипы,
+## кроме Death — он роняет её на землю), height у них — верх модели над землёй; 0 — зверь ходит по земле.
 const BASE_INFO := {
 	"height": 1.0, "length": 1.2, "width": 0.6, "walk_speed": 1.5, "run_speed": 4.0, "attack_hit_time": 0.4,
+	"hover": 0.0,
 }
 ## Виды с моделью из файла и их размеры, если creatures.json нет. По этим же размерам строится
 ## запасная модель из примитивов, коллизия и высота подписи.
@@ -34,6 +37,13 @@ const DEFAULTS := {
 		"attack_hit_time": 0.5},
 	"pheasant": {"height": 0.85, "length": 1.1, "width": 0.4, "walk_speed": 1.0, "run_speed": 3.0,
 		"attack_hit_time": 0.35},
+	# Летающие рыбы (tools/prepare_creatures.py, стиль «fish»): парят на уровне головы героя
+	"flyfish": {"height": 1.84, "length": 1.0, "width": 0.61, "walk_speed": 1.4, "run_speed": 4.0,
+		"attack_hit_time": 0.42, "hover": 1.45},
+	"flyfish_sail": {"height": 2.0, "length": 1.4, "width": 0.32, "walk_speed": 1.5, "run_speed": 4.4,
+		"attack_hit_time": 0.42, "hover": 1.5},
+	"flyfish_drake": {"height": 2.17, "length": 1.8, "width": 1.25, "walk_speed": 1.5, "run_speed": 4.2,
+		"attack_hit_time": 0.42, "hover": 1.55},
 }
 const CLIPS := ["idle", "walk", "run", "attack", "hit", "death", "cast"]
 const LOOPED := ["idle", "walk", "run"]
@@ -142,6 +152,11 @@ static func _load_json() -> void:
 ## Высота макушки над землёй при масштабе s.
 static func height_for(id: String, s: float) -> float:
 	return float(info_for(id)["height"]) * s
+
+
+## Высота оси тела парящего зверя над землёй при масштабе s (0 — зверь ходит по земле).
+static func hover_for(id: String, s: float) -> float:
+	return float(info_for(id)["hover"]) * s
 
 
 ## Ключ клипа по имени анимации: "Armature|Walk" → "walk"; "" — не наш клип.

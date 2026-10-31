@@ -797,6 +797,101 @@
      1
     ]
    ]
+  },
+  {
+   "id": "fish_pond",
+   "name": "Пруд у Светлой рощи",
+   "center": [
+    -66.0,
+    -37.0
+   ],
+   "radius": 12.0,
+   "levels": [
+    4,
+    5
+   ],
+   "mobs": [
+    [
+     "flyfish",
+     3
+    ]
+   ]
+  },
+  {
+   "id": "fish_north",
+   "name": "Северная протока",
+   "center": [
+    -6.0,
+    -72.0
+   ],
+   "radius": 12.0,
+   "levels": [
+    5,
+    6
+   ],
+   "mobs": [
+    [
+     "flyfish",
+     3
+    ]
+   ]
+  },
+  {
+   "id": "fish_fork",
+   "name": "Речная развилка",
+   "center": [
+    -64.0,
+    -8.0
+   ],
+   "radius": 12.0,
+   "levels": [
+    7,
+    8
+   ],
+   "mobs": [
+    [
+     "flyfish_sail",
+     3
+    ]
+   ]
+  },
+  {
+   "id": "fish_lower",
+   "name": "Нижнее течение",
+   "center": [
+    -42.0,
+    34.0
+   ],
+   "radius": 12.0,
+   "levels": [
+    7,
+    8
+   ],
+   "mobs": [
+    [
+     "flyfish_sail",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "fish_mouth",
+   "name": "Устье реки",
+   "center": [
+    -38.0,
+    58.0
+   ],
+   "radius": 12.0,
+   "levels": [
+    9,
+    10
+   ],
+   "mobs": [
+    [
+     "flyfish_drake",
+     2
+    ]
+   ]
   }
  ]
 }
