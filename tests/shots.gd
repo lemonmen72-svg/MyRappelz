@@ -20,9 +20,10 @@ var _frames := 0
 ## Умения Наёмника для кадров окна героя [id, уровень].
 const HERO_SKILLS := [["blade_mastery", 2], ["charge_stab", 2], ["dark_strike", 1], ["evasion_expert", 2],
 	["concentration", 1], ["crossbow_mastery", 1], ["dual_shot", 1]]
-## Предметы для кадров сумки и торговца (27, 28): [id, количество].
+## Предметы для кадров сумки и торговца (27–30): [id, количество]. Карты существ: пустые, с душой, зеркальная.
 const BAG_ITEMS := [
-	["daggers_steel", 1], ["crossbow_heavy", 1], ["crystal_rare", 1], ["crystal_unique", 1], ["boar_tusk", 7],
+	["daggers_steel", 1], ["crossbow_heavy", 1], ["card_panther", 4], ["card_wolf", 1], ["card_golem", 1],
+	["card_panther_soul", 1], ["card_golem_soul", 1], ["mirror_card", 2], ["boar_tusk", 7],
 	["wolf_pelt", 3], ["panther_fang", 2], ["pheasant_feather", 4], ["shell_plate", 2], ["golem_shard", 1],
 	["hp_potion", 12],
 ]
@@ -290,6 +291,29 @@ func run_step() -> void:
 		31:
 			shot("28_shop")
 			main.hud.close_window()
+			# Сумка с картами существ: карточка карты с душой (кнопка «Сформировать»)
+			main.economy.open_bag()
+			main.economy.window.select_cell(game.inventory.find_cell("card_panther_soul"))
+			wait = 8
+			step = 32
+		32:
+			shot("29_bag_soul_card")
+			# Карточка пустой карты: где водится вид, уровни, тир, где взять, что делать
+			main.economy.window.select_cell(game.inventory.find_cell("card_panther"))
+			wait = 8
+			step = 33
+		33:
+			shot("30_bag_card")
+			main.hud.close_window()
+			# Панель цели со значком приручения: кабан, карта кабана в сумке — зелёный значок
+			var m := find_mob("boar")
+			if m != null:
+				stand_near(m, 4.0)
+				player._set_target(m)
+			wait = 20
+			step = 34
+		34:
+			shot("31_target_tame")
 			ok_done()
 
 

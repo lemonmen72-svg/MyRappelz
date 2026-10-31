@@ -1,7 +1,8 @@
 class_name PetManager
 extends Node
 ## Питомцы: призыв из коллекции Game.pets, команды «Атакуй» / «За мной», опыт за убийства,
-## окно питомцев (подробнее — окно существа, призвать, отозвать, воскресить свитком, отпустить).
+## окно питомцев (формирование существ из карт с душой, подробнее — окно существа, призвать, отозвать,
+## воскресить свитком, отпустить).
 ## Призванный питомец всегда соответствует Game.active_pet: сверка идёт каждый кадр,
 ## поэтому после загрузки сохранения или отпускания другого питомца узел пересоздаётся сам.
 
@@ -13,7 +14,8 @@ var main: Node
 ## Призванный питомец (узел в мире) или null. Контракт узла (используют HUD и другие модули):
 ## поля pet_name, level, hp, max_hp, is_down (погиб/скрыт), метод heal(amount: int), сигнал stats_changed.
 var active_pet: Pet = null
-## Кнопки открытого окна питомцев: "info_<i>", "summon_<i>", "recall_<i>", "revive_<i>", "release_<i>".
+## Кнопки открытого окна питомцев: "form_<id карты>", "info_<i>", "summon_<i>", "recall_<i>", "revive_<i>",
+## "release_<i>".
 var window_buttons: Dictionary = {}
 ## Окно существа (характеристики и умения питомца).
 var creature: CreatureWindow = null
@@ -210,15 +212,51 @@ func open_window() -> void:
 		Game.pets.size(), Game.MAX_PETS, Game.inventory.count("revive_scroll")]
 	head.add_theme_color_override("font_color", Color(0.85, 0.8, 0.6))
 	body.add_child(head)
+	_add_forming(body)
 	if Game.pets.is_empty():
 		var hint := Label.new()
-		hint.text = "Питомцев пока нет. Нажмите «Приручить» рядом со зверем (нужен кристалл души), затем добейте его."
+		hint.text = "Питомцев пока нет. Возьмите карту существа нужного вида (базовые продаёт торговец, другие выпадают " \
+			+ "из зверей), нажмите «Приручить» рядом со зверем и победите его. Из карты с душой сформируйте существо."
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		hint.custom_minimum_size = Vector2(WINDOW_SIZE.x - 60.0, 0)
 		body.add_child(hint)
 		return
 	for i in Game.pets.size():
 		_add_row(body, i)
+
+
+## Карты с душой в сумке (id, по порядку сортировки сумки).
+static func soul_cards() -> Array:
+	var res: Array = []
+	for id in Inventory.sorted_ids(Game.inventory.ids()):
+		if ItemData.is_soul_card(String(id)):
+			res.append(String(id))
+	return res
+
+
+## Блок «Формирование»: карты с душой из сумки, у каждой — «Сформировать».
+func _add_forming(body: VBoxContainer) -> void:
+	var cards := soul_cards()
+	var title := Label.new()
+	title.text = "Формирование" if not cards.is_empty() else "Формирование: карт с душой в сумке нет"
+	title.add_theme_color_override("font_color", Color(0.6, 0.95, 0.8) if not cards.is_empty() else Color(0.7, 0.72, 0.8))
+	body.add_child(title)
+	for c in cards:
+		var id := String(c)
+		var sp := ItemData.card_species(id)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		body.add_child(row)
+		var ic := ItemIcon.make(id, 44.0)
+		row.add_child(ic)
+		var info := Label.new()
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var n: int = Game.inventory.count(id)
+		info.text = "%s%s → «%s» (%s, ур. 1)" % [ItemData.item_name(id), " ×%d" % n if n > 1 else "",
+			PetData.stage_name(sp, 1), PetData.role_name(sp)]
+		info.modulate = ItemData.frame_color(id).lerp(Color.WHITE, 0.45)
+		row.add_child(info)
+		_add_button(row, "form_" + id, "Сформировать", _on_form.bind(id))
 
 
 func _add_row(body: VBoxContainer, i: int) -> void:
@@ -267,6 +305,13 @@ func _add_button(row: HBoxContainer, key: String, text: String, cb: Callable) ->
 	b.pressed.connect(cb)
 	row.add_child(b)
 	window_buttons[key] = b
+
+
+func _on_form(card_id: String) -> void:
+	_release_confirm = -1
+	if main.get("taming") != null:
+		main.taming.form(card_id)
+	_refresh_window()
 
 
 func _on_info(i: int) -> void:
