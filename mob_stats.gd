@@ -8,10 +8,12 @@ extends RefCounted
 ##   у рыб и анатем — свои профили PROFILES (рыбы — Ловкость, анатемы — Сила и Ловкость при низкой Выносливости).
 ## • Производные: HP, атака (у мага и лекаря — магическая), физ. и маг. защита, точность, избегание, уклонение,
 ##   крит, скорость атаки — формулы Stats с калибровкой героя REF_CLASS (HeroStats.calibration) × множители зверей
-##   HP_K, ATK_K (+ATK_FLAT — «природное оружие»), DEF_K, MDEF_K. Профиль меняет облик (танк — HP и защита,
-##   маг — урон), но не силу: HP и атака каждого вида нормируются к зверю с ровным профилем (с учётом скорости атаки).
+##   HP_K, ATK_K (+ATK_FLAT — «природное оружие», ×(1 + ATK_LVL·(L − 1)) — рост по уровню), DEF_K, MDEF_K.
+##   Профиль меняет облик (танк — HP и защита, маг — урон), но не силу: HP и атака каждого вида нормируются
+##   к зверю с ровным профилем (с учётом скорости атаки).
 ## • Калибровка: зверь равного уровня ≈ на 20 % слабее героя по «эффективной силе» HP × урон в секунду
-##   (Combat.power_ratio ≈ 0.8 у Бродяги с оружием 1-го ранга; расчёт — tools/rappelz_strider_reference.md,
+##   (Combat.power_ratio ≈ 0.77–0.83 у Бродяги с учебным мечом на всех уровнях 1–30; ATK_FLAT держит низкие
+##   уровни, ATK_LVL — высокие, где герой быстрее бьёт от Ловкости; расчёт — tools/rappelz_strider_reference.md,
 ##   раздел «Звери мира»).
 ## • Поверх: сила редкости MobData.power (HP, атака, опыт), защита вида MobData.defense (анатемы — ниже), темп ударов
 ##   MobData.attack_cd; боссы — BOSS_* (HP, атака, защита, опыт, размер).
@@ -20,10 +22,11 @@ extends RefCounted
 
 ## Герой-ориентир калибровки (статы по уровню и множители HeroStats.calibration).
 const REF_CLASS := "wanderer"
-## Множители зверей к калибровке героя: HP, атака (+ прибавка ATK_FLAT), физ. и маг. защита.
+## Множители зверей к калибровке героя: HP, атака (+ прибавка ATK_FLAT, рост ATK_LVL за уровень), физ. и маг. защита.
 const HP_K := 1.0
-const ATK_K := 1.5
-const ATK_FLAT := 5.0
+const ATK_K := 1.475
+const ATK_FLAT := 7.0
+const ATK_LVL := 0.003
 const DEF_K := 1.0
 const MDEF_K := 0.75
 ## Профили статов видов без питомца [Str, Vit, Agi, Int, Wis, Dex, Luck] (доли; масштаб задаёт уровень).
@@ -165,7 +168,7 @@ static func derived(type_id: String, lvl: int) -> Dictionary:
 	var hp_m := HP_K * n * pw * (BOSS_HP if boss else 1.0)
 	var atk_m := pw * (BOSS_ATK if boss else 1.0)
 	var def_m := DEF_K * dm * (BOSS_DEF if boss else 1.0)
-	var ka := float(k["atk"]) * ATK_K * n
+	var ka := float(k["atk"]) * ATK_K * n * (1.0 + ATK_LVL * float(lv - 1))
 	var patk := maxi(1, roundi((ka * Stats.raw_patk(s, lf) + ATK_FLAT) * atk_m))
 	var matk := maxi(1, roundi((ka * Stats.raw_matk(s, lf) + ATK_FLAT) * atk_m))
 	var aspd := Stats.attack_speed(s)

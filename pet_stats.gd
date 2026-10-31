@@ -5,8 +5,9 @@ extends RefCounted
 ## с опорными точками по уровню и стадии эволюции (между точками — линейная интерполяция).
 ## Уровень вики = наш уровень / 0.3 (у нас макс. 50 и эволюция на 15 и 30, в оригинале — 150 и 50/100).
 ## Из статов — производные значения нашего масштаба (общие формулы с героем — Stats, сборка — derived()).
-## Чтобы бой не сломался, у каждого вида они калибруются так, что на 1 уровне равны прежним hp/atk/def
-## из PetData.SPECIES.
+## У каждого вида они калибруются так, что на 1 уровне равны hp/atk/def из PetData.SPECIES (подобраны под
+## зверей мира MobStats: питомец своего уровня побеждает зверя своего уровня, как герой), дальше растут по статам
+## × (1 + LEVEL_GROWTH·(L − 1)) × STAGE_POWER стадии (HP, атаки, лечение).
 ## Исходные таблицы и расчёт баланса — tools/rappelz_pet_reference.md.
 
 const STATS := Stats.STATS
@@ -15,6 +16,14 @@ const STAT_NAMES := Stats.STAT_NAMES
 const WIKI_LEVEL_SCALE := Stats.WIKI_LEVEL_SCALE
 ## Множитель урона крита питомца.
 const CRIT_MULT := 1.5
+## Сила питомца против зверей мира (MobStats растут по статам героя с весом уровня 2.5, а статы питомца — по
+## таблицам вики): HP, атаки и лечение × (1 + LEVEL_GROWTH·(L − 1)) — без этого питомец к концу стадии отстаёт
+## от зверей своего уровня — и × STAGE_POWER стадии: на эволюции таблицы вики почти удваивают статы, питомец
+## заметно крепнет, но не становится вдвое сильнее зверей своего уровня. Итог (Combat.power_ratio зверя своего
+## уровня против питомца, 1–30 ур.): боец ≈ 0.5–0.9, маг ≈ 0.6–0.9, танк ≈ 0.55–0.8, лекарь ≈ 0.6–1.05 (у героя
+## ≈ 0.8); расчёт — tools/rappelz_pet_reference.md, «Питомец против зверей мира».
+const LEVEL_GROWTH := 0.01
+const STAGE_POWER := [1.0, 0.72, 0.68]
 
 ## Опорные точки статов: по стадии эволюции — список [уровень вики, [Str, Vit, Agi, Int, Wis, Dex, Luck]].
 ## Стадия с одной точкой растёт с наклоном предыдущей стадии. Числа пантеры, черепахи, фазана и кентавра — из вики
@@ -157,6 +166,10 @@ static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles:
 	kh *= pw
 	ka *= pw
 	kd *= pw
+	# Рост по уровню и сила стадии (HP, атаки, лечение; защита — только по статам)
+	var grow := (1.0 + LEVEL_GROWTH * float(lv - 1)) * float(STAGE_POWER[PetData.stage_for(lv)])
+	kh *= grow
+	ka *= grow
 	var r := {"stats": s}
 	var lf := float(lv)
 	r["max_hp"] = roundi(kh * Stats.raw_hp(s, lf) * (1.0 + float(bon.get("hp_pct", 0.0))))
@@ -182,6 +195,18 @@ static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles:
 	r["range"] = float(sp["range"])
 	r["cd"] = float(sp["cd"]) * 100.0 / float(r["aspd"])
 	return r
+
+
+## Профиль питомца вида species уровня lvl для оценки силы (Combat.power_ratio против зверя мира; как
+## Combat.profile_of у призванного питомца).
+static func combat_profile(species: String, lvl: int, skills: Dictionary = {}, toggles: Dictionary = {}) -> Dictionary:
+	var d := derived(species, lvl, skills, toggles)
+	return {
+		"level": clampi(lvl, 1, PetData.MAX_LEVEL), "max_hp": int(d["max_hp"]), "atk": int(d["atk"]),
+		"magic": is_magic(species), "def": int(d["def"]), "mdef": int(d["mdef"]), "acc": int(d["acc"]),
+		"avoid": int(d["avoid"]), "eva": float(d["eva"]) / 100.0, "crit": float(d["crit"]) / 100.0,
+		"interval": float(d["cd"]), "crit_mult": CRIT_MULT, "block": 0.0,
+	}
 
 
 ## Очки умений (JP) по умолчанию для питомца уровня lvl (старые сохранения, новые питомцы).

@@ -119,11 +119,16 @@ func run_step() -> void:
 			main.hud.close_window()
 			step = 4
 		4:
-			# Питомец помогает убить зверя и получает опыт
+			# Питомец помогает убить зверя и получает опыт. Фазаны на лугах — 1–2 ур.: волк 1-го ур. против зверя
+			# своего уровня побеждает лишь чуть чаще, чем проигрывает (≈ как герой), а против 2-го ур. — реже;
+			# чтобы бой не решал случай, питомец сначала дорастает опытом до 4 ур.
 			mob = find_mob("pheasant")
 			if mob == null:
 				return
 			var pet: Pet = pm.active_pet
+			while pet.level < 4:
+				pet.gain_xp(PetData.xp_to_next(pet.level) - pet.xp)
+			check(pet.level == 4 and pet.hp == pet.max_hp, "питомец 4 ур. (HP %d) против фазана %d ур." % [pet.max_hp, mob.level])
 			xp_before = pet.xp
 			lvl_before = pet.level
 			stand_near(mob, 2.0)

@@ -6,6 +6,9 @@ extends "res://tests/test_base.gd"
 ## формирование — отказ), снятие метки со зверя, ушедшего домой.
 
 const SPECIES := ["turtle", "pheasant", "panther", "wolf", "golem"]
+## Уровни питомцев: маг и боец дерутся с дикими волками лугов (2–3 ур., «Обычные» — сильнее базовых зверей),
+## поэтому они старше: бой с более слабым зверем не решает случай.
+const LEVELS := {"panther": 5, "wolf": 5}
 
 var mob: Mob = null
 var timer := 0
@@ -14,7 +17,7 @@ var hp_low := 0
 
 func before_start() -> void:
 	for sp in SPECIES:
-		game.add_pet(sp, PetData.stage_name(sp, 1), 1)
+		game.add_pet(sp, PetData.stage_name(sp, 1), int(LEVELS.get(sp, 1)))
 	game.active_pet = 0
 	game.inventory.add("card_pheasant", 1)
 	game.inventory.add("card_wolf", 1)
@@ -196,7 +199,7 @@ func _fight(role: String) -> bool:
 		stand_near(mob, 2.0)
 		pet.global_position = mob.global_position + Vector3(6.0, 0.2, 0)
 		player.last_target = mob
-		# Зверь мира (статы MobStats) крепче питомца 1-го ур.: бой с уже раненым зверем, чтобы тест шёл недолго
+		# Бой с уже раненым зверем, чтобы тест шёл недолго
 		mob.hp = maxi(1, mob.max_hp / 3)
 		return false
 	if mob.is_dead:
@@ -205,5 +208,5 @@ func _fight(role: String) -> bool:
 	stand_near(mob, 2.0)
 	player.last_target = mob
 	if timer > 60 * 40:
-		fail("%s не убил фазана" % role)
+		fail("%s не убил зверя (%s %d ур.)" % [role, mob.type_id, mob.level])
 	return false
