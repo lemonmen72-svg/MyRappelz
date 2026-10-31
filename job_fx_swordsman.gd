@@ -1,9 +1,9 @@
 class_name JobFxSwordsman
 extends RefCounted
-## Особые механики Мечника (страж со щитом): вызываются из HeroSkillFx (job_special / job_check), данные —
-## JobSkills.SKILLS. Угроза зверя — статус "taunt" движка (зверь бросает цель и бьёт героя; у «Грома щита» — все
+## Особые механики Мечника (страж со щитом); подключение — HeroSkillFx.JOB_FX_FILES (шесть функций, описание —
+## шапка HeroSkillFx), данные — JobSkills.SKILLS. Угроза зверя — статус "taunt" движка (зверь бросает цель и бьёт героя; у «Грома щита» — все
 ## звери вокруг цели), блок щитом — бонус "block" (Player.take_damage), «Колючий щит» — бонус "reflect" на время
-## (HeroSkillFx.on_hurt: доля полученного урона — ударившему зверю), «Непробиваемый заслон» — бонус "guard" на время.
+## (on_hurt: доля полученного урона — ударившему зверю), «Непробиваемый заслон» — бонус "guard" на время.
 ## Здесь (имена обработчиков с префиксом sw_): "sw_rush" — рывок к цели (вплотную, вспышки в начале и в конце),
 ## "sw_cross" — вторая дуга крест-накрест («Крест рассвета»), "sw_mana" — герой получает долю pct нанесённого умением урона в MP («Разбитая воля»).
 
@@ -26,8 +26,35 @@ static func special(fx: HeroSkillFx, handler: String, sid: String, n: int, t: Mo
 
 
 ## Особых условий у умений Мечника нет.
-static func check(_fx: HeroSkillFx, _handler: String, _n: int, _e: Dictionary) -> String:
+static func pre_cast(_fx: HeroSkillFx, _sid: String, _n: int, _sk: Dictionary) -> String:
 	return ""
+
+
+static func on_basic_hit(_fx: HeroSkillFx, _t: Mob, _dealt: int) -> void:
+	pass
+
+
+## «Колючий щит» (бонус "reflect" на время): доля полученного урона — ударившему зверю (fx.state["reflect_hits"]).
+static func on_hurt(fx: HeroSkillFx, attacker: Node3D, amount: int) -> void:
+	var r := fx.bonus("reflect")
+	if r <= 0.0 or amount <= 0 or not is_instance_valid(attacker) or not (attacker is Mob):
+		return
+	var m := attacker as Mob
+	if m.is_dead:
+		return
+	var p := fx.p
+	m.take_damage(maxi(1, roundi(float(amount) * r)), p, false, true)
+	fx.state["reflect_hits"] = int(fx.state.get("reflect_hits", 0)) + 1
+	if p.is_inside_tree():
+		Vfx.hit_spark(p.get_parent(), m.aim_point(), SHIELD.lightened(0.2), 0.9)
+
+
+static func tick(_fx: HeroSkillFx, _delta: float) -> void:
+	pass
+
+
+static func reset(_fx: HeroSkillFx) -> void:
+	pass
 
 
 ## «Натиск щита»: рывок к зверю t — герой оказывается вплотную (1.4 м), лицом к нему.

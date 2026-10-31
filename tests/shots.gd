@@ -906,7 +906,51 @@ func run_step() -> void:
 			main.cam.current = true
 			main.hud.visible = true
 			main.player.visible = true
+			# Умения Воина (кадр 98): две искры духа (значок с числом у полоски HP), «Ярость дикаря», «Камнелом» по волку
+			AdminPanel.god = true
+			game.admin_set_look("human", "m")
+			_job_showcase("warrior", ["stonebreaker", "kindle_spark", "power_breath", "spin_strike"], ["savage_fury"], 1.8)
+			JobFxWarrior.add_sparks(main.player._fx, 2)
+			main.player.use_skill("skill1")
+			wait = 10
+			step = 818
+		818:
+			shot("98_skills_warrior_shaman")
+			# Умения Шамана (кадр 99): огненное лезвие и «Священный огонь» включены, «Обвал» по зверю, сгусток посоха
+			_job_showcase("shaman", ["rockslide", "fire_frenzy", "pure_spring", "earth_grip"], ["fire_edge", "sacred_fire"], 6.0)
+			main.player.use_skill("skill2")
+			main.player.use_skill("skill1")
+			main.player.try_attack()
+			wait = 14
+			step = 819
+		819:
+			shot("99_skills_shaman")
 			ok_done()
+
+
+## Кадры 98–99: герой профессии job 40 ур. с изученным древом, умения slots на кнопках 1–4, включённые toggles,
+## у волка (или фазана) на расстоянии dist м, MP полное.
+func _job_showcase(job: String, slots: Array, toggles: Array, dist: float) -> void:
+	var p: Player = main.player
+	become_job(job)
+	game.level = 40
+	game.hero["jp"] = 5000
+	HeroSkills.learn_all(game.hero, job, game.level)
+	p.refresh_skills()
+	p.mp = p.max_mp
+	p.hp = p.max_hp
+	for i in slots.size():
+		p.assign_slot(String(slots[i]), i)
+	for t in toggles:
+		p.set_toggle(String(t), true)
+	p.mp = p.max_mp
+	var m := find_mob("wolf")
+	if m == null:
+		m = find_mob("pheasant")
+	if m != null:
+		stand_near(m, dist)
+		p.select_target(m)
+		main.cam_yaw = atan2(p.global_position.x - m.global_position.x, p.global_position.z - m.global_position.z) + 0.5
 
 
 ## Камера _top в 3.4 м перед жителем, чуть сбоку; игрок (скрыт) у камеры — житель повернётся к ней.

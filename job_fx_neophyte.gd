@@ -1,21 +1,24 @@
 class_name JobFxNeophyte
 extends RefCounted
 ## Особые механики Неофита (огонь, молния, тьма) и общие помощники заклинателей (ими пользуются и Волшебник,
-## и Мечник): вызываются из HeroSkillFx (job_special / job_check / status), данные — JobSkills.SKILLS.
+## и Мечник); подключение — HeroSkillFx.JOB_FX_FILES (шесть функций, описание — шапка HeroSkillFx), ослабления
+## зверя — ещё HeroSkillFx.status; данные — JobSkills.SKILLS. «Теневая печать» (бонус "dark_hit") — доп. урон
+## тьмой попавшей обычной атаки (on_basic_hit, как «Сияющее лезвие» — JobFxWizard.element_hit).
 ##
 ## Ослабления зверя на время, меняющие его поле (MODS): "armor" — защита ниже (pdef), "ward" — маг. защита ниже
 ##   (mdef), "aslow" — бьёт медленнее (attack_every), "snare" — не может сдвинуться (speed = 0, бить рядом может).
 ##   Узел MobMod — ребёнок зверя: держит исходное значение, сверяет значок у полоски HP (Mob.effects) и по истечении
 ##   возвращает поле. Повтор — сильнейшее из двух и дольше. Эффект "status" движка с этими видами — HeroSkillFx.status.
-## Имена обработчиков — с префиксом ne_. Зоны на земле (handler "ne_zone"): узел Zone в точке цели — видимый круг радиусом radius на time с, раз в
-##   ZONE_TICK с бьёт всех зверей в круге (доля mult маг. атаки через маг. защиту, как урон со временем), может
+## Имена обработчиков — с префиксом ne_.
+## Зоны на земле (handler "ne_zone"): узел Zone в точке цели — видимый круг радиусом radius на time с, раз
+##   в ZONE_TICK с бьёт всех зверей в круге (доля mult маг. атаки через маг. защиту, как урон со временем), может
 ##   замедлять бег (slow, slow_time) и удары (aslow). Одна зона умения за раз (повтор переносит её).
 ## Тела убитых зверей (on_mob_killed из main): CORPSE_TIME с лежат «остатки» (у Неофита с «Последним вздохом» или
-##   «Остатком силы» — тёмный дымок на земле); "ne_corpse_hp" / "ne_corpse_mp" поглощают ближайшее тело в CORPSE_RANGE м:
-##   HP или MP героя + доля pct от максимума.
-## Прочее: "ne_volley" — серия снарядов (hits, gap) по цели («Град тьмы», «Шквал света»), "ne_burn_area" — горение всем
-##   зверям вокруг цели, "ne_blood_gift" — лечит питомца ценой HP героя, "ne_mark" / "ne_pillar" — только вспышка
-##   (на цели или на герое) и столб света / молния с неба.
+##   «Остатком силы» — тёмный дымок на земле); "ne_corpse_hp" / "ne_corpse_mp" поглощают ближайшее тело
+##   в CORPSE_RANGE м: HP или MP героя + доля pct от максимума.
+## Прочее: "ne_volley" — серия снарядов (hits, gap) по цели («Град тьмы», «Шквал света»), "ne_burn_area" — горение
+##   всем зверям вокруг цели, "ne_blood_gift" — лечит питомца ценой HP героя, "ne_mark" / "ne_pillar" — только
+##   вспышка (на цели или на герое) и столб света / молния с неба.
 
 ## Ослабления зверя: вид → [поле Mob, название эффекта у значка].
 const MODS := {
@@ -64,15 +67,34 @@ static func special(fx: HeroSkillFx, handler: String, sid: String, n: int, t: Mo
 
 
 ## Можно ли применить ("" — можно): тело зверя рядом, HP героя на «Кровный дар».
-static func check(fx: HeroSkillFx, handler: String, n: int, e: Dictionary) -> String:
-	match handler:
-		"ne_corpse_hp", "ne_corpse_mp":
-			if nearest_corpse(fx.p.global_position, CORPSE_RANGE) < 0:
-				return "рядом нет тела зверя"
-		"ne_blood_gift":
-			if fx.p.hp <= _blood_cost(fx.p, n, e):
-				return "не хватает HP"
+static func pre_cast(fx: HeroSkillFx, _sid: String, n: int, sk: Dictionary) -> String:
+	for item in sk.get("fx", []):
+		var e: Dictionary = item
+		match String(e.get("handler", "")):
+			"ne_corpse_hp", "ne_corpse_mp":
+				if nearest_corpse(fx.p.global_position, CORPSE_RANGE) < 0:
+					return "рядом нет тела зверя"
+			"ne_blood_gift":
+				if fx.p.hp <= _blood_cost(fx.p, n, e):
+					return "не хватает HP"
 	return ""
+
+
+## «Теневая печать»: доп. урон тьмой попавшей обычной атаки.
+static func on_basic_hit(fx: HeroSkillFx, t: Mob, _dealt: int) -> void:
+	JobFxWizard.element_hit(fx, t, "dark_hit", DARK)
+
+
+static func on_hurt(_fx: HeroSkillFx, _attacker: Node3D, _amount: int) -> void:
+	pass
+
+
+static func tick(_fx: HeroSkillFx, _delta: float) -> void:
+	pass
+
+
+static func reset(_fx: HeroSkillFx) -> void:
+	pass
 
 
 # ---------- Ослабления зверя ----------

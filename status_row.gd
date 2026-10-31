@@ -121,6 +121,7 @@ func _rebuild() -> void:
 		ic.set_spec(e.get("icon", {}))
 		var col := TOGGLE if bool(e.get("toggle", false)) else (DEBUFF if bool(e.get("debuff", false)) else BUFF)
 		ic.set_ring(col, maxf(2.0, icon_px * 0.09))
+		ic.set_count(int(e.get("count", -1)))
 		ic.set_sector(0.0, 0.0 if bool(e.get("toggle", false)) else 1.0 - StatusEffects.left_frac(e))
 	var extra := list.size() - n
 	if extra > 0:

@@ -1,14 +1,18 @@
 class_name JobFxWizard
 extends RefCounted
-## Особые механики Волшебника: вызываются из HeroSkillFx (job_special / job_check), данные — JobSkills.SKILLS.
-## Обработчики (префикс wz_): "wz_revive_pet" — «Возвращение души»: первый погибший питомец коллекции встаёт с долей pct HP и MP и сразу
-##   призывается к герою (как свиток воскрешения, но умением). "wz_renew" — «Живительный свет»: тот, кому хуже (герой
-##   или призванный питомец), лечится сразу на pct макс. HP (+ mult маг. атаки) и ещё на hot макс. HP за time с —
-##   узел Hot (ребёнок лечимого: раз в секунду, значок «hot:<умение>» у полоски HP).
+## Особые механики Волшебника; подключение — HeroSkillFx.JOB_FX_FILES (шесть функций, описание — шапка HeroSkillFx),
+## данные — JobSkills.SKILLS. Обработчики (префикс wz_): "wz_revive_pet" — «Возвращение души»: первый погибший
+##   питомец коллекции встаёт с долей pct HP и MP и сразу призывается к герою (как свиток воскрешения, но умением);
+##   "wz_renew" — «Живительный свет»: тот, кому хуже (герой или призванный питомец), лечится сразу на pct макс. HP
+##   (+ mult маг. атаки) и ещё на hot макс. HP за time с — узел Hot (ребёнок лечимого: раз в секунду, значок
+##   «hot:<умение>» у полоски HP).
+## «Сияющее лезвие» (бонус "light_hit"): попавшая обычная атака добавляет урон светом — доля маг. атаки через маг.
+##   защиту зверя (on_basic_hit, счётчик fx.state["light_hits"]).
 ## Остальное у Волшебника — данными движка (лечение, щиты-«купола» через бонус guard, лёд и свет: замедление ударов
 ## "aslow", обездвиживание "snare", зона «Топь» — JobFxNeophyte "ne_zone").
 
 const HOLY := Color(1.0, 0.9, 0.5)
+const LIGHT := Color(1.0, 0.9, 0.5)
 
 
 ## Особая механика handler умения sid уровня n по цели t (может быть null). false — обработчик не наш.
@@ -24,10 +28,41 @@ static func special(fx: HeroSkillFx, handler: String, sid: String, n: int, _t: M
 
 
 ## Можно ли применить ("" — можно): есть ли погибший питомец.
-static func check(_fx: HeroSkillFx, handler: String, _n: int, _e: Dictionary) -> String:
-	if handler == "wz_revive_pet" and dead_pet() < 0:
-		return "нет погибших питомцев"
+static func pre_cast(_fx: HeroSkillFx, _sid: String, _n: int, sk: Dictionary) -> String:
+	for item in sk.get("fx", []):
+		var e: Dictionary = item
+		if String(e.get("handler", "")) == "wz_revive_pet" and dead_pet() < 0:
+			return "нет погибших питомцев"
 	return ""
+
+
+## «Сияющее лезвие»: доп. урон светом попавшей обычной атаки.
+static func on_basic_hit(fx: HeroSkillFx, t: Mob, _dealt: int) -> void:
+	element_hit(fx, t, "light_hit", LIGHT)
+
+
+## Доп. урон стихией по t: бонус key — доля маг. атаки (через маг. защиту зверя); счётчик fx.state[key + "s"].
+static func element_hit(fx: HeroSkillFx, t: Mob, key: String, col: Color) -> void:
+	var v := fx.bonus(key)
+	if v <= 0.0 or t == null or not is_instance_valid(t) or t.is_dead:
+		return
+	var p := fx.p
+	t.take_damage(maxi(1, roundi(float(p.cur_matk()) * v * p.damage_factor(t, true))), p, false, true)
+	fx.state[key + "s"] = int(fx.state.get(key + "s", 0)) + 1
+	if p.is_inside_tree():
+		Vfx.hit_spark(p.get_parent(), t.aim_point(), col, 0.8)
+
+
+static func on_hurt(_fx: HeroSkillFx, _attacker: Node3D, _amount: int) -> void:
+	pass
+
+
+static func tick(_fx: HeroSkillFx, _delta: float) -> void:
+	pass
+
+
+static func reset(_fx: HeroSkillFx) -> void:
+	pass
 
 
 ## Индекс первого погибшего питомца коллекции (-1 — все живы).

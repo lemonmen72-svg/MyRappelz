@@ -7,26 +7,39 @@ extends RefCounted
 ## knock, buff, special. Числа эффектов — массивы по уровням умения (HeroSkills.value_at).
 ## Особая механика (блок щитом с ответным уроном, призыв, жертва питомцем, слияние и т. п.) — метод
 ## sp_<имя>(sid, n, target, e) -> bool в этом файле и эффект {"do": "special", "handler": "<имя>"} в данных умения.
+## Механики профессий — в своих файлах (JOB_FX_FILES: job_fx_<профессия>.gd, только static func), у каждого
+## файла шесть функций (fx — этот движок: fx.p — герой, fx.state — запасы профессий, общий словарь):
+##   pre_cast(fx, sid, n, sk) -> String — перед умением (цель уже найдена): проверить и списать свой запас
+##     (искры духа Воина); "" — можно, иначе причина (умение не применяется, MP и перезарядка не тратятся);
+##   special(fx, handler, sid, n, t, e) -> bool — эффект {"do": "special", "handler"}; false — не свой обработчик;
+##   on_basic_hit(fx, t, dealt) — обычная атака героя попала (удар, выстрел, второй удар): заряды, зачарование;
+##   on_hurt(fx, attacker, amount) — героя ударили (урон уже снят): ответный урон;
+##   tick(fx, delta) — каждый кадр (свои таймеры); reset(fx) — смерть героя, смена профессии (снять запасы).
+## Новая профессия — строка в JOB_FX_FILES (файлы грузятся при первом обращении, без циклов preload).
 ## Владелец — Player (поля и помощники: _find_target, _engage, _deal, _shoot, heal, add_timed_bonus, add_hot).
 ## Бой — Combat: урон проходит через защиту зверя (Player._deal / _shoot), по зверю выше героя больше чем на 2 ур.
 ## умение может промахнуться (Player.skill_hits) — и урон, и ослабления.
-## Особые механики профессий — в своих файлах (job_fx_<профессия>.gd, static func special / check): эффект
-## {"do": "special", "handler": "<имя>"} без метода sp_<имя> здесь уходит в job_special (точка подключения), проверка
-## «можно ли применить» (нет питомца, тела зверя и т. п.) — job_check до траты MP. Хуки боя: on_basic_hit (обычная
-## атака попала: доп. урон стихией — бонусы "<стихия>_hit"), on_hurt (зверь ударил героя: "reflect" — ответный урон),
-## множитель урона умений skill_factor ("skill_pct", "fire_pct" у огненных умений).
+## Множитель урона умений — skill_factor (бонусы "skill_pct", у огненных умений ещё "fire_pct"), урон последнего эффекта
+## "damage" — last_dealt (MP из урона «Разбитой воли» и т. п.).
 
 ## Анимации героя по полю anim.
 const ANIMS := ["attack", "cast", "bash", "spin", "buff", "dash"]
-## Доп. урон обычной атаки стихией (бонус "<ключ>": доля маг. атаки за удар) — цвет вспышки.
-const HIT_ELEMENTS := {"light_hit": Color(1.0, 0.9, 0.5), "dark_hit": Color(0.62, 0.35, 0.9)}
+## Файлы механик профессий (по строке на профессию).
+const JOB_FX_FILES := [
+	"res://job_fx_warrior.gd",
+	"res://job_fx_shaman.gd",
+	"res://job_fx_swordsman.gd",
+	"res://job_fx_wizard.gd",
+	"res://job_fx_neophyte.gd",
+]
 
 var p: Player
+## Запасы и таймеры механик профессий (искры духа Воина, горение «Неистовства огня» и т. п.).
+var state: Dictionary = {}
 ## Урон последнего эффекта "damage" (для особых механик: MP из урона и т. п.).
 var last_dealt := 0
-## Сколько раз сработал доп. урон стихией обычной атаки и ответный урон (для тестов).
-var element_hits := 0
-var reflect_hits := 0
+
+static var _job_fx: Array[Script] = []
 
 
 func _init(owner: Player) -> void:
@@ -54,7 +67,7 @@ func cast(sid: String, n: int, sk: Dictionary) -> bool:
 	if use == "melee" or use == "ranged" or use == "magic" or use == "near":
 		if t == null:
 			return p._no_target()
-	var why := job_check(sid, n, sk)
+	var why := job_pre_cast(sid, n, sk)
 	if why != "":
 		p.message.emit("«%s»: %s" % [String(sk.get("name", sid)), why])
 		return false
@@ -273,85 +286,69 @@ static func _find(fx: Array, what: String) -> Dictionary:
 	return {}
 
 
-# ---------- Особые механики профессий и хуки боя ----------
+# ---------- Механики профессий (JOB_FX_FILES) ----------
 
-## Обработчик особой механики handler в файлах профессий (job_fx_*.gd). false — такого нет.
-func job_special(handler: String, sid: String, n: int, t: Mob, e: Dictionary) -> bool:
-	if JobFxSwordsman.special(self, handler, sid, n, t, e):
-		return true
-	if JobFxWizard.special(self, handler, sid, n, t, e):
-		return true
-	return JobFxNeophyte.special(self, handler, sid, n, t, e)
+## Скрипты механик профессий (грузятся один раз).
+static func job_scripts() -> Array[Script]:
+	if _job_fx.is_empty():
+		for path in JOB_FX_FILES:
+			var scr := load(String(path)) as Script
+			if scr != null:
+				_job_fx.append(scr)
+	return _job_fx
 
 
-## Можно ли применить умение sid уровня n с особыми механиками ("" — можно, иначе причина: нет питомца, тела и т. п.).
-func job_check(sid: String, n: int, sk: Dictionary) -> String:
-	for item in sk.get("fx", []):
-		var e: Dictionary = item
-		if String(e.get("do", "")) != "special":
-			continue
-		var h := String(e.get("handler", ""))
-		var why := JobFxSwordsman.check(self, h, n, e)
-		if why == "":
-			why = JobFxWizard.check(self, h, n, e)
-		if why == "":
-			why = JobFxNeophyte.check(self, h, n, e)
+func job_pre_cast(sid: String, n: int, sk: Dictionary) -> String:
+	for scr in job_scripts():
+		var why := String(scr.call("pre_cast", self, sid, n, sk))
 		if why != "":
 			return why
 	return ""
 
 
-## Сумма бонуса key от пассивных, включённых переключаемых умений и усилений на время (для механик, которых нет
-## в Player.recalc_stats: урон умений, ответный урон, доп. урон стихией).
+func job_special(handler: String, sid: String, n: int, t: Mob, e: Dictionary) -> bool:
+	for scr in job_scripts():
+		if bool(scr.call("special", self, handler, sid, n, t, e)):
+			return true
+	return false
+
+
+## Обычная атака героя попала по t (готовый урон dealt).
+func on_basic_hit(t: Mob, dealt: int) -> void:
+	if t == null or not is_instance_valid(t):
+		return
+	for scr in job_scripts():
+		scr.call("on_basic_hit", self, t, dealt)
+
+
+## Героя ударил attacker (урон amount уже снят).
+func on_hurt(attacker: Node3D, amount: int) -> void:
+	for scr in job_scripts():
+		scr.call("on_hurt", self, attacker, amount)
+
+
+func tick(delta: float) -> void:
+	for scr in job_scripts():
+		scr.call("tick", self, delta)
+
+
+## Снять запасы профессий (смерть, смена профессии).
+func reset() -> void:
+	for scr in job_scripts():
+		scr.call("reset", self)
+	state.clear()
+
+
+## Сумма бонуса key умений героя и усилений на время (Player.skill_bonus).
 func bonus(key: String) -> float:
-	return float(bonuses().get(key, 0.0))
-
-
-## Все бонусы героя (умения + усиления на время).
-func bonuses() -> Dictionary:
-	var b := HeroSkills.bonuses(Game.hero, Game.class_id, p.weapon_kind, p.has_shield)
-	for id in p.timed_bonus:
-		var tb: Dictionary = p.timed_bonus[id]["bonus"]
-		for k in tb:
-			b[k] = float(b.get(k, 0.0)) + float(tb[k])
-	return b
+	return float(p.skill_bonus.get(key, 0.0))
 
 
 ## Множитель урона умения sid: «Благословенный клинок» (skill_pct), «Огненное сердце» (fire_pct — огненные умения).
 func skill_factor(sid: String) -> float:
 	if sid == "":
 		return 1.0
-	var b := bonuses()
-	var f := 1.0 + float(b.get("skill_pct", 0.0))
+	var f := 1.0 + bonus("skill_pct")
 	if String(HeroSkills.base_skill(sid).get("c", "")) == "fire":
-		f += float(b.get("fire_pct", 0.0))
+		f += bonus("fire_pct")
 	return f
-
-
-## Обычная атака попала по зверю t: доп. урон стихией («Сияющее лезвие» — светом, «Теневая печать» — тьмой):
-## доля маг. атаки через маг. защиту зверя.
-func on_basic_hit(t: Mob) -> void:
-	if t == null or not is_instance_valid(t) or t.is_dead:
-		return
-	var b := HeroSkills.bonuses(Game.hero, Game.class_id, p.weapon_kind, p.has_shield)
-	for key in HIT_ELEMENTS:
-		var v := float(b.get(key, 0.0))
-		if v <= 0.0 or t.is_dead:
-			continue
-		var dealt := maxi(1, roundi(float(p.cur_matk()) * v * p.damage_factor(t, true)))
-		t.take_damage(dealt, p, false, true)
-		element_hits += 1
-		Vfx.hit_spark(p.get_parent(), t.aim_point(), HIT_ELEMENTS[key], 0.75)
-
-
-## Зверь (или кто-то) ударил героя на amount (урон уже прошёл): «Колючий щит» возвращает долю зверю.
-func on_hurt(attacker: Node3D, amount: int) -> void:
-	var m := attacker as Mob
-	if m == null or not is_instance_valid(m) or m.is_dead or amount <= 0:
-		return
-	var r := bonus("reflect")
-	if r <= 0.0:
-		return
-	m.take_damage(maxi(1, roundi(float(amount) * r)), p, false, true)
-	reflect_hits += 1
-	Vfx.hit_spark(p.get_parent(), m.aim_point(), JobSkills.COLORS["shield"], 0.8)

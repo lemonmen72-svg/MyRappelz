@@ -89,6 +89,9 @@ var weapon_aspd := 0.0
 ## пауза после заклинания (cast_time) короче.
 var cast_speed := 0.0
 var basic_mult := 1.0
+## Сумма бонусов умений (HeroSkills.bonuses + усиления на время): ключи механик профессий (искры, зачарование,
+## яд, ответный урон) читают файлы HeroSkillFx.JOB_FX_FILES.
+var skill_bonus: Dictionary = {}
 var double_chance := 0.0
 var mp_drain := 0.0
 var stealth := 0.0
@@ -188,6 +191,7 @@ func recalc_stats() -> void:
 		var tb: Dictionary = timed_bonus[id]["bonus"]
 		for k in tb:
 			b[k] = float(b.get(k, 0.0)) + float(tb[k])
+	skill_bonus = b
 	var extra: Dictionary = {}
 	for k in Stats.STATS:
 		if b.has(k):
@@ -463,6 +467,7 @@ func _physics_process(delta: float) -> void:
 	_tick_skills(delta)
 	_tick_timed(delta)
 	_tick_mp(delta)
+	_fx.tick(delta)
 
 	if current_target != null and (not is_instance_valid(current_target) or current_target.is_dead):
 		_set_target(null)
@@ -660,6 +665,8 @@ func clear_buffs() -> void:
 	for h in hots:
 		effects.remove("hot:" + String((h as Dictionary)["id"]))
 	hots.clear()
+	if _fx != null:
+		_fx.reset()
 	_update_guard_fx()
 
 
@@ -681,9 +688,7 @@ func try_attack() -> bool:
 	var twice := double_chance > 0.0 and randf() < double_chance
 	if attack_kind == "melee":
 		if hit:
-			_deal(target, dmg)
-			# Доп. урон стихией («Сияющее лезвие», «Теневая печать»: HeroSkillFx.on_basic_hit)
-			_fx.on_basic_hit(target)
+			_fx.on_basic_hit(target, _deal(target, dmg))
 		else:
 			_miss_text(target)
 		Vfx.slash_arc(get_parent(), target.aim_point(),
@@ -691,10 +696,11 @@ func try_attack() -> bool:
 		if twice:
 			get_tree().create_timer(HIT_GAP).timeout.connect(_late_hit.bind(target, basic_mult, 0.0, false, true))
 	else:
+		# Попадание выстрела: MP с урона («Иссушающие болты»), механики профессий (искры, зачарование, яд)
 		var cb := func(hit_mob: Mob, dealt: int) -> void:
 			if mp_drain > 0.0:
 				_gain_mp(float(dealt) * mp_drain)
-			_fx.on_basic_hit(hit_mob)
+			_fx.on_basic_hit(hit_mob, dealt)
 		_shoot(target, dmg, 1.0, cb, not hit)
 		if twice:
 			get_tree().create_timer(HIT_GAP).timeout.connect(_late_shot.bind(target, basic_mult, 0.0, false, cb, true))
@@ -712,10 +718,11 @@ func _late_hit(t: Variant, mult: float, flat: float, force_crit: bool, say_doubl
 	if (say_double and not _basic_hits(m)) or (not say_double and not skill_hits(m)):
 		_miss_text(m)
 		return
-	_deal(m, _roll(mult, force_crit, flat))
+	var dealt := _deal(m, _roll(mult, force_crit, flat))
 	Vfx.slash_arc(get_parent(), m.aim_point(),
 		m.global_position - global_position, _class_color().lightened(0.25))
 	if say_double:
+		_fx.on_basic_hit(m, dealt)
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.6, 0), "Двойной удар!", Color(1, 0.75, 0.4))
 
 
@@ -1142,10 +1149,11 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 		amount = maxi(1, roundi(float(amount) * (1.0 - guard)))
 	if skill_guard > 0.0:
 		amount = maxi(1, roundi(float(amount) * (1.0 - skill_guard)))
-	# Ответный урон («Колючий щит»: HeroSkillFx.on_hurt)
-	_fx.on_hurt(attacker, amount)
 	hp -= amount
 	regen_delay = REST_DELAY
+	# Механики профессий: ответный урон («Огненная кожа» Шамана)
+	if hp > 0:
+		_fx.on_hurt(attacker, amount)
 	if _has_model():
 		_model.play_hit()
 	Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), str(amount), Color(1, 0.3, 0.3))

@@ -36,6 +36,15 @@ jobs:
           V="${RAW_VERSION:-$(tr -d '[:space:]' < android/release_version.txt)}"
           echo "VERSION=${V#v}" >> "$GITHUB_ENV"
 
+      # Версия пакета ресурсов = хэш его содержимого (исходники моделей, их .import, версия Godot).
+      # Считается до импорта Godot: импорт переписывает .import. Не изменился — игра берёт пакет из кэша.
+      - name: Хэш пакета ресурсов
+        run: |
+          set -euo pipefail
+          python3 -I tools/asset_pack.py check
+          python3 -I tools/asset_pack.py files | tail -n 1
+          echo "ASSETS_HASH=$(python3 -I tools/asset_pack.py digest --godot "$GODOT_VERSION")" >> "$GITHUB_ENV"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -96,13 +105,50 @@ jobs:
             -e "s|^version/name=.*|version/name=\"$VERSION\"|" \
             export_presets.cfg
 
+          # Версия игры в настройках проекта (Assets.game_version — адрес манифеста в релизе)
+          sed -i '/^config\/version=/d' project.godot
+          sed -i "s|^config/name=.*|&\nconfig/version=\"$VERSION\"|" project.godot
+          grep -n "^config/" project.godot
+
+      # Пакет ресурсов (пресет «Assets»): тяжёлые модели, которых нет в APK. Экспортируется до APK, чтобы
+      # манифест (хэш, sha256, размер, адрес) лёг в APK как res://assets_pack.json.
+      - name: Экспорт пакета ресурсов
+        run: |
+          set -uo pipefail
+          mkdir -p build
+          PCK="build/MyRappelz-assets-${ASSETS_HASH:0:16}.pck"
+          timeout 600 godot --headless --path . --export-pack "Assets" "$PCK" 2>&1 | tee export_pack.log
+          set -e
+          ls -la build
+          test -s "$PCK"
+          python3 -I tools/asset_pack.py verify-pck "$PCK"
+          python3 -I tools/asset_pack.py manifest --pck "$PCK" --hash "$ASSETS_HASH" --version "$VERSION" \
+            --url "https://github.com/${{ github.repository }}/releases/download/v$VERSION/$(basename "$PCK")" \
+            --out build/assets-manifest.json
+          cp build/assets-manifest.json assets_pack.json
+          echo "ASSETS_PCK=$PCK" >> "$GITHUB_ENV"
+
       - name: Экспорт APK
         run: |
           set -uo pipefail
           mkdir -p build
           timeout 600 godot --headless --path . --export-release "Android" "build/MyRappelz-$VERSION.apk" 2>&1 | tee export.log
           ls -la build
-          test -s "build/MyRappelz-$VERSION.apk"
+          APK="build/MyRappelz-$VERSION.apk"
+          test -s "$APK" || exit 1
+          # Модели пакета не должны попасть в APK, запасные модели и манифест — должны
+          # (проверка по списку файлов APK; если Godot сложил их в один .pck внутри APK — пропускается)
+          unzip -l "$APK" > apk_files.txt || true
+          if grep -q "project.binary" apk_files.txt; then
+            if grep -E "hero_wizard_f\.(glb|png)|wolf_2\.(glb|png)" apk_files.txt; then
+              echo "::error::в APK попали файлы пакета ресурсов"; exit 1
+            fi
+            grep -q "hero_human_m_starter.glb" apk_files.txt || { echo "::error::в APK нет запасной модели героя"; exit 1; }
+            grep -q "assets_pack.json" apk_files.txt || { echo "::error::в APK нет манифеста пакета"; exit 1; }
+            echo "APK: файлов пакета нет, запасные модели и манифест на месте"
+          else
+            echo "::warning::список файлов APK не проверен"
+          fi
 
       - name: Публикация релиза
         uses: softprops/action-gh-release@v2
@@ -111,11 +157,16 @@ jobs:
           name: MyRappelz ${{ env.VERSION }}
           target_commitish: ${{ github.sha }}
           prerelease: true
-          files: build/MyRappelz-${{ env.VERSION }}.apk
+          files: |
+            build/MyRappelz-${{ env.VERSION }}.apk
+            ${{ env.ASSETS_PCK }}
+            build/assets-manifest.json
           body: |
             Прототип MyRappelz ${{ env.VERSION }} для Android (сборка №${{ github.run_number }}, коммит ${{ github.sha }}).
 
             **Установка:** скачайте `MyRappelz-${{ env.VERSION }}.apk` на телефон, откройте его и разрешите установку из неизвестных источников.
+
+            **Пакет ресурсов:** модели героев профессий и старших стадий питомцев — отдельным файлом (`MyRappelz-assets-….pck`, `assets-manifest.json`). Игра сама загрузит его при первом запуске (покажет размер и спросит) и сохранит в своей памяти; следующие версии скачивают пакет заново, только если модели изменились. Вручную его скачивать не нужно.
 
             **Управление:** слева джойстик; справа «Атака» (держать), четыре кнопки умений (назначаются в окне героя),
             «Приручить» и «Зелье»; вверху меню «Герой», «Питомцы», «Сумка», «Задания», «Настройки».

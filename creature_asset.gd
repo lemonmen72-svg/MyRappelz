@@ -142,13 +142,19 @@ static func model_for(id: String, stage: int) -> String:
 	return mid if has_asset(mid) else id
 
 
-## Есть ли файл модели вида (и модели из файлов не выключены).
+## Есть ли файл модели вида (и модели из файлов не выключены). Модели стадий лежат в пакете ресурсов
+## (Assets): без пакета их «нет» — берётся модель 1-й стадии.
 static func has_asset(id: String) -> bool:
 	if not use_assets or id == "":
 		return false
 	if not _exists.has(id):
-		_exists[id] = ResourceLoader.exists(path_for(id))
+		_exists[id] = Assets.exists(path_for(id))
 	return bool(_exists[id])
+
+
+## Забыть, какие файлы моделей есть (после загрузки пакета ресурсов Assets).
+static func reset_cache() -> void:
+	_exists.clear()
 
 
 ## Размеры, скорости, клипы и кости вида: creatures.json поверх DEFAULTS и BASE_INFO.
@@ -222,7 +228,7 @@ func setup(id: String, s: float, color: Color = Color.WHITE, tint: Color = Color
 	_s = s
 	info = info_for(id)
 	var path := path_for(id)
-	if not ResourceLoader.exists(path):
+	if not Assets.exists(path):
 		return false
 	var ps := load(path) as PackedScene
 	if ps == null:
@@ -289,7 +295,7 @@ func _setup_material(id: String, color: Color, tint: Color) -> void:
 	material = StandardMaterial3D.new()
 	material.metallic = 0.0
 	var tex_path := DIR + id + ".png"
-	if ResourceLoader.exists(tex_path):
+	if Assets.exists(tex_path):
 		material.albedo_texture = load(tex_path) as Texture2D
 	if material.albedo_texture != null:
 		material.albedo_color = tint

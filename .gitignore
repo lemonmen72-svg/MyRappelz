@@ -5,3 +5,4 @@ build/
 export_credentials.cfg
 .claude/worktrees/
 __pycache__/
+assets_pack.json
