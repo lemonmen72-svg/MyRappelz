@@ -319,7 +319,7 @@ func _unit_lines() -> void:
 func _unit_full_bag() -> void:
 	var a := Inventory.new()
 	a.add("card_wolf", 1)
-	a.add("dual_swords_steel", Inventory.CAPACITY - 1)
+	a.add("sword_steel", Inventory.CAPACITY - 1)
 	a.move(a.find_cell("card_wolf"), 7)
 	check(a.is_full() and String(a.cell(7).get("id", "")) == "card_wolf", "сумка полна, карта в ячейке 7")
 	check(a.replace_one("card_wolf", "card_wolf_soul"), "карта заменена")
@@ -327,7 +327,7 @@ func _unit_full_bag() -> void:
 		"карта с душой легла в ту же ячейку")
 	var b := Inventory.new()
 	b.add("card_wolf", 2)
-	b.add("dual_swords_steel", Inventory.CAPACITY - 1)
+	b.add("sword_steel", Inventory.CAPACITY - 1)
 	check(b.replace_one("card_wolf", "card_wolf_soul"), "карта из стопки заменена")
 	check(b.count("card_wolf") == 1 and b.count("card_wolf_soul") == 1 and b.cell_count() == Inventory.CAPACITY + 1,
 		"полная сумка: карта с душой сверх вместимости, ничего не пропало")

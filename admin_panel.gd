@@ -441,14 +441,14 @@ static func ask(main: Node, what: String) -> void:
 		open(main)
 
 
-## Сумка пустеет; надетое оружие и щит остаются.
+## Сумка пустеет; надетое оружие обеих рук (щит или второй такой же клинок) остаётся.
 static func clear_bag(main: Node) -> void:
 	_confirm = ""
 	var keep: Dictionary = {}
 	if Game.weapon != "" and Game.inventory.has(Game.weapon):
 		keep[Game.weapon] = 1
-	if Game.shield != "" and Game.inventory.has(Game.shield):
-		keep[Game.shield] = 1
+	if Game.offhand != "" and Game.inventory.has(Game.offhand, int(keep.get(Game.offhand, 0)) + 1):
+		keep[Game.offhand] = int(keep.get(Game.offhand, 0)) + 1
 	Game.inventory.from_dict(keep)
 	_done(main, "Сумка очищена")
 

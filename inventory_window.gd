@@ -44,10 +44,11 @@ const SEL_COLOR := Color(1.0, 0.96, 0.62)
 const EMPTY_FRAME := Color(0.42, 0.44, 0.58, 0.75)
 const CELL_BG := Color(0.05, 0.06, 0.13, 0.92)
 
-## Слоты экипировки: [id, название]. Рабочие — «Оружие» (Game.weapon) и «Щит» (вторая рука, Game.shield),
+## Слоты экипировки: [id, название]. Рабочие — «Оружие» (Game.weapon) и «2-я рука» (щит или второй такой же клинок,
+## Game.offhand),
 ## остальные — заглушки (аксессуар вернётся вместе с экипировкой).
 const EQUIP_SLOTS := [
-	["weapon", "Оружие"], ["offhand", "Щит"], ["head", "Голова"], ["body", "Тело"],
+	["weapon", "Оружие"], ["offhand", "2-я рука"], ["head", "Голова"], ["body", "Тело"],
 	["hands", "Руки"], ["feet", "Ноги"],
 ]
 
@@ -196,7 +197,7 @@ func _validate_selection() -> void:
 func _build_equipment(parent: VBoxContainer) -> void:
 	for i in EQUIP_SLOTS.size():
 		var slot_id := String(EQUIP_SLOTS[i][0])
-		var id: String = Game.weapon if slot_id == "weapon" else (Game.shield if slot_id == "offhand" else "")
+		var id: String = Game.weapon if slot_id == "weapon" else (Game.offhand if slot_id == "offhand" else "")
 		var b := _make_cell("equip", i, id, "", UiScale.px(EQUIP_CELL), sel_kind == "equip" and sel_index == i,
 			String(EQUIP_SLOTS[i][1]))
 		parent.add_child(b)
@@ -370,7 +371,7 @@ func _card_item(card: VBoxContainer) -> void:
 	var n := int(c.get("n", 1))
 	var sub := "В ячейке: %d" % n if n > 1 else ""
 	_card_head(card, id, sub)
-	_card_body(card, id, Game.weapon)
+	_card_body(card, id, Game.shield if ItemData.is_shield(id) else Game.weapon)
 	var sell := int(ItemData.get_item(id).get("sell", 0))
 	if sell > 0:
 		var t := "Цена продажи: %d зол." % sell
@@ -383,6 +384,10 @@ func _card_item(card: VBoxContainer) -> void:
 	var acts: Array = []
 	if ItemData.is_weapon(id):
 		acts.append(["Надеть", "act_equip", _on_equip, not ItemData.weapon_fits(id, Game.class_id)])
+		# Второй такой же клинок или топор — во вторую руку (пара)
+		if not ItemData.is_shield(id) and ItemData.weapon_fits(id, Game.class_id) \
+				and ItemData.offhand_block(id, Game.weapon, Game.class_id) == "":
+			acts.append(["Во 2-ю руку", "act_equip_off", _on_equip_off, Game.offhand_block(id) != ""])
 	elif _usable(id):
 		acts.append(["Использовать", "act_use", _on_use])
 	elif ItemData.is_soul_card(id):
@@ -424,17 +429,17 @@ func _card_equip(card: VBoxContainer) -> void:
 		_card_body(card, Game.weapon, "")
 		card.add_child(_text("Сменить: коснитесь другого оружия в сумке и «Надеть» или перетащите его сюда.", UiScale.FONT_BODY, MUTED))
 		return
-	if slot_id == "offhand" and Game.shield != "":
-		_card_head(card, Game.shield, "Надето · слот «%s»" % slot_name)
-		_card_body(card, Game.shield, "")
-		card.add_child(_action_grid([["Снять щит", "act_unshield", _on_unshield]]))
+	if slot_id == "offhand" and Game.offhand != "":
+		_card_head(card, Game.offhand, "Надето · слот «%s»" % slot_name)
+		_card_body(card, Game.offhand, "")
+		card.add_child(_action_grid([["Снять щит" if Game.has_shield() else "Снять", "act_unshield", _on_unshield]]))
 		return
 	_card_head(card, "", "")
 	card.add_child(_label(slot_name, UiScale.FONT_HEAD, GOLD))
 	if slot_id == "weapon":
 		card.add_child(_text("Оружия в руках нет: коснитесь оружия в сумке и «Надеть».", UiScale.FONT_TEXT, MUTED))
 	elif slot_id == "offhand":
-		card.add_child(_text("Щит надевается к одноручному оружию (меч, булава, топор, жезл, кинжал), если профессия им владеет.",
+		card.add_child(_text("Вторая рука — к одноручному оружию: щит (если профессия им владеет) или второй такой же кинжал, меч или топор (если профессия держит пару). Двуручное оружие занимает обе руки.",
 			UiScale.FONT_TEXT, MUTED))
 	else:
 		card.add_child(_text("Скоро: доспехи и украшения появятся вместе с экипировкой.", UiScale.FONT_TEXT, MUTED))
@@ -444,7 +449,7 @@ func _card_good(card: VBoxContainer) -> void:
 	var id := sel_id
 	var price := int(ItemData.get_item(id).get("buy", 0))
 	_card_head(card, id, "В сумке: %d" % Game.inventory.count(id))
-	_card_body(card, id, Game.weapon)
+	_card_body(card, id, Game.shield if ItemData.is_shield(id) else Game.weapon)
 	var pl := _text("Цена: %d зол." % price, UiScale.FONT_TEXT, GOLD if Game.gold >= price else BAD)
 	pl.name = "price_label"
 	card.add_child(pl)
@@ -484,11 +489,27 @@ func _weapon_stats(card: VBoxContainer, id: String, cmp: String) -> void:
 	g.add_theme_constant_override("h_separation", int(UiScale.px(12)))
 	g.add_theme_constant_override("v_separation", 0)
 	card.add_child(g)
-	_stat(g, "Атака", float(it.get("atk", 0)), float(ot.get("atk", 0)), has_cmp, "+%.0f", "%.0f", true)
-	_stat(g, "Удар раз в", float(it.get("cd", 1.0)), float(ot.get("cd", 1.0)), has_cmp, "%.2f с", "%.2f", false)
-	_stat(g, "Дальность", float(it.get("range", 2.0)), float(ot.get("range", 2.0)), has_cmp, "%.1f м", "%.1f", true)
-	_stat(g, "Крит", float(it.get("crit", 0.0)) * 100.0, float(ot.get("crit", 0.0)) * 100.0, has_cmp,
-		"+%.0f%%", "%.0f%%", true)
+	# Бонусы вида (ItemData.weapon_bonus): показаны те, что есть у этого оружия или у надетого для сравнения
+	var wb := ItemData.weapon_bonus(id)
+	var ob := ItemData.weapon_bonus(cmp) if has_cmp else wb
+	for row in [["Физ. атака", "atk", "+%.0f", "%.0f", 1.0], ["Маг. атака", "matk", "+%.0f", "%.0f", 1.0],
+			["Физ. защита", "def", "+%.0f", "%.0f", 1.0], ["Шанс блока", "block", "%.0f%%", "%.0f%%", 100.0],
+			["Скорость атаки", "aspd", "%+.0f%%", "%.0f%%", 1.0], ["Скорость каста", "cast", "%+.0f%%", "%.0f%%", 1.0]]:
+		var r: Array = row
+		var v := float(wb[r[1]]) * float(r[4])
+		var o := float(ob[r[1]]) * float(r[4])
+		if v != 0.0 or (has_cmp and o != 0.0):
+			_stat(g, String(r[0]), v, o, has_cmp, String(r[2]), String(r[3]), true)
+	if not ItemData.is_shield(id):
+		_stat(g, "Дальность", float(it.get("range", 2.0)), float(ot.get("range", 2.0)), has_cmp, "%.1f м", "%.1f", true)
+		_stat(g, "Крит", float(it.get("crit", 0.0)) * 100.0, float(ot.get("crit", 0.0)) * 100.0, has_cmp,
+			"+%.0f%%", "%.0f%%", true)
+	var hands_text := "двуручное" if not ItemData.is_one_handed(ItemData.weapon_kind(id)) else "одноручное"
+	if ItemData.is_shield(id):
+		hands_text = "во вторую руку"
+	elif ItemData.pair_kind(ItemData.weapon_kind(id)) != "":
+		hands_text += ", можно два — по одному в каждой руке"
+	card.add_child(_text("Хват: %s" % hands_text, UiScale.FONT_SMALL, MUTED))
 	if has_cmp:
 		card.add_child(_text("В скобках — разница с надетым: %s" % ItemData.item_name(cmp), UiScale.FONT_SMALL, MUTED))
 
@@ -592,7 +613,7 @@ func _on_drop(kind: String, index: int, from: int) -> void:
 		sel_id = String(Game.inventory.cell(from).get("id", ""))
 		_move_to(index)
 	elif kind == "equip" and index <= 1:
-		_equip_cell(from)
+		_equip_cell(from, index == 1)
 	refresh()
 
 
@@ -601,20 +622,25 @@ func _can_drop(kind: String, index: int, from: int) -> bool:
 		return index != from
 	if kind == "equip" and index <= 1:
 		var id := String(Game.inventory.cell(from).get("id", ""))
-		return ItemData.is_weapon(id) and ItemData.is_shield(id) == (index == 1)
+		if not ItemData.is_weapon(id):
+			return false
+		if index == 0:
+			return not ItemData.is_shield(id)
+		return ItemData.is_shield(id) or ItemData.offhand_block(id, Game.weapon, Game.class_id) == ""
 	return false
 
 
-## Надеть оружие из ячейки i; снятое оружие ложится в ту же ячейку (обмен).
-func _equip_cell(i: int) -> void:
+## Надеть оружие из ячейки i (second — во вторую руку; щит — всегда во вторую); снятое оружие ложится в ту же
+## ячейку (обмен).
+func _equip_cell(i: int, second: bool = false) -> void:
 	var inv: Inventory = Game.inventory
 	var id := String(inv.cell(i).get("id", ""))
 	if not ItemData.is_weapon(id):
 		_msg("Это нельзя надеть")
 		return
-	var shield := ItemData.is_shield(id)
-	var old: String = Game.shield if shield else Game.weapon
-	var err: String = main.player.equip(id)
+	var off := second or ItemData.is_shield(id)
+	var old: String = Game.offhand if off else Game.weapon
+	var err: String = main.player.equip(id, off)
 	if err != "":
 		_msg(err)
 		return
@@ -624,14 +650,17 @@ func _equip_cell(i: int) -> void:
 		if j >= 0 and j != i and (here == "" or here == id):
 			inv.move(j, i)
 	sel_kind = "equip"
-	sel_index = 1 if shield else 0
-	sel_id = "offhand" if shield else "weapon"
+	sel_index = 1 if off else 0
+	sel_id = "offhand" if off else "weapon"
 
 
 func _on_unshield() -> void:
-	Game.unequip_shield()
-	main.player.refresh_skills()
-	main.player._build_model()
+	main.player.unequip_offhand()
+	refresh()
+
+
+func _on_equip_off() -> void:
+	_equip_cell(sel_index, true)
 	refresh()
 
 

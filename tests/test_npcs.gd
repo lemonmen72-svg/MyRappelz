@@ -343,9 +343,9 @@ func _check_situations() -> void:
 	game.level = lv
 	var inv: Inventory = game.inventory
 	var free_n := Inventory.CAPACITY - inv.used_cells()
-	inv.add("dual_swords_steel", free_n)
+	inv.add("sword_steel", free_n)
 	check(Npcs.situation("storekeeper") == "full_bag", "кладовщик видит полную сумку")
-	inv.remove("dual_swords_steel", inv.count("dual_swords_steel"))
+	inv.remove("sword_steel", inv.count("sword_steel"))
 	check(Npcs.situation("storekeeper") == "idle", "сумка свободна — обычная реплика")
 
 

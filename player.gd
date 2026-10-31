@@ -2,7 +2,8 @@ class_name Player
 extends CharacterBody3D
 ## Персонаж игрока. Уровень, опыт и золото хранятся в Game. Характеристики — из 7 статов профессии (HeroStats: HP,
 ## MP, атака, маг. атака, защита, точность, уклонение, крит, скорость атаки, восстановление HP); поверх — надетое
-## оружие и щит (Game.weapon, Game.shield, ItemData) и умения героя (Game.hero, HeroSkills: пассивные, включённые
+## оружие обеих рук (Game.weapon, Game.offhand — щит или пара; бонусы вида ItemData.grip_bonus: физ. и маг. атака,
+## защита, блок, скорость атаки и каста) и умения героя (Game.hero, HeroSkills: пассивные, включённые
 ## переключаемые и усиления на время). Бой — Combat: обычная атака может промахнуться (точность против избегания
 ## зверя и разница уровней), умения не промахиваются по зверю до +2 ур. выше героя (выше — кривая уровней);
 ## урон проходит через защиту зверя (физ. или маг.) и множитель разницы уровней, крит — с поправкой на уровни.
@@ -35,6 +36,8 @@ const SKILL_ANIM := {"backstab": "bash", "charge_stab": "dash", "dark_strike": "
 	"bloody_blade": "attack", "sleeping_dust": "cast"}
 ## Пауза между ударами многоударных умений и вторым ударом обычной атаки, с.
 const HIT_GAP := 0.14
+## Время каста заклинания при скорости каста 0 (обычная атака после него — не раньше), с: cast_time().
+const CAST_TIME := 0.6
 
 var max_hp := 100
 var hp := 100
@@ -62,7 +65,8 @@ var attack_time := 0.8
 var crit := 0.05
 ## "melee" | "ranged" | "magic"
 var attack_kind := "melee"
-## Вид надетого оружия (ItemData.WEAPON_KINDS; "" — без оружия) и щит во второй руке.
+## Вид хвата (ItemData.grip_kind: вид оружия, у двух одинаковых — вид пары "daggers" и т. п.; "" — без оружия)
+## и щит во второй руке.
 var weapon_kind := ""
 var has_shield := false
 ## Магическая атака (сила заклинаний и магической обычной атаки) и магическая защита.
@@ -79,6 +83,11 @@ var hots: Array = []
 ## Скорость атаки (1.0 = 100%: от Ловкости и умений), множитель урона обычной атаки, шанс второго удара (выстрела),
 ## доля урона выстрела в MP, незаметность (звери замечают ближе, удары реже отвлекают зверя от питомца).
 var aspd := 1.0
+## Прибавка скорости атаки от вида оружия (доля, −0.4…+0.25; ItemData.WEAPON_KINDS aspd) — входит в aspd.
+var weapon_aspd := 0.0
+## Скорость каста заклинаний (доля: одноручный посох +0.2, двуручный +0.1): обычная магическая атака чаще,
+## пауза после заклинания (cast_time) короче.
+var cast_speed := 0.0
 var basic_mult := 1.0
 var double_chance := 0.0
 var mp_drain := 0.0
@@ -152,7 +161,7 @@ func _ready() -> void:
 
 
 ## Пересчитать характеристики: профессия и уровень (Game.class_id, Game.level) через 7 статов (HeroStats),
-## оружие и щит (Game.weapon, Game.shield), пассивные и включённые переключаемые умения героя (HeroSkills.bonuses —
+## оружие обеих рук (Game.weapon, Game.offhand: ItemData.grip_bonus), пассивные и включённые переключаемые умения героя (HeroSkills.bonuses —
 ## только подходящие оружию) и усиления на время (timed_bonus).
 func recalc_stats() -> void:
 	var s := ClassData.stats_for(Game.class_id, Game.level)
@@ -199,22 +208,25 @@ func recalc_stats() -> void:
 		avoid = int(h["avoid"])
 		hp_regen = float(h["hp_regen"])
 		stat_aspd = float(h["aspd"]) / 100.0
+	# Бонусы оружия обеих рук (ItemData.grip_bonus — по видам, решение Максима): физ. и маг. атака, защита и блок
+	# щита, скорость атаки и каста (%) — прямо в производные героя
+	var wb := ItemData.grip_bonus(Game.weapon, Game.offhand)
+	weapon_aspd = float(wb["aspd"]) / 100.0
+	cast_speed = float(wb["cast"]) / 100.0
 	if weapon_kind != "":
 		var w := ItemData.get_item(Game.weapon)
 		attack_kind = ItemData.weapon_attack(weapon_kind)
 		# Стрельба — атака дальнего боя (от Меткости и Ловкости), посох — маг. атака, остальное — от Силы
 		if attack_kind == "ranged" and not hero_stats.is_empty():
 			atk = int(hero_stats["ratk"])
-		elif attack_kind == "magic":
-			atk = matk
-		atk += int(w.get("atk", 0))
+		atk += int(wb["atk"])
+		matk += int(wb["matk"])
 		if attack_kind == "magic":
-			matk = atk
-		attack_time = float(w.get("cd", attack_time))
+			atk = matk
+		attack_time = ItemData.base_cd(weapon_kind)
 		attack_range = float(w.get("range", attack_range))
 		crit += float(w.get("crit", 0.0))
-	if has_shield:
-		defense += int(ItemData.get_item(Game.shield).get("def", 0))
+	defense += int(wb["def"])
 	atk = roundi(float(atk) * (1.0 + _bv(b, "atk_pct") + (_bv(b, "matk_pct") if attack_kind == "magic" else 0.0))) + roundi(_bv(b, "atk_flat"))
 	matk = roundi(float(matk) * (1.0 + _bv(b, "matk_pct")))
 	defense = roundi(float(defense + roundi(_bv(b, "def_flat"))) * (1.0 + _bv(b, "def_pct")))
@@ -222,14 +234,18 @@ func recalc_stats() -> void:
 	eva = clampf(eva + _bv(b, "eva"), 0.0, 0.6)
 	crit += _bv(b, "crit")
 	speed *= 1.0 + _bv(b, "speed_pct")
-	# Как в Rappelz: прибавки скорости атаки от умений складываются со скоростью от Ловкости
-	aspd = stat_aspd + _bv(b, "aspd")
+	# Как в Rappelz: прибавки скорости атаки от оружия и умений складываются со скоростью от Ловкости
+	aspd = maxf(0.2, stat_aspd + weapon_aspd + _bv(b, "aspd"))
 	attack_time /= aspd
+	# Скорость каста (посохи): обычная магическая атака и пауза после заклинания короче
+	cast_speed += _bv(b, "cast")
+	if attack_kind == "magic":
+		attack_time /= 1.0 + cast_speed
 	basic_mult = 1.0 + _bv(b, "basic_pct")
 	double_chance = _bv(b, "double")
 	mp_drain = _bv(b, "mp_drain")
 	stealth = _bv(b, "stealth")
-	block = clampf(_bv(b, "block"), 0.0, 0.75)
+	block = clampf(float(wb["block"]) + _bv(b, "block"), 0.0, 0.75)
 	skill_guard = clampf(_bv(b, "guard"), 0.0, 0.9)
 	cdr = clampf(_bv(b, "cdr"), 0.0, 0.5)
 	hp_regen += _bv(b, "regen")
@@ -337,12 +353,13 @@ func refresh_skills() -> void:
 	stats_changed.emit()
 
 
-## Надеть оружие id из сумки (щит — во вторую руку). "" — получилось, иначе причина. Модель меняет оружие в руках,
-## переключаемые умения, которым оружие не подходит, выключаются.
-func equip(id: String) -> String:
-	if id == Game.weapon:
+## Надеть оружие id из сумки: в основную руку (щит — во вторую), second = true — во вторую руку (щит или второе такое
+## же одноручное — пара). "" — получилось, иначе причина. Модель меняет оружие в руках, переключаемые умения,
+## которым оружие не подходит, выключаются.
+func equip(id: String, second: bool = false) -> String:
+	if id == (Game.offhand if second else Game.weapon):
 		return ""
-	var err := Game.equip_weapon(id)
+	var err: String = Game.equip_offhand(id) if second else Game.equip_weapon(id)
 	if err != "":
 		return err
 	recalc_stats()
@@ -351,12 +368,20 @@ func equip(id: String) -> String:
 	var off: PackedStringArray = []
 	for t in Game.last_dropped_toggles:
 		off.append(String(HeroSkills.get_skill(String(t)).get("name", t)))
-	var text := ("Во второй руке: %s" if ItemData.is_shield(id) else "В руках: %s") % ItemData.item_name(id)
+	var text := ("Во второй руке: %s" if second or ItemData.is_shield(id) else "В руках: %s") % ItemData.item_name(id)
 	if not off.is_empty():
 		text += ". Выключено: %s" % ", ".join(off)
 	message.emit(text)
 	stats_changed.emit()
 	return ""
+
+
+## Освободить вторую руку (щит или второй клинок — в сумку).
+func unequip_offhand() -> void:
+	Game.unequip_offhand()
+	recalc_stats()
+	_build_model()
+	stats_changed.emit()
 
 
 func cur_atk() -> int:
@@ -887,8 +912,21 @@ func _use_hero_skill(sid: String) -> bool:
 	mp -= cost
 	_mp_delay = MP_COMBAT_TIME
 	skill_cd[sid] = HeroSkills.cooldown(sid, n) * (1.0 - cdr)
+	# Заклинание: обычная атака — после каста (скорость каста посоха его сокращает)
+	if is_spell(sk):
+		attack_cd = maxf(attack_cd, cast_time())
 	stats_changed.emit()
 	return true
+
+
+## Заклинание ли умение (магическое: use "magic" или анимация каста) — его ускоряет скорость каста.
+static func is_spell(sk: Dictionary) -> bool:
+	return String(sk.get("use", "")) == "magic" or String(sk.get("anim", "")) == "cast"
+
+
+## Время каста заклинания, с (CAST_TIME / (1 + скорость каста)).
+func cast_time() -> float:
+	return CAST_TIME / (1.0 + maxf(cast_speed, -0.5))
 
 
 ## Перезарядка умения sid в секундах (у умений героя — по изученному уровню).

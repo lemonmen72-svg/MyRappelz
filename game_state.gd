@@ -36,18 +36,24 @@ var level := 1
 var xp := 0
 var gold := 0
 var inventory := Inventory.new()
-## Надетое оружие (id предмета ItemData из сумки; "" — нет). Сменное оружие только у классов
-## со стартовым набором (Наёмник), у остальных оружие задано классом. Надетое оружие не занимает ячейку сумки
-## (inventory.equipped), в окне сумки оно в слоте «Оружие».
+## Надетое оружие (id предмета ItemData из сумки; "" — нет), основная рука. Надетое оружие не занимает ячейку
+## сумки (inventory.equipped), в окне сумки оно в слоте «Оружие».
 var weapon := "":
 	set(v):
 		weapon = v
 		inventory.equipped = v
-## Щит во второй руке (id предмета из сумки, "" — нет): только к одноручному оружию и у профессий со щитом.
-var shield := "":
+## Вторая рука (id предмета из сумки, "" — пусто): щит (у профессий со щитом, к одноручному оружию) или второе
+## одноручное того же вида — пара (два кинжала, два меча, два топора; ItemData.offhand_block). Двуручное — пусто.
+var offhand := "":
 	set(v):
-		shield = v
+		offhand = v
 		inventory.equipped_off = v
+## Щит во второй руке ("" — щита нет; запись — то же, что offhand).
+var shield: String:
+	get:
+		return offhand if ItemData.is_shield(offhand) else ""
+	set(v):
+		offhand = v
 ## Умения героя (HeroSkills): {"jp": int, "jp_part": float, "skills": {id: ур.}, "toggles": {id: true},
 ## "slots": [id умения на кнопке skill1…skill4 или ""]}.
 var hero: Dictionary = {}
@@ -99,7 +105,7 @@ func reset() -> void:
 	gold = 0
 	inventory.from_dict({})
 	weapon = ""
-	shield = ""
+	offhand = ""
 	hero = {}
 	load_note = ""
 	pets.clear()
@@ -134,7 +140,7 @@ func new_character(n: String, race: String, cls: String = ClassData.WANDERER, se
 
 ## Приводит умения и оружие героя к текущей профессии: запись умений (HeroSkills.ensure_record),
 ## стартовый набор оружия в сумке (если подходящего оружия нет совсем), надетое оружие (по умолчанию — первое
-## из набора, у старых сохранений Наёмника — парные мечи) и щит (только к одноручному оружию).
+## из набора) и вторая рука (щит или пара — только по правилам ItemData.offhand_block).
 ## Вызывается при создании, загрузке и смене профессии.
 func ensure_hero() -> void:
 	if not ClassData.has_class(class_id):
@@ -147,9 +153,7 @@ func ensure_hero() -> void:
 		if ItemData.weapon_fits(String(id), class_id) and not ItemData.is_shield(String(id)):
 			has_any = true
 	if not has_any:
-		for id in ItemData.starter_weapons(class_id):
-			if not inventory.has(String(id)):
-				inventory.add(String(id))
+		_give_starters(class_id)
 	if not (ItemData.weapon_fits(weapon, class_id) and not ItemData.is_shield(weapon) and inventory.has(weapon)):
 		weapon = ItemData.default_weapon(class_id)
 		if not inventory.has(weapon):
@@ -158,71 +162,115 @@ func ensure_hero() -> void:
 				if ItemData.weapon_fits(String(id), class_id) and not ItemData.is_shield(String(id)):
 					weapon = String(id)
 					break
-	if shield != "" and not (ItemData.is_shield(shield) and ItemData.weapon_fits(shield, class_id)
-			and inventory.has(shield) and ItemData.is_one_handed(weapon_kind())):
-		shield = ""
+	if offhand != "" and offhand_block(offhand) != "":
+		offhand = ""
 	HeroSkills.drop_unfit_toggles(hero, weapon_kind(), has_shield())
 
 
-## Стартовое оружие профессии в сумку (чего нет) и надеть: первое — в руку, щит из набора — во вторую руку.
+## Стартовое оружие профессии в сумку (чего не хватает) и надеть: первое — в руку, повтор того же — во вторую руку
+## (пара), щит из набора — во вторую руку (к одноручному).
 func _give_starters(job: String) -> void:
+	var need: Dictionary = {}
+	for k in ItemData.starter_weapons(job):
+		need[String(k)] = int(need.get(String(k), 0)) + 1
+	for id in need:
+		var miss := int(need[id]) - inventory.count(String(id))
+		if miss > 0:
+			inventory.add(String(id), miss)
 	var first := ""
-	var sh := ""
+	var off := ""
 	for k in ItemData.starter_weapons(job):
 		var id := String(k)
-		if not inventory.has(id):
-			inventory.add(id)
-		if ItemData.is_shield(id):
-			sh = id
+		if ItemData.is_shield(id) or (first != "" and id == first):
+			if off == "":
+				off = id
 		elif first == "":
 			first = id
 	if first != "":
 		weapon = first
-	shield = sh if ItemData.is_one_handed(weapon_kind()) else ""
+	offhand = ""
+	if off != "" and offhand_block(off) == "":
+		offhand = off
 
 
-## Вид надетого оружия (ItemData.WEAPON_KINDS: "sword_1h", "daggers", "crossbow" …; "" — без оружия).
+## Вид хвата (ItemData.grip_kind): вид надетого оружия ("sword_1h", "crossbow" …), у пары — вид пары ("daggers",
+## "dual_swords", "dual_axes"); "" — без оружия. По нему — умения, модель и тип атаки.
 func weapon_kind() -> String:
+	return ItemData.grip_kind(weapon, offhand)
+
+
+## Вид оружия в основной руке (без учёта пары).
+func main_kind() -> String:
 	return ItemData.weapon_kind(weapon)
 
 
 ## Щит во второй руке.
 func has_shield() -> bool:
-	return shield != ""
+	return ItemData.is_shield(offhand)
 
 
-## Надеть оружие id из сумки (щит — во вторую руку). "" — получилось, иначе причина. Двуручное или парное оружие
-## снимает щит. Переключаемые умения, которым новое оружие не подходит, выключаются (их id — в last_dropped_toggles).
+## Почему id нельзя взять во вторую руку при нынешнем оружии ("" — можно): правила ItemData.offhand_block,
+## предмет в сумке (второй такой же — если в основной руке тот же предмет).
+func offhand_block(id: String) -> String:
+	var err := ItemData.offhand_block(id, weapon, class_id)
+	if err != "":
+		return err
+	if not inventory.has(id, 2 if id == weapon else 1):
+		return "Второго такого оружия нет в сумке" if id == weapon else "Этого оружия нет в сумке"
+	return ""
+
+
+## Надеть оружие id из сумки в основную руку (щит — во вторую руку). "" — получилось, иначе причина. Двуручное
+## оружие освобождает вторую руку, другое одноручное — снимает пару, щит остаётся. Переключаемые умения, которым
+## новое оружие не подходит, выключаются (их id — в last_dropped_toggles).
 func equip_weapon(id: String) -> String:
 	last_dropped_toggles = []
 	if not ItemData.is_weapon(id):
 		return "Это не оружие"
+	if ItemData.is_shield(id):
+		return equip_offhand(id)
 	if not ItemData.weapon_fits(id, class_id):
-		if ClassData.is_wanderer(class_id) and ItemData.rank(id) > 1:
-			return "Бродяге доступно только оружие 1-го ранга"
 		return "Это оружие не для профессии «%s»" % ClassData.job_name(class_id)
 	if not inventory.has(id):
 		return "Этого оружия нет в сумке"
-	if ItemData.is_shield(id):
-		if not ItemData.is_one_handed(weapon_kind()):
-			return "Щит — только к одноручному оружию"
-		shield = id
-	else:
-		weapon = id
-		if shield != "" and not ItemData.is_one_handed(weapon_kind()):
-			shield = ""
+	if id == offhand and not inventory.has(id, 2):
+		offhand = ""
+	weapon = id
+	if offhand != "" and offhand_block(offhand) != "":
+		offhand = ""
 	last_dropped_toggles = HeroSkills.drop_unfit_toggles(hero, weapon_kind(), has_shield())
 	changed.emit()
 	return ""
 
 
-## Снять щит (остаётся в сумке).
-func unequip_shield() -> void:
-	if shield == "":
+## Взять id во вторую руку: щит или второе такое же одноручное (пара). "" — получилось, иначе причина.
+func equip_offhand(id: String) -> String:
+	last_dropped_toggles = []
+	if not ItemData.is_weapon(id):
+		return "Это не оружие"
+	if not ItemData.weapon_fits(id, class_id):
+		return "Это оружие не для профессии «%s»" % ClassData.job_name(class_id)
+	var err := offhand_block(id)
+	if err != "":
+		return err
+	offhand = id
+	last_dropped_toggles = HeroSkills.drop_unfit_toggles(hero, weapon_kind(), has_shield())
+	changed.emit()
+	return ""
+
+
+## Освободить вторую руку (щит или второй клинок остаются в сумке).
+func unequip_offhand() -> void:
+	if offhand == "":
 		return
-	shield = ""
+	offhand = ""
 	last_dropped_toggles = HeroSkills.drop_unfit_toggles(hero, weapon_kind(), false)
 	changed.emit()
+
+
+## Снять щит (то же, что освободить вторую руку).
+func unequip_shield() -> void:
+	unequip_offhand()
 
 
 # ---------- Профессия ----------
@@ -319,7 +367,7 @@ func to_dict() -> Dictionary:
 		# Раскладка сумки по ячейкам (у старых сохранений нет — предметы ложатся по порядку сортировки)
 		"bag": inventory.layout_to_array(),
 		"weapon": weapon,
-		"shield": shield,
+		"offhand": offhand,
 		"hero": hero.duplicate(true),
 		"pets": pets.duplicate(true),
 		"active_pet": active_pet,
@@ -411,10 +459,14 @@ func from_dict(d: Dictionary) -> void:
 		active_pet = -1
 	# Задания (старые сохранения — без заданий)
 	_load_quests(d.get("quests", {}))
-	# Оружие (старые сохранения Наёмника и переведённые герои — парные мечи и стартовый набор в сумку,
-	# см. ensure_hero)
-	weapon = "" if converted else String(d.get("weapon", ""))
-	shield = "" if converted else String(d.get("shield", ""))
+	# Оружие (переведённые герои — стартовый набор Наёмника, см. ensure_hero). Вторая рука — "offhand"
+	# (раньше "shield"); прежняя пара клинков одним предметом (ItemData.PAIRED) — тот же клинок в обеих руках
+	var w := "" if converted else String(d.get("weapon", ""))
+	var off := "" if converted else String(d.get("offhand", d.get("shield", "")))
+	if ItemData.PAIRED.has(w):
+		off = ItemData.migrate_id(w)
+	weapon = ItemData.migrate_id(w)
+	offhand = ItemData.migrate_id(off)
 	# Умения героя: старые сохранения — JP, как будто копились с 1 уровня, стартовые умения
 	var h: Variant = d.get("hero", null)
 	if converted:
@@ -536,7 +588,7 @@ static func migrate_items(src: Dictionary) -> Dictionary:
 	var res: Dictionary = {}
 	for k in src:
 		var id := ItemData.migrate_id(String(k))
-		res[id] = int(res.get(id, 0)) + int(src[k])
+		res[id] = int(res.get(id, 0)) + int(src[k]) * ItemData.migrate_count(String(k))
 	return res
 
 
