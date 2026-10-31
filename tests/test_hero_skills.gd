@@ -209,7 +209,8 @@ func run_step() -> void:
 			game.race_id = "human"
 			game.class_id = "wanderer"
 			player.apply_class()
-			check(game.weapon == "weapon_sword_1h_r1" and player.weapon_kind == "sword_1h", "у Бродяги учебный меч")
+			# Бродяге подходит любое оружие — прежнее остаётся в руках
+			check(game.weapon != "" and ItemData.weapon_fits(String(game.weapon), "wanderer"), "у Бродяги оружие в руках: %s" % game.weapon)
 			check((game.hero["skills"] as Dictionary).is_empty(), "у Бродяги нет умений")
 			for i in 4:
 				check(not main.hud.is_button_visible("skill%d" % (i + 1)), "кнопка умения %d скрыта" % (i + 1))
