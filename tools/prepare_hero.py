@@ -16,7 +16,10 @@
 
 Как устроено (общий код с двуногими зверями — блок «biped» в tools/prepare_creatures.py):
   * Роли костей гуманоида Meshy (biped_roles): ноги — две ветки у земли, таз — их общий родитель, путь к макушке —
-    позвоночник, грудь — кость с двумя боковыми ветками (руки), дальше шея, голова и макушка. Рука: ключица, плечо,
+    позвоночник, грудь — кость с двумя боковыми ветками-руками (цепочка ≥ 4 костей, уходит в сторону; короткие ветки
+    груди у женских ригов — не руки), дальше шея, голова и макушка. Если Meshy повесил руки выше плеч (на макушку,
+    риг hero_assassin_f), biped_regraft_arms переносит их (и грудь, висящую на шее) на кость позвоночника не выше
+    плеч — поза покоя та же, меняется только родитель. Рука: ключица, плечо,
     предплечье, кисть (запястье), ладонь; пальцы — ветки ладони: большой — ближайший к запястью, остальные по
     порядку спереди назад: указательный, средний, безымянный, мизинец.
   * Клипы — Quaternius Universal Animation Library 1 и 2 (CC0), перенос через глобальные повороты (HeroRetarget —
@@ -424,6 +427,11 @@ def build(cid: str, src_path: str, height: float, out_dir: str, preview: str = "
 	src = pc.load_source(src_path)
 	g = pc.to_game_space(src, height, pc.biped_yaw(src))
 	g = pc.reorder(g, pc.topo_order(g["parent"]))
+	# Руки, повешенные Meshy выше плеч (на макушку), — на грудь; у обычного рига ничего не меняется
+	g["parent"], moved = pc.biped_regraft_arms(g["parent"], g["gpos"], height)
+	if moved:
+		print("   руки висели выше плеч — перенесены на грудь: %s" % ", ".join(g["names"][b] for b in moved))
+		g = pc.reorder(g, pc.topo_order(g["parent"]))
 	roles = pc.biped_roles(g["names"], g["parent"], g["gpos"], height)
 	print("   поворот %d°, масштаб %.4f, исходный меш %d треуг., костей %d" % (
 		g["yaw_deg"], g["scale"], len(g["tris"]), len(g["names"])))
@@ -521,9 +529,12 @@ def build(cid: str, src_path: str, height: float, out_dir: str, preview: str = "
 
 def verify(rt, rig, roles: dict, mesh: dict, clips: list, meta: dict) -> bool:
 	"""Проверка по всем кадрам: низ меша не под землёй (кроме кувырка и смерти — там допускается касание),
-	голова выше таза в покое и шаге, в конце Death — лёжа (голова ниже 0.6 м)."""
+	голова выше тазобедренных суставов (корней ног) в покое и шаге, в конце Death — лёжа (голова ниже 0.6 м).
+	Корни ног, а не кость таза: у части ригов Meshy ноги висят на кости живота (hero_assassin_f — на 0.14 м выше
+	суставов), и наклон бега сближал бы голову с ней."""
 	ok = True
-	head, hips = roles["head"], roles["hips"]
+	head = roles["head"]
+	thighs = [c[0] for c in roles["legs"].values()]
 	for cl in clips:
 		Gq, Gp = rt.fk(cl["rot"], cl["trans"])
 		Gr = pc.qm_batch(Gq)
@@ -532,7 +543,7 @@ def verify(rt, rig, roles: dict, mesh: dict, clips: list, meta: dict) -> bool:
 		miny = min(float(pc.skin_points(rig, mesh["pos"], mesh["joints"], mesh["weights"], Gr[f], Gp[f])[:, 1].min())
 			for f in range(0, F, step))
 		bad = miny < -0.01
-		if cl["name"] in ("Idle", "Walking", "Running") and not (Gp[:, head, 1] > Gp[:, hips, 1] + 0.3).all():
+		if cl["name"] in ("Idle", "Walking", "Running") and not (Gp[:, head, 1] > Gp[:, thighs, 1].max(1) + 0.3).all():
 			bad = True
 		if cl["name"] == "Death" and Gp[-1, head, 1] > 0.6:
 			bad = True

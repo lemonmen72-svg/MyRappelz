@@ -18,6 +18,11 @@ var _create: Node = null
 const HERO_ROW := ["res://assets/characters/dark_elf_wanderer.glb", "res://assets/characters/hero_assassin_m.glb",
 	"res://assets/characters/hero_swordsman_f.glb", "res://assets/characters/hero_warrior_m.glb",
 	"res://assets/characters/hero_swordsman_m.glb"]
+## Второй ряд (кадр 89): героиня-Наёмник, Воин-женщина и Бродяги всех рас и полов.
+const HERO_ROW2 := ["res://assets/characters/hero_assassin_f.glb", "res://assets/characters/hero_warrior_f.glb",
+	"res://assets/characters/hero_dark_elf_f_starter.glb", "res://assets/characters/hero_dark_elf_m_starter.glb",
+	"res://assets/characters/hero_light_elf_f_starter.glb", "res://assets/characters/hero_light_elf_m_starter.glb",
+	"res://assets/characters/hero_human_f_starter.glb", "res://assets/characters/hero_human_m_starter.glb"]
 var _heroes: Node3D = null
 var _top: Camera3D = null
 var _row: Node3D = null
@@ -756,11 +761,19 @@ func run_step() -> void:
 			main.pets.recall()
 			_top.queue_free()
 			# Герои из Meshy (tools/prepare_hero.py) и прежняя героиня в ряд, стойка покоя — кадр 86
-			_heroes_row()
+			_heroes_row(HERO_ROW, 1.25, 4.6)
 			wait = 60
 			step = 807
 		807:
 			shot("86_heroes_row")
+			_heroes.queue_free()
+			_top.queue_free()
+			# Второй ряд: героиня-Наёмник, Воин-женщина, Бродяги — кадр 89
+			_heroes_row(HERO_ROW2, 1.0, 5.6)
+			wait = 60
+			step = 820
+		820:
+			shot("89_heroes_row2")
 			_heroes.queue_free()
 			_top.queue_free()
 			main.cam.current = true
@@ -1012,8 +1025,8 @@ func _anathema_row() -> void:
 
 
 ## Героиня (скелет Mixamo) и герои из Meshy с родным скелетом в ряд на площади города перед камерой (Idle, парные
-## мечи; у последнего — арбалет), игрок скрыт, HUD скрыт.
-func _heroes_row() -> void:
+## мечи; у последнего — арбалет), игрок скрыт, HUD скрыт. gap — шаг ряда, м; dist — камера от ряда, м.
+func _heroes_row(paths: Array, gap: float, dist: float) -> void:
 	var player: Player = main.player
 	player.visible = false
 	# Площадь города (ровно, без воды); игрок скрыт там же
@@ -1024,13 +1037,13 @@ func _heroes_row() -> void:
 	_heroes = Node3D.new()
 	_heroes.name = "HeroRow"
 	main.add_child(_heroes)
-	for i in HERO_ROW.size():
-		var spec := CharacterModel.spec_for("dark_elf", "assassin", "crossbow" if i == HERO_ROW.size() - 1 else "dual_swords")
-		spec["asset"] = String(HERO_ROW[i])
+	for i in paths.size():
+		var spec := CharacterModel.spec_for("dark_elf", "assassin", "crossbow" if i == paths.size() - 1 else "dual_swords")
+		spec["asset"] = String(paths[i])
 		var m := CharacterModel.new()
 		m.setup(spec)
 		_heroes.add_child(m)
-		var gp := base + Vector3((float(i) - 2.0) * 1.25, 0, 0)
+		var gp := base + Vector3((float(i) - float(paths.size() - 1) * 0.5) * gap, 0, 0)
 		if IslandWorld.current != null:
 			gp.y = IslandWorld.current.height_at(gp.x, gp.z)
 		m.global_position = gp
@@ -1038,7 +1051,7 @@ func _heroes_row() -> void:
 		m.rotation.y = PI + 0.25
 	_top = Camera3D.new()
 	main.add_child(_top)
-	_top.global_position = base + Vector3(0, 1.2, 4.6)
+	_top.global_position = base + Vector3(0, 1.2, dist)
 	_top.look_at(base + Vector3(0, 0.95, 0))
 	_top.current = true
 	main.hud.visible = false
