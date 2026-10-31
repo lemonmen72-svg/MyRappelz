@@ -42,8 +42,9 @@ func _ready() -> void:
 
 	var who := "Аккаунт: %s · персонажей до %d" % [Accounts.current, Accounts.SLOTS]
 	if Accounts.is_admin():
-		who += " · администратор (админ-панель в настройках)"
-	root.add_child(MenuKit.label(who, UiScale.FONT_TEXT, MenuKit.MUTED))
+		who += " · администратор"
+	# С переносом: строка не должна раздвигать экран шире 1280 px на «Крупном»
+	root.add_child(MenuKit.label(who, UiScale.FONT_TEXT, MenuKit.MUTED, true))
 	_info = MenuKit.label(note, UiScale.FONT_TEXT, MenuKit.GOOD, true)
 	root.add_child(_info)
 
@@ -154,7 +155,10 @@ func _card(i: int) -> PanelContainer:
 	var cls := String(s.get("class", ClassData.WANDERER))
 	var col := _card_color(s)
 	var nick := _pass(MenuKit.label(String(s.get("name", "")), UiScale.FONT_NAME + 2, MenuKit.GOLD))
-	nick.clip_text = false
+	# Длинный ник (до 16 букв) не раздвигает карточку: обрезается многоточием, полностью — в подсказке
+	nick.clip_text = true
+	nick.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	nick.tooltip_text = nick.text
 	v.add_child(nick)
 	v.add_child(_pass(MenuKit.label("Уровень %d" % int(s.get("level", 1)), UiScale.FONT_HEAD, Color.WHITE)))
 	v.add_child(_pass(MenuKit.label(ClassData.job_name(cls), UiScale.FONT_HEAD, col)))
