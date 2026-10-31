@@ -1,5 +1,7 @@
 extends Node
-## Основа автотестов (без экрана). Создаёт нового персонажа, запускает main.tscn и каждый кадр
+## Основа автотестов (без экрана). Входит тестовым аккаунтом (test_login(), по умолчанию Dedok_max — с админ-панелью;
+## хранилище аккаунтов тестов — TEST_ACCOUNTS, стирается в начале), создаёт нового персонажа в слоте 1 аккаунта
+## (Game.enter_slot(0): game.save_path — файл слота), запускает main.tscn (герой есть — сразу мир) и каждый кадр
 ## вызывает run_step(), пока не вызван ok_done() или fail(). Пропуск кадров: wait = N.
 ## Наследник: extends "res://tests/test_base.gd", переопределяет run_step() и при нужде
 ## race_class() / hero_level() / before_start(). Герой с профессией в race_class() (например, ["dark_elf", "assassin"])
@@ -9,6 +11,8 @@ extends Node
 ## godot --headless --fixed-fps 60 --path . res://tests/runner.tscn -- res://tests/<файл>.gd
 
 const MAX_FRAMES := 60 * 300
+## Хранилище аккаунтов автотестов (Accounts.use_storage): настоящие аккаунты и user://save.json не трогаются.
+const TEST_ACCOUNTS := "user://test_accounts/"
 
 var main: Node
 var game: Node
@@ -29,6 +33,11 @@ func hero_level() -> int:
 	return 1
 
 
+## Логин тестового аккаунта (создаётся автоматически). Dedok_max — администратор: админ-панель в настройках.
+func test_login() -> String:
+	return "Dedok_max"
+
+
 ## Вызывается после создания персонажа, до запуска мира (можно выдать предметы, питомцев).
 func before_start() -> void:
 	pass
@@ -41,10 +50,14 @@ func run_step() -> void:
 
 func _ready() -> void:
 	game = Game
-	game.save_path = "user://test_save.json"
-	game.delete_save()
+	Accounts.use_storage(TEST_ACCOUNTS, true)
+	var err := Accounts.create(test_login())
+	if err != "":
+		printerr("[FAIL] тестовый аккаунт: " + err)
+	game.slot = -1
 	var rc := race_class()
 	game.new_character("Тест", rc[0], rc[1])
+	game.enter_slot(0)
 	var lvl := hero_level()
 	if lvl > 1:
 		game.level = lvl

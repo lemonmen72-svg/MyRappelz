@@ -14,6 +14,8 @@ const SHOWCASE_SKILLS := [
 ]
 
 var _create: Node = null
+## Экран до мира для кадров 102–109 (вход, выбор, создание персонажа).
+var _menu: CanvasLayer = null
 ## Герои в ряд (кадр 86): прежняя героиня и герои из Meshy (tools/prepare_hero.py).
 const HERO_ROW := ["res://assets/characters/dark_elf_wanderer.glb", "res://assets/characters/hero_assassin_m.glb",
 	"res://assets/characters/hero_swordsman_f.glb", "res://assets/characters/hero_warrior_m.glb",
@@ -983,6 +985,64 @@ func run_step() -> void:
 			step = 834
 		834:
 			shot("97_skills_guard")
+			# Экраны до мира (кадры 102–109): вход, выбор персонажа, шаги создания, настройки со сменой персонажа
+			main.hud.close_window()
+			_menu = LoginScreen.new()
+			get_tree().root.add_child(_menu)
+			wait = 10
+			step = 900
+		900:
+			shot("102_login")
+			_menu.queue_free()
+			# Выбор персонажа: тестовый герой в слоте 1 и ещё два персонажа (только сводка), слот 4 пуст
+			Accounts.save_slot(1, {"name": "Лиара", "race": "light_elf", "class": "wizard", "level": 24, "gender": "f"})
+			Accounts.save_slot(2, {"name": "Гром_топор", "race": "human", "class": "warrior", "level": 31, "gender": "m"})
+			_menu = CharacterSelect.new()
+			get_tree().root.add_child(_menu)
+			(_menu as CharacterSelect).select(1)
+			wait = 10
+			step = 901
+		901:
+			shot("103_char_select")
+			(_menu as CharacterSelect)._on_delete()
+			wait = 6
+			step = 902
+		902:
+			shot("104_char_delete")
+			_menu.queue_free()
+			Accounts.delete_slot(1)
+			Accounts.delete_slot(2)
+			_menu = CharacterCreate.new()
+			get_tree().root.add_child(_menu)
+			(_menu as CharacterCreate)._select_race("light_elf")
+			wait = 10
+			step = 903
+		903:
+			shot("105_create_race")
+			(_menu as CharacterCreate).go_next()
+			wait = 10
+			step = 904
+		904:
+			shot("106_create_jobs")
+			(_menu as CharacterCreate).go_next()
+			wait = 40
+			step = 905
+		905:
+			shot("107_create_gender")
+			(_menu as CharacterCreate).go_next()
+			(_menu as CharacterCreate)._name_edit.text = "Светлана"
+			wait = 40
+			step = 906
+		906:
+			shot("108_create_name")
+			_menu.queue_free()
+			_menu = null
+			SettingsMenu.open(main.hud)
+			wait = 6
+			step = 907
+		907:
+			shot("109_settings_account")
+			main.hud.close_window()
 			ok_done()
 
 

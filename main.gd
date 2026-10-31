@@ -1,5 +1,9 @@
 extends Node3D
-## Главная сцена: создание персонажа (если нет сохранения), затем мир (тренировочный остров
+## Главная сцена. Порядок экранов при запуске: пакет ресурсов (AssetLoader, если нужен) → вход в аккаунт
+## (LoginScreen) → выбор персонажа из 4 слотов аккаунта (CharacterSelect) → создание, если слот пуст
+## (CharacterCreate: раса → профессии расы → пол → ник) → мир. Уже есть герой (Game.has_character — автотесты) —
+## сразу мир. «Сменить персонажа / выйти из аккаунта» в настройках — back_to_menu (сохранение, новая сцена с экраном
+## выбора персонажа). Затем мир (тренировочный остров
 ## из конфига world/training_island.json), игрок в деревне своей расы, звери по зонам,
 ## модули (питомцы, приручение, предметы, окно героя, задания, NPC, выбор профессии) и интерфейс. Кнопки умений
 ## skill1…skill4 показывают умения, назначенные в окне героя (Game.hero.slots); неподходящие оружию — затемнены
@@ -70,6 +74,9 @@ var cam_yaw := 0.0
 var cam_pitch := atan2(9.0, 8.5)
 var cam_dist := CAM_DIST
 
+## Экран до мира (вход, выбор или создание персонажа; null — мир).
+var screen: Node = null
+
 var _slots: Array = []
 var _rng := RandomNumberGenerator.new()
 var _started := false
@@ -94,17 +101,97 @@ func _ready() -> void:
 	_begin()
 
 
-## Создание персонажа или вход в мир (после пакета ресурсов).
+## Вход в аккаунт, выбор или создание персонажа, затем мир (после пакета ресурсов). Герой уже есть — сразу мир.
 func _begin() -> void:
-	if Game.has_character or Game.load_game():
+	if Game.has_character:
 		_start_world()
 		return
+	if Accounts.is_logged_in():
+		show_select()
+	else:
+		show_login()
+
+
+func _set_screen(n: Node) -> void:
+	if screen != null and is_instance_valid(screen):
+		screen.queue_free()
+	screen = n
+	if n != null:
+		add_child(n)
+
+
+## Экран входа: логин (последний подставлен), «Войти» / «Создать аккаунт».
+func show_login() -> void:
+	var ls := LoginScreen.new()
+	_set_screen(ls)
+	ls.logged_in.connect(show_select)
+
+
+## Выбор персонажа (4 слота аккаунта). Сохранение до аккаунтов (user://save.json) у аккаунта без персонажей
+## становится слотом 1 (Accounts.migrate_legacy).
+func show_select() -> void:
+	var moved := Accounts.migrate_legacy()
+	var cs := CharacterSelect.new()
+	if moved >= 0:
+		cs.note = "Прежний герой перенесён в слот %d" % (moved + 1)
+	_set_screen(cs)
+	cs.play.connect(_on_play_slot.bind(cs))
+	cs.create.connect(show_create)
+	cs.switch_account.connect(_on_switch_account)
+
+
+## «Играть»: загрузить героя слота i и войти в мир.
+func _on_play_slot(i: int, cs: CharacterSelect) -> void:
+	if not Game.load_slot(i):
+		cs.show_error("Не удалось загрузить персонажа")
+		return
+	_set_screen(null)
+	_start_world()
+
+
+## «Сменить аккаунт»: выход и экран входа.
+func _on_switch_account() -> void:
+	Accounts.logout()
+	AdminPanel.reset_session()
+	show_login()
+
+
+## Создание персонажа в слоте i: раса → профессии → пол → ник; «Назад» с первого шага — к выбору персонажа.
+func show_create(i: int) -> void:
 	var cc := CharacterCreate.new()
-	add_child(cc)
-	cc.created.connect(func(n: String, r: String, g: String):
-		Game.new_character(n, r, ClassData.WANDERER, g)
-		cc.queue_free()
-		_start_world())
+	_set_screen(cc)
+	cc.cancelled.connect(show_select)
+	cc.created.connect(_on_created.bind(i))
+
+
+## Герой создан (CharacterCreate): новый Бродяга в слоте i, мир.
+func _on_created(n: String, r: String, g: String, i: int) -> void:
+	Game.new_character(n, r, ClassData.WANDERER, g)
+	Game.enter_slot(i)
+	_set_screen(null)
+	_start_world()
+
+
+## «Сменить персонажа / выйти из аккаунта» (настройки): сохранить героя, забыть его и запустить сцену заново —
+## откроется выбор персонажа (аккаунт остаётся). Возвращает новую главную сцену (тесты).
+func back_to_menu() -> Node:
+	Game.leave_slot()
+	AdminPanel.reset_session()
+	JobFxNeophyte.corpses.clear()
+	var fresh: Node = load("res://main.tscn").instantiate()
+	var p := get_parent()
+	var was_current := get_tree().current_scene == self
+	var tree := get_tree()
+	_started = false
+	# До удаления (конец кадра) старая сцена не обновляется: герой уже забыт (Game.leave_slot)
+	process_mode = Node.PROCESS_MODE_DISABLED
+	if hud != null:
+		hud.visible = false
+	queue_free()
+	p.add_child.call_deferred(fresh)
+	if was_current:
+		(func() -> void: tree.current_scene = fresh).call_deferred()
+	return fresh
 
 
 func _start_world() -> void:

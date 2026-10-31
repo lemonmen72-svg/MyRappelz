@@ -26,6 +26,9 @@ extends RefCounted
 ##     ×1/×2/×3 (только на эту игру); перенос в точку — постройки и места острова и зоны зверей из
 ##     world/training_island.json (свободная ровная точка рядом; деревни и город — точки старта рас).
 ## Выключить панель — ADMIN_TOOLS = false (кнопка в «Настройках» пропадёт, множитель опыта из сохранения — ×1).
+## Панель есть только у аккаунта администратора — логин Dedok_max без учёта регистра (Accounts.is_admin, enabled());
+## у других логинов кнопки нет, множитель опыта из сохранения — ×1. Автотесты входят тестовым аккаунтом Dedok_max
+## (tests/test_base.gd, test_login).
 ## Кнопки открытого окна для тестов (buttons): вкладки "tab_<hero|xp|items|pets|world>";
 ##   «Герой»: "race_<id>", "gender_<f|m>", "job_<id>", "lvl_minus10", "lvl_minus", "lvl_plus", "lvl_plus10",
 ##     "lvl_set_<N>", "xp_next", "jp_plus10", "jp_plus100", "jp_zero", "gold_plus100", "gold_plus1000",
@@ -75,7 +78,21 @@ static var _confirm := ""
 static var _scroll: ScrollContainer = null
 
 
+## Доступна ли панель: ADMIN_TOOLS и вошёл администратор (Accounts.is_admin: логин Dedok_max).
+static func enabled() -> bool:
+	return ADMIN_TOOLS and Accounts.is_admin()
+
+
+## Сбросить то, что действует «только на эту игру» (бессмертие, скорость бега), — при смене персонажа или аккаунта.
+static func reset_session() -> void:
+	god = false
+	speed_mult = 1
+	_confirm = ""
+
+
 static func open(main: Node, which: String = "") -> void:
+	if not enabled():
+		return
 	if main == null or not is_instance_valid(main) or main.get("hud") == null or main.get("player") == null:
 		return
 	# Перестройка той же вкладки — прокрутка остаётся на месте

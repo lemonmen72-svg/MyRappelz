@@ -2,8 +2,9 @@ extends "res://tests/test_base.gd"
 ## Масштаб интерфейса (UiScale, «Размер интерфейса» в настройках): при каждом размере — «Мелкий», «Средний»,
 ## «Крупный» — круглые кнопки HUD не перекрываются, помещаются на экран, не мельче 56 px и не на панелях,
 ## меню и панель цели на месте, трекер не на кнопках, касание по кнопке работает; все окна (герой, древо,
-## существо, питомцы, сумка, лавка, журнал, диалог, настройки, выбор профессии, админ-панель) и экран создания
-## персонажа помещаются в экран,
+## существо, питомцы, сумка, лавка, журнал, диалог, настройки, выбор профессии, админ-панель) и экраны до мира
+## (вход в аккаунт, выбор персонажа с 4 занятыми слотами и подтверждением удаления, 4 шага создания персонажа)
+## помещаются в экран,
 ## заголовки и обрезаемые подписи не обрезаны. Кнопки «Размер интерфейса» в настройках применяют размер сразу
 ## и сохраняют его; надписи над головами — компактнее прежних.
 
@@ -17,12 +18,20 @@ const WINDOWS := [
 	["диалог", "_w_dialog"], ["задание в диалоге", "_w_dialog_quest"], ["настройки", "_w_settings"],
 	["выбор профессии", "_w_job"], ["админ-панель", "_w_admin"],
 ]
+## Экраны до мира: [что, ключ] — "login", "select", "create_<шаг 0..3>".
+const SCREENS := [
+	["вход в аккаунт", "login"], ["выбор персонажа", "select"], ["создание: раса", "create_0"],
+	["создание: профессии", "create_1"], ["создание: пол", "create_2"], ["создание: ник", "create_3"],
+]
+## Длинный ник (16 символов) для занятых слотов на экране выбора.
+const LONG_NICK := "Шшшшшшшшшшшшшш_%d"
 ## Наименьший зазор между круглыми кнопками, px.
 const MIN_GAP := 4.0
 
 var _li := 0
 var _wi := 0
-var _create: CharacterCreate = null
+var _screen: CanvasLayer = null
+var _si := 0
 ## Содержимое user://settings.cfg до теста ("" — файла не было).
 var _cfg_backup := ""
 var _had_cfg := false
@@ -82,14 +91,16 @@ func run_step() -> void:
 			if _wi < WINDOWS.size():
 				_open_window()
 				return
-			_create = CharacterCreate.new()
-			get_tree().root.add_child(_create)
-			wait = 4
+			_si = 0
+			_open_screen()
 			step = 4
 		4:
-			_check_create()
-			_create.queue_free()
-			_create = null
+			_check_screen(String(SCREENS[_si][0]))
+			_close_screen()
+			_si += 1
+			if _si < SCREENS.size():
+				_open_screen()
+				return
 			_li += 1
 			step = 1 if _li < LEVELS.size() else 5
 			wait = 2
@@ -293,17 +304,52 @@ func _check_window(what: String) -> void:
 	print("  %s: %s" % [what, r])
 
 
-func _check_create() -> void:
+## Открыть экран до мира SCREENS[_si] поверх игры (выбор персонажа — 4 занятых слота с длинными никами
+## и подтверждение удаления; создание — нужный шаг).
+func _open_screen() -> void:
+	var k := String(SCREENS[_si][1])
+	if k == "login":
+		_screen = LoginScreen.new()
+	elif k == "select":
+		for i in range(1, Accounts.SLOTS):
+			Accounts.save_slot(i, {"name": LONG_NICK % i, "race": "light_elf", "class": "beastmaster", "level": 40,
+				"gender": "m"})
+		_screen = CharacterSelect.new()
+	else:
+		_screen = CharacterCreate.new()
+	get_tree().root.add_child(_screen)
+	if _screen is CharacterSelect:
+		var cs := _screen as CharacterSelect
+		cs.select(0)
+		cs._on_delete()
+	elif _screen is CharacterCreate:
+		var cc := _screen as CharacterCreate
+		cc._select_race("light_elf")
+		cc.set_step(k.substr(7).to_int())
+	wait = 4
+
+
+func _close_screen() -> void:
+	if _screen is CharacterSelect:
+		for i in range(1, Accounts.SLOTS):
+			Accounts.delete_slot(i)
+	_screen.queue_free()
+	_screen = null
+
+
+func _check_screen(what: String) -> void:
 	var view: Vector2 = main.hud._view
-	var margin: MarginContainer = null
-	for c in _create.get_children():
-		if c is MarginContainer:
-			margin = c as MarginContainer
-	check(margin != null, "экран создания персонажа построен")
+	var margin := MenuKit.margin_of(_screen)
+	check(margin != null, "%s: экран построен" % what)
 	if margin == null:
 		return
 	var need := margin.get_combined_minimum_size()
-	check(need.x <= view.x + 0.5 and need.y <= view.y + 0.5, "экран создания помещается в %s: нужно %s" % [view, need])
+	check(need.x <= view.x + 0.5 and need.y <= view.y + 0.5, "%s помещается в %s: нужно %s" % [what, view, need])
+	if _screen is CharacterSelect:
+		var cs := _screen as CharacterSelect
+		check(cs.cards.size() == Accounts.SLOTS and not cs.buttons.has("create_1"), "%s: 4 занятых слота" % what)
+		var last := cs.cards[cs.cards.size() - 1].get_global_rect()
+		check(last.end.x <= view.x + 0.5, "%s: карточки на экране (%s)" % [what, last])
 
 
 # ---------- Настройки ----------

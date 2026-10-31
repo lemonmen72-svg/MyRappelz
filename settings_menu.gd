@@ -7,7 +7,8 @@ extends RefCounted
 ## Тени солнца, постобработка, дальность и контуры растительности применяются сразу
 ## (Quality.apply), густота травы и цветов — при следующем запуске игры.
 ## Открытие: SettingsMenu.open(hud) (действие HUD "settings_window").
-## Кнопки открытого окна для тестов (buttons): "ui_<0..2>", "quality_<0..2>", "fps_<30|45|60>", "admin" (AdminPanel).
+## Кнопки открытого окна для тестов (buttons): "ui_<0..2>", "quality_<0..2>", "fps_<30|45|60>", "admin" (AdminPanel,
+## только у аккаунта Dedok_max), "account" (сменить персонажа / выйти из аккаунта — main.back_to_menu).
 
 ## Размер окна для «Среднего» размера интерфейса (было 680×600).
 const WINDOW_SIZE := Vector2(620, 590)
@@ -58,12 +59,17 @@ static func open(hud: HUD) -> void:
 	body.add_child(_wrap_label("Меньше кадров — телефон меньше греется и дольше держит батарея.", UiScale.FONT_BODY,
 		NOTE_COLOR))
 
-	# Админ-панель для тестирования (AdminPanel.ADMIN_TOOLS = false — убрать)
-	if AdminPanel.ADMIN_TOOLS:
+	# Админ-панель для тестирования — только у аккаунта Dedok_max (AdminPanel.enabled; ADMIN_TOOLS = false — убрать)
+	var main_node := hud.get_parent()
+	if AdminPanel.enabled():
 		var admin_row := _row(body)
-		var main_node := hud.get_parent()
 		_choice(admin_row, "admin", "Админ-панель: герой, опыт, предметы, питомцы, мир", false,
 			func() -> void: AdminPanel.open(main_node))
+	# Сменить персонажа или аккаунт: сохранить и вернуться к экрану выбора персонажа (main.back_to_menu)
+	if main_node != null and main_node.has_method("back_to_menu"):
+		var acc_row := _row(body)
+		_choice(acc_row, "account", "Сменить персонажа / выйти из аккаунта", false,
+			func() -> void: main_node.call("back_to_menu"))
 
 
 static func _row(body: VBoxContainer) -> HBoxContainer:
