@@ -19,6 +19,8 @@ extends RefCounted
 ## Владелец — Player (поля и помощники: _find_target, _engage, _deal, _shoot, heal, add_timed_bonus, add_hot).
 ## Бой — Combat: урон проходит через защиту зверя (Player._deal / _shoot), по зверю выше героя больше чем на 2 ур.
 ## умение может промахнуться (Player.skill_hits) — и урон, и ослабления.
+## Множитель урона умений — skill_factor (бонусы "skill_pct", у огненных умений ещё "fire_pct"), урон последнего эффекта
+## "damage" — last_dealt (MP из урона «Разбитой воли» и т. п.).
 
 ## Анимации героя по полю anim.
 const ANIMS := ["attack", "cast", "bash", "spin", "buff", "dash"]
@@ -26,6 +28,9 @@ const ANIMS := ["attack", "cast", "bash", "spin", "buff", "dash"]
 const JOB_FX_FILES := [
 	"res://job_fx_warrior.gd",
 	"res://job_fx_shaman.gd",
+	"res://job_fx_swordsman.gd",
+	"res://job_fx_wizard.gd",
+	"res://job_fx_neophyte.gd",
 	"res://job_fx_beastmaster.gd",
 	"res://job_fx_adept.gd",
 	"res://job_fx_conjurer.gd",
@@ -34,6 +39,8 @@ const JOB_FX_FILES := [
 var p: Player
 ## Запасы и таймеры механик профессий (искры духа Воина, горение «Неистовства огня» и т. п.).
 var state: Dictionary = {}
+## Урон последнего эффекта "damage" (для особых механик: MP из урона и т. п.).
+var last_dealt := 0
 
 static var _job_fx: Array[Script] = []
 
@@ -74,7 +81,7 @@ func cast(sid: String, n: int, sk: Dictionary) -> bool:
 	var col: Color = sk.get("color", Color.WHITE)
 	if use == "ranged" or (use == "magic" and bool(sk.get("proj", false))):
 		var de := _find(fx, "damage")
-		var dmg := roll(de, n) if not de.is_empty() else 1
+		var dmg := roll(de, n, sid) if not de.is_empty() else 1
 		var cb := func(hit: Mob, dealt: int) -> void:
 			if is_instance_valid(hit):
 				apply(sid, n, hit, fx, dealt)
@@ -113,7 +120,7 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 						if not p.skill_hits(t):
 							p._miss_text(t)
 							continue
-						dealt += p._deal(t, roll(e, n))
+						dealt += p._deal(t, roll(e, n, sid))
 					var dir := t.global_position - p.global_position
 					if String(sk.get("use", "")) == "melee":
 						Vfx.slash_arc(parent, t.aim_point(), dir, col, 1.2)
@@ -124,7 +131,8 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 					Projectile.burst(parent, t.global_position + Vector3(0, 0.6, 0), col, r, 0.4)
 					for m in p._mobs_around(t.global_position, r):
 						if m != t and p.skill_hits(m):
-							p._deal(m, roll(e, n))
+							p._deal(m, roll(e, n, sid))
+				last_dealt = dealt
 				if e.has("leech") and dealt > 0:
 					p.heal(maxi(1, roundi(float(dealt) * HeroSkills.value_at(e["leech"], n))))
 			"heal":
@@ -152,7 +160,7 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 					continue
 				var power := float(p.cur_matk()) if String(e.get("power", "atk")) == "matk" else float(p.cur_atk())
 				var dps := power * HeroSkills.value_at(e.get("mult", 0.0), n) + HeroSkills.value_at(e.get("flat", 0.0), n)
-				dps *= p.damage_factor(t, String(e.get("power", "atk")) == "matk")
+				dps *= p.damage_factor(t, String(e.get("power", "atk")) == "matk") * skill_factor(sid)
 				t.add_dot(sid, dps, HeroSkills.value_at(e.get("time", 10.0), n), p, bool(e.get("no_regen", false)), src)
 			"knock":
 				if t != null and is_instance_valid(t) and not t.is_dead:
@@ -180,11 +188,11 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 
 
 ## «Сырой» урон эффекта e на уровне n (до защиты зверя): доля атаки (power "atk") или маг. атаки ("matk") × mult + flat,
-## разброс, крит.
-func roll(e: Dictionary, n: int) -> int:
+## разброс, крит; sid — умение (множитель skill_factor: «Благословенный клинок», «Огненное сердце»).
+func roll(e: Dictionary, n: int, sid: String = "") -> int:
 	var power := float(p.cur_matk()) if String(e.get("power", "atk")) == "matk" else float(p.cur_atk())
 	var base := power * HeroSkills.value_at(e.get("mult", 1.0), n) + HeroSkills.value_at(e.get("flat", 0.0), n)
-	base += float(randi_range(-2, 3))
+	base = base * skill_factor(sid) + float(randi_range(-2, 3))
 	p._last_crit = bool(e.get("crit", false)) or randf() < p.crit_rate()
 	p._last_magic = String(e.get("power", "atk")) == "matk"
 	if p._last_crit:
@@ -215,6 +223,10 @@ func status(m: Mob, st: String, sec: float, value: float, src: Dictionary) -> vo
 			m.weaken(value, sec, src)
 		"taunt":
 			m.taunt(p, sec, src)
+		_:
+			# Ослабления, меняющие поле зверя на время (защита, маг. защита, скорость атаки, обездвиживание)
+			if JobFxNeophyte.MODS.has(st):
+				JobFxNeophyte.apply_mod(m, st, value, sec, src)
 
 
 func anim(kind: String) -> void:
@@ -328,3 +340,18 @@ func reset() -> void:
 	for scr in job_scripts():
 		scr.call("reset", self)
 	state.clear()
+
+
+## Сумма бонуса key умений героя и усилений на время (Player.skill_bonus).
+func bonus(key: String) -> float:
+	return float(p.skill_bonus.get(key, 0.0))
+
+
+## Множитель урона умения sid: «Благословенный клинок» (skill_pct), «Огненное сердце» (fire_pct — огненные умения).
+func skill_factor(sid: String) -> float:
+	if sid == "":
+		return 1.0
+	var f := 1.0 + bonus("skill_pct")
+	if String(HeroSkills.base_skill(sid).get("c", "")) == "fire":
+		f += bonus("fire_pct")
+	return f
