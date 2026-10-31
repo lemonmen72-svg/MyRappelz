@@ -81,9 +81,9 @@ func _notification(what: int) -> void:
 			save_game()
 
 
-## Опыт до следующего уровня персонажа.
+## Опыт до следующего уровня персонажа (кривая — MobStats.xp_to_next: сколько зверей своего уровня на уровень).
 func xp_to_next(lvl: int) -> int:
-	return int(30.0 * pow(1.5, lvl - 1))
+	return MobStats.xp_to_next(lvl)
 
 
 func reset() -> void:
@@ -358,7 +358,8 @@ func from_dict(d: Dictionary) -> void:
 		job_changed = bool(d.get("job_changed", ClassData.is_job(class_id))) and ClassData.is_job(class_id)
 		job_level_at_change = int(d.get("job_level", 0))
 	level = int(d.get("level", 1))
-	xp = int(d.get("xp", 0))
+	# Кривая опыта менялась: накопленного не больше, чем нужно до следующего уровня
+	xp = clampi(int(d.get("xp", 0)), 0, maxi(0, xp_to_next(level) - 1))
 	gold = int(d.get("gold", 0))
 	xp_mult = clampi(int(d.get("xp_mult", 1)), 1, 50) if AdminPanel.ADMIN_TOOLS else 1
 	# Кристаллы души старых версий заменены зеркальными картами (ItemData.RENAMED), за редкий и древний —

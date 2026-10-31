@@ -8,6 +8,8 @@ extends RefCounted
 ## Особая механика (блок щитом с ответным уроном, призыв, жертва питомцем, слияние и т. п.) — метод
 ## sp_<имя>(sid, n, target, e) -> bool в этом файле и эффект {"do": "special", "handler": "<имя>"} в данных умения.
 ## Владелец — Player (поля и помощники: _find_target, _engage, _deal, _shoot, heal, add_timed_bonus, add_hot).
+## Бой — Combat: урон проходит через защиту зверя (Player._deal / _shoot), по зверю выше героя больше чем на 2 ур.
+## умение может промахнуться (Player.skill_hits) — и урон, и ослабления.
 
 ## Анимации героя по полю anim.
 const ANIMS := ["attack", "cast", "bash", "spin", "buff", "dash"]
@@ -50,7 +52,7 @@ func cast(sid: String, n: int, sk: Dictionary) -> bool:
 		var cb := func(hit: Mob, dealt: int) -> void:
 			if is_instance_valid(hit):
 				apply(sid, n, hit, fx, dealt)
-		p._shoot(t, dmg, 1.4, cb)
+		p._shoot(t, dmg, 1.4, cb, not p.skill_hits(t))
 	else:
 		apply(sid, n, t, fx, -1)
 		if use == "self" or use == "pet":
@@ -82,9 +84,10 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 					for i in hits:
 						if t.is_dead:
 							break
-						var dmg := roll(e, n)
-						p._deal(t, dmg)
-						dealt += dmg
+						if not p.skill_hits(t):
+							p._miss_text(t)
+							continue
+						dealt += p._deal(t, roll(e, n))
 					var dir := t.global_position - p.global_position
 					if String(sk.get("use", "")) == "melee":
 						Vfx.slash_arc(parent, t.aim_point(), dir, col, 1.2)
@@ -94,7 +97,7 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 					var r := HeroSkills.value_at(e["area"], n)
 					Projectile.burst(parent, t.global_position + Vector3(0, 0.6, 0), col, r, 0.4)
 					for m in p._mobs_around(t.global_position, r):
-						if m != t:
+						if m != t and p.skill_hits(m):
 							p._deal(m, roll(e, n))
 				if e.has("leech") and dealt > 0:
 					p.heal(maxi(1, roundi(float(dealt) * HeroSkills.value_at(e["leech"], n))))
@@ -114,7 +117,8 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 						if m != t:
 							targets.append(m)
 				for m in targets:
-					if chance >= 1.0 or randf() < chance:
+					var c := chance * Combat.skill_hit_chance(Game.level, m.level)
+					if c >= 1.0 or randf() < c:
 						status(m, String(e.get("status", "")), HeroSkills.value_at(e.get("time", 0.0), n),
 							HeroSkills.value_at(e.get("value", 0.0), n), src)
 			"dot":
@@ -122,6 +126,7 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 					continue
 				var power := float(p.cur_matk()) if String(e.get("power", "atk")) == "matk" else float(p.cur_atk())
 				var dps := power * HeroSkills.value_at(e.get("mult", 0.0), n) + HeroSkills.value_at(e.get("flat", 0.0), n)
+				dps *= p.damage_factor(t, String(e.get("power", "atk")) == "matk")
 				t.add_dot(sid, dps, HeroSkills.value_at(e.get("time", 10.0), n), p, bool(e.get("no_regen", false)), src)
 			"knock":
 				if t != null and is_instance_valid(t) and not t.is_dead:
@@ -148,12 +153,14 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 					p.message.emit("«%s»: особое действие появится в следующем обновлении" % String(sk.get("name", sid)))
 
 
-## Урон эффекта e на уровне n: доля атаки (power "atk") или маг. атаки ("matk") × mult + flat, разброс, крит.
+## «Сырой» урон эффекта e на уровне n (до защиты зверя): доля атаки (power "atk") или маг. атаки ("matk") × mult + flat,
+## разброс, крит.
 func roll(e: Dictionary, n: int) -> int:
 	var power := float(p.cur_matk()) if String(e.get("power", "atk")) == "matk" else float(p.cur_atk())
 	var base := power * HeroSkills.value_at(e.get("mult", 1.0), n) + HeroSkills.value_at(e.get("flat", 0.0), n)
 	base += float(randi_range(-2, 3))
-	p._last_crit = bool(e.get("crit", false)) or randf() < p.cur_crit()
+	p._last_crit = bool(e.get("crit", false)) or randf() < p.crit_rate()
+	p._last_magic = String(e.get("power", "atk")) == "matk"
 	if p._last_crit:
 		base *= Player.CRIT_MULT
 	return maxi(1, int(base))

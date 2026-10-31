@@ -1,11 +1,12 @@
 class_name MobData
 extends RefCounted
-## Звери мира: характеристики, редкость, приручение (карта существа и её тир), добыча.
+## Звери мира: вид, редкость, приручение (карта существа и её тир), добыча, боссы. Характеристики из 7 статов
+## по уровню — MobStats, модель боя — Combat.
 ## Где и какого уровня они появляются — mob_zones в world/training_island.json.
 ## id зверя совпадает с id вида питомца (PetData; у летающих рыб и анатем вида питомца нет). Пантера, черепаха, фазан,
 ## волк, кентавр, летающие рыбы и анатемы — модели из файлов (CreatureAsset, assets/creatures/), кабан и страж — из примитивов
 ## (CreatureModels) и в мире больше не появляются.
-## defense — защита относительно обычной (по умолчанию 1.0), attack_cd — пауза между ударами (по умолчанию 1.3 с).
+## defense — множитель защиты (по умолчанию 1.0), attack_cd — пауза между ударами (по умолчанию 1.3 с).
 ## flying: true — летающий зверь (парит на уровне головы героя, падает только после смерти).
 
 ## Радиус безопасной зоны города новичков в центре мира (там торговец, звери туда не заходят).
@@ -27,88 +28,96 @@ const RARITY_COLORS := {
 	"common": Color(1, 1, 1), "uncommon": Color(0.6, 0.8, 1.0), "rare": Color(0.82, 0.62, 1.0),
 	"unique": Color(1.0, 0.8, 0.3),
 }
-## Сила по редкости — множитель поверх чисел вида: у зверя мира HP, атака, опыт и золото (Mob, Economy),
+## Сила по редкости — множитель поверх статов вида: у зверя мира HP, атака, опыт и золото (MobStats, Economy),
 ## у питомца HP, атаки, лечение и защиты (PetStats.derived). Поле вида "power" заменяет его (у стража числа
 ## подобраны вручную — power 1.0).
 const RARITY_POWER := {"common": 1.0, "uncommon": 1.15, "rare": 1.3, "unique": 1.5}
 ## Прежние id зверей (и видов питомцев) → новые: старые сохранения переводит Game.from_dict.
 const RENAMED := {"bear": "panther", "sparkbug": "turtle", "fairy": "pheasant"}
 
-## loot: [id предмета, шанс 0..1, мин., макс.]. gold: [мин., макс.].
+## Характеристики (HP, атака, защиты, точность, крит, опыт) — не числами вида, а из 7 статов по уровню (MobStats):
+## level — базовый уровень вида (где он обычно водится; уровень в мире — из зоны острова), speed — скорость бега,
+## scale — размер модели, color — цвет запасной модели. loot: [id предмета, шанс 0..1, мин., макс.].
+## gold: [мин., макс.] на базовом уровне вида (с уровнем растёт — gold_range).
 ## gen — название в родительном падеже («душа пантеры», «выпадает из волка»).
 ## Приручение: tameable (по умолчанию true; false — фиолетовый значок «нельзя приручить» на панели цели,
 ## карт вида нет), card — тир карты существа ("basic" | "rare" | "special" | "unique"; по умолчанию — по редкости).
 ## Пустая карта вида — предмет card_<id>, заполненная — card_<id>_soul (ItemData).
 ## Кабана и каменного стража приручить нельзя (решение Максима); их вид питомца (PetData) остаётся
 ## для уже прирученных в старых версиях.
+## Боссы (boss: true; решение Максима — по одному на каждое существо острова): species — чьи статы и модель,
+## stage — стадия модели (2 — 3-я эволюция «<вид>_3»; у рыб и анатем эволюций нет — модель старшего вида),
+## редкость «Уникальный», статы выше зверя 3-й стадии того же уровня (MobStats.BOSS_*), крупнее, не приручаются,
+## своя добыча (гарантированный редкий трофей, больше золота, шанс карты), долгий респаун respawn (с).
 const TYPES := {
 	"boar": {
-		"name": "Кабан", "gen": "кабана", "level": 1, "hp": 30, "atk": 5, "speed": 3.0, "xp": 12, "gold": [2, 5],
+		"name": "Кабан", "gen": "кабана", "level": 1, "speed": 3.0, "gold": [2, 5],
 		"color": Color(0.55, 0.35, 0.2), "scale": 0.9, "rarity": "common", "tameable": false,
 		"loot": [["boar_tusk", 0.6, 1, 1], ["hp_potion", 0.08, 1, 1]],
 	},
-	# Волк — «Обычный»: числа на уровне базовых, сильнее их делает RARITY_POWER
+	# Волк — «Обычный»: сильнее базовых (RARITY_POWER)
 	"wolf": {
-		"name": "Волк", "gen": "волка", "level": 3, "hp": 48, "atk": 8, "speed": 4.4, "xp": 20, "gold": [4, 8],
+		"name": "Волк", "gen": "волка", "level": 3, "speed": 4.4, "gold": [4, 8],
 		"color": Color(0.5, 0.5, 0.55), "scale": 1.0, "rarity": "uncommon",
 		"loot": [["wolf_pelt", 0.55, 1, 1], ["hp_potion", 0.1, 1, 1], ["card_wolf", 0.04, 1, 1]],
 	},
 	"panther": {
-		"name": "Пантера", "gen": "пантеры", "level": 6, "hp": 120, "atk": 17, "speed": 4.2, "xp": 70, "gold": [10, 20],
+		"name": "Пантера", "gen": "пантеры", "level": 11, "speed": 4.2, "gold": [10, 20],
 		"color": Color(0.24, 0.2, 0.32), "scale": 1.0, "rarity": "common",
 		"loot": [["panther_fang", 0.5, 1, 2], ["hp_potion", 0.15, 1, 1], ["revive_scroll", 0.05, 1, 1],
 			["mirror_card", 0.03, 1, 1]],
 	},
 	"pheasant": {
-		"name": "Фазан", "gen": "фазана", "level": 4, "hp": 45, "atk": 7, "speed": 3.6, "xp": 35, "gold": [6, 12],
+		"name": "Фазан", "gen": "фазана", "level": 2, "speed": 3.6, "gold": [5, 10],
 		"color": Color(0.74, 0.4, 0.2), "scale": 1.0, "rarity": "common",
 		"loot": [["pheasant_feather", 0.6, 1, 2], ["hp_potion", 0.15, 1, 1], ["mirror_card", 0.03, 1, 1]],
 	},
 	"turtle": {
-		"name": "Черепаха", "gen": "черепахи", "level": 7, "hp": 150, "atk": 14, "speed": 1.6, "xp": 80, "gold": [12, 24],
+		"name": "Черепаха", "gen": "черепахи", "level": 5, "speed": 1.6, "gold": [10, 20],
 		"color": Color(0.36, 0.55, 0.32), "scale": 1.0, "rarity": "common",
 		"loot": [["shell_plate", 0.5, 1, 1], ["revive_scroll", 0.08, 1, 1], ["mirror_card", 0.04, 1, 1]],
 	},
 	# Летающие рыбы: парят на уровне головы героя (модель из файла, высота парения — hover в creatures.json),
 	# на землю падают только после смерти. Не приручаются и не бывают питомцами (вида в PetData нет).
 	"flyfish": {
-		"name": "Летучий зубан", "gen": "летучего зубана", "level": 5, "hp": 70, "atk": 12, "speed": 3.8, "xp": 50,
+		"name": "Летучий зубан", "gen": "летучего зубана", "level": 5, "speed": 3.8,
 		"gold": [8, 15], "color": Color(0.25, 0.4, 0.68), "scale": 1.0, "rarity": "common", "tameable": false,
 		"flying": true,
 		"loot": [["flyfish_scale", 0.55, 1, 2], ["hp_potion", 0.15, 1, 1]],
 	},
 	"flyfish_sail": {
-		"name": "Рыба-парусник", "gen": "рыбы-парусника", "level": 7, "hp": 120, "atk": 16, "speed": 4.4, "xp": 85,
+		"name": "Рыба-парусник", "gen": "рыбы-парусника", "level": 9, "speed": 4.4,
 		"gold": [12, 24], "color": Color(0.22, 0.36, 0.62), "scale": 1.0, "rarity": "common", "tameable": false,
 		"flying": true,
 		"loot": [["sail_fin", 0.5, 1, 1], ["hp_potion", 0.18, 1, 1], ["revive_scroll", 0.05, 1, 1]],
 	},
 	"flyfish_drake": {
-		"name": "Змеекрыл", "gen": "змеекрыла", "level": 9, "hp": 230, "atk": 22, "speed": 4.0, "xp": 160,
+		"name": "Змеекрыл", "gen": "змеекрыла", "level": 16, "speed": 4.0,
 		"gold": [30, 60], "color": Color(0.2, 0.32, 0.58), "scale": 1.0, "rarity": "rare", "tameable": false,
 		"flying": true,
 		"loot": [["drake_crest", 0.6, 1, 2], ["hp_potion", 0.25, 1, 2], ["revive_scroll", 0.08, 1, 1],
 			["mirror_card", 0.08, 1, 1]],
 	},
 	# Анатемы — человекоподобные ящеры с костяными клинками на предплечьях (модели Максима из файлов, двуногие,
-	# клипы — Quaternius UAL). Физический ближний бой: высокая атака, частые удары (attack_cd), но низкая защита
-	# (defense < 1: по ним проходит больше урона). Не приручаются и не бывают питомцами (вида в PetData нет).
+	# клипы — Quaternius UAL). Физический ближний бой: статы Сила и Ловкость, частые удары (attack_cd),
+	# низкая Выносливость и защита (defense < 1). Не приручаются и не бывают питомцами (вида в PetData нет).
 	"anathema": {
-		"name": "Анатема", "gen": "анатемы", "level": 6, "hp": 95, "atk": 18, "speed": 4.0, "xp": 75, "gold": [10, 20],
+		"name": "Анатема", "gen": "анатемы", "level": 9, "speed": 4.0, "gold": [10, 20],
 		"color": Color(0.22, 0.32, 0.2), "scale": 1.0, "rarity": "common", "tameable": false,
 		"defense": 0.7, "attack_cd": 1.0,
 		"loot": [["lizard_scale", 0.55, 1, 2], ["hp_potion", 0.15, 1, 1], ["revive_scroll", 0.04, 1, 1]],
 	},
 	"anathema_blade": {
-		"name": "Анатема-рубака", "gen": "анатемы-рубаки", "level": 8, "hp": 140, "atk": 23, "speed": 4.2, "xp": 120,
+		"name": "Анатема-рубака", "gen": "анатемы-рубаки", "level": 18, "speed": 4.2,
 		"gold": [16, 30], "color": Color(0.2, 0.3, 0.18), "scale": 1.0, "rarity": "common", "tameable": false,
 		"defense": 0.7, "attack_cd": 1.0,
 		"loot": [["bone_blade", 0.5, 1, 1], ["lizard_scale", 0.4, 1, 1], ["hp_potion", 0.2, 1, 1],
 			["revive_scroll", 0.06, 1, 1]],
 	},
-	# Вожак анатем — главный враг логова в пещере (вместо каменного стража): крепче остальных
+	# Вожак анатем — страж логова у пещеры (вместо каменного стража): «Редкий», крепче остальных. Не босс:
+	# босс анатем — отдельный «Костяной владыка»
 	"anathema_chief": {
-		"name": "Вожак анатем", "gen": "вожака анатем", "level": 10, "hp": 320, "atk": 24, "speed": 4.0, "xp": 260,
+		"name": "Вожак анатем", "gen": "вожака анатем", "level": 25, "speed": 4.0,
 		"gold": [60, 120], "color": Color(0.24, 0.3, 0.18), "scale": 1.0, "rarity": "rare", "tameable": false,
 		"defense": 0.8, "attack_cd": 1.1,
 		"loot": [["chief_spike", 1.0, 1, 2], ["bone_blade", 0.5, 1, 1], ["hp_potion", 0.4, 1, 2],
@@ -117,19 +126,74 @@ const TYPES := {
 	# Кентавр — «Редкий» копейщик (модели Максима из файлов, 3 стадии): сильнее базовых и «Обычного» волка
 	# (RARITY_POWER 1.3), бьёт реже, но больно. Карта кентавра только выпадает из него (Кирк её не продаёт).
 	"centaur": {
-		"name": "Кентавр", "gen": "кентавра", "level": 9, "hp": 230, "atk": 24, "speed": 4.6, "xp": 170, "gold": [24, 45],
+		"name": "Кентавр", "gen": "кентавра", "level": 14, "speed": 4.6, "gold": [24, 45],
 		"color": Color(0.5, 0.33, 0.2), "scale": 1.0, "rarity": "rare", "attack_cd": 1.4,
 		"loot": [["spear_tip", 0.5, 1, 1], ["horse_hair", 0.4, 1, 2], ["hp_potion", 0.25, 1, 2],
 			["revive_scroll", 0.08, 1, 1], ["card_centaur", 0.03, 1, 1]],
 	},
+	# ---------- Боссы: по одному на существо острова, логова — зоны boss_* острова ----------
+	"boss_pheasant": {
+		"name": "Пламенный Златохвост", "gen": "Пламенного Златохвоста", "level": 15, "speed": 4.0,
+		"gold": [150, 260], "color": Color(0.74, 0.4, 0.2), "scale": 1.0, "rarity": "unique", "tameable": false,
+		"boss": true, "species": "pheasant", "stage": 2, "respawn": 360.0,
+		"loot": [["golden_plume", 1.0, 1, 1], ["pheasant_feather", 1.0, 3, 5], ["hp_potion", 0.8, 2, 4],
+			["revive_scroll", 0.4, 1, 1], ["mirror_card", 0.5, 1, 1]],
+	},
+	"boss_wolf": {
+		"name": "Седой Вожак бури", "gen": "Седого Вожака бури", "level": 18, "speed": 4.8,
+		"gold": [200, 340], "color": Color(0.5, 0.5, 0.55), "scale": 1.0, "rarity": "unique", "tameable": false,
+		"boss": true, "species": "wolf", "stage": 2, "respawn": 360.0,
+		"loot": [["storm_fang", 1.0, 1, 1], ["wolf_pelt", 1.0, 2, 4], ["hp_potion", 0.8, 2, 4],
+			["revive_scroll", 0.4, 1, 1], ["mirror_card", 0.5, 1, 1], ["card_wolf", 0.25, 1, 1]],
+	},
+	"boss_turtle": {
+		"name": "Тысячелетний Бастион", "gen": "Тысячелетнего Бастиона", "level": 21, "speed": 2.0,
+		"gold": [260, 420], "color": Color(0.36, 0.55, 0.32), "scale": 1.0, "rarity": "unique", "tameable": false,
+		"boss": true, "species": "turtle", "stage": 2, "respawn": 420.0,
+		"loot": [["bastion_shard", 1.0, 1, 1], ["shell_plate", 1.0, 2, 4], ["hp_potion", 0.8, 2, 4],
+			["revive_scroll", 0.5, 1, 2], ["mirror_card", 0.5, 1, 1]],
+	},
+	"boss_flyfish": {
+		"name": "Владыка течений", "gen": "Владыки течений", "level": 22, "speed": 4.4,
+		"gold": [280, 450], "color": Color(0.2, 0.32, 0.58), "scale": 1.0, "rarity": "unique", "tameable": false,
+		"flying": true, "boss": true, "species": "flyfish_drake", "stage": 0, "respawn": 420.0,
+		"loot": [["current_pearl", 1.0, 1, 1], ["drake_crest", 1.0, 2, 3], ["hp_potion", 0.8, 2, 4],
+			["revive_scroll", 0.5, 1, 2], ["mirror_card", 0.5, 1, 1]],
+	},
+	"boss_panther": {
+		"name": "Владычица полуночи", "gen": "Владычицы полуночи", "level": 24, "speed": 4.6,
+		"gold": [320, 500], "color": Color(0.24, 0.2, 0.32), "scale": 1.0, "rarity": "unique", "tameable": false,
+		"boss": true, "species": "panther", "stage": 2, "respawn": 480.0,
+		"loot": [["midnight_claw", 1.0, 1, 1], ["panther_fang", 1.0, 2, 4], ["hp_potion", 0.8, 2, 4],
+			["revive_scroll", 0.5, 1, 2], ["mirror_card", 0.5, 1, 1]],
+	},
+	"boss_centaur": {
+		"name": "Громовой хан", "gen": "Громового хана", "level": 27, "speed": 5.0,
+		"gold": [380, 600], "color": Color(0.5, 0.33, 0.2), "scale": 1.0, "rarity": "unique", "tameable": false,
+		"attack_cd": 1.4, "boss": true, "species": "centaur", "stage": 2, "respawn": 540.0,
+		"loot": [["thunder_spear", 1.0, 1, 1], ["spear_tip", 1.0, 1, 2], ["horse_hair", 1.0, 2, 4],
+			["hp_potion", 0.8, 2, 4], ["revive_scroll", 0.5, 1, 2], ["mirror_card", 0.5, 1, 1], ["card_centaur", 0.25, 1, 1]],
+	},
+	# Босс анатем — отдельный от «Вожака анатем» (тот остаётся «Редким» стражем логова у пещеры)
+	"boss_anathema": {
+		"name": "Костяной владыка", "gen": "Костяного владыки", "level": 30, "speed": 4.4,
+		"gold": [450, 700], "color": Color(0.24, 0.3, 0.18), "scale": 1.0, "rarity": "unique", "tameable": false,
+		"defense": 0.8, "attack_cd": 1.1, "boss": true, "species": "anathema_chief", "stage": 0, "respawn": 600.0,
+		"loot": [["bone_crown", 1.0, 1, 1], ["chief_spike", 1.0, 1, 2], ["bone_blade", 1.0, 1, 2], ["hp_potion", 0.8, 2, 4],
+			["revive_scroll", 0.6, 1, 2], ["mirror_card", 0.6, 1, 1]],
+	},
 	# Кабан и каменный страж — модели из примитивов: в мире больше не появляются (на острове только существа
 	# Максима), данные — для совместимости (старые сохранения, тесты)
 	"golem": {
-		"name": "Каменный страж", "gen": "каменного стража", "level": 10, "hp": 400, "atk": 24, "speed": 2.6, "xp": 250, "gold": [60, 120],
+		"name": "Каменный страж", "gen": "каменного стража", "level": 10, "speed": 2.6, "gold": [60, 120],
 		"color": Color(0.5, 0.5, 0.45), "scale": 2.0, "rarity": "unique", "tameable": false, "power": 1.0,
 		"loot": [["golem_shard", 1.0, 1, 3], ["mirror_card", 0.3, 1, 1]],
 	},
 }
+## Подпись босса над головой и на панели цели.
+const BOSS_COLOR := Color(1.0, 0.5, 0.22)
+## Через сколько секунд зверь появляется снова (у боссов — поле respawn).
+const RESPAWN_TIME := 20.0
 
 
 static func get_type(id: String) -> Dictionary:
@@ -155,17 +219,41 @@ static func tameable(id: String) -> bool:
 	return TYPES.has(id) and bool(get_type(id).get("tameable", true))
 
 
-## Защита вида относительно обычной (1.0; поле "defense"): < 1 — по зверю проходит больше урона.
+## Защита вида относительно обычной (1.0; поле "defense", множитель физ. и маг. защиты MobStats): < 1 — по зверю
+## проходит больше урона (анатемы).
 static func defense(id: String) -> float:
 	return clampf(float(get_type(id).get("defense", 1.0)), 0.2, 3.0)
 
 
-## Множитель получаемого зверем урона: 1 / защита (у анатем ≈ 1.4).
-static func damage_taken(id: String) -> float:
-	return 1.0 / defense(id)
+## Босс (по одному на каждое существо острова).
+static func is_boss(id: String) -> bool:
+	return TYPES.has(id) and bool(get_type(id).get("boss", false))
 
 
-## Пауза между ударами зверя, с (поле "attack_cd"; у анатем удары чаще).
+## Вид, чьи статы и модель у зверя: у босса — поле species, у остальных — сам id.
+static func species_of(id: String) -> String:
+	return String(get_type(id).get("species", id if TYPES.has(id) else "boar"))
+
+
+## Через сколько секунд зверь появится снова: боссы — долго (поле respawn), остальные — RESPAWN_TIME.
+static func respawn_time(id: String) -> float:
+	return float(get_type(id).get("respawn", RESPAWN_TIME))
+
+
+## Золото за зверя уровня lvl: [мин., макс.] вида на базовом уровне, с уровнем растёт ((lvl + 4) / (база + 4)).
+static func gold_range(id: String, lvl: int) -> Array:
+	var d := get_type(id)
+	var g: Array = d["gold"]
+	var k := clampf(float(maxi(1, lvl) + 4) / float(int(d["level"]) + 4), 0.5, 6.0)
+	return [maxi(1, roundi(float(g[0]) * k)), maxi(1, roundi(float(g[1]) * k))]
+
+
+## Цвет подписи зверя: у босса — BOSS_COLOR, иначе — цвет редкости.
+static func label_color(id: String) -> Color:
+	return BOSS_COLOR if is_boss(id) else rarity_color(String(get_type(id)["rarity"]))
+
+
+## Пауза между ударами зверя, с (поле "attack_cd"; у анатем удары чаще), до скорости атаки от Ловкости (MobStats).
 static func attack_cd(id: String) -> float:
 	return float(get_type(id).get("attack_cd", 1.3))
 

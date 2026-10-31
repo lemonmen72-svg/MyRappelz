@@ -57,8 +57,11 @@ var atk := 6
 var defense := 0
 ## Сила лечения (от Мудрости): прибавка к лечению хозяина.
 var heal_power := 1
-## Точность (шанс попасть — PetStats.hit_chance), уклонение и крит — в процентах.
+## Точность и избегание (Combat.hit_chance: против избегания и точности зверя, с разницей уровней),
+## уклонение и крит — в процентах. Маг. защита — от ударов пантеры и фазана (их атака магическая).
 var accuracy := 10
+var avoid := 10
+var mdef := 0
 var evasion := 0.0
 var crit := 3.0
 ## Восстановление HP (всегда, и в бою) и MP в секунду.
@@ -369,8 +372,8 @@ func _do_attack(t: Mob) -> void:
 		_say_skill(String(sk["name"]))
 		_blast(t.global_position, float(sk["radius"]), maxi(1, roundi(atk * float(sk["power"]))), fx)
 		return
-	# Обычная атака: точность против уровня зверя, крит
-	if randf() > PetStats.hit_chance(accuracy, t.level):
+	# Обычная атака: точность против избегания зверя и разница уровней (Combat), крит
+	if randf() >= Combat.hit_chance(float(accuracy), float(t.avoid), level, t.level):
 		_miss_text(t)
 		_bump()
 		return
@@ -381,13 +384,19 @@ func _do_attack(t: Mob) -> void:
 		"healer":
 			_shoot(t, dmg, PetData.fx_color(species, Color(0.6, 1.0, 0.7)))
 		_:
-			t.take_damage(dmg, self, _last_crit)
+			t.take_damage(_mitigate(t, dmg), self, _last_crit)
 			_threat_hit(t)
 			_slash(t, 0.8)
 			_bump()
 
 
-## Урон от главной атаки × mult с разбросом и критом (результат крита — в _last_crit).
+## Готовый урон по зверю m из «сырого» raw: защита зверя (у мага и лекаря — магическая) и разница уровней (Combat).
+func _mitigate(m: Mob, raw: int) -> int:
+	var mg := PetStats.is_magic(species)
+	return Combat.damage(float(raw), float(atk), float(m.mdef if mg else m.pdef), level, m.level)
+
+
+## «Сырой» урон от главной атаки × mult с разбросом и критом (результат крита — в _last_crit).
 func _roll(mult: float) -> int:
 	var base := float(atk) * mult + float(randi_range(-1, 2))
 	_last_crit = randf() * 100.0 < crit
@@ -423,7 +432,7 @@ func _dash_hit(t: Mob) -> void:
 		_bump()
 		return
 	var sk := PetData.skill(species)
-	t.take_damage(maxi(1, roundi(atk * float(sk["power"]))), self)
+	t.take_damage(_mitigate(t, maxi(1, roundi(atk * float(sk["power"])))), self)
 	CreatureModels.spawn_ring(get_parent(), t.global_position, 1.2, Color(1.0, 0.9, 0.5), 0.3)
 	_slash(t, 1.3)
 	_bump()
@@ -484,7 +493,7 @@ func _shoot(t: Mob, dmg: int, c: Color) -> void:
 	var b := Bolt.new()
 	b.target = t
 	b.source = self
-	b.damage = dmg
+	b.damage = _mitigate(t, dmg)
 	b.crit = _last_crit
 	b.color = c
 	get_parent().add_child(b)
@@ -499,7 +508,7 @@ func _blast(center: Vector3, radius: float, dmg: int, c: Color) -> void:
 	# Тёмная сердцевина вспышки
 	Vfx.magic_burst(get_parent(), center + Vector3(0, 0.3, 0), c.darkened(0.55), radius * 0.55, 0.3)
 	for m in _mobs_near(center, radius):
-		m.take_damage(dmg, self)
+		m.take_damage(_mitigate(m, dmg), self)
 
 
 func _mobs_near(center: Vector3, radius: float) -> Array[Mob]:
@@ -777,9 +786,13 @@ func _apply_skill(id: String, t: Mob) -> void:
 	var hits := int(sk.get("hits", 1))
 	var src := StatusEffects.source_pet_skill(species, id)
 	for m in victims:
+		var sure := Combat.skill_hit_chance(level, m.level)
+		if sure < 1.0 and randf() >= sure:
+			_miss_text(m)
+			continue
 		_skill_fx(m, fx, mult > 1.5)
 		if mult > 0.0:
-			m.take_damage(_roll(mult), self, _last_crit)
+			m.take_damage(_mitigate(m, _roll(mult)), self, _last_crit)
 			for i in range(1, hits):
 				if is_inside_tree():
 					get_tree().create_timer(0.22 * float(i)).timeout.connect(_extra_hit.bind(m, mult, fx))
@@ -819,7 +832,7 @@ func _extra_hit(target_ref: Variant, mult: float, fx: Color) -> void:
 	if m == null or m.is_dead:
 		return
 	_skill_fx(m, fx, false)
-	m.take_damage(_roll(mult), self, _last_crit)
+	m.take_damage(_mitigate(m, _roll(mult)), self, _last_crit)
 
 
 ## Усиление хозяина: атака, защита (меньше урона) или лечение хозяина и питомца.
@@ -893,7 +906,9 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 		if is_inside_tree():
 			Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.5, 0), "Уклон", Color(0.8, 0.95, 1.0))
 		return
-	amount = maxi(1, amount - int(defense * 0.5))
+	# Удар зверя уже прошёл через защиту питомца (Combat.damage у зверя); прочий урон — по-старому
+	if not (attacker is Mob):
+		amount = maxi(1, amount - int(defense * 0.5))
 	hp -= amount
 	_calm = 0.0
 	Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.5, 0), str(amount), Color(1, 0.5, 0.3))
@@ -1009,6 +1024,8 @@ func _apply_stats() -> void:
 	defense = int(s["def"])
 	heal_power = int(s["heal"])
 	accuracy = int(s["acc"])
+	avoid = int(s["avoid"])
+	mdef = int(s["mdef"])
 	evasion = float(s["eva"])
 	crit = float(s["crit"])
 	hp_regen = float(s["hp_regen"])
