@@ -235,7 +235,8 @@ func _hero_start() -> void:
 	for mi in hero.find_children("*", "MeshInstance3D", true, false):
 		var m := (mi as MeshInstance3D).material_override as StandardMaterial3D
 		check(m != null and m.diffuse_mode == BaseMaterial3D.DIFFUSE_TOON, "герой: toon-материал у %s" % mi.name)
-		if m != null and mi.name != "Sword":
+		# Оружие и щит в руках — процедурные меши без текстуры
+		if m != null and not ["Sword", "SwordL", "Axe", "Mace", "Staff", "DaggerR", "DaggerL", "Crossbow", "Shield"].has(String(mi.name)):
 			check(m.albedo_texture != null, "герой: текстура у %s" % mi.name)
 	var a := hero._anim.get_animation(hero._pick(CharacterModel.ASSET_ACTIONS["leap"])[0])
 	var pinned := false
