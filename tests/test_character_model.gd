@@ -154,32 +154,41 @@ func run_step() -> void:
 			wait = 5
 			step = 6
 		6:
-			check(create._preview_model != null and is_instance_valid(create._preview_model),
-				"экран создания: 3D-превью построено")
-			# Все три расы и оба пола доступны, класс не выбирается — все начинают Бродягой
-			check(create._race == "dark_elf" and create._gender == "f", "по умолчанию — тёмная эльфийка")
+			# Шаги создания: раса (по умолчанию тёмные эльфы) → профессии → пол (превью Бродяг обоих полов) → ник
+			check(create.step == 0 and create._race == "dark_elf" and create._gender == "f", "по умолчанию — тёмная эльфийка")
 			for rid in ClassData.RACES:
-				check(not (create._race_btns[rid] as Button).disabled, "раса «%s» доступна" % ClassData.race(rid)["name"])
-			check(create._gender_btns.has("f") and create._gender_btns.has("m"), "выбор пола: женский и мужской")
+				check(create._race_cards.has(rid), "раса «%s» доступна" % ClassData.race(rid)["name"])
 			create._select_race("human")
+			check(create._race == "human", "выбраны люди")
+			create.go_next()
+			check(create.step == 1 and create._job_cards.size() == 3, "три профессии расы (%d)" % create._job_cards.size())
+			create.go_next()
+			check(create.step == 2, "шаг «Пол»")
 			create._select_gender("m")
 			check(create._race == "human" and create._gender == "m", "выбраны люди, мужской")
-			check(create._class_title.text == "Бродяга", "карточка: Бродяга")
-			var jobs := create._jobs_box.get_child_count()
-			check(jobs >= 3, "три профессии расы в карточке (%d)" % jobs)
-			check(create._stats7.text.contains("Ловкость"), "7 статов Бродяги: %s" % create._stats7.text)
-			create._select_race("dark_elf")
-			create._select_gender("f")
 			wait = 5
 			step = 7
 		7:
-			var pm: CharacterModel = create._preview_model
-			check(pm != null and pm._asset != null and pm.has_ears(), "превью: главный герой из файла")
-			check(create._preview_caption.text.contains("Бродяга"), "превью: подпись «%s»" % create._preview_caption.text)
+			for g in ["f", "m"]:
+				var gm := create.preview_model(String(g))
+				check(gm != null and gm._asset != null, "превью пола %s: модель из файла" % g)
+			create.go_back()
+			create.go_back()
+			create._select_race("dark_elf")
+			create.set_step(2)
+			create._select_gender("f")
+			create.go_next()
+			wait = 5
+			step = 8
+		8:
+			var pm := create.preview_model("name")
+			check(pm != null and pm._asset != null and pm.has_ears(), "превью на шаге «Ник»: тёмная эльфийка из файла")
 			var got: Array = []
 			create.created.connect(func(n: String, r: String, g: String): got.append_array([n, r, g]))
-			create._on_start()
-			check(got.size() == 3 and got[1] == "dark_elf" and got[2] == "f", "«Начать игру» — раса и пол: %s" % [got])
+			create._name_edit.text = "Ночная_тень"
+			check(create.go_next(), "«Войти в игру»")
+			check(got.size() == 3 and got[0] == "Ночная_тень" and got[1] == "dark_elf" and got[2] == "f",
+				"ник, раса и пол: %s" % [got])
 			check(CharacterModel.hero_asset("dark_elf", "f", "assassin") == CharacterModel.MAIN_ASSET
 				or ResourceLoader.exists(CharacterModel.HERO_ASSET_DIR + "hero_assassin_f.glb"), "тёмная эльфийка-Наёмник — героиня")
 			for rid in ClassData.RACES:

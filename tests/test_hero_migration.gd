@@ -10,7 +10,8 @@ const OLD_GOLD := 345
 const OLD_XP := 40
 
 
-## Вместо нового персонажа — файл сохранения старой версии; мир загрузит его сам (Game.load_game в main).
+## Вместо нового персонажа — файл сохранения старой версии в слоте тестового аккаунта; загружается, как при выборе
+## персонажа (Game.load_game читает файл слота), затем мир.
 func before_start() -> void:
 	var old := {
 		"version": 1, "name": "Максим", "race": "human", "class": "warrior",
@@ -29,6 +30,7 @@ func before_start() -> void:
 	f.store_string(JSON.stringify(old, "\t"))
 	f.close()
 	game.reset()
+	game.load_game()
 
 
 func run_step() -> void:

@@ -168,7 +168,9 @@ func _pet() -> Pet:
 
 func _check_open() -> void:
 	SettingsMenu.open(main.hud)
+	check(AdminPanel.enabled() and Accounts.is_admin(), "тестовый аккаунт %s — администратор" % Accounts.current)
 	check(SettingsMenu.buttons.has("admin") == AdminPanel.ADMIN_TOOLS, "в настройках — кнопка «Админ-панель»")
+	check(SettingsMenu.buttons.has("account"), "в настройках — «Сменить персонажа / выйти из аккаунта»")
 	SettingsMenu.buttons["admin"].pressed.emit()
 	check(main.hud.is_window_open() and AdminPanel.is_open(main), "админ-панель открыта из настроек")
 	for t in TABS:

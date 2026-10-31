@@ -1,5 +1,6 @@
 extends Node
-## Автозагрузка Game: персонаж, сумка, оружие и умения героя, питомцы, сохранение в user://.
+## Автозагрузка Game: персонаж, сумка, оружие и умения героя, питомцы, сохранение в слот аккаунта (Accounts:
+## enter_slot / load_slot / leave_slot, save_game пишет текущий слот).
 ## Новый герой любой расы и пола — Бродяга (ClassData.WANDERER); с 10 ур. — задание на профессию у мудреца, смена —
 ## change_job (одна из трёх профессий своей расы, сверх-эволюция ClassData.over_jp, стартовое оружие профессии).
 ## Сохранения версии 1 (до профессий): герой-Наёмник остаётся Наёмником (профессия уже получена, без бонуса),
@@ -15,8 +16,11 @@ const MAX_PETS := 6
 ## Виды питомцев, ушедшие с острова (модели из примитивов), → вид, которым становится питомец при загрузке.
 const RETIRED_PETS := {"boar": "wolf", "golem": "turtle"}
 
-## Тесты подменяют путь, чтобы не трогать настоящее сохранение.
-var save_path := "user://save.json"
+## Файл сохранения героя: файл слота аккаунта (Accounts.slot_path, ставит enter_slot / load_slot); "" — героя нет.
+## Без слота (slot −1) save_game / load_game пишут и читают этот путь как есть.
+var save_path := ""
+## Слот аккаунта (Accounts, 0…3), в котором живёт герой; −1 — без слота.
+var slot := -1
 
 var has_character := false
 var char_name := ""
@@ -409,7 +413,8 @@ func from_dict(d: Dictionary) -> void:
 	# Кривая опыта менялась: накопленного не больше, чем нужно до следующего уровня
 	xp = clampi(int(d.get("xp", 0)), 0, maxi(0, xp_to_next(level) - 1))
 	gold = int(d.get("gold", 0))
-	xp_mult = clampi(int(d.get("xp_mult", 1)), 1, 50) if AdminPanel.ADMIN_TOOLS else 1
+	# Множитель опыта — только у администратора (логин Dedok_max, AdminPanel.enabled), у остальных ×1
+	xp_mult = clampi(int(d.get("xp_mult", 1)), 1, 50) if AdminPanel.enabled() else 1
 	# Кристаллы души старых версий заменены зеркальными картами (ItemData.RENAMED), за редкий и древний —
 	# доплата золотом; убранные карты кабана и стража — тоже зеркальные карты
 	var old_inv: Dictionary = d.get("inventory", {})
@@ -592,11 +597,42 @@ static func migrate_items(src: Dictionary) -> Dictionary:
 	return res
 
 
+# ---------- Сохранение: слот аккаунта (Accounts) ----------
+
+## Герой живёт в слоте i вошедшего аккаунта: save_game пишет туда (Accounts.save_slot).
+func enter_slot(i: int) -> void:
+	slot = i
+	save_path = Accounts.slot_path(i)
+
+
+## Загрузить героя из слота i вошедшего аккаунта (экран выбора персонажа). false — слот пуст или испорчен.
+func load_slot(i: int) -> bool:
+	var d := Accounts.load_slot(i)
+	if d.is_empty():
+		return false
+	from_dict(d)
+	enter_slot(i)
+	return true
+
+
+## Выйти из героя (сменить персонажа): сохранить и забыть героя и слот.
+func leave_slot() -> void:
+	if has_character:
+		save_game()
+	reset()
+	slot = -1
+	save_path = ""
+
+
 func has_save() -> bool:
-	return FileAccess.file_exists(save_path)
+	return save_path != "" and FileAccess.file_exists(save_path)
 
 
 func save_game() -> bool:
+	if slot >= 0 and Accounts.is_logged_in():
+		return Accounts.save_slot(slot, to_dict())
+	if save_path == "":
+		return false
 	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f == null:
 		return false
@@ -607,13 +643,10 @@ func save_game() -> bool:
 func load_game() -> bool:
 	if not has_save():
 		return false
-	var f := FileAccess.open(save_path, FileAccess.READ)
-	if f == null:
+	var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(save_path))
+	if not (v is Dictionary):
 		return false
-	var d = JSON.parse_string(f.get_as_text())
-	if not (d is Dictionary):
-		return false
-	from_dict(d)
+	from_dict(v)
 	return true
 
 
