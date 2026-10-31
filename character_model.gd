@@ -117,6 +117,12 @@ const ASSET_WEAPONS := ["sword", "dual_swords", "daggers", "crossbow", "dagger",
 ## Модели героя из файлов: hero_<профессия>_<пол>.glb (пол m / f), у Бродяги — hero_<раса>_<пол>_starter.glb
 ## (раса dark_elf / light_elf / human); откат — hero_asset.
 const HERO_ASSET_DIR := "res://assets/characters/"
+## Запасные модели героя по полу — лежат в APK (не в пакете ресурсов Assets): Бродяги-люди без примет расы.
+## Ими показан любой герой, пока пакет не загружен или игрок выбрал «Играть без загрузки».
+const FALLBACK_HEROES := {
+	"m": "res://assets/characters/hero_human_m_starter.glb",
+	"f": "res://assets/characters/hero_human_f_starter.glb",
+}
 ## Одежда модели из примитивов (запасной вид) по профессии.
 const OUTFITS := {
 	"wanderer": "ranger", "swordsman": "guardian", "wizard": "cleric", "beastmaster": "ranger",
@@ -370,7 +376,9 @@ static var _sword_material: StandardMaterial3D
 # ---------- Параметры внешности ----------
 
 ## Файл модели героя: у каждой профессии своя одежда, лицо расы и пола одно. Порядок: hero_<профессия>_<пол>.glb →
-## hero_<раса>_<пол>_starter.glb (Бродяга) → любая модель профессии той же расы и пола → героиня MAIN_ASSET.
+## hero_<раса>_<пол>_starter.glb (Бродяга) → любая модель профессии той же расы и пола → запасная модель пола
+## FALLBACK_HEROES (Бродяга-человек, лежит в APK) → героиня MAIN_ASSET. Модели героев, кроме запасных, — в пакете
+## ресурсов (Assets): пока он не загружен, их «нет» (Assets.exists).
 static func hero_asset(race_id: String, gender: String, class_id: String = "") -> String:
 	var g := "m" if gender == "m" else "f"
 	var tries: Array = []
@@ -379,8 +387,9 @@ static func hero_asset(race_id: String, gender: String, class_id: String = "") -
 	tries.append(HERO_ASSET_DIR + "hero_%s_%s_starter.glb" % [race_id, g])
 	for j in ClassData.jobs_of(race_id):
 		tries.append(HERO_ASSET_DIR + "hero_%s_%s.glb" % [String(j), g])
+	tries.append(String(FALLBACK_HEROES[g]))
 	for path in tries:
-		if ResourceLoader.exists(String(path)):
+		if Assets.exists(String(path)):
 			return String(path)
 	return MAIN_ASSET
 
@@ -408,7 +417,7 @@ static func spec_for(race_id: String, class_id: String, weapon: String = "", gen
 	var c := ClassData.cls(class_id)
 	var main_c: Color = c.get("color", Color(0.6, 0.3, 0.2))
 	var asset := hero_asset(race_id, gender, class_id)
-	var use_file := use_assets and asset != "" and ResourceLoader.exists(asset)
+	var use_file := use_assets and asset != "" and Assets.exists(asset)
 	var w := weapon if weapon != "" else String(c.get("weapon", "sword"))
 	var s := {
 		"skin": r.get("skin", Color(0.95, 0.8, 0.65)),
@@ -568,7 +577,7 @@ static func npc_spec(npc_id: String) -> Dictionary:
 		_:
 			s = merchant_spec()
 	var asset := npc_asset(npc_id)
-	if use_assets and ResourceLoader.exists(asset):
+	if use_assets and Assets.exists(asset):
 		s["asset"] = asset
 		s["weapon"] = ""
 	return s
@@ -1755,7 +1764,7 @@ func _reset_spin() -> void:
 ## метки Head и Face на костях (по ролям из <модель>.json, иначе по именам Mixamo). false — файла нет,
 ## модель соберётся из примитивов.
 func _setup_asset(path: String) -> bool:
-	if not ResourceLoader.exists(path):
+	if not Assets.exists(path):
 		return false
 	var ps := load(path) as PackedScene
 	if ps == null:
@@ -1775,7 +1784,7 @@ func _setup_asset(path: String) -> bool:
 
 	var tex_path := path.get_basename() + ".png"
 	var tex: Texture2D = null
-	if ResourceLoader.exists(tex_path):
+	if Assets.exists(tex_path):
 		tex = load(tex_path) as Texture2D
 	for n in _asset.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D

@@ -82,6 +82,20 @@ func _ready() -> void:
 	Quality.apply_resolution(get_tree())
 	Quality.apply_fps()
 	get_tree().node_added.connect(_on_node_added)
+	# Пакет ресурсов (модели героев профессий, стадии зверей) — до первого обращения к моделям.
+	# В редакторе и автотестах ресурсы встроены (Assets.available) — экрана нет, всё как раньше.
+	if not Assets.available() and not Assets.skipped:
+		var loader := AssetLoader.new()
+		add_child(loader)
+		loader.finished.connect(func(_with_pack: bool) -> void:
+			loader.queue_free()
+			_begin())
+		return
+	_begin()
+
+
+## Создание персонажа или вход в мир (после пакета ресурсов).
+func _begin() -> void:
 	if Game.has_character or Game.load_game():
 		_start_world()
 		return
