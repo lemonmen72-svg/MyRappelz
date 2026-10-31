@@ -47,7 +47,14 @@ func run_step() -> void:
 			var msg: String = hud._msg_label.text
 			check(msg.contains("Кентавр") and msg.contains("выпадает из кентавра"), "подсказка, где взять карту: " + msg)
 			inv.add("card_centaur", 1)
-			player._set_target(mob)
+			# Значок цели HUD обновляет в своём кадре — проверяем на следующем шаге
+			wait = 2
+			step = 10
+		10:
+			if not mob_ok(mob):
+				fail("кентавр пропал до приручения")
+				return
+			stand_near(mob, 3.0)
 			check(hud.target_tame_state == Taming.BADGE_READY, "значок кентавра зелёный: карта в сумке")
 			tm.cooldown = 0.0
 			main._on_action("tame")
