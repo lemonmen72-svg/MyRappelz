@@ -35,6 +35,8 @@ const JP_PER_LEVEL := 10
 const UPKEEP_PERIOD := 10.0
 ## Сколько кнопок умений в HUD (skill1…skill4).
 const SLOTS := 4
+## Воин: искра духа — за каждые SPARK_HITS попавших обычных атак (JobFxWarrior).
+const SPARK_HITS := 4
 ## Базовый урон умений вики (сотни единиц) → наш масштаб атаки.
 const FLAT_SCALE := 0.06
 const KIND_NAMES := {"active": "активное", "passive": "пассивное", "toggle": "переключаемое"}
@@ -289,6 +291,9 @@ const BONUS_NAMES := {
 	"def_pct": "защита", "matk_pct": "маг. атака", "mdef_flat": "маг. защита", "mp_pct": "макс. MP", "hp_flat": "макс. HP",
 	"regen": "восстановление HP", "guard": "получаемый урон", "block": "шанс блока", "cdr": "перезарядка умений",
 	"cast": "скорость каста",
+	"sparks": "запас искр духа", "edge": "урон стихией к обычным атакам", "edge_stun": "шанс оглушить ударом",
+	"edge_poison": "шанс отравить ударом", "edge_mp": "шанс вернуть MP ударом", "poison": "шанс отравить выстрелом",
+	"thorns": "ответный урон огнём",
 	"str": "Сила", "vit": "Выносливость", "agi": "Ловкость", "int": "Интеллект", "wis": "Мудрость", "dex": "Меткость",
 	"luck": "Удача",
 }
@@ -800,11 +805,20 @@ static func _num(v: float) -> String:
 
 
 static func bonus_text(key: String, v: float) -> String:
+	var sg := "+" if v >= 0.0 else "−"
 	match key:
 		"eva", "crit", "atk_pct", "hp_pct", "speed_pct", "aspd", "basic_pct", "def_pct", "matk_pct", "mp_pct", "block", "cast":
-			return "%s +%s" % [String(BONUS_NAMES[key]), _pct(v)]
+			return "%s %s%s" % [String(BONUS_NAMES[key]), sg, _pct(absf(v))]
 		"atk_flat", "def_flat", "mdef_flat", "hp_flat", "str", "vit", "agi", "int", "wis", "dex", "luck":
-			return "%s +%s" % [String(BONUS_NAMES[key]), _num(v)]
+			return "%s %s%s" % [String(BONUS_NAMES[key]), sg, _num(absf(v))]
+		"sparks":
+			return "можно копить до %s искр духа (искра — за каждые %d попавших обычных атак)" % [_num(v), SPARK_HITS]
+		"edge":
+			return "обычные атаки добавляют урон стихией: %s маг. атаки" % _pct(v)
+		"edge_stun", "edge_poison", "edge_mp", "poison":
+			return "%s %s" % [String(BONUS_NAMES[key]), _pct(v)]
+		"thorns":
+			return "кто бьёт вблизи, получает огнём %s маг. атаки" % _pct(v)
 		"regen":
 			return "восстановление HP +%s/с" % _num(v)
 		"guard":
@@ -895,6 +909,11 @@ static func effect_text(id: String, n: int) -> String:
 static func fx_text(id: String, n: int) -> String:
 	var sk := get_skill(id)
 	var parts: PackedStringArray = []
+	# Воин: искры духа (JobFxWarrior)
+	if sk.has("spark_cost"):
+		parts.append("тратит %s искру духа" % _num(value_at(sk["spark_cost"], n)))
+	if sk.has("spark_spend"):
+		parts.append("тратит до %s искр духа (нужна хотя бы одна)" % _num(value_at(sk["spark_spend"], n)))
 	for e in sk.get("fx", []):
 		var d: Dictionary = e
 		match String(d.get("do", "")):
@@ -932,8 +951,8 @@ static func fx_text(id: String, n: int) -> String:
 					t = "шанс %s: %s" % [_pct(value_at(d["chance"], n)), t]
 				parts.append(t)
 			"dot":
-				parts.append("ещё %s с по %s атаки в секунду" % [_num(value_at(d.get("time", 10.0), n)),
-					_pct(value_at(d.get("mult", 0.0), n))])
+				parts.append("ещё %s с по %s %s в секунду" % [_num(value_at(d.get("time", 10.0), n)),
+					_pct(value_at(d.get("mult", 0.0), n)), "маг. атаки" if String(d.get("power", "atk")) == "matk" else "атаки"])
 			"knock":
 				parts.append("отбрасывает на %s м" % _num(value_at(d.get("dist", 3.0), n)))
 			"buff":

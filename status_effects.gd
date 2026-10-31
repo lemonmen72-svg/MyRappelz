@@ -11,7 +11,8 @@ extends RefCounted
 ## значки меняются: HUD перестраивает значки лишь тогда, а сектор времени обновляет у видимых.
 ##
 ## Запись: {"id", "name" (эффект), "src" (источник: умение, питомец; может быть ""), "icon" (спецификация IconView),
-## "debuff": bool, "toggle": bool, "dur": полная длительность, с (у переключаемых 0), "left": осталось, с}.
+## "debuff": bool, "toggle": bool, "dur": полная длительность, с (у переключаемых 0), "left": осталось, с,
+## "count": число в углу значка (заряды: искры духа Воина; −1 — без числа; задаётся в info)}.
 
 ## Виды эффектов: [название, дебаф, цвет значка без источника].
 const KINDS := {
@@ -188,8 +189,11 @@ static func describe(e: Dictionary) -> String:
 func _set_info(e: Dictionary, info: Dictionary) -> bool:
 	var icon: Dictionary = info.get("icon", {})
 	var old_icon: Dictionary = e.get("icon", {})
+	var cnt := int(info.get("count", -1))
 	var changed := String(e.get("name", "")) != String(info.get("name", "")) \
-		or String(e.get("src", "")) != String(info.get("src", "")) or old_icon.hash() != icon.hash()
+		or String(e.get("src", "")) != String(info.get("src", "")) or old_icon.hash() != icon.hash() \
+		or int(e.get("count", -1)) != cnt
+	e["count"] = cnt
 	e["name"] = String(info.get("name", ""))
 	e["src"] = String(info.get("src", ""))
 	e["icon"] = icon
