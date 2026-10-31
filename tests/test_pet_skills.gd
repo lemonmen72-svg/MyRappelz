@@ -355,14 +355,17 @@ func _stat_sum(id: String, lvl: int) -> int:
 	return t
 
 
-## Питомец своего уровня против зверей мира своего уровня (MobStats; Combat.power_ratio — HP × урон в секунду
-## зверя / то же у питомца, без умений): побеждает, как герой (у героя ≈ 0.8; лекарь — помощник, у него
-## до 1.15), но и после эволюции не многократно сильнее зверей своего уровня.
+## Питомец своего уровня против зверей мира своего уровня (MobStats, HP ×MOB_HP_MULT; Combat.power_ratio — HP × урон
+## в секунду зверя / то же у питомца, без умений): с 5 ур. почти на равных, зверь чуть сильнее (0.85–1.35; герой без
+## умений — ≈ 3, вместе с питомцем побеждают уверенно), и после эволюции питомец не многократно сильнее зверей своего
+## уровня; на 1–4 ур. звери слабее (вход новичка, MobStats.MOB_HP_START) — питомец побеждает.
 func _check_balance() -> void:
 	for sp in TAMEABLE:
 		var id := String(sp)
 		var lo := 99.0
 		var hi := 0.0
+		var lo_new := 99.0
+		var hi_new := 0.0
 		var row := ""
 		for lvl in range(1, 31):
 			var pp := PetStats.combat_profile(id, lvl)
@@ -373,13 +376,18 @@ func _check_balance() -> void:
 				sum += Combat.power_ratio(pp, Combat.profile_of(m))
 				m.free()
 			var r := sum / float(BASIC.size())
-			lo = minf(lo, r)
-			hi = maxf(hi, r)
+			if lvl <= MobStats.MOB_HP_START.size():
+				lo_new = minf(lo_new, r)
+				hi_new = maxf(hi_new, r)
+			else:
+				lo = minf(lo, r)
+				hi = maxf(hi, r)
 			if [1, 5, 10, 14, 15, 20, 29, 30].has(lvl):
 				row += " %d:%.2f" % [lvl, r]
-		var lim := 1.15 if PetData.role(id) == "healer" else 1.0
-		check(hi < lim and lo > 0.4, "%s побеждает зверей своего уровня (1–30): их сила %.2f–%.2f от силы питомца, предел %.2f"
-			% [id, lo, hi, lim])
+		check(lo >= 0.85 and hi <= 1.35, "%s на равных со зверями своего уровня (5–30): их сила %.2f–%.2f от силы питомца"
+			% [id, lo, hi])
+		check(hi_new < 1.2 and lo_new > 0.2, "%s 1–4 ур. побеждает зверей лугов: их сила %.2f–%.2f от силы питомца"
+			% [id, lo_new, hi_new])
 		print("  %s, сила зверя своего уровня:%s" % [id, row])
 		var d10 := PetStats.derived(id, 10)
 		print("  %s ур.10: HP %d, атака %d, защита %d, MP %d" % [id, int(d10["max_hp"]), int(d10["atk"]),

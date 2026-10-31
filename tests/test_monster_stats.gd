@@ -1,10 +1,12 @@
 extends "res://tests/test_base.gd"
 ## Звери мира со статами и единая модель боя (решения Максима): у зверей те же 7 статов (MobStats), зверь равного
-## уровня на ~20 % слабее героя (Combat.power_ratio — «эффективная сила» HP × урон в секунду), столкновение статов
-## (Combat): герой 10 ур. по зверю 30 ур. почти не попадает, а тот убивает героя за пару ударов; при равном уровне
-## попадание ≥ 85 %; опыт по разнице уровней (−6 ур. — 50 %, +6 — +25 %) и множитель Game.xp_mult; кривая опыта;
-## боссы — по одному на существо (модель 3-й эволюции или старшая, статы выше, не приручаются, логово на суше вне
-## безопасных зон); уровни зон острова 1–30; main.spawn_mob.
+## уровня без прибавки HP равен герою (Combat.power_ratio — «эффективная сила» HP × урон в секунду ≈ 1), затем HP
+## зверей ×MobStats.MOB_HP_MULT (3; у зверей 1–4 ур. — меньше, MOB_HP_START): один на один без умений зверь своего
+## уровня ≈ втрое сильнее героя, зверь на 5 ур. ниже — по силам; столкновение статов (Combat): герой 10 ур. по зверю
+## 30 ур. почти не попадает, а тот убивает героя за пару ударов; при равном уровне попадание ≥ 85 %; опыт по разнице
+## уровней (−6 ур. — 50 %, +6 — +25 %) и множитель Game.xp_mult; кривая опыта; боссы — по одному на существо (модель
+## 3-й эволюции или старшая, статы выше, один на один почти непобедимы, не приручаются, логово на суше вне безопасных
+## зон); уровни зон острова 1–30; main.spawn_mob; зверь не лечится в бою, вне боя — лечится.
 
 const COMMON := ["pheasant", "turtle", "panther"]
 const JOBS := ["swordsman", "wizard", "beastmaster", "assassin", "neophyte", "adept", "warrior", "shaman", "conjurer"]
@@ -13,6 +15,10 @@ const FAMILIES := {
 	"panther": "panther", "turtle": "turtle", "pheasant": "pheasant", "wolf": "wolf", "centaur": "centaur",
 	"flyfish_drake": "flyfish", "anathema_chief": "anathema",
 }
+## Зверь для проверки лечения в бою и вне боя.
+var regen_mob: Mob = null
+var regen_hp := 0
+var timer := 0
 
 
 func race_class() -> Array:
@@ -33,6 +39,44 @@ func run_step() -> void:
 		1:
 			_world_xp()
 			_world_bosses()
+			_regen_start()
+			wait = 2
+			step = 2
+		2:
+			# Зверь в бою (цель — герой): HP ×3 не лечатся, пока герой рядом
+			regen_mob.take_damage(regen_mob.max_hp / 2, main.player)
+			regen_hp = regen_mob.hp
+			timer = 0
+			step = 3
+		3:
+			timer += 1
+			stand_near(regen_mob, 1.5)
+			if timer < 90:
+				return
+			check(regen_mob.target == main.player and regen_mob.hp <= regen_hp,
+				"в бою зверь не лечится: %d/%d за 1.5 с" % [regen_mob.hp, regen_mob.max_hp])
+			# Герой ушёл (дальше, чем зверь замечает): зверь лечится — доля HP в секунду, как прежде
+			var p: Player = main.player
+			var far: Vector3 = regen_mob.global_position + Vector3(20.0, 0.0, 0.0)
+			far.y = IslandWorld.current.height_at(far.x, far.z) + 0.1
+			p.global_position = far
+			p.hp = p.max_hp
+			regen_mob.target = null
+			regen_mob.returning = false
+			regen_hp = regen_mob.hp
+			timer = 0
+			step = 4
+		4:
+			timer += 1
+			main.player.hp = main.player.max_hp
+			if timer < 60:
+				return
+			var healed := regen_mob.hp - regen_hp
+			check(regen_mob.target == null and healed >= roundi(float(regen_mob.max_hp) * 0.05),
+				"вне боя зверь лечится: +%d HP за 1 с (из %d)" % [healed, regen_mob.max_hp])
+			regen_mob.consume()
+			game.level = 1
+			main.player.recalc_stats()
 			ok_done()
 
 
@@ -79,17 +123,31 @@ func _unit_stats() -> void:
 		"черепаха 20 ур. сильнее 10-го")
 
 
-## Равный уровень: зверь слабее героя-Бродяги на ~20 % (0.7–0.9).
+## Равный уровень: без прибавки HP зверь равен герою-Бродяге (0.9–1.1), с HP ×MOB_HP_MULT — втрое сильнее;
+## звери 1–4 ур. — вход новичка (MOB_HP_START: зверь 1-го ур. равен Бродяге 1-го).
 func _unit_equal_level() -> void:
+	check(is_equal_approx(MobStats.MOB_HP_MULT, 3.0), "HP зверей ×%.1f" % MobStats.MOB_HP_MULT)
+	check(is_equal_approx(MobStats.hp_mult(1), 1.0) and MobStats.hp_mult(2) < MobStats.hp_mult(4)
+		and MobStats.hp_mult(4) < MobStats.MOB_HP_MULT and is_equal_approx(MobStats.hp_mult(5), MobStats.MOB_HP_MULT)
+		and is_equal_approx(MobStats.hp_mult(30), MobStats.MOB_HP_MULT),
+		"вход новичка: HP зверей 1–5 ур. ×%.1f ×%.1f ×%.1f ×%.1f ×%.1f" % [MobStats.hp_mult(1), MobStats.hp_mult(2),
+		MobStats.hp_mult(3), MobStats.hp_mult(4), MobStats.hp_mult(5)])
+	var d0 := MobStats.derived("turtle", 10)
+	check(int(d0["max_hp"]) > int(MobStats.derived("turtle", 9)["max_hp"]), "HP зверей растёт с уровнем")
 	var rows := ""
 	for lvl in [1, 5, 10, 20, 30]:
 		var r := _ratio(lvl)
-		rows += " %d:%.2f" % [lvl, r]
-		check(r >= 0.7 and r <= 0.9, "Бродяга %d ур.: зверь своего уровня — %.2f силы героя" % [lvl, r])
-	print("  Бродяга, сила зверя своего уровня:" + rows)
+		var pre := r / MobStats.hp_mult(lvl)
+		rows += " %d:%.2f(%.2f)" % [lvl, r, pre]
+		check(pre >= 0.9 and pre <= 1.1, "Бродяга %d ур.: без прибавки HP зверь своего уровня равен герою — %.2f" % [lvl, pre])
+		if lvl >= 5:
+			check(r >= 2.6 and r <= 3.4, "Бродяга %d ур.: зверь своего уровня с HP ×%.0f — %.2f силы героя (один на один без умений — проигрыш)"
+				% [lvl, MobStats.MOB_HP_MULT, r])
+	print("  Бродяга, сила зверя своего уровня (без прибавки HP):" + rows)
 
 
-## Профессии без умений, со стартовым оружием: бой со зверем своего уровня выигрышный.
+## Профессии без умений, со стартовым оружием: без прибавки HP зверь своего уровня примерно равен герою, с HP ×3 —
+## заметно сильнее (без умений, питомца и зелий бой 1×1 проигрышный).
 func _unit_jobs() -> void:
 	for lvl in [10, 20, 30]:
 		var sum := 0.0
@@ -97,12 +155,14 @@ func _unit_jobs() -> void:
 		for j in JOBS:
 			become_job(String(j))
 			var r := _ratio(lvl)
-			sum += r
-			row += " %s %.2f" % [j, r]
-			check(r > 0.35 and r < 1.15, "%s %d ур.: зверь своего уровня — %.2f силы героя" % [j, lvl, r])
+			var pre := r / MobStats.hp_mult(lvl)
+			sum += pre
+			row += " %s %.2f" % [j, pre]
+			check(pre > 0.55 and pre < 1.35 and r > 1.5, "%s %d ур.: зверь своего уровня — %.2f силы героя (без прибавки HP %.2f)"
+				% [j, lvl, r, pre])
 		var avg := sum / float(JOBS.size())
-		print("  ур.%d:%s" % [lvl, row])
-		check(avg >= 0.6 and avg <= 0.95, "профессии %d ур.: в среднем зверь — %.2f силы героя" % [lvl, avg])
+		print("  ур.%d, без прибавки HP:%s" % [lvl, row])
+		check(avg >= 0.8 and avg <= 1.1, "профессии %d ур.: в среднем зверь без прибавки HP — %.2f силы героя" % [lvl, avg])
 	become_job("wanderer")
 
 
@@ -135,12 +195,17 @@ func _unit_level_gap() -> void:
 	check(Combat.level_hit(10) < 0.3, "+10 ур.: %.0f%%" % (Combat.level_hit(10) * 100.0))
 	check(Combat.level_hit(20) < 0.01, "+20 ур.: %.2f%%" % (Combat.level_hit(20) * 100.0))
 	check(Combat.skill_hit_chance(10, 12) == 1.0 and Combat.skill_hit_chance(10, 30) < 0.01, "умения: до +2 ур. без промаха")
-	# Тяжёлый бой: зверь на 3–5 ур. выше сильнее героя
+	# Зверь на 4 ур. выше — намного сильнее зверя своего уровня; на 5 ур. ниже — по силам герою без умений
 	var m5 := Mob.new()
 	m5.setup("turtle", -1, Vector3.ZERO, 14)
 	var r5 := Combat.power_ratio(hp, Combat.profile_of(m5))
-	check(r5 > 1.0, "зверь +4 ур. — тяжёлый бой: %.2f силы героя" % r5)
+	check(r5 > 4.5, "зверь +4 ур. — %.2f силы героя" % r5)
 	m5.free()
+	var lo := Mob.new()
+	lo.setup("turtle", -1, Vector3.ZERO, 5)
+	var rl := Combat.power_ratio(hp, Combat.profile_of(lo))
+	check(rl < 1.0, "зверь −5 ур. по силам герою без умений: %.2f" % rl)
+	lo.free()
 	# Защита снижает урон, но не в ноль; разница уровней усиливает и ослабляет
 	check(Combat.damage(100.0, 50.0, 1000.0, 10, 10) >= 1 and Combat.damage(100.0, 50.0, 50.0, 10, 10) == 50,
 		"пробивание: защита, равная атаке, — половина урона")
@@ -211,6 +276,11 @@ func _unit_bosses() -> void:
 			"%s сильнее %s %d ур.: HP %d/%d, атака %d/%d, опыт %d/%d" % [id, sp, lvl, b.max_hp, n.max_hp, b.atk, n.atk,
 			b.xp_reward, n.xp_reward])
 		check(b.body_scale >= MobStats.body_scale(sp, 30) * 1.3, "%s крупнее зверя 3-й стадии: ×%.2f" % [id, b.body_scale])
+		# Один на один без умений, питомца и зелий босс своего уровня почти непобедим
+		game.level = lvl
+		main.player.recalc_stats()
+		var rb := Combat.power_ratio(Combat.profile_of(main.player), Combat.profile_of(b))
+		check(rb > 8.0, "%s %d ур. против Бродяги своего уровня: %.1f силы героя" % [id, lvl, rb])
 		var rare := false
 		for e in d["loot"]:
 			var it := String((e as Array)[0])
@@ -223,6 +293,8 @@ func _unit_bosses() -> void:
 		check(int(g[0]) > int(ng[1]), "%s: золота больше (%d–%d против %d–%d)" % [id, int(g[0]), int(g[1]), int(ng[0]), int(ng[1])])
 		b.free()
 		n.free()
+	game.level = 1
+	main.player.recalc_stats()
 	for sp in FAMILIES:
 		check(int(per.get(sp, 0)) == 1, "босс %s — ровно один (%d)" % [FAMILIES[sp], int(per.get(sp, 0))])
 	check(not MobData.is_boss("anathema_chief") and MobData.rarity_name("anathema_chief") == "Редкий",
@@ -282,6 +354,24 @@ func _world_xp() -> void:
 	game.level = 1
 	game.xp = 0
 	p.recalc_stats()
+
+
+## Зверь для проверки лечения: черепаха 10 ур. у дома черепахи острова (вне безопасных зон), герой 10 ур.
+func _regen_start() -> void:
+	var p: Player = main.player
+	game.level = 10
+	p.recalc_stats()
+	var t := find_mob("turtle")
+	var w := IslandWorld.current
+	var base: Vector3 = t.home if t != null else p.global_position + Vector3(30.0, 0.0, 0.0)
+	var pos := base
+	for off in [Vector3(3, 0, 0), Vector3(-3, 0, 0), Vector3(0, 0, 3), Vector3(0, 0, -3)]:
+		var c: Vector3 = base + off
+		if w.is_walkable(c.x, c.z) and not w.in_safe_zone(c):
+			pos = c
+			break
+	regen_mob = main.spawn_mob("turtle", 10, w.ground(pos.x, pos.z))
+	check(regen_mob != null and not IslandWorld.current.in_safe_zone(regen_mob.global_position), "черепаха для проверки лечения")
 
 
 ## Боссы в мире: крупные, подпись «Босс», не приручаются.
