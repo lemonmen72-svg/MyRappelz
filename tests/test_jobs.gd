@@ -439,7 +439,7 @@ func _check_admin(player: Player) -> void:
 			"модель сменилась с профессией: %s" % String(player._model.spec["asset"]).get_file())
 	check((game.hero["skills"] as Dictionary).is_empty(), "умения прежней профессии сброшены")
 	var jp0 := int(game.hero["jp"])
-	AdminPanel.buttons["jp100"].pressed.emit()
+	AdminPanel.buttons["jp_plus100"].pressed.emit()
 	check(int(game.hero["jp"]) == jp0 + 100, "+100 JP")
 	var lv0: int = game.level
 	AdminPanel.buttons["lvl_plus10"].pressed.emit()
