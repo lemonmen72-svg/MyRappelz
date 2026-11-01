@@ -40,7 +40,13 @@ extends RefCounted
 ##   PCF 5 / 13 Compatibility);
 ## - цветокоррекция и свечение — тот же PostFx в обоих рендерерах (одна картинка; проверена снимками CI).
 ## Атлас и фильтр теней передаются RenderingServer только при изменении (в Mobile смена фильтра пересобирает
-## специализации шейдеров).
+## специализации шейдеров); атлас один на все уровни (SHADOW_ATLAS) — задаётся один раз и в игре не пересоздаётся.
+##
+## MSAA при уменьшенном 3D-кадре в Compatibility на Android (msaa_scaled_broken): в Godot 4.3
+## RenderSceneBuffersGLES3::_check_render_buffers при MSAA через EXT_multisampled_render_to_texture и внутреннем
+## буфере 3D (scaling_3d_scale < 1) проверяет «уже создано» по msaa3d.color, которого на этом пути нет, — и каждый
+## кадр создаёт новый msaa3d.fbo, не удаляя прежний (утечка ~5 МБ/с, upstream #124258, исправлено в #124643 после
+## 4.4). Такое MSAA заменяется на FXAA своим проходом PostFx (msaa_replaced): на родном разрешении MSAA как было.
 
 const LOW := 0
 const MEDIUM := 1
@@ -134,6 +140,8 @@ const SHADOW_LEVELS := [
 ## Сдвиг тени (против «ряби» — самозатенения карты теней на гранях): по глубине и вдоль нормали.
 ## У Godot по умолчанию 0.1 / 1.0; у построек cull_disabled (двусторонние грани) рябь сильнее — нормаль больше.
 const SHADOW_BIAS := 0.08
+## Атлас карты теней солнца, px — один на все уровни (SHADOW_LEVELS "atlas" — тот же): задаётся один раз.
+const SHADOW_ATLAS := 2048
 const SHADOW_NORMAL_BIAS := 1.5
 ## Дальность прорисовки по уровню, м: трава, кусты/камни/кристаллы, деревья, мелочи у построек (ящики,
 ## бочки, огни), декор полей (колосья); "lod" — порог LOD мешей, пикселей (Viewport.mesh_lod_threshold: больше —
@@ -201,6 +209,13 @@ static var renderer_override := -1
 ## Последние атлас и фильтр теней, переданные RenderingServer (−1 — ещё не передавали).
 static var _last_atlas := -1
 static var _last_filter := -1
+## Тесты: 1 — считать, что MSAA при уменьшенном кадре ломается (Android, Compatibility), 0 — нет, −1 — как есть.
+static var msaa_scaled_override := -1
+## Высота окна, по которой последний раз применено разрешение (apply_resolution; 0 — ещё не применяли).
+static var _screen_h := 0.0
+## Счётчики (тест): вызовы apply и передачи атласа и фильтра теней RenderingServer.
+static var apply_count := 0
+static var shadow_rs_changes := 0
 ## Материалы моделей (персонажи, звери, питомцы): тени на модели по model_shadows — WeakRef.
 static var _model_mats: Array[WeakRef] = []
 ## Материалы с контуром (next_pass по outlines; контур — meta "outline") — WeakRef.
@@ -308,7 +323,10 @@ static func option_label(key: String, v: int = -1) -> String:
 
 
 static func option_hint(key: String) -> String:
-	return String(HINTS.get(key, ""))
+	var h := String(HINTS.get(key, ""))
+	if key == "aa" and msaa_replaced(_screen_h):
+		h += " На этом телефоне MSAA при разрешении 3D ниже родного заменяется на FXAA (иначе сбои картинки)."
+	return h
 
 
 ## Предел кадров пресета l (−1 — текущего; «Свои» — «Среднего»).
@@ -561,9 +579,16 @@ static func mobile_renderer() -> bool:
 	return RendererGuard.is_vulkan()
 
 
-## FXAA своим проходом PostFx — только в Compatibility (в Mobile — встроенный, screen_aa()).
+## FXAA своим проходом PostFx — только в Compatibility (в Mobile — встроенный, screen_aa()); и вместо MSAA, которое
+## при уменьшенном 3D-кадре на Android отключено (msaa_replaced).
 static func postfx_fxaa() -> bool:
-	return fxaa() and not mobile_renderer()
+	return postfx_fxaa_for(_screen_h)
+
+
+static func postfx_fxaa_for(screen_h: float) -> bool:
+	if mobile_renderer():
+		return false
+	return fxaa() or msaa_replaced(screen_h)
 
 
 ## Встроенное экранное сглаживание окна (Viewport.screen_space_aa): FXAA в Mobile, иначе выключено.
@@ -601,21 +626,49 @@ static func render_params(screen_h: float) -> Dictionary:
 		"mobile": mobile_renderer(),
 		"scale": render_scale_for(screen_h),
 		"scaling": scaling_mode_for(screen_h),
-		"msaa": msaa(),
+		"msaa": msaa_for(screen_h),
 		"screen_aa": screen_aa(),
-		"postfx_fxaa": postfx_fxaa(),
+		"postfx_fxaa": postfx_fxaa_for(screen_h),
 		"shadow_filter": shadow_filter(),
 	}
 
 
-## MSAA 3D-кадра (Viewport.MSAA_*).
+## MSAA 3D-кадра (Viewport.MSAA_*) для окна, к которому применено разрешение (apply_resolution).
 static func msaa() -> Viewport.MSAA:
+	return msaa_for(_screen_h)
+
+
+## MSAA 3D-кадра на экране высотой screen_h: выбранное, но без MSAA, если оно заменено на FXAA (msaa_replaced).
+static func msaa_for(screen_h: float) -> Viewport.MSAA:
+	if msaa_replaced(screen_h):
+		return Viewport.MSAA_DISABLED
+	return chosen_msaa()
+
+
+## Выбранное MSAA (с потолком авто-снижения).
+static func chosen_msaa() -> Viewport.MSAA:
 	match effective("aa"):
 		2:
 			return Viewport.MSAA_2X
 		3:
 			return Viewport.MSAA_4X
 	return Viewport.MSAA_DISABLED
+
+
+## MSAA при уменьшенном 3D-кадре ломается: Compatibility на Android и в вебе (Godot 4.3, путь
+## EXT_multisampled_render_to_texture — новый framebuffer каждый кадр, см. шапку). На ПК — путь с renderbuffer, без утечки.
+static func msaa_scaled_broken() -> bool:
+	if mobile_renderer():
+		return false
+	if msaa_scaled_override >= 0:
+		return msaa_scaled_override == 1
+	var os_name := OS.get_name()
+	return os_name == "Android" or os_name == "Web"
+
+
+## Выбрано MSAA, но кадр 3D меньше экрана и MSAA так ломается — вместо него FXAA своим проходом PostFx.
+static func msaa_replaced(screen_h: float) -> bool:
+	return chosen_msaa() != Viewport.MSAA_DISABLED and msaa_scaled_broken() and render_scale_for(screen_h) < 0.9999
 
 
 ## Полные (дорогие) версии шейдеров земли и воды; иначе — облегчённые.
@@ -668,6 +721,7 @@ static func render_scale_for(screen_h: float) -> float:
 static func apply(tree: SceneTree) -> void:
 	if tree == null or tree.root == null:
 		return
+	apply_count += 1
 	apply_lights(tree.root)
 	apply_resolution(tree)
 	apply_fps()
@@ -697,6 +751,7 @@ static func apply_resolution(tree: SceneTree) -> void:
 	var win := tree.root
 	win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 	win.content_scale_size = Vector2i(1280, 720)
+	_screen_h = float(win.size.y)
 	win.msaa_3d = msaa()
 	win.screen_space_aa = screen_aa()
 	win.scaling_3d_mode = scaling_mode_for(float(win.size.y))
@@ -708,9 +763,17 @@ static func apply_resolution(tree: SceneTree) -> void:
 	if not _resize_hooked:
 		_resize_hooked = true
 		var on_resize := func() -> void:
-			if is_instance_valid(win):
-				win.scaling_3d_mode = Quality.scaling_mode_for(float(win.size.y))
-				win.scaling_3d_scale = Quality.render_scale_for(float(win.size.y))
+			if not is_instance_valid(win) or is_equal_approx(float(win.size.y), Quality._screen_h):
+				return
+			Quality._screen_h = float(win.size.y)
+			win.scaling_3d_mode = Quality.scaling_mode_for(Quality._screen_h)
+			win.scaling_3d_scale = Quality.render_scale_for(Quality._screen_h)
+			# MSAA или FXAA вместо него — по новому масштабу (msaa_replaced)
+			win.msaa_3d = Quality.msaa()
+			if win.is_inside_tree():
+				for n in win.get_tree().get_nodes_in_group("postfx"):
+					if n.has_method("apply_quality"):
+						n.call("apply_quality")
 		win.size_changed.connect(on_resize)
 
 
@@ -720,15 +783,17 @@ static func apply_lights(root: Node) -> void:
 		return
 	var sh := _shadow()
 	var on := not sh.is_empty()
+	# Атлас — один раз (у всех уровней один размер): смена размера в GLES3 удаляет текстуру и FBO атласа
+	if _last_atlas != SHADOW_ATLAS:
+		_last_atlas = SHADOW_ATLAS
+		shadow_rs_changes += 1
+		RenderingServer.directional_shadow_atlas_set_size(SHADOW_ATLAS, true)
 	if on:
-		# Только при изменении: в Mobile смена фильтра пересобирает специализации шейдеров сцены
-		var atlas := int(sh["atlas"])
-		if atlas != _last_atlas:
-			_last_atlas = atlas
-			RenderingServer.directional_shadow_atlas_set_size(atlas, true)
+		# Только при изменении: в Mobile смена фильтра пересобирает специализации шейдеров сцены (в GLES3 — поле)
 		var filter := shadow_filter()
 		if filter != _last_filter:
 			_last_filter = filter
+			shadow_rs_changes += 1
 			RenderingServer.directional_soft_shadow_filter_set_quality(filter as RenderingServer.ShadowQuality)
 	for n in root.find_children("*", "DirectionalLight3D", true, false):
 		var sun := n as DirectionalLight3D

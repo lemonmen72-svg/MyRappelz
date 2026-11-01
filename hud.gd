@@ -692,7 +692,10 @@ func window_rect() -> Rect2:
 ## Если содержимое шире или выше, окно растёт и всё равно держится по центру (_keep_window_on_screen).
 ## Пока окно открыто, джойстик и круглые кнопки не работают. Открыто только одно окно.
 func create_window(title: String, sz: Vector2) -> VBoxContainer:
-	close_window()
+	# Прежнее окно — без снятия предела окна (перестройка окна не дёргает предел кадров туда-обратно)
+	if _window != null and is_instance_valid(_window):
+		_window.queue_free()
+	_window = null
 	Quality.set_menu_open(true)
 	var panel := PanelContainer.new()
 	panel.theme = Util.ui_theme()
