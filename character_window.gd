@@ -116,14 +116,17 @@ func _add_tabs(body: VBoxContainer) -> void:
 		root.move_child(bar, 1)
 	else:
 		body.add_child(bar)
-	_tab_button(bar, "hero", "Герой")
+	# Вкладки — значок и подпись (UiIcons: menu_hero — «Герой», tab_skills — древа умений)
+	_tab_button(bar, "hero", "Герой", "menu_hero")
 	for t in _tabs():
-		_tab_button(bar, String(t[0]), String(t[1]))
+		_tab_button(bar, String(t[0]), String(t[1]), "tab_skills")
 
 
-func _tab_button(bar: HBoxContainer, id: String, text: String) -> void:
+func _tab_button(bar: HBoxContainer, id: String, text: String, icon_id: String = "") -> void:
 	var b := Button.new()
 	b.text = text
+	if icon_id != "":
+		UiIcons.add_icon(b, icon_id)
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(UiScale.px(120), UiScale.px(UiScale.TAB_H))
 	b.toggle_mode = true

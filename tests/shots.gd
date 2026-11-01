@@ -1421,6 +1421,85 @@ func run_step() -> void:
 		1065:
 			shot("182_cast_crossbow_aim")
 			main.player.cancel_cast("")
+			# Компактный HUD и значки (кадры 210–217): панели с числами в полосках, значки меню, значки заданий
+			# над жителями («!», «?», «=») и красный значок над зверем — целью задания; вкладки окон значками
+			game.admin_set_look("human", "m")
+			game.level = 12
+			main.player.apply_class()
+			main.player.hp = int(main.player.max_hp * 0.7)
+			main.player.mp = int(main.player.max_mp * 0.45)
+			game.xp = int(game.xp_to_next(game.level) * 0.37)
+			game.quests_active = {}
+			game.quests_done = {}
+			game.quest_tracked = ""
+			main.quests._changed()
+			if main.pets.active_pet == null and game.pets.size() > 0:
+				game.pets[0]["dead"] = false
+				main.pets.summon(0)
+			check(main.quests.accept("elder_hunt"), "кадры 210–213: задание старосты взято")
+			wait = 10
+			step = 1120
+		1120:
+			main.hud.update_player(main.player)
+			_mark_view(4.5)
+			wait = 20
+			step = 1121
+		1121:
+			check(main.hud.player_summary().contains("Ур. 12"), "кадр 210: панель игрока — %s" % main.hud.player_summary())
+			shot("210_hud_panels")
+			_mark_view(2.6)
+			main.cam_dist = 4.5
+			main.cam_pitch = 0.22
+			wait = 10
+			step = 1122
+		1122:
+			var mk := find_mob("pheasant")
+			check(mk != null and mk.quest_mark_visible(), "кадр 211: над фазаном красный значок задания")
+			shot("211_mob_quest_mark")
+			main.player.select_target(null)
+			_talk_view("elder_human")
+			wait = 12
+			step = 1123
+		1123:
+			check(main.npcs.npc("elder_human").mark_text() == "?", "кадр 212: над старостой «?»")
+			shot("212_npc_mark_active")
+			var ph := find_mob("pheasant")
+			if ph != null:
+				for i in 3:
+					main.quests.on_mob_killed(ph)
+			main.npcs.refresh_marks()
+			wait = 6
+			step = 1124
+		1124:
+			check(main.npcs.npc("elder_human").mark_text() == "=", "кадр 213: над старостой «=»")
+			shot("213_npc_mark_complete")
+			_talk_view("kirk")
+			wait = 12
+			step = 1125
+		1125:
+			check(main.npcs.kirk.mark_text() == "!", "кадр 214: над Кирком «!»")
+			shot("214_npc_mark_available")
+			SettingsMenu.open(main.hud, "ui")
+			wait = 6
+			step = 1126
+		1126:
+			shot("215_settings_tabs_icons")
+			main.hud.close_window()
+			main.hero_window.open("hero")
+			wait = 8
+			step = 1127
+		1127:
+			shot("216_hero_tabs_icons")
+			main.hud.close_window()
+			UiScale.set_level(UiScale.LARGE, false)
+			main.hud.apply_ui_scale()
+			_mark_view(4.5)
+			wait = 12
+			step = 1128
+		1128:
+			shot("217_hud_large")
+			UiScale.set_level(UiScale.MEDIUM, false)
+			main.hud.apply_ui_scale()
 			ok_done()
 
 
@@ -1447,6 +1526,21 @@ func _job_showcase(job: String, slots: Array, toggles: Array, dist: float) -> vo
 		stand_near(m, dist)
 		p.select_target(m)
 		main.cam_yaw = atan2(p.global_position.x - m.global_position.x, p.global_position.z - m.global_position.z) + 0.5
+
+
+## Кадры 210–217: игрок в dist м от фазана (цель выделена, над ним красный значок задания), камера за игроком.
+func _mark_view(dist: float) -> void:
+	var p: Player = main.player
+	p.visible = true
+	var m := find_mob("pheasant")
+	if m == null:
+		return
+	stand_near(m, dist)
+	p.select_target(m)
+	main.npcs.refresh_marks()
+	main.cam_yaw = atan2(p.global_position.x - m.global_position.x, p.global_position.z - m.global_position.z) + 0.3
+	main.cam_pitch = 0.3
+	main.cam_dist = 7.0
 
 
 ## Камера _top в 3.4 м перед жителем, чуть сбоку; игрок (скрыт) у камеры — житель повернётся к ней.

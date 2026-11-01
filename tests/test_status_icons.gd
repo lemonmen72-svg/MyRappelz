@@ -189,7 +189,8 @@ func _check_buttons(player: Player, hud: HUD) -> void:
 	check(String(hud.button_icon("attack").spec.get("item", "")) == "crossbow_starter", "значок «Атаки» — арбалет")
 	check(player.equip("weapon_dagger_r1") == "" and player.equip("weapon_dagger_r1", true) == "", "снова два кинжала")
 	var tame := hud.button_icon("tame")
-	check(tame != null and String(tame.spec.get("item", "")).begins_with("card_"), "«Приручить» — карта существа")
+	check(tame != null and (String(tame.spec.get("item", "")).begins_with("card_")
+		or String(tame.spec.get("path", "")) == UiIcons.path("btn_tame")), "«Приручить» — карта существа")
 	var talk := hud.button_icon("talk")
 	check(talk != null and String(talk.spec.get("shape", "")) == "talk" and hud.button_text("talk") == "Говорить",
 		"«Говорить» — рисунок, подпись в button_text")

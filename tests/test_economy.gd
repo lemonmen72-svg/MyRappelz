@@ -149,7 +149,7 @@ func run_step() -> void:
 			check(not hud.is_window_open() and not eco.is_shop_open(), "магазин закрылся, когда игрок отошёл")
 			main._on_action("bag_window")
 			check(hud.is_window_open() and eco.is_bag_open(), "окно сумки открыто")
-			check(_find_text(hud._window, "Закрыть") != null, "в окне есть кнопка «Закрыть»")
+			check(hud._window.find_child("CloseButton", true, false) != null, "в окне есть кнопка «Закрыть» (значок)")
 			# Зелье из сумки
 			check(eco.potion_cooldown_frac() == 0.0, "зелье готово")
 			player.hp = 10
@@ -165,7 +165,7 @@ func run_step() -> void:
 			check(player.hp == 10 and game.inventory.count("hp_potion") == potions - 1, "зелье на перезарядке")
 			check(eco.potion_cooldown_frac() > 0.5, "доля перезарядки %.2f" % eco.potion_cooldown_frac())
 			# Закрытие кнопкой окна
-			var close := _find_text(hud._window, "Закрыть")
+			var close := hud._window.find_child("CloseButton", true, false) as Button
 			if close != null:
 				close.pressed.emit()
 			check(not hud.is_window_open() and not eco.is_bag_open(), "сумка закрыта кнопкой «Закрыть»")

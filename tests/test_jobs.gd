@@ -240,7 +240,7 @@ func _check_quest_gate() -> void:
 	game.changed.emit()
 	check(q.is_ready(QID), "с 10 ур. доклад можно сдать")
 	main.npcs.refresh_marks()
-	check(main.npcs.npc("sage").mark_text() == "?", "над мудрецом «?»: «%s»" % main.npcs.npc("sage").mark_text())
+	check(main.npcs.npc("sage").mark_text() == "=", "над мудрецом «=»: «%s»" % main.npcs.npc("sage").mark_text())
 	check(not bool(NpcData.talk_entry("sage", "profession").get("soon", false)), "пункт «Первая профессия» — рабочий")
 	check(q.abandon(QID) and q.state(QID) == "available", "отказ — доклад снова у охотницы")
 
@@ -263,7 +263,7 @@ func _run_job(race: String, lvl: int, job: String, over: int) -> void:
 	npcs.buttons["accept"].pressed.emit()
 	check(q.is_active(QID) and q.is_ready(QID), "доклад взят, на %d ур. — можно сдавать" % lvl)
 	main.npcs.refresh_marks()
-	check(main.npcs.npc("sage").mark_text() == "?", "над мудрецом «?»")
+	check(main.npcs.npc("sage").mark_text() == "=", "над мудрецом «=» (можно сдать)")
 	# Сдача — окно выбора профессии
 	npcs.open_dialog("sage", "quest", QID)
 	check(npcs.buttons.has("complete"), "кнопка «Сдать задание»")

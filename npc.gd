@@ -2,9 +2,10 @@ class_name Npc
 extends StaticBody3D
 ## Житель-NPC в мире (данные — NpcData по npc_id): аниме-модель CharacterModel.npc_spec(npc_id) — из файла
 ## npc_<id>.glb (пакет ресурсов; предметы в руках — NpcProps) или из примитивов, имя над головой,
-## значок задания над именем («!» — можно взять задание, «?» золотой — задание готово к сдаче, «?» серый — взято,
-## но не выполнено; ставит Npcs по Quests.npc_mark). Поворачивается к игроку и машет рукой, когда тот подходит
-## и когда с ним заговорили (greet).
+## значок задания сразу над именем (ставит Npcs по Quests.npc_mark): «!» золотой — можно взять задание,
+## «?» серый — взято, но не выполнено, «=» зелёный — выполнено, можно сдать. Картинка UiIcons quest_available /
+## quest_active / quest_complete (Sprite3D «QuestMarkIcon»), если файл есть, иначе буква (Label3D «QuestMark»).
+## Поворачивается к игроку и машет рукой, когда тот подходит и когда с ним заговорили (greet).
 ## Группы: "npc", торгующие — ещё "trader" (Economy). Коллизия — цилиндр (слой 1, мир).
 ## Наследники (Merchant) добавляют свои мелочи в _build_extra().
 
@@ -17,10 +18,20 @@ const WAVE_TIME := 2.0
 const LABEL_Y := 2.55
 const MARK_GOLD := Color(1.0, 0.82, 0.18)
 const MARK_GREY := Color(0.72, 0.74, 0.8)
+const MARK_GREEN := Color(0.45, 0.95, 0.45)
+## Значок задания: вид → [буква, цвет, id значка UiIcons].
+const MARKS := {
+	"offer": ["!", MARK_GOLD, "quest_available"],
+	"active": ["?", MARK_GREY, "quest_active"],
+	"ready": ["=", MARK_GREEN, "quest_complete"],
+}
+## Значок задания: высота, м (буква — по шрифту, картинка — по этой высоте), зазор над именем.
+const MARK_H := 0.4
+const MARK_GAP := 0.05
 
 ## id NPC (NpcData.NPCS); задаётся до добавления в дерево.
 var npc_id := ""
-## Значок задания: "" (нет), "offer" («!»), "ready" («?» золотой), "active" («?» серый).
+## Значок задания: "" (нет), "offer" («!»), "active" («?»), "ready" («=»).
 var mark_kind := ""
 ## Куда смотрит модель, пока игрок далеко (поворот вокруг Y; 0 — на север, −Z).
 var face_yaw := 0.0
@@ -28,6 +39,8 @@ var face_yaw := 0.0
 var _model: CharacterModel
 var _label: Label3D
 var _mark: Label3D
+## Картинка значка задания (если в assets/icons/ui есть файл значка).
+var _mark_icon: Sprite3D
 var _near := false
 var _wave_cd := 0.0
 var _t := 0.0
@@ -74,12 +87,18 @@ func _ready() -> void:
 	_mark.name = "QuestMark"
 	_mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_mark.pixel_size = UiScale.world_px(0.008)
-	_mark.font_size = 96
-	_mark.outline_size = 18
-	_mark.outline_modulate = Color(0.25, 0.14, 0.02)
+	_mark.font_size = 76
+	_mark.outline_size = 16
+	_mark.outline_modulate = Color(0.12, 0.08, 0.04)
 	_mark.position.y = mark_height()
 	_mark.visible = false
 	add_child(_mark)
+	_mark_icon = Sprite3D.new()
+	_mark_icon.name = "QuestMarkIcon"
+	_mark_icon.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_mark_icon.position.y = mark_height()
+	_mark_icon.visible = false
+	add_child(_mark_icon)
 	set_mark(mark_kind)
 
 
@@ -96,34 +115,56 @@ func _build_extra() -> void:
 	pass
 
 
-## Высота значка задания над землёй, м.
+## Высота центра значка задания над землёй, м: сразу над именем (имя не перекрывается).
 func mark_height() -> float:
-	return float(NpcData.npc(npc_id).get("mark_y", 3.15))
+	var name_half := 0.5 * float(_label.font_size) * _label.pixel_size if _label != null else 0.1
+	return LABEL_Y + name_half + MARK_GAP + MARK_H * 0.5 * UiScale.k()
 
 
-## Значок задания над головой: "" — нет, "offer" — «!», "ready" — золотой «?», "active" — серый «?».
+## Значок задания над головой: "" — нет, "offer" — «!», "active" — «?», "ready" — «=».
 func set_mark(kind: String) -> void:
-	if _mark != null and kind == mark_kind and _mark.visible == (kind != ""):
+	if not MARKS.has(kind):
+		kind = ""
+	if _mark != null and kind == mark_kind and mark_shown() == (kind != ""):
 		return
 	mark_kind = kind
 	if _mark == null:
 		return
-	_mark.visible = kind != ""
-	_mark.text = "!" if kind == "offer" else "?"
-	_mark.modulate = MARK_GREY if kind == "active" else MARK_GOLD
+	_mark.visible = false
+	_mark_icon.visible = false
+	if kind == "":
+		return
+	var m: Array = MARKS[kind]
+	_mark.text = String(m[0])
+	_mark.modulate = m[1]
+	var icon_id := String(m[2])
+	if UiIcons.has_file(icon_id):
+		var tex := UiIcons.texture(icon_id)
+		_mark_icon.texture = tex
+		_mark_icon.pixel_size = MARK_H * UiScale.k() / maxf(1.0, float(tex.get_height()))
+		_mark_icon.visible = true
+	else:
+		_mark.visible = true
 
 
-## Текст значка над головой ("" — значка нет).
+## Виден ли значок задания (буква или картинка).
+func mark_shown() -> bool:
+	return _mark != null and (_mark.visible or _mark_icon.visible)
+
+
+## Текст значка над головой ("" — значка нет): «!», «?» или «=» (и при картинке).
 func mark_text() -> String:
-	if _mark == null or not _mark.visible:
+	if not mark_shown():
 		return ""
 	return _mark.text
 
 
 func _process(delta: float) -> void:
 	_t += delta
-	if _mark != null and _mark.visible:
-		_mark.position.y = mark_height() + sin(_t * 2.6) * 0.06
+	if mark_shown():
+		var my := mark_height() + sin(_t * 2.6) * 0.04
+		_mark.position.y = my
+		_mark_icon.position.y = my
 	_wave_cd = maxf(0.0, _wave_cd - delta)
 	var p := get_tree().get_first_node_in_group("player") as Node3D
 	if p == null or _model == null:
