@@ -12,3 +12,4 @@ source_file="res://assets/characters/hero_conjurer_f.glb"
 
 gltf/embedded_image_handling=0
 meshes/generate_lods=true
+animation/fps=90
