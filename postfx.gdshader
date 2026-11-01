@@ -3,17 +3,15 @@
 // - USE_FXAA: сглаживание краёв (FXAA по яркости: 5 выборок, на краях ещё 4 вдоль края; на ровных местах —
 //   ранний выход). Для GL Compatibility, где нет встроенного FXAA; MSAA — отдельно (Viewport.msaa_3d);
 // - USE_GRADE: цветокоррекция — насыщенность, лёгкий контраст, тёплые света и прохладные тени, виньетка;
-// - USE_BLOOM: мягкое свечение светлых мест по mip-уровням экранной текстуры (только вместе с USE_GRADE).
+// - USE_BLOOM: мягкое свечение светлых мест — размытие выборками вокруг точки (только вместе с USE_GRADE).
 shader_type canvas_item;
 render_mode unshaded;
 
 // @VARIANT
 
-#ifdef USE_BLOOM
-uniform sampler2D screen_tex : hint_screen_texture, repeat_disable, filter_linear_mipmap;
-#else
+// Без mip-уровней экранной текстуры: в GL Compatibility 4.3 при масштабе 3D-кадра ≠ 1 (900p/720p) их построение
+// писало уменьшенные копии кадра в угол экрана (копии кадра «лесенкой», мерцание краёв — жалоба Максима, 0.24).
 uniform sampler2D screen_tex : hint_screen_texture, repeat_disable, filter_linear;
-#endif
 
 uniform float saturation = 1.0;
 uniform float contrast = 1.04;
@@ -70,13 +68,14 @@ void fragment() {
 #endif
 #ifdef USE_BLOOM
 	if (bloom_strength > 0.0) {
-		vec2 o = SCREEN_PIXEL_SIZE * 10.0;
-		vec3 b = textureLod(screen_tex, uv, 3.0).rgb * 0.3;
-		b += textureLod(screen_tex, uv + vec2(o.x, o.y), 4.0).rgb * 0.15;
-		b += textureLod(screen_tex, uv + vec2(-o.x, o.y), 4.0).rgb * 0.15;
-		b += textureLod(screen_tex, uv + vec2(o.x, -o.y), 4.0).rgb * 0.15;
-		b += textureLod(screen_tex, uv + vec2(-o.x, -o.y), 4.0).rgb * 0.15;
-		b += textureLod(screen_tex, uv, 5.5).rgb * 0.1;
+		// Размытие выборками нулевого уровня: два кольца по 6 точек (7 и 16 px) — без mip-уровней
+		vec3 b = vec3(0.0);
+		for (int i = 0; i < 6; i++) {
+			float a = float(i) * 1.0472 + 0.26;
+			vec2 dir = vec2(cos(a), sin(a)) * SCREEN_PIXEL_SIZE;
+			b += textureLod(screen_tex, uv + dir * 7.0, 0.0).rgb * 0.1;
+			b += textureLod(screen_tex, uv + dir * 16.0, 0.0).rgb * 0.0667;
+		}
 		float bl = max(b.r, max(b.g, b.b));
 		c += b * smoothstep(bloom_threshold, 1.0, bl) * bloom_strength;
 	}
