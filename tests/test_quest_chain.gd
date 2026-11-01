@@ -211,9 +211,9 @@ func _elder_chain(race: String) -> void:
 	_complete_at(elder, "elder_trophies")
 	check(inv.count("wolf_pelt") == pelts - 3, "шкуры отданы старосте (%d → %d)" % [pelts, inv.count("wolf_pelt")])
 	# 3. Зелье: выдаётся при взятии, если нет; при полном здоровье не пьётся
-	inv.remove("hp_potion", inv.count("hp_potion"))
-	check(q.accept("elder_potion") and inv.count("hp_potion") == 1, "зелье выдано при взятии")
-	check(last_hud_text().contains("Получено: Зелье здоровья ×1"), "сообщение: " + last_hud_text())
+	inv.remove("potion_hp_r1", inv.count("potion_hp_r1"))
+	check(q.accept("elder_potion") and inv.count("potion_hp_r1") == 1, "зелье выдано при взятии")
+	check(last_hud_text().contains("Получено: Зелье здоровья I ×1"), "сообщение: " + last_hud_text())
 	player.hp = player.max_hp
 	eco._potion_cd = 0.0
 	check(not eco.use_potion() and q.goal_progress("elder_potion", 0) == 0, "при полном здоровье зелье не выпить")
@@ -291,7 +291,7 @@ func _sage_quests(first: bool) -> void:
 	_stand_near(eco.merchant, 2.0)
 	check(eco.nearest_trader() == "merchant", "рядом — торговец Гордей")
 	game.gold += 100
-	check(eco.buy("hp_potion", 2, "merchant") and q.goal_progress("sage_shop", 0) == 2, "куплено 2 из 3")
+	check(eco.buy("potion_hp_r1", 2, "merchant") and q.goal_progress("sage_shop", 0) == 2, "куплено 2 из 3")
 	check(eco.buy("revive_scroll", 1, "merchant") and q.goal_done("sage_shop", 0), "куплено 3 из 3")
 	inv.add("wolf_pelt", 3)
 	for i in 3:
@@ -567,7 +567,7 @@ func _check_migration() -> void:
 	# Новое сохранение: версия цепочки и склад
 	var d: Dictionary = game.to_dict()
 	check(int(d["quests"]["chain"]) == QuestData.CHAIN_VERSION and d.has("storage"), "в сохранении — версия цепочки и склад")
-	game.storage.add("hp_potion", 3)
+	game.storage.add("potion_hp_r1", 3)
 	game.from_dict({"version": 2, "name": "Без склада", "race": "human", "class": "wanderer", "level": 3})
 	check(game.storage.items.is_empty(), "старое сохранение — склад пуст")
 	game.load_note = ""

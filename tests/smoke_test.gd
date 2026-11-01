@@ -24,17 +24,23 @@ func run_step() -> void:
 		2:
 			if not mob_ok(mob):
 				check(game.xp > 0 or game.level > 1, "игрок получил опыт")
-				check(game.gold > gold_before, "игрок получил золото")
-				step = 3
+				# Золото — в мешочке добычи (всегда): игрок рядом, подбор через LootDrop.PICKUP_DELAY
+				wait = 40
+				step = 30
 				return
 			stand_near(mob)
 			player.try_attack()
+		30:
+			check(game.gold > gold_before, "игрок получил золото (мешочек подобран: %d → %d)" % [gold_before, game.gold])
+			step = 3
 		3:
 			player.hp = 10
-			potions_before = game.inventory.count("hp_potion")
+			var pid: String = Economy.best_potion("hp")
+			check(pid == "potion_hp_r1", "кнопка «Зелье» — зелье здоровья 1-го ранга: %s" % pid)
+			potions_before = game.inventory.count(pid)
 			main._on_action("potion")
 			check(player.hp > 10, "зелье лечит")
-			check(game.inventory.count("hp_potion") == potions_before - 1, "зелье потрачено")
+			check(game.inventory.count(pid) == potions_before - 1, "зелье потрачено")
 			step = 4
 		4:
 			player.take_damage(99999, null)
@@ -45,14 +51,14 @@ func run_step() -> void:
 			check(game.save_game(), "игра сохранена")
 			var lvl: int = game.level
 			var gold: int = game.gold
-			var potions: int = game.inventory.count("hp_potion")
+			var potions: int = game.inventory.count("potion_hp_r1")
 			var scrolls: int = game.inventory.count("revive_scroll")
 			game.level = 99
 			game.gold = 0
 			game.inventory.from_dict({})
 			check(game.load_game(), "игра загружена")
 			check(game.level == lvl and game.gold == gold, "уровень и золото восстановлены")
-			check(potions >= 1 and scrolls >= 1 and game.inventory.count("hp_potion") == potions
+			check(potions >= 1 and scrolls >= 1 and game.inventory.count("potion_hp_r1") == potions
 				and game.inventory.count("revive_scroll") == scrolls, "сумка восстановлена (зелий: %d)" % potions)
 			check(game.char_name == "Тест", "персонаж восстановлен")
 			# Сохранение с профессиями (версия 2): Воин людей (класс автотеста) остаётся Воином, без перевода

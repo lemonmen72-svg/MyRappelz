@@ -87,8 +87,8 @@ func _unit_data() -> void:
 		check(not PetData.SPECIES.has(id), "%s не бывает питомцем" % id)
 		check(MobData.defense(id) < 1.0, "%s: низкая защита (%.2f)" % [id, MobData.defense(id)])
 		check(MobData.attack_cd(id) < 1.3, "%s бьёт чаще обычного зверя: раз в %.1f с" % [id, MobData.attack_cd(id)])
-		for e in d["loot"]:
-			check(not ItemData.get_item(String(e[0])).is_empty(), "добыча %s есть в предметах: %s" % [id, e[0]])
+		for e in MobData.materials(id):
+			check(not ItemData.get_item(String(e)).is_empty(), "добыча %s есть в предметах: %s" % [id, e])
 		check(CreatureAsset.has_asset(id), "модель %s из файла есть" % id)
 		var inf := CreatureAsset.info_for(id)
 		check(float(inf["height"]) > 1.8 and float(inf["height"]) < 2.4 and float(inf["hover"]) == 0.0,
@@ -113,9 +113,10 @@ func _unit_data() -> void:
 	check(int(st["str"]) > int(st["vit"]) and int(st["agi"]) > int(st["vit"]), "анатема: Сила и Ловкость выше Выносливости")
 	check(String(c["rarity"]) == "rare" and MobData.rarity_name("anathema_chief") == "Редкий", "вожак — «Редкий»")
 	var mirror := false
-	for e in c["loot"]:
-		mirror = mirror or String(e[0]) == ItemData.MIRROR_CARD
-	check(mirror, "вожак роняет зеркальную карту")
+	for e in LootTable.pool("card", "anathema_chief", 25):
+		mirror = mirror or String((e as Array)[0]) == ItemData.MIRROR_CARD
+	check(mirror and MobData.is_mini_boss("anathema_chief") and LootTable.item_count("anathema_chief") == 3,
+		"вожак — минибосс (3 предмета), роняет зеркальную карту")
 	check(Taming.where_to_get(ItemData.MIRROR_CARD).contains("продаётся"), "зеркальная карта продаётся у Кирка")
 	for id in ["lizard_scale", "bone_blade", "chief_spike"]:
 		check(ItemData.item_type(id) == "trophy", "трофей %s" % id)

@@ -18,10 +18,15 @@ extends Node
 ## Склад (у Кладовщика Тобина, Economy.open_storage): слева — ячейки склада (Game.storage), в центре — сумка, справа —
 ## карточка: у вещи из сумки «На склад» / «На склад все», у вещи со склада «В сумку» / «В сумку все»; значок можно
 ## перетащить из сумки на склад и обратно. Надетое оружие в ячейках сумки не лежит — на склад его не положить.
+## Золото на складе (Game.storage_gold): под ячейками склада «На складе: N зол.», поле суммы с «Положить» / «Забрать»
+## и быстрые кнопки +100 / +1000 / всё в обе стороны (Economy.deposit_gold / withdraw_gold).
+## Зелья (ItemData.POTION_KINDS): «Использовать» — Economy.drink; в карточке ранг и с какого уровня можно пить.
+## Оружие: в карточке ранг и с какого уровня можно надеть (ниже — «Надеть» выключена).
 ## Кнопки открытого окна для тестов (buttons): "cell_<i>", "store_<i>", "equip_<слот>", "good_<id>", "sort",
 ## "sort_store", "act_equip", "act_use", "act_form", "act_sell", "act_sell_all", "act_move", "act_move_cancel",
 ## "act_drop", "act_drop_yes", "act_drop_no", "act_drop_minus", "act_drop_plus", "act_drop_all", "act_buy", "act_buy5",
-## "act_store", "act_store_all", "act_take", "act_take_all".
+## "act_store", "act_store_all", "act_take", "act_take_all", "gold_put", "gold_take", "gold_put_100",
+## "gold_put_1000", "gold_put_all", "gold_take_100", "gold_take_1000", "gold_take_all"; поле суммы — gold_edit.
 
 ## Размеры — для «Среднего» размера интерфейса (умножаются на UiScale.k(); было окно 1240×680, ячейка 88).
 const WINDOW_SIZE := Vector2(1000, 580)
@@ -82,6 +87,8 @@ var dirty := false
 var seen_gold := 0
 
 var _body: VBoxContainer = null
+## Поле суммы золота в окне склада (null — окно не склада).
+var gold_edit: LineEdit = null
 
 
 func setup(m: Node, eco: Node) -> void:
@@ -160,6 +167,7 @@ func _build() -> void:
 	dirty = false
 	seen_gold = Game.gold
 	buttons.clear()
+	gold_edit = null
 	_validate_selection()
 	var title := "Сумка" if mode == "bag" else NpcData.shop_title(seller)
 	if mode == "storage":
@@ -268,6 +276,39 @@ func _build_storage(parent: VBoxContainer) -> void:
 			sel_kind == "store" and sel_index == i)
 		grid.add_child(b)
 		buttons["store_%d" % i] = b
+	_build_storage_gold(parent)
+
+
+## Золото на складе: сколько лежит, поле суммы с «Положить» / «Забрать», быстрые суммы.
+func _build_storage_gold(parent: VBoxContainer) -> void:
+	var l := _label("На складе: %d зол." % Game.storage_gold, UiScale.FONT_HEAD, GOLD)
+	l.name = "store_gold_label"
+	parent.add_child(l)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", int(UiScale.px(6)))
+	parent.add_child(row)
+	gold_edit = LineEdit.new()
+	gold_edit.name = "gold_edit"
+	gold_edit.placeholder_text = "Сумма"
+	gold_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
+	gold_edit.custom_minimum_size = Vector2(UiScale.px(90), UiScale.button_h())
+	gold_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	gold_edit.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT))
+	row.add_child(gold_edit)
+	row.add_child(_button("Положить", "gold_put", _on_gold_typed.bind(true)))
+	row.add_child(_button("Забрать", "gold_take", _on_gold_typed.bind(false)))
+	for side in [[true, "На склад:", "gold_put_", "+"], [false, "В сумку:", "gold_take_", ""]]:
+		var e: Array = side
+		var put := bool(e[0])
+		var q := HBoxContainer.new()
+		q.add_theme_constant_override("separation", int(UiScale.px(5)))
+		parent.add_child(q)
+		var cap := _label(String(e[1]), UiScale.FONT_BODY, MUTED)
+		cap.custom_minimum_size = Vector2(UiScale.px(80), 0)
+		q.add_child(cap)
+		for n in [100, 1000]:
+			q.add_child(_button("%s%d" % [String(e[3]), int(n)], "%s%d" % [String(e[2]), int(n)], _on_gold.bind(put, int(n))))
+		q.add_child(_button("Всё", String(e[2]) + "all", _on_gold.bind(put, -1)))
 
 
 func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
@@ -445,7 +486,8 @@ func _card_item(card: VBoxContainer) -> void:
 		return
 	var acts: Array = []
 	if ItemData.is_weapon(id):
-		acts.append(["Надеть", "act_equip", _on_equip, not ItemData.weapon_fits(id, Game.class_id)])
+		acts.append(["Надеть", "act_equip", _on_equip, not ItemData.weapon_fits(id, Game.class_id)
+			or ItemData.level_block(id, Game.level) != ""])
 		# Второй такой же клинок или топор — во вторую руку (пара)
 		if not ItemData.is_shield(id) and ItemData.weapon_fits(id, Game.class_id) \
 				and ItemData.offhand_block(id, Game.weapon, Game.class_id) == "":
@@ -547,8 +589,14 @@ func _card_body(card: VBoxContainer, id: String, cmp: String) -> void:
 				card.add_child(_text(String(line), UiScale.FONT_BODY, MUTED))
 		"trophy":
 			card.add_child(_text("Продаётся торговцу в городе.", UiScale.FONT_BODY, MUTED))
-	if id == "hp_potion":
-		card.add_child(_text("Пить можно и кнопкой «Зелье» на экране (Q). После глотка — перезарядка.", UiScale.FONT_BODY, MUTED))
+	if ItemData.is_potion(id) or ItemData.is_equipment(id):
+		var lr := ItemData.rank_level_range(ItemData.rank(id), ItemData.is_potion(id))
+		var need := ItemData.required_level(id)
+		var what := "пить" if ItemData.is_potion(id) else "надеть"
+		card.add_child(_text("Ранг %d (ур. %d–%d) · %s можно с %d уровня" % [ItemData.rank(id), int(lr[0]), int(lr[1]),
+			what, need], UiScale.FONT_BODY, BAD if Game.level < need else MUTED))
+	if ItemData.potion_kind(id) == "hp":
+		card.add_child(_text("Пить можно и кнопкой «Зелье» на экране (Q): берётся старший ранг, который можно по уровню. После глотка — перезарядка.", UiScale.FONT_BODY, MUTED))
 
 
 func _weapon_stats(card: VBoxContainer, id: String, cmp: String) -> void:
@@ -620,7 +668,7 @@ func _action_grid(acts: Array) -> GridContainer:
 
 
 func _usable(id: String) -> bool:
-	return id == "hp_potion" or id == "revive_scroll"
+	return ItemData.is_potion(id) or id == "revive_scroll"
 
 
 func _name_color(id: String) -> Color:
@@ -767,13 +815,30 @@ func _on_equip() -> void:
 
 
 func _on_use() -> void:
-	match sel_id:
-		"hp_potion":
-			economy.use_potion()
-		"revive_scroll":
-			main.pets.revive_any()
-		_:
-			_msg("Этот предмет нельзя использовать")
+	if ItemData.is_potion(sel_id):
+		economy.drink(sel_id)
+	elif sel_id == "revive_scroll":
+		main.pets.revive_any()
+	else:
+		_msg("Этот предмет нельзя использовать")
+	refresh()
+
+
+## «Положить» / «Забрать» сумму из поля (пусто или не число — сообщение).
+func _on_gold_typed(put: bool) -> void:
+	var t := gold_edit.text.strip_edges() if gold_edit != null else ""
+	if not t.is_valid_int() or int(t) <= 0:
+		_msg("Введите сумму золота")
+		return
+	_on_gold(put, int(t))
+
+
+## Быстрые суммы золота склада: put — на склад, n < 0 — всё.
+func _on_gold(put: bool, n: int) -> void:
+	if put:
+		economy.deposit_gold(n)
+	else:
+		economy.withdraw_gold(n)
 	refresh()
 
 

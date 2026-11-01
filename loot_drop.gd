@@ -3,9 +3,11 @@ extends Node3D
 ## Мешочек с добычей на земле: подпрыгивает и вращается, игрок подбирает его, подойдя ближе
 ## PICKUP_RANGE. Через LIFETIME секунд исчезает (последние секунды мигает). В сумку кладётся то, что помещается
 ## (Inventory.try_add); если сумка полна, остаток лежит дальше (bag_full), повторная попытка — через RETRY_TIME.
+## Золото (gold; со зверя — всегда, Economy.on_mob_killed) берётся сразу при подборе, даже в полную сумку.
+## Чем больше предметов, тем крупнее мешочек (босс — 4 предмета).
 
-## Подобрано (может быть и часть содержимого): items = {id предмета: количество}.
-signal picked_up(items: Dictionary)
+## Подобрано (может быть и часть содержимого): items = {id предмета: количество}, gold — золото (0 — без него).
+signal picked_up(items: Dictionary, gold: int)
 ## Сумка полна: left — что осталось лежать в мешочке.
 signal bag_full(left: Dictionary)
 
@@ -19,6 +21,8 @@ const RETRY_TIME := 3.0
 
 ## id предмета -> количество.
 var items: Dictionary = {}
+## Золото в мешочке.
+var gold := 0
 var age := 0.0
 
 var _taken := false
@@ -27,9 +31,11 @@ var _model: Node3D
 var _sparkle: MeshInstance3D
 
 
-## Текст вида «Клык кабана, Зелье здоровья ×2».
-static func describe(list: Dictionary) -> String:
+## Текст вида «12 зол., Клык кабана, Зелье здоровья I ×2».
+static func describe(list: Dictionary, gold_n: int = 0) -> String:
 	var parts := PackedStringArray()
+	if gold_n > 0:
+		parts.append("%d зол." % gold_n)
 	for key in list:
 		var id: String = key
 		var n: int = int(list[key])
@@ -140,10 +146,14 @@ func _ready() -> void:
 	spot.material_override = Vfx.fx_mat(Color(1.0, 0.85, 0.35, 0.45), Vfx.tex("dot"), true)
 	add_child(spot)
 
-	# Появление: мешочек «выпрыгивает»
+	# Появление: мешочек «выпрыгивает»; крупнее, если предметов больше двух (минибосс, босс)
+	var n := 0
+	for k in items:
+		n += int(items[k])
+	var big := 1.0 + 0.12 * float(clampi(n - 2, 0, 4))
 	_model.scale = Vector3.ONE * 0.2
 	var t := create_tween()
-	t.tween_property(_model, "scale", Vector3.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(_model, "scale", Vector3.ONE * big, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	Vfx.pickup(get_parent(), global_position + Vector3(0, 0.4, 0))
 
 
@@ -183,6 +193,10 @@ func pick_up() -> bool:
 		return false
 	var got: Dictionary = {}
 	var left: Dictionary = {}
+	var g := gold
+	if g > 0:
+		Game.gold += g
+		gold = 0
 	for key in items:
 		var id: String = key
 		var n: int = int(items[key])
@@ -191,10 +205,10 @@ func pick_up() -> bool:
 			got[id] = k
 		if n - k > 0:
 			left[id] = n - k
-	if not got.is_empty():
-		Util.float_text(get_parent(), global_position + Vector3(0, 1.6, 0), describe(got), Color(1, 0.9, 0.5))
+	if not got.is_empty() or g > 0:
+		Util.float_text(get_parent(), global_position + Vector3(0, 1.6, 0), describe(got, g), Color(1, 0.9, 0.5))
 		Vfx.pickup(get_parent(), global_position + Vector3(0, 0.5, 0))
-		picked_up.emit(got)
+		picked_up.emit(got, g)
 	if left.is_empty():
 		_taken = true
 		queue_free()
@@ -203,4 +217,4 @@ func pick_up() -> bool:
 	_retry = RETRY_TIME
 	Util.float_text(get_parent(), global_position + Vector3(0, 1.2, 0), "Сумка полна", Color(1, 0.5, 0.4))
 	bag_full.emit(left)
-	return not got.is_empty()
+	return not got.is_empty() or g > 0

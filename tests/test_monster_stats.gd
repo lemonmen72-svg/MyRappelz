@@ -300,12 +300,16 @@ func _unit_bosses() -> void:
 		var rb := Combat.power_ratio(Combat.profile_of(main.player), Combat.profile_of(b))
 		check(rb > 8.0, "%s %d ур. против Бродяги своего уровня: %.1f силы героя" % [id, lvl, rb])
 		var rare := false
-		for e in d["loot"]:
-			var it := String((e as Array)[0])
+		for e in MobData.materials(id) + MobData.special_materials(id):
+			var it := String(e)
 			check(not ItemData.get_item(it).is_empty(), "добыча %s: %s" % [id, it])
-			if float((e as Array)[1]) >= 1.0 and ItemData.rarity(it) != "common" and ItemData.item_type(it) == "trophy":
+		for e in MobData.special_materials(id):
+			var it := String(e)
+			if ItemData.rarity(it) != "common" and ItemData.item_type(it) == "trophy":
 				rare = true
-		check(rare, "%s: гарантированный редкий трофей" % id)
+		check(rare, "%s: особый материал — редкий трофей" % id)
+		check(LootTable.item_count(id) == 4 and LootTable.categories_for(id, lvl).has("special"),
+			"%s: 4 предмета, среди категорий — особый материал" % id)
 		var g: Array = MobData.gold_range(id, lvl)
 		var ng: Array = MobData.gold_range(sp, lvl)
 		check(int(g[0]) > int(ng[1]), "%s: золота больше (%d–%d против %d–%d)" % [id, int(g[0]), int(g[1]), int(ng[0]), int(ng[1])])

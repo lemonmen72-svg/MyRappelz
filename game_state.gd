@@ -81,6 +81,8 @@ var quest_tracked := ""
 ## Склад у Кладовщика Тобина (Economy.deposit / withdraw, окно — InventoryWindow "storage"): те же ячейки и стопки,
 ## что в сумке, Inventory.CAPACITY ячеек. В сохранении — ключ "storage" {"items", "cells"}; у старых сохранений пуст.
 var storage := Inventory.new()
+## Золото на складе (Economy.deposit_gold / withdraw_gold; ключ сохранения "storage_gold", у старых — 0).
+var storage_gold := 0
 ## Множитель опыта за зверей (админ-панель, вкладка «Опыт»: 1, 2, 5, 10, 20, 50): герою и питомцу
 ## (main._on_mob_gone, PetManager.on_mob_killed). Хранится в сохранении; без админ-панели — всегда 1.
 var xp_mult := 1
@@ -123,6 +125,7 @@ func reset() -> void:
 	quests_done = {}
 	quest_tracked = ""
 	storage.from_dict({})
+	storage_gold = 0
 	xp_mult = 1
 
 
@@ -140,7 +143,7 @@ func new_character(n: String, race: String, cls: String = ClassData.WANDERER, se
 	job_changed = ClassData.is_job(class_id)
 	job_level_at_change = 1 if job_changed else 0
 	gold = 50
-	inventory.add("hp_potion", 3)
+	inventory.add(ItemData.potion_id("hp", 1), 3)
 	inventory.add("revive_scroll", 1)
 	hero = HeroSkills.new_record(class_id, 1)
 	_give_starters(class_id)
@@ -241,6 +244,9 @@ func equip_weapon(id: String) -> String:
 		return equip_offhand(id)
 	if not ItemData.weapon_fits(id, class_id):
 		return "Это оружие не для профессии «%s»" % ClassData.job_name(class_id)
+	var lvl_err := ItemData.level_block(id, level)
+	if lvl_err != "":
+		return lvl_err
 	if not inventory.has(id):
 		return "Этого оружия нет в сумке"
 	if id == offhand and not inventory.has(id, 2):
@@ -260,6 +266,9 @@ func equip_offhand(id: String) -> String:
 		return "Это не оружие"
 	if not ItemData.weapon_fits(id, class_id):
 		return "Это оружие не для профессии «%s»" % ClassData.job_name(class_id)
+	var lvl_err := ItemData.level_block(id, level)
+	if lvl_err != "":
+		return lvl_err
 	var err := offhand_block(id)
 	if err != "":
 		return err
@@ -384,6 +393,7 @@ func to_dict() -> Dictionary:
 		"quests": {"active": quests_active.duplicate(true), "done": quests_done.duplicate(), "tracked": quest_tracked,
 			"chain": QuestData.CHAIN_VERSION},
 		"storage": {"items": storage.to_dict(), "cells": storage.layout_to_array()},
+		"storage_gold": storage_gold,
 		"xp_mult": xp_mult,
 	}
 
@@ -492,6 +502,7 @@ func from_dict(d: Dictionary) -> void:
 		var si: Variant = sd.get("items", {})
 		storage.from_dict(migrate_items(si as Dictionary) if si is Dictionary else {})
 		storage.load_layout(sd.get("cells", []))
+	storage_gold = maxi(0, int(d.get("storage_gold", 0)))
 	# Оружие (переведённые герои — стартовый набор Наёмника, см. ensure_hero). Вторая рука — "offhand"
 	# (раньше "shield"); прежняя пара клинков одним предметом (ItemData.PAIRED) — тот же клинок в обеих руках
 	var w := "" if converted else String(d.get("weapon", ""))

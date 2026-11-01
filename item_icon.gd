@@ -7,6 +7,9 @@ extends Control
 ## кристалл, клинки, арбалет, клык, шкура, перо, пластина, осколок, чешуя, плавник); неизвестный — первая буква названия.
 ## Карта существа: вертикальная карточка с рамкой цвета тира и буквой вида; с душой — яркая, с сиянием;
 ## зеркальная — серебристая с бликами отражения.
+## Зелья: картинка одна на вид и размер колбы (ItemData.icon_path: potion_<вид>_t<1|2|3>.png — ранги 1–5, 6–10,
+## 11–15), без картинки — колба цвета вида, крупнее с размером; номер ранга — римской цифрой в правом верхнем углу.
+## Оружие 2-го ранга и выше — номер ранга в углу тоже.
 
 ## Цвет контуров силуэтов.
 const INK := Color(0.08, 0.06, 0.12, 0.95)
@@ -21,13 +24,13 @@ static var _tex_cache: Dictionary = {}
 static func texture(id: String) -> Texture2D:
 	if id == "":
 		return null
-	if _tex_cache.has(id):
-		return _tex_cache[id]
-	var tex: Texture2D = null
 	var path := ItemData.icon_path(id)
+	if _tex_cache.has(path):
+		return _tex_cache[path]
+	var tex: Texture2D = null
 	if ResourceLoader.exists(path):
 		tex = load(path) as Texture2D
-	_tex_cache[id] = tex
+	_tex_cache[path] = tex
 	return tex
 
 
@@ -56,6 +59,7 @@ func _draw() -> void:
 	var tex := texture(item_id)
 	if tex != null:
 		draw_texture_rect(tex, Rect2(Vector2.ZERO, size), false)
+		_rank_mark()
 		return
 	var base: Color = ItemData.get_item(item_id).get("color", Color.WHITE)
 	# Мягкий фон цвета рамки
@@ -64,7 +68,16 @@ func _draw() -> void:
 	draw_circle(_p(0.5, 0.5), _s(0.36), Color(fc.r, fc.g, fc.b, 0.14))
 	match ItemData.icon_shape(item_id):
 		"flask":
-			_flask(base)
+			if ItemData.is_potion(item_id):
+				# Размер колбы по рангу: малая (1–5), средняя (6–10), большая (11–15)
+				var sizes: Array = [0.78, 0.9, 1.04]
+				var k: float = sizes[ItemData.potion_tier(ItemData.rank(item_id)) - 1]
+				var c := _p(0.5, 0.56)
+				draw_set_transform(c - c * k, 0.0, Vector2(k, k))
+				_flask(base)
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			else:
+				_flask(base)
 		"scroll":
 			_scroll(base)
 		"card":
@@ -105,6 +118,21 @@ func _draw() -> void:
 			_spike(base)
 		_:
 			_letter(base)
+	_rank_mark()
+
+
+## Номер ранга в правом верхнем углу: у зелий — всегда, у снаряжения — со 2-го ранга.
+func _rank_mark() -> void:
+	var on := ItemData.is_potion(item_id) or (ItemData.is_equipment(item_id) and ItemData.rank(item_id) >= 2)
+	if not on:
+		return
+	var font := ThemeDB.fallback_font
+	var fs := maxi(8, int(_s(0.3)))
+	var t := ItemData.roman(ItemData.rank(item_id))
+	var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var pos := Vector2(size.x - w - _s(0.06), _s(0.06) + font.get_ascent(fs))
+	draw_string_outline(font, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, maxi(2, int(_s(0.05))), INK)
+	draw_string(font, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1.0, 0.93, 0.6))
 
 
 # ---------- Координаты: доли размера значка ----------

@@ -225,6 +225,10 @@ static func reward_row(id: String) -> HFlowContainer:
 		flow.add_child(box)
 	if int(r.get("jp", 0)) > 0:
 		flow.add_child(_chip("Очки умений: %d JP" % int(r["jp"]), Color(0.85, 0.7, 1.0)))
+	# Сверх наград из данных — 1–2 случайных предмета (LootTable.quest_reward): заранее неизвестно какие
+	var rnd := _chip("Случайная награда: %d–%d предмета" % [LootTable.QUEST_MIN, LootTable.QUEST_MAX], Color(0.75, 0.95, 0.8))
+	rnd.name = "reward_random"
+	flow.add_child(rnd)
 	return flow
 
 
