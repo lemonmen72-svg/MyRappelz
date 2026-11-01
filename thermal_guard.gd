@@ -14,6 +14,9 @@ extends Node
 ##   шаг вверх (на 0 — «Телефон остыл — графика восстановлена»). Нагрелся снова за REHEAT с после шага вверх —
 ##   _cool_need удваивается (до COOL_TIME_MAX): без качелей «снизил — вернул — снизил».
 ## - раз в ModelLod.TICK — контур дальних моделей (ModelLod.tick).
+## Пока открыто окно или экран до мира (Quality.menu_open), графика не переключается (кроме CRITICAL): смена
+## разрешения, MSAA, теней под окном пересоздаёт буферы кадра — мигание; бюджет кадра — от действующего предела
+## (Quality.current_fps_cap: в окне 30 к/с), время кадра в окне не считается, после смены предела — IDLE_SETTLE с.
 ## В автотестах (tests/runner.tscn) авто-снижение и фон выключены (кадры CI на программном рендере долгие);
 ## тест включает force и подставляет источники (status_source, headroom_source) и время кадра (tick).
 
@@ -47,6 +50,8 @@ const SETTLE := 6.0
 ## Кадр дольше HITCH с — заминка (загрузка), а не нагрев: HITCH_SETTLE с кадры не считаются.
 const HITCH := 0.4
 const HITCH_SETTLE := 3.0
+## Открыли или закрыли окно, ушли в фон и вернулись (сменился предел кадров) — столько секунд кадры не считаются.
+const IDLE_SETTLE := 2.0
 
 static var current: ThermalGuard = null
 ## Авто-снижение приостановлено тест-ботом (TestBot: снижение испортило бы замер; бот сам следит за температурой и
@@ -75,6 +80,10 @@ var _restored_at := -1.0e9
 var _settle := WARMUP
 var _plugin_ok := true
 var _in_tests := false
+## Было ли окно / экран до мира / фон на прошлом шаге (смена предела кадров).
+var _was_idle := false
+## Шагов, отложенных из-за открытого окна (тест).
+var held_steps := 0
 
 
 func _init() -> void:
@@ -129,7 +138,16 @@ func tick(dt: float, frame_dt: float) -> void:
 		headroom = _read(headroom_source, "thermalHeadroom")
 	var budget := 1.0 / float(maxi(Quality.current_fps_cap(), 1))
 	# Окно, экран до мира, фон — свой предел кадров, время кадра не показатель
-	var measure := not Quality.menu_open() and not Quality.in_background()
+	var idle := Quality.menu_open() or Quality.in_background()
+	var measure := not idle
+	if idle != _was_idle:
+		# Предел кадров сменился (окно, фон): кадры переходного времени — не показатель
+		_was_idle = idle
+		_settle = maxf(_settle, IDLE_SETTLE)
+		_slow_t = 0.0
+		frame_avg = 0.0
+	# Под окном графику не переключаем (пересоздание буферов кадра под окном — мигание); CRITICAL — сразу
+	var hold := Quality.menu_open() and status < STATUS_CRITICAL
 	# Разовая заминка (загрузка мира, компиляция шейдеров) — не нагрев: пару секунд кадры не считаются
 	if frame_dt > HITCH:
 		_settle = maxf(_settle, HITCH_SETTLE)
@@ -155,7 +173,9 @@ func tick(dt: float, frame_dt: float) -> void:
 	if hot_thermal or hot_frames:
 		_cool_t = 0.0
 		var gap := STEP_GAP_SEVERE if status >= STATUS_SEVERE else STEP_GAP
-		if lvl < Quality.throttle_max() and _since_change >= gap:
+		if lvl < Quality.throttle_max() and _since_change >= gap and hold:
+			held_steps += 1
+		elif lvl < Quality.throttle_max() and _since_change >= gap:
 			var to := lvl + 1
 			if status >= STATUS_CRITICAL:
 				to = Quality.throttle_max()
@@ -163,7 +183,9 @@ func tick(dt: float, frame_dt: float) -> void:
 			_step(to)
 	elif cool and lvl > 0:
 		_cool_t += dt
-		if _cool_t >= _cool_need and _since_change >= STEP_GAP:
+		if _cool_t >= _cool_need and _since_change >= STEP_GAP and hold:
+			held_steps += 1
+		elif _cool_t >= _cool_need and _since_change >= STEP_GAP:
 			_cool_t = 0.0
 			_step(lvl - 1)
 	else:

@@ -9,6 +9,11 @@ extends "res://tests/test_base.gd"
 ## (ModelLod) и участков растительности (двойники без контура), предел кадров окна, экрана до мира и фона,
 ## авто-снижение ThermalGuard по подставному статусу температуры и по времени кадра (шаги, потолки поверх выбранного,
 ## восстановление, гистерезис, повторный нагрев), выключатель «Беречь от перегрева».
+## Без мигания (жалоба Максима 0.24: «лесенка» уменьшенных копий кадра и мигание при открытой сумке, выборе зелья,
+## смене оружия): открытие окна, выбор предмета, смена оружия не меняют параметров окна (MSAA, масштаб 3D) и теней,
+## Quality.apply не вызывается; атлас теней один; под окном ThermalGuard графику не переключает и предел окна
+## (30 к/с) за «медленные кадры» не считает; MSAA при уменьшенном 3D-кадре на Android заменяется FXAA; PostFx —
+## без mip-уровней экранной текстуры.
 
 var _had_cfg := false
 var _cfg_backup := ""
@@ -57,9 +62,17 @@ func run_step() -> void:
 		4:
 			check(main.hud.is_window_open(), "окно настроек открыто после нажатий")
 			main.hud.close_window()
+			_stability_begin()
+			wait = 3
+			step = 5
+		5:
+			_stability_end()
+			_check_msaa_scaled()
+			_check_postfx_no_mips()
 			_check_model_lod()
 			_check_fps_caps()
 			_check_thermal()
+			_check_thermal_window()
 			_restore()
 			ok_done()
 
@@ -547,6 +560,158 @@ func _check_thermal() -> void:
 	g.headroom_source = Callable()
 	_fake_status = -1
 	Quality.set_throttle(0)
+	Quality.set_level(Quality.MEDIUM, false)
+	Quality.apply(tree)
+
+
+## Снимок того, что пересоздаёт буферы кадра или атлас теней при изменении (окно, солнце, счётчики Quality).
+var _snap: Dictionary = {}
+
+
+func _render_state() -> Dictionary:
+	var win := get_tree().root
+	var sun := _sun()
+	return {
+		"msaa": win.msaa_3d, "scale": win.scaling_3d_scale, "mode": win.scaling_3d_mode, "ssaa": win.screen_space_aa,
+		"size": win.size, "applies": Quality.apply_count, "rs": Quality.shadow_rs_changes,
+		"shadow": sun.shadow_enabled if sun != null else false,
+		"shadow_mode": sun.directional_shadow_mode if sun != null else -1,
+		"shadow_dist": sun.directional_shadow_max_distance if sun != null else 0.0,
+		"postfx": _fx().current_shader() if _fx() != null else null,
+	}
+
+
+## Открыть сумку, выбрать зелье, надеть другое оружие (кнопка «Надеть»), закрыть — на «Максимальном».
+func _stability_begin() -> void:
+	var tree := get_tree()
+	Quality.set_level(Quality.ULTRA, false)
+	Quality.apply(tree)
+	var inv: Inventory = Game.inventory
+	inv.add("potion_hp_r1", 3)
+	inv.add("weapon_sword_1h_r1", 1)
+	_snap = _render_state()
+	var eco: Economy = main.economy
+	eco.open_bag()
+	check(main.hud.is_window_open() and Quality.menu_open(), "сумка открыта, предел окна")
+	var win: InventoryWindow = eco.window
+	win.select_cell(inv.find_cell("potion_hp_r1"))
+	check(win.sel_id == "potion_hp_r1", "в сумке выбрано зелье")
+	var before := Game.weapon
+	var wc := inv.find_cell("weapon_sword_1h_r1")
+	check(wc >= 0, "запасной меч в сумке")
+	if wc >= 0:
+		win.select_cell(wc)
+		win.call("_on_equip")
+	check(Game.weapon == "weapon_sword_1h_r1" and before != Game.weapon, "оружие сменено (%s → %s)" % [before,
+		Game.weapon])
+
+
+func _stability_end() -> void:
+	var now := _render_state()
+	for k in _snap:
+		check(now[k] == _snap[k], "сумка, выбор зелья, смена оружия: «%s» не изменилось (%s → %s)" % [k, str(_snap[k]),
+			str(now[k])])
+	main.economy.window.close()
+	check(not main.hud.is_window_open() and not Quality.menu_open(), "сумка закрыта")
+	check(Quality._last_atlas == Quality.SHADOW_ATLAS, "атлас теней задан один раз: %d" % Quality._last_atlas)
+	for lvl in Quality.SHADOW_LEVELS:
+		var sl: Dictionary = lvl
+		if not sl.is_empty():
+			check(int(sl["atlas"]) == Quality.SHADOW_ATLAS, "у всех уровней теней один атлас %d" % Quality.SHADOW_ATLAS)
+	# Смена уровня теней (пресеты, авто-снижение) атлас не трогает: только фильтр (в GLES3 — поле, без пересоздания)
+	var rs := Quality.shadow_rs_changes
+	var filters := {}
+	for v in Quality.option_count("shadows"):
+		Quality.set_option("shadows", v, false)
+		Quality.apply(get_tree())
+		filters[Quality.shadow_filter()] = true
+		check(Quality._last_atlas == Quality.SHADOW_ATLAS, "тени «%s»: атлас тот же" % Quality.option_label("shadows", v))
+	check(Quality.shadow_rs_changes - rs <= filters.size(), "смена теней: передач RenderingServer %d — только фильтр"
+		% (Quality.shadow_rs_changes - rs))
+	Quality.set_level(Quality.MEDIUM, false)
+	Quality.apply(get_tree())
+
+
+## MSAA при уменьшенном 3D-кадре (Android, Compatibility): Godot 4.3 каждый кадр создаёт новый framebuffer
+## (утечка, upstream #124258) — вместо MSAA FXAA своим проходом; кадр не меньше экрана — MSAA как было.
+func _check_msaa_scaled() -> void:
+	var tree := get_tree()
+	var win := tree.root
+	Quality.renderer_override = 0
+	Quality.msaa_scaled_override = 0
+	Quality.set_level(Quality.ULTRA, false)
+	check(int(Quality.render_params(1080.0)["msaa"]) == Viewport.MSAA_4X, "ПК: MSAA 4× и при 900p на экране 1080")
+	Quality.msaa_scaled_override = 1
+	var p := Quality.render_params(1080.0)
+	check(int(p["msaa"]) == Viewport.MSAA_DISABLED and bool(p["postfx_fxaa"]),
+		"Android, 900p на экране 1080: MSAA → FXAA PostFx")
+	var p_native := Quality.render_params(900.0)
+	check(int(p_native["msaa"]) == Viewport.MSAA_4X and not bool(p_native["postfx_fxaa"]),
+		"Android, кадр не меньше экрана: MSAA 4× как выбрано")
+	Quality.set_level(Quality.LOW, false)
+	check(int(Quality.render_params(1080.0)["msaa"]) == Viewport.MSAA_DISABLED
+		and not bool(Quality.render_params(1080.0)["postfx_fxaa"]), "«Низкое» без сглаживания — замены нет")
+	# На окне: 540p ниже окна — MSAA выключено, в PostFx — FXAA
+	Quality.set_level(Quality.MEDIUM, false)
+	Quality.set_option("render", 0, false)
+	Quality.apply(tree)
+	if Quality.render_scale_for(float(win.size.y)) < 0.9999:
+		check(win.msaa_3d == Viewport.MSAA_DISABLED, "Android, 540p: окно без MSAA")
+		var fx := _fx()
+		var sh: Shader = fx.current_shader() if fx != null else null
+		check(sh != null and sh.code.contains("#define USE_FXAA"), "Android, 540p: FXAA в PostFx вместо MSAA")
+		check(Quality.option_hint("aa").contains("заменяется на FXAA"), "подсказка о замене MSAA")
+	Quality.msaa_scaled_override = -1
+	Quality.renderer_override = -1
+	Quality.set_level(Quality.MEDIUM, false)
+	Quality.apply(tree)
+	check(win.msaa_3d == Quality.chosen_msaa(), "ПК: MSAA как выбрано")
+
+
+## PostFx не читает mip-уровни экранной текстуры (в Compatibility 4.3 их построение — CopyEffects::gaussian_blur
+## по уровням того же backbuffer каждый кадр).
+func _check_postfx_no_mips() -> void:
+	var code := (load(PostFx.SHADER_PATH) as Shader).code
+	check(not code.contains("_mipmap"), "postfx.gdshader: экранная текстура без фильтра mipmap")
+	check(not code.contains("texture(screen_tex"), "postfx.gdshader: выборки только textureLod")
+	check(code.count("textureLod(") == code.count(", 0.0)"), "postfx.gdshader: textureLod только нулевого уровня")
+
+
+## Под окном (предел 30 к/с при пресете 45) ThermalGuard не снижает графику: кадры 33 мс — не «медленные», нагрев —
+## шаг откладывается до закрытия окна.
+func _check_thermal_window() -> void:
+	var tree := get_tree()
+	var g := ThermalGuard.current
+	if g == null:
+		return
+	Quality.set_level(Quality.ULTRA, false)
+	Quality.set_guard_enabled(true, false)
+	Quality.apply(tree)
+	g.force = true
+	g.status_source = func() -> int: return _fake_status
+	g.headroom_source = func() -> int: return -1
+	_fake_status = -1
+	g.reset()
+	g._settle = 0.0
+	var snap := _render_state()
+	Quality.set_menu_open(true)
+	_ticks(g, 120, 0.5, 1.0 / 30.0)
+	check(Quality.throttle_level() == 0, "окно открыто 60 с, кадры 30/с — графика не снижена")
+	_fake_status = 2
+	var held := g.held_steps
+	_ticks(g, 20, 1.0, 1.0 / 30.0)
+	check(Quality.throttle_level() == 0 and g.held_steps > held, "нагрелся под окном — шаг отложен")
+	var now := _render_state()
+	check(now["msaa"] == snap["msaa"] and now["scale"] == snap["scale"] and now["applies"] == snap["applies"],
+		"под окном параметры кадра не менялись")
+	Quality.set_menu_open(false)
+	_ticks(g, 1, 0.5, 1.0 / 45.0)
+	check(Quality.throttle_level() == 1, "окно закрыто — отложенный шаг сразу (шаг %d)" % Quality.throttle_level())
+	_fake_status = -1
+	g.force = false
+	g.status_source = Callable()
+	g.headroom_source = Callable()
+	g.reset()
 	Quality.set_level(Quality.MEDIUM, false)
 	Quality.apply(tree)
 
