@@ -800,7 +800,7 @@
   `query`, `remove`, `requestNotifications`, `notificationsAllowed`, `lastError`; температура для `ThermalGuard` —
   `thermalStatus`, `thermalHeadroom` (int); для тест-бота — `batteryTemp`, `deviceInfo`, `saveToDownloads`, `share`,
   `openFile` и свой провайдер `ReportProvider` (раздел «Тест-бот»); рендерер — `vulkanSupported`,
-  `rememberRendererFiles`, проверка до движка `RendererPreflight` (раздел «Рендерер»); только String/bool/int/Dictionary — JNI
+  `rememberRendererFiles`, `restartApp`, проверка до движка `RendererPreflight` (раздел «Рендерер»); только String/bool/int/Dictionary — JNI
   4.3 не умеет long-параметры и результаты; манифест AAR — meta-data `org.godotengine.plugin.v2.MyRappelzDownload`,
   POST_NOTIFICATIONS), плагин редактора `addons/myrappelz_download/` (включён в `project.godot`; отдаёт экспорту
   `bin/myrappelz_download-release.aar`, только если AAR есть — в репозитории его нет). В игре: `Assets.download_plugin()`
@@ -887,9 +887,15 @@
   `application/config/version` сборки, на ПК — «dev») и `.zip` с тем же именем (отчёт + `shots/*.jpg`) в
   `user://bot_reports/` (снимки — в подпапке запуска). Текст: сводка (режим, итог — готово / лимит / вручную /
   перегрев / ошибка, замеров N из M, проверок и ошибок, версия, дата, длительность, паузы на остывание по одной,
-  графика игрока до теста), устройство (модель и Android из плагина `deviceInfo`, иначе `OS`; процессор и чип,
-  видеочип `RenderingServer.get_video_adapter_name/vendor`, API, драйвер, рендерер — метод и OpenGL/Vulkan, экран, окно
-  и масштаб 3D, память, пакет ресурсов, температура в начале и в конце), пресеты в среднем по сценам, таблица замеров,
+  графика игрока до теста), устройство (модель и Android из плагина `deviceInfo`, иначе `OS`; процессор — имя Godot,
+  на Android оно пустое (нет «model name» в /proc/cpuinfo) — тогда `hardware`/`board` плагина, ядра, ABI, чип;
+  видеочип `RenderingServer.get_video_adapter_name/vendor`, API, драйвер, рендерер — метод и OpenGL/Vulkan, «Рендерер
+  подробно» — `RendererGuard.diagnostics()`: что рисует, настройка проекта, файлы `renderer_override.cfg` и
+  `renderer.cfg`, ответ `vulkanSupported`, журнал запусков `renderer_log.txt`; как закончился прошлый запуск
+  (`last_exit` плагина); экран, окно и масштаб 3D, память — `memory_text`: ОЗУ телефона из плагина
+  (`ram_total_mb`/`ram_avail_mb`; в релизе 4.3 `OS.get_static_memory_usage()` = 0, `OS.get_memory_info()` на Android
+  −1), статическая Godot — только если > 0, видеопамять; пакет ресурсов, температура в начале и в конце), пресеты в
+  среднем по сценам, таблица замеров,
   настройки по одной против базы (Δ кадр, p95, ГП, вызовы %, треугольники %), рекомендации (`recommendations`:
   самый высокий пресет, что держит свой предел кадров во всех сценах; самая тяжёлая сцена; самые дорогие и самые
   экономные настройки; что грело сильнее всего; паузы; заминки), раздел сценария, журнал, проверки, хвост лога Godot
@@ -1454,10 +1460,36 @@
   `uses-feature` в `android-apk.yml` не нужен), шаблоны 4.3 те же — в `libgodot_android.so` оба драйвера.
   `application/config/project_settings_override = "user://renderer_override.cfg"` — Godot читает этот файл при каждом
   запуске (`ProjectSettings::setup`, после project.godot, до создания окна и до `usesVulkan()` в Java; редактор и
-  экспорт его не читают, `user://` на Android — папка приложения). Пишет его только игра и только на Android
+  экспорт его не читают, `user://` на Android — папка приложения). Пишут его игра (только на Android) и плагин
   (`RendererGuard.override_text`: `[rendering]` `renderer/rendering_method` и `.mobile` = "mobile" / "gl_compatibility",
-  `rendering_device/driver.android="vulkan"`; запись через `.tmp` и переименование). Состояние — `user://renderer.cfg`
-  `[renderer]`: `choice` (auto / vulkan / compat), `armed`, `confirmed`, `failed`, `gpu`.
+  `rendering_device/driver.android="vulkan"`; запись через `.tmp` и переименование внутри `user://` —
+  `DirAccess.open(папка).rename`, итог проверяется чтением, не вышло — прямо в файл). Состояние — `user://renderer.cfg`
+  `[renderer]`: `choice` (auto / vulkan / compat), `want` (рендерер, который игра хочет со следующего запуска —
+  пишется при каждом сохранении, плагин сверяет с ним файл), `armed`, `confirmed`, `failed`, `tries` (запусков на
+  неподтверждённом Vulkan — считает плагин), `gpu`, `last_exit` (как закончился прошлый запуск — пишет плагин).
+- **Цепочка чтения (проверено по исходникам 4.3-stable, механизм рабочий и в экспортированной игре)**:
+  `GodotLib.setup` (Godot.kt `onInitNativeLayer`) → `Main::setup` → `globals->setup(…, p_ignore_override = editor)` →
+  `ProjectSettings::setup`: после `_setup` (на Android — `res://project.binary` из APK, `get_resource_dir()` = "/")
+  `String custom_settings = GLOBAL_GET("application/config/project_settings_override"); … _load_settings_text(
+  custom_settings)`; `user://` уже доступен — `OS_Android::get_user_data_dir()` = `GodotIO.getDataDir()` =
+  `getFilesDir()` (Java-обёртка создана в `GodotLib.initialize`), `FileAccess` `ACCESS_USERDATA` = `FileAccessUnix`
+  (`OS_Android::initialize_core`). Ключи файла `[rendering]` `renderer/rendering_method.mobile` — особенность
+  «mobile» (`OS_Android::_check_internal_feature_support`), `GLOBAL_GET` = `get_setting_with_override`. Java решает
+  после: `onInitRenderView` → `usesVulkan()` = `GodotLib.getGlobal("rendering/renderer/rendering_method")` (JNI →
+  `GLOBAL_GET`) ∈ {forward_plus, mobile} и `getGlobal("rendering/rendering_device/driver")` == "vulkan"; C++ — тот же
+  `GLOBAL_GET` в `Main::setup` → `DisplayServerAndroid` с драйвером vulkan. Экспорт 4.3 кладёт настройку в
+  `project.binary` как есть (в APK 0.25.0 — проверено). Командная строка (`_cl_`, `--rendering-method`) Java не
+  читает — ею рендерер не сменить.
+- **Почему в 0.25.0 на S24 Ultra оставался Compatibility** (отчёт бота: «gl_compatibility, OpenGL · выбор
+  «Vulkan»»): по исходникам файл читается, а при выборе «Vulkan» игра пишет в него Vulkan при каждом запуске на
+  Compatibility — значит, этот запуск был либо тем же процессом (выбор без перезапуска процесса: «Сохранить и выйти»
+  требовало открыть игру вручную, возврат из недавних — в живой процесс), либо следующим после неудачной попытки
+  Vulkan (вылет или любое закрытие до 8 с в мире — тогда сообщение «Vulkan в прошлый раз не заработал»). Различить
+  по отчёту 0.25.0 нельзя: в нём не было ни файлов рендерера, ни причины конца прошлого запуска. Слабые места 0.25.0,
+  которые исправлены: сбоем считался любой конец неподтверждённого Vulkan, кроме фона (смахнули из недавних, закрыли
+  во время долгой первой компиляции конвейеров Mobile) — `failed` + 1, и «Авто» больше никогда не включал Vulkan;
+  плагин в `onMainCreate` взводил страховку по файлу, а не по тому, что взял движок; перезапуск — только вручную.
+  Настоящий вылет Vulkan на S24 теперь виден в журнале (`last_exit`: crash_native и описание).
 - **«Авто»** (по умолчанию): видеочип из списка надёжных (`gpu_supports_vulkan` по имени `RenderingServer.
   get_video_adapter_name()`: Adreno ≥ 600 `ADRENO_MIN`, Mali-G кроме G71/G72 `MALI_BAD`, Immortalis, Xclipse; Adreno
   3xx–5xx, Mali-T, PowerVR, неизвестные — нет) и Vulkan на нём не падал → со **следующего** запуска Mobile (первый
@@ -1471,21 +1503,33 @@
   (`main._start_world` → `world_started`) — подтверждён (`confirmed`), файл снова Mobile, дальше страховки нет. Игра
   ушла в фон / закрыта / «Назад» — страховка снимается (вылета не было), вернулась — снова взводится. Вылет во время
   проверки → следующий запуск на Compatibility, `failed` + 1, сообщение «Vulkan в прошлый раз не заработал…», «Авто»
-  больше Vulkan не включает (выбрать «Vulkan» вручную — `failed` сбрасывается). **Вылет до скриптов** (окно «нет
-  Vulkan», сбой драйвера при создании окна) ловит плагин — `RendererPreflight.java` (пути файлов игра передаёт ему в
-  `startup` — `rememberRendererFiles`, SharedPreferences; без них — `getFilesDir()`): в конструкторе плагина (Godot.kt
-  `onCreate` → реестр плагинов, до `Main::setup`, который читает файл рендерера) файл говорит «Vulkan», а в
-  `renderer.cfg` `armed=true` или Vulkan 1.0.3 нет — файл на Compatibility (+ `armed=true`); в `onMainCreate`
-  (`onInitRenderView`: настройки этого запуска прочитаны, Vulkan-вид создан, драйвер поднимается позже на потоке
-  отрисовки) неподтверждённый Vulkan — файл заранее на Compatibility и `armed=true` (как `_arm`, но до драйвера).
-  Упал драйвер — следующий запуск на Compatibility, `startup` засчитывает сбой. Текст файла Compatibility и признак
-  Vulkan у плагина и игры одинаковые (проверяет `tests/test_renderer.gd`). Список видеочипов остаётся (сбой драйвера
-  на телефоне, где Vulkan 1.0.3 «есть», один вылет всё же будет — следующий запуск уже на Compatibility).
+  больше Vulkan не включает (выбрать «Vulkan» вручную — `failed` и `tries` сбрасываются). Состояние 0.25.0 (без
+  `want`) со сбоем — один раз `failed` = 0 (там сбой засчитывался и без вылета). **Вылет до скриптов** (окно «нет
+  Vulkan», сбой драйвера при создании окна) и **причину конца** ловит плагин — `RendererPreflight.java` (пути файлов
+  игра передаёт ему в `startup` — `rememberRendererFiles`, SharedPreferences; без них — `getFilesDir()`):
+  `beforeEngine` (конструктор плагина: Godot.kt `onCreate` → реестр плагинов, до `Main::setup`): `armed=true` — как
+  закончился прошлый процесс (Android 11+ `ActivityManager.getHistoricalProcessExitReasons`, процессы `:phoenix`
+  мимо): сбой (crash, crash_native, anr, initialization_failure) или уже `MAX_TRIES` (3) запусков без подтверждения —
+  файл на Compatibility, `armed` остаётся (игра засчитает сбой); не сбой (смахнули, система выгрузила, перезапуск) —
+  снова Vulkan, `armed=false`, сбоем не считается; причина неизвестна (Android 10−) — как сбой. Не `armed` — файл
+  приводится к `want`. Файл на Vulkan, а Vulkan 1.0.3 нет — Compatibility + `armed`. `afterSetup` (`onMainCreate`:
+  настройки прочитаны, Vulkan-вид создан, драйвер поднимается позже на потоке отрисовки): что движок взял на самом
+  деле — `GodotLib.getGlobal` (как `usesVulkan()`); Vulkan и не подтверждён — файл заранее на Compatibility,
+  `armed=true`, `tries` + 1 (как `_arm`, но до драйвера); файл говорил Vulkan, а движок взял OpenGL — в журнал
+  «ВНИМАНИЕ: … файл не прочитан движком», страховки нет. Упал драйвер — следующий запуск на Compatibility, `startup`
+  засчитывает сбой (в журнал — `last_exit`). **Журнал** `user://renderer_log.txt` (последние 80 строк) пишут плагин
+  («· плагин ·») и игра («· игра ·»: `startup` — что рисует, настройка проекта, файл, состояние; решения, сбои,
+  подтверждение, выбор, перезапуск; `RendererGuard.log_line`, только на Android). Текст файлов Compatibility и Vulkan,
+  признак Vulkan, ключи состояния и имя журнала у плагина и игры одинаковые (проверяет `tests/test_renderer.gd`;
+  логику плагина — `PreflightTest` против заглушек Android вне репозитория). Список видеочипов остаётся (сбой
+  драйвера на телефоне, где Vulkan 1.0.3 «есть», один вылет всё же будет — следующий запуск уже на Compatibility).
 - **Настройки → Графика → «Рендерер»** (внизу вкладки): «Сейчас: …», кнопки `renderer_auto` / `renderer_vulkan`
   (недоступна, если видеочип не из списка и Vulkan ещё не работал) / `renderer_compat`, подсказка «Меняется после
-  перезапуска» и «После перезапуска: …»; если рендерер сменится — `renderer_restart` «Сохранить и выйти (откройте игру
-  снова)» (`quit_for_restart`: сохранение героя, страховка снята, `get_tree().quit()`). На ПК выбор только
-  запоминается — всегда Compatibility.
+  перезапуска» и «После перезапуска: …»; если рендерер сменится — `renderer_restart` «Перезапустить игру»
+  (`quit_for_restart`: сохранение героя, страховка снята, плагин `restartApp` → `ProcessPhoenix.triggerRebirth` —
+  тот же путь, что у самого Godot 4.3 при потере контекста (`GodotActivity.onGodotRestartRequested`), активность
+  `ProcessPhoenix` в процессе `:phoenix` есть в манифесте APK; без плагина — «Сохранить и выйти (откройте игру
+  снова)», `get_tree().quit()`). На ПК выбор только запоминается — всегда Compatibility.
 - **Ветки `Quality` по рендереру** (`Quality.mobile_renderer()` — `RendererGuard.is_vulkan()`: есть
   `RenderingServer.get_rendering_device()`; тесты — `Quality.renderer_override`; `render_params(высота экрана)` —
   что уйдёт окну и солнцу): разрешение 3D 720p / 900p ниже экрана — **FSR 1.0** (`use_fsr`, `FSR_SHARPNESS` 0.3; в
@@ -1507,10 +1551,11 @@
   `--rendering-method gl_compatibility --rendering-driver opengl3` (`screenshots.sh`, `perf.sh`); на ПК файл
   рендерера не пишется. Ветка Mobile проверяется функциями `Quality` и логикой `RendererGuard` на «подставном
   Android» (`platform_override`, `method_override`, `gpu_override`, свои файлы).
-- **Что проверить на телефоне** (S24 Ultra): первый запуск новой версии — Compatibility, в мире сообщение «со
-  следующего запуска…», в «Настройки → Графика» внизу «Рендерер: сейчас Совместимость», «После перезапуска: Vulkan»;
-  «Сохранить и выйти», открыть снова — «сейчас Vulkan (Mobile)»; побыть в мире > 8 с (подтверждение), перезапустить —
-  Vulkan без страховки; сравнить нагрев на «Максимальном» с прошлой версией (ThermalGuard: шаги снижения реже?),
+- **Что проверить на телефоне** (S24 Ultra): первый запуск новой версии — Compatibility (или сразу Vulkan, если
+  выбран «Vulkan»: сбой 0.25.0 сброшен), в «Настройки → Графика» внизу «Рендерер: сейчас …», «После перезапуска:
+  Vulkan»; «Перезапустить игру» — игра закрывается и открывается сама — «сейчас Vulkan (Mobile)»; побыть в мире > 8 с
+  (подтверждение), перезапустить — Vulkan без страховки; если снова Совместимость — тест-бот → отчёт, раздел
+  «Рендерер подробно» (журнал: что движок взял, `last_exit` — вылет ли это и где); сравнить нагрев на «Максимальном» с прошлой версией (ThermalGuard: шаги снижения реже?),
   картинку (цвета, тени, контуры, вода, небо, свечение «Высокого»), первую минуту в мире (в 4.3 Mobile шейдеры
   компилируются при первом показе — заминки в первый раз, дальше кэш `user://` и кэш конвейеров), «Совместимость» →
   перезапуск → снова OpenGL. На телефоне без Vulkan / со слабым видеочипом — игра на Совместимости, «Vulkan»

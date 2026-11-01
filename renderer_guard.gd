@@ -28,12 +28,22 @@ extends Node
 ## Чего не ловит без плагина: вылет до запуска скриптов (окно «нет Vulkan» или сбой драйвера при создании окна) —
 ## поэтому «Авто» и «Vulkan» только у видеочипов из списка (Adreno 6xx+, Mali-G кроме G71/G72, Immortalis,
 ## Xclipse) и не при ответе плагина «нет Vulkan».
+## С плагином MyRappelzDownload (RendererPreflight.java) до движка: armed — смотрит, как закончился прошлый запуск
+## (Android 11+, ApplicationExitInfo): не сбой (смахнули, система выгрузила, перезапуск) — снова Vulkan, сбоем не
+## считается; сбой или MAX_TRIES запусков без подтверждения — Compatibility, игра засчитывает сбой. Файл не совпал с
+## want (рендерер, который игра хочет; пишется в состояние при каждом сохранении) — плагин его исправляет. После
+## чтения настроек (onMainCreate) — что движок взял на самом деле (GodotLib.getGlobal, как usesVulkan() Godot.kt);
+## страховка взводится, только если движок взял Vulkan. Всё — в журнал LOG_PATH (и плагин, и игра; в отчёте
+## тест-бота — diagnostics()). «Перезапустить игру» — плагин restartApp (ProcessPhoenix, как сам Godot 4.3).
 ##
-## Тесты: override_path / state_path — свои файлы, platform_override (1 — как Android), method_override,
+## Тесты: override_path / state_path / log_path — свои файлы, platform_override (1 — как Android), method_override,
 ## gpu_override, plugin_override; reset_session() — заново, как новый запуск.
 
 const OVERRIDE_PATH := "user://renderer_override.cfg"
 const STATE_PATH := "user://renderer.cfg"
+## Журнал запусков рендерера (пишут плагин и игра, последние LOG_MAX строк).
+const LOG_PATH := "user://renderer_log.txt"
+const LOG_MAX := 80
 const SECTION := "renderer"
 const MOBILE := "mobile"
 const COMPAT := "gl_compatibility"
@@ -52,6 +62,7 @@ const PLUGIN := "MyRappelzDownload"
 
 static var override_path := OVERRIDE_PATH
 static var state_path := STATE_PATH
+static var log_path := LOG_PATH
 ## Тесты: 1 — вести себя как на Android, 0 — как на ПК, −1 — как есть.
 static var platform_override := -1
 ## Тесты: текущий рендерер ("mobile" / "gl_compatibility"; "" — как есть).
@@ -124,6 +135,12 @@ static func is_vulkan() -> bool:
 	return current_method() == MOBILE
 
 
+## Рендерер в настройках проекта этого запуска (project.godot + файл рендерера, как их прочитал Godot в
+## ProjectSettings::setup; то же значение Godot.kt usesVulkan() брал через GodotLib.getGlobal).
+static func engine_method() -> String:
+	return String(ProjectSettings.get_setting_with_override("rendering/renderer/rendering_method"))
+
+
 static func method_name(m: String = "") -> String:
 	return String(METHOD_NAMES.get(current_method() if m == "" else m, m))
 
@@ -194,8 +211,13 @@ static func device_ok() -> bool:
 
 # ---------- Состояние (user://renderer.cfg) ----------
 
+## Ключи: choice — выбор игрока; want — рендерер, который игра хочет со следующего запуска (плагин сверяет с ним
+## файл); armed — идёт проверка Vulkan; confirmed — Vulkan на этом телефоне подтверждён; failed — сбоев Vulkan;
+## tries — запусков на неподтверждённом Vulkan (считает плагин); gpu — видеочип при подтверждении; last_exit — как
+## закончился прошлый запуск (пишет плагин, Android 11+).
 static func _load() -> Dictionary:
-	var st := {"choice": "auto", "armed": false, "confirmed": false, "failed": 0, "gpu": ""}
+	var st := {"choice": "auto", "want": "", "armed": false, "confirmed": false, "failed": 0, "tries": 0, "gpu": "",
+		"last_exit": ""}
 	var cf := ConfigFile.new()
 	if cf.load(state_path) == OK:
 		for k in st:
@@ -206,6 +228,8 @@ static func _load() -> Dictionary:
 
 
 static func _save(st: Dictionary) -> void:
+	if is_android():
+		st["want"] = desired_method(st)
 	var cf := ConfigFile.new()
 	for k in st:
 		cf.set_value(SECTION, String(k), st[k])
@@ -259,6 +283,8 @@ static func set_choice(c: String) -> bool:
 	st["choice"] = c
 	if c == "vulkan":
 		st["failed"] = 0
+		st["tries"] = 0
+	log_line("выбор рендерера: %s" % c)
 	# Идёт проверка Vulkan — файл остаётся на Compatibility до подтверждения (страховка)
 	if not _armed:
 		_write_override(desired_method(st))
@@ -278,12 +304,29 @@ static func startup() -> void:
 	var st := _load()
 	var m := current_method()
 	var changed := false
+	log_line("скрипты: рисует %s, в настройках проекта %s, файл %s, выбор %s, want %s, armed %s, confirmed %s, сбоев %d, попыток %d, видеочип %s"
+		% [_file_name(m), engine_method(), _file_name(override_method()), String(st["choice"]), String(st["want"]),
+		str(st["armed"]), str(st["confirmed"]), int(st["failed"]), int(st["tries"]), gpu_name()])
+	if engine_method() == MOBILE and m != MOBILE:
+		log_line("ВНИМАНИЕ: в настройках проекта Mobile, а RenderingDevice нет — Vulkan не поднялся")
+	# Состояние версии 0.25.0 (без want): сбой там засчитывался и без вылета (страховка плагина взводилась по файлу,
+	# а не по рендереру движка; смахнули игру до подтверждения — тоже «сбой») — один раз дать Vulkan ещё попытку
+	var raw := ConfigFile.new()
+	if is_android() and raw.load(state_path) == OK and not raw.has_section_key(SECTION, "want") \
+			and int(st["failed"]) > 0 and not bool(st["armed"]):
+		st["failed"] = 0
+		changed = true
+		log_line("состояние 0.25.0: счётчик сбоев Vulkan сброшен (новая проверка сбоев)")
 	if bool(st["armed"]):
 		st["armed"] = false
 		changed = true
 		if m != MOBILE:
 			st["failed"] = int(st["failed"]) + 1
+			st["tries"] = 0
 			note = "Vulkan в прошлый раз не заработал — игра на «Совместимости». Вернуть: Настройки → Графика → Рендерер."
+			var why := String(st["last_exit"])
+			log_line("прошлый запуск на Vulkan не подтверждён — сбой засчитан (сбоев %d; прошлый выход: %s)"
+				% [int(st["failed"]), why if why != "" else "неизвестно"])
 	if not is_android():
 		if changed:
 			_save(st)
@@ -294,8 +337,11 @@ static func startup() -> void:
 	else:
 		var want := desired_method(st)
 		_write_override(want)
+		log_line("следующий запуск: %s (файл — %s)" % [_file_name(want), _file_name(override_method())])
 		if want == MOBILE and m != MOBILE and note == "":
 			note = "Видеочип поддерживает Vulkan: со следующего запуска игра будет рисовать через него (меньше нагрев)."
+			if can_restart():
+				note += " Сразу: Настройки → Графика → «Перезапустить игру»."
 	_save(st)
 
 
@@ -314,9 +360,11 @@ static func confirm() -> void:
 	st["armed"] = false
 	st["confirmed"] = true
 	st["failed"] = 0
+	st["tries"] = 0
 	st["gpu"] = gpu_name()
 	_write_override(desired_method(st))
 	_save(st)
+	log_line("Vulkan подтверждён на этом телефоне (%s)" % gpu_name())
 
 
 static func is_armed() -> bool:
@@ -327,6 +375,7 @@ static func _arm(st: Dictionary) -> void:
 	_armed = true
 	st["armed"] = true
 	_write_override(COMPAT)
+	log_line("Vulkan ещё не подтверждён: страховка взведена (файл — Совместимость до %d с в мире)" % int(CONFIRM_WORLD_SEC))
 
 
 ## Снять страховку (фон, выход): вылета не было — файл на выбранный рендерер.
@@ -338,6 +387,7 @@ static func disarm() -> void:
 	st["armed"] = false
 	_write_override(desired_method(st))
 	_save(st)
+	log_line("страховка снята (фон или выход), файл — %s" % _file_name(override_method()))
 
 
 ## Вернуть страховку после фона, если Vulkan ещё не подтверждён.
@@ -351,14 +401,26 @@ static func rearm() -> void:
 	_save(st)
 
 
-## Перезапуск после смены рендерера: сохранить героя, снять страховку и выйти (на Android 4.3 OS.set_restart_on_exit
-## не перезапускает приложение — GodotActivity не обрабатывает onNewGodotInstanceRequested; игрок открывает игру сам).
+## Перезапуск после смены рендерера: сохранить героя, снять страховку и перезапустить игру через плагин
+## (restartApp → ProcessPhoenix.triggerRebirth — так перезапускается сам Godot 4.3 при потере контекста отрисовки;
+## OS.set_restart_on_exit на Android 4.3 не работает — GodotActivity не обрабатывает onNewGodotInstanceRequested).
+## Без плагина — выход, игрок открывает игру сам.
 static func quit_for_restart(tree: SceneTree) -> void:
 	if Game.has_character and Game.slot >= 0:
 		Game.save_game()
 	disarm()
+	log_line("перезапуск для смены рендерера: сейчас %s, файл — %s" % [_file_name(current_method()), _file_name(override_method())])
+	if can_restart():
+		var r: Variant = _plugin_call("restartApp", [])
+		if typeof(r) == TYPE_BOOL and bool(r):
+			return
 	if tree != null:
 		tree.quit()
+
+
+## Игру можно перезапустить кнопкой (Android с плагином); иначе — «Сохранить и выйти».
+static func can_restart() -> bool:
+	return is_android() and Assets.download_plugin() != null
 
 
 # ---------- Файл для Godot (application/config/project_settings_override) ----------
@@ -383,27 +445,105 @@ static func override_method() -> String:
 	return MOBILE if s.contains("rendering_method.mobile=\"mobile\"") else COMPAT
 
 
-## Записать файл (только на Android; тот же текст — не трогать). Сначала во временный, потом переименовать:
-## оборванная запись не оставит полфайла.
+## Записать файл (только на Android; тот же текст — не трогать).
 static func _write_override(method: String) -> void:
 	if not is_android():
 		return
 	var text := override_text(method)
-	if FileAccess.file_exists(override_path) and FileAccess.get_file_as_string(override_path) == text:
+	if _read(override_path) == text:
 		return
-	var tmp := override_path + ".tmp"
+	if not _write_text(override_path, text):
+		push_warning("RendererGuard: не удалось записать %s" % override_path)
+		log_line("не удалось записать файл рендерера (%s)" % _file_name(method))
+
+
+static func _read(path: String) -> String:
+	if not FileAccess.file_exists(path):
+		return ""
+	return FileAccess.get_file_as_string(path)
+
+
+## Сначала во временный файл, потом переименовать (оборванная запись не оставит полфайла). Переименование — внутри
+## папки user:// (DirAccess.open(папка) — DirAccessUnix, rename(2)), не DirAccess.rename_absolute (на Android —
+## через Java: DirAccessJAndroid → FilesystemDirectoryAccess). Не вышло — прямо в файл. Итог проверяется чтением.
+static func _write_text(path: String, text: String) -> bool:
+	var tmp := path + ".tmp"
+	var d := DirAccess.open(path.get_base_dir())
 	var f := FileAccess.open(tmp, FileAccess.WRITE)
+	if f != null:
+		f.store_string(text)
+		f.close()
+		if d != null and d.rename(tmp.get_file(), path.get_file()) == OK and _read(path) == text:
+			return true
+	f = FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
-		push_warning("RendererGuard: не удалось записать %s" % tmp)
-		return
+		return false
 	f.store_string(text)
 	f.close()
-	var abs_tmp := ProjectSettings.globalize_path(tmp)
-	var abs_dst := ProjectSettings.globalize_path(override_path)
-	if DirAccess.rename_absolute(abs_tmp, abs_dst) != OK:
-		DirAccess.remove_absolute(abs_dst)
-		if DirAccess.rename_absolute(abs_tmp, abs_dst) != OK:
-			push_warning("RendererGuard: не удалось записать %s" % override_path)
+	if d != null and d.file_exists(tmp.get_file()):
+		d.remove(tmp.get_file())
+	return _read(path) == text
+
+
+static func _file_name(m: String) -> String:
+	if m == "":
+		return "нет"
+	return "Vulkan" if m == MOBILE else "Совместимость"
+
+
+# ---------- Журнал и диагностика (отчёт тест-бота) ----------
+
+## Строка в журнал рендерера (только на Android; последние LOG_MAX строк; тот же файл пишет плагин).
+static func log_line(text: String) -> void:
+	if not is_android():
+		return
+	var lines := _read(log_path).split("\n", false)
+	lines.append("%s · игра · %s" % [Time.get_datetime_string_from_system(false, true), text])
+	var from := maxi(0, lines.size() - LOG_MAX)
+	var f := FileAccess.open(log_path, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string("\n".join(lines.slice(from)) + "\n")
+	f.close()
+
+
+## Последние n строк журнала.
+static func log_tail(n: int) -> PackedStringArray:
+	var lines := _read(log_path).split("\n", false)
+	return lines.slice(maxi(0, lines.size() - n))
+
+
+## Для отчёта тест-бота: что рисует сейчас, что в настройках проекта, файлы рендерера и состояния, ответ плагина,
+## журнал запусков.
+static func diagnostics(log_lines: int = 30) -> PackedStringArray:
+	var out := PackedStringArray()
+	var drv := String(ProjectSettings.get_setting_with_override("rendering/rendering_device/driver"))
+	out.append("Сейчас рисует: %s (RenderingDevice %s); в настройках проекта rendering_method «%s», rendering_device/driver «%s»"
+		% [method_name(), "есть" if RenderingServer.get_rendering_device() != null else "нет", engine_method(), drv])
+	var body := PackedStringArray()
+	for l in _read(override_path).split("\n", false):
+		var line := String(l).strip_edges()
+		if line != "" and not line.begins_with(";"):
+			body.append(line)
+	out.append("Файл рендерера %s: %s" % [override_path, " · ".join(body) if not body.is_empty() else "нет"])
+	var st_body := PackedStringArray()
+	for l in _read(state_path).split("\n", false):
+		var line := String(l).strip_edges()
+		if line != "" and not line.begins_with("["):
+			st_body.append(line)
+	out.append("Состояние %s: %s" % [state_path, " · ".join(st_body) if not st_body.is_empty() else "нет"])
+	var pv := plugin_vulkan()
+	out.append("Плагин vulkanSupported: %s · видеочип «%s» в списке надёжных: %s · после перезапуска: %s"
+		% ["да" if pv == 1 else ("нет" if pv == 0 else "нет ответа"), gpu_name(),
+		"да" if gpu_supports_vulkan(gpu_name()) else "нет", method_name(desired_method()) if is_android() else "—"])
+	var tail := log_tail(log_lines)
+	if tail.is_empty():
+		out.append("Журнал рендерера: пусто")
+	else:
+		out.append("Журнал рендерера (последние %d):" % tail.size())
+		for l in tail:
+			out.append("  " + String(l))
+	return out
 
 
 ## Тесты: как новый запуск (статические флаги сброшены).

@@ -219,7 +219,8 @@ static func _renderer_rows(hud: HUD, page: VBoxContainer) -> void:
 	page.add_child(_wrap_label(hint, UiScale.FONT_SMALL, HINT_COLOR))
 	if RendererGuard.restart_needed():
 		var rrow := _row(page)
-		_choice(rrow, "renderer_restart", "Сохранить и выйти (откройте игру снова)", false,
+		var label := "Перезапустить игру" if RendererGuard.can_restart() else "Сохранить и выйти (откройте игру снова)"
+		_choice(rrow, "renderer_restart", label, false,
 			func() -> void: RendererGuard.quit_for_restart(hud.get_tree()))
 
 
