@@ -138,8 +138,11 @@ func _unit_data() -> void:
 		check(ItemData.card_for(id) == "" and ItemData.soul_card_for(id) == "", "у %s нет карт" % id)
 		check(not PetData.SPECIES.has(id), "%s не бывает питомцем" % id)
 		check(MobData.rarity_tier(id) < int(MobData.RARITY_TIER["unique"]), "%s не уникальный" % id)
-		for e in MobData.get_type(id)["loot"]:
-			check(not ItemData.get_item(String(e[0])).is_empty(), "добыча %s есть в предметах: %s" % [id, e[0]])
+		for e in MobData.materials(id):
+			check(not ItemData.get_item(String(e)).is_empty(), "добыча %s есть в предметах: %s" % [id, e])
+		check(not MobData.materials(id).is_empty(), "у %s есть материал" % id)
+		check(not LootTable.categories_for(id, 10).has("card") or MobData.drops_mirror(id),
+			"из %s карты существа не выпадают (только зеркальная у змеекрыла)" % id)
 		check(CreatureAsset.has_asset(id), "модель %s из файла есть" % id)
 		var inf := CreatureAsset.info_for(id)
 		check(float(inf["hover"]) > HOVER_MIN and float(inf["height"]) > float(inf["hover"]),

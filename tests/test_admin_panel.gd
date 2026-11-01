@@ -477,10 +477,10 @@ func _check_items() -> void:
 	_press("clear_bag")
 	_press("clear_bag_yes")
 	check(game.inventory.ids() == [w] or (game.shield != "" and game.inventory.ids().size() == 2), "сумка пуста, кроме надетого")
-	_press("item_hp_potion_1")
-	check(game.inventory.count("hp_potion") == 1, "+1 зелье")
-	_press("item_hp_potion_10")
-	check(game.inventory.count("hp_potion") == 11, "+10 зелий")
+	_press("item_potion_hp_r1_1")
+	check(game.inventory.count("potion_hp_r1") == 1, "+1 зелье")
+	_press("item_potion_hp_r1_10")
+	check(game.inventory.count("potion_hp_r1") == 11, "+10 зелий")
 	_press("item_card_wolf_10")
 	check(game.inventory.count("card_wolf") == 10, "+10 карт волка")
 	_press("item_mirror_card_1")
@@ -504,18 +504,18 @@ func _check_items() -> void:
 	check(game.inventory.count(weapon_id) == c1 + 10 and game.inventory.used_cells() <= Inventory.CAPACITY,
 		"+10 оружия: %d, занято %d" % [game.inventory.count(weapon_id), game.inventory.used_cells()])
 	# Очистка с подтверждением
-	var potions_before: int = game.inventory.count("hp_potion")
+	var potions_before: int = game.inventory.count("potion_hp_r1")
 	_press("clear_bag")
 	check(AdminPanel.buttons.has("clear_bag_yes") and AdminPanel.buttons.has("clear_bag_no"), "подтверждение очистки")
 	_press("clear_bag_no")
-	check(game.inventory.count("hp_potion") == potions_before and potions_before > 0 and AdminPanel.buttons.has("clear_bag"),
-		"отмена — сумка цела (зелий %d)" % game.inventory.count("hp_potion"))
+	check(game.inventory.count("potion_hp_r1") == potions_before and potions_before > 0 and AdminPanel.buttons.has("clear_bag"),
+		"отмена — сумка цела (зелий %d)" % game.inventory.count("potion_hp_r1"))
 	_press("clear_bag")
 	_press("clear_bag_yes")
-	check(game.inventory.count("hp_potion") == 0 and game.inventory.has(w) and game.weapon == w and game.inventory.used_cells() == 0,
+	check(game.inventory.count("potion_hp_r1") == 0 and game.inventory.has(w) and game.weapon == w and game.inventory.used_cells() == 0,
 		"сумка очищена, надетое оружие осталось: %s" % ", ".join(PackedStringArray(game.inventory.ids())))
 	# Для проверки сохранения
-	_press("item_hp_potion_10")
+	_press("item_potion_hp_r1_10")
 	print("  предметов в панели: %d" % n)
 
 
@@ -640,7 +640,7 @@ func _check_save() -> void:
 		return
 	var sd: Dictionary = d
 	check(int(sd["level"]) == 15 and int(sd["gold"]) == 1000 and int(sd["xp_mult"]) == 5
-		and int((sd["inventory"] as Dictionary).get("hp_potion", 0)) >= 10 and (sd["pets"] as Array).size() == 1,
+		and int((sd["inventory"] as Dictionary).get("potion_hp_r1", 0)) >= 10 and (sd["pets"] as Array).size() == 1,
 		"в сохранении: ур. 15, 1000 зол., ×5, зелья, 1 питомец")
 	game.xp_mult = 1
 	game.level = 1

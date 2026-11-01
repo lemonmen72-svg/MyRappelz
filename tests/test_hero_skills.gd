@@ -50,7 +50,7 @@ func run_step() -> void:
 				% player.attack_range)
 			_check_model(player, ["Crossbow"], "арбалет в руках")
 			check(player._model.find_child("SwordL", true, false) == null, "с арбалетом клинков в руках нет")
-			check(player.equip("hp_potion") != "", "зелье не надеть как оружие")
+			check(player.equip("potion_hp_r1") != "", "зелье не надеть как оружие")
 			check(player.equip("dagger_steel") != "", "оружие не из сумки не надеть")
 			mob = find_mob("pheasant")
 			check(mob != null, "найден фазан")

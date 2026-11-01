@@ -292,12 +292,16 @@ func recalc_stats() -> void:
 
 
 ## Усиление на время от умения sid (HeroSkillFx "buff"): bonus — {ключ HeroSkills.BONUS_NAMES: число} на sec секунд,
-## значок у полоски HP ("buff:<id>"). Повтор продлевает.
-func add_timed_bonus(sid: String, sec: float, bonus: Dictionary) -> void:
+## значок у полоски HP ("buff:<id>"). Повтор продлевает (и заменяет прибавку). src — источник значка
+## ({"name", "icon"}; пусто — умение героя sid; зелья — сам предмет, Economy.drink).
+func add_timed_bonus(sid: String, sec: float, bonus: Dictionary, src: Dictionary = {}) -> void:
 	if sec <= 0.0:
 		return
 	timed_bonus[sid] = {"left": sec, "bonus": bonus}
-	effects.add("buff:" + sid, sec, StatusEffects.effect_info("buff", StatusEffects.source_hero_skill(sid)))
+	var info := StatusEffects.effect_info("buff", src if not src.is_empty() else StatusEffects.source_hero_skill(sid))
+	# Повтор: значок с новым источником (другой ранг зелья) и отсчёт заново
+	effects.remove("buff:" + sid)
+	effects.add("buff:" + sid, sec, info)
 	recalc_stats()
 	stats_changed.emit()
 

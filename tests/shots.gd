@@ -77,12 +77,17 @@ const ANATHEMA_ROW := ["anathema", "anathema_blade", "anathema_chief"]
 ## Умения Наёмника для кадров окна героя [id, уровень].
 const HERO_SKILLS := [["blade_mastery", 2], ["charge_stab", 2], ["dark_strike", 1], ["evasion_expert", 2],
 	["concentration", 1], ["crossbow_mastery", 1], ["dual_shot", 1]]
+## Зелья рангов и оружие 2-го ранга для кадра 190 (сумка): [id, количество].
+const POTION_BAG := [
+	["potion_hp_r2", 6], ["potion_hp_r6", 2], ["potion_hp_r11", 1], ["potion_mp_r1", 5], ["potion_mp_r7", 2],
+	["potion_aspd_r2", 3], ["potion_cast_r12", 1], ["potion_speed_r1", 4], ["weapon_staff_2h_r2", 1], ["weapon_sword_1h_r2", 1],
+]
 ## Предметы для кадров сумки и торговца (27–30): [id, количество]. Карты существ: пустые, с душой, зеркальная.
 const BAG_ITEMS := [
 	["dagger_steel", 1], ["sword_steel", 2], ["crossbow_heavy", 1], ["card_panther", 4], ["card_wolf", 1], ["card_turtle", 1],
 	["card_panther_soul", 1], ["card_wolf_soul", 1], ["mirror_card", 2], ["lizard_scale", 7],
 	["wolf_pelt", 3], ["panther_fang", 2], ["pheasant_feather", 4], ["shell_plate", 2], ["chief_spike", 1],
-	["hp_potion", 12],
+	["potion_hp_r1", 12],
 ]
 
 
@@ -1057,7 +1062,7 @@ func run_step() -> void:
 			main.npcs.close_dialog()
 			# Склад у Кладовщика Тобина: стопки на складе, выбрана вещь из сумки
 			_talk_view("storekeeper")
-			for e in [["wolf_pelt", 6], ["pheasant_feather", 9], ["mirror_card", 2], ["hp_potion", 20], ["shell_plate", 3]]:
+			for e in [["wolf_pelt", 6], ["pheasant_feather", 9], ["mirror_card", 2], ["potion_hp_r1", 20], ["shell_plate", 3]]:
 				game.storage.add(String(e[0]), int(e[1]))
 			game.inventory.add("panther_fang", 4)
 			main.economy.open_storage()
@@ -1421,6 +1426,52 @@ func run_step() -> void:
 		1065:
 			shot("182_cast_crossbow_aim")
 			main.player.cancel_cast("")
+			wait = 3
+			step = 1080
+		# ---------- Кадры 190–192: зелья рангов в сумке, золото на складе, мешочки добычи ----------
+		1080:
+			game.level = 12
+			main.player.apply_class()
+			for e in POTION_BAG:
+				game.inventory.add(String(e[0]), int(e[1]))
+			main.economy.open_bag()
+			main.economy.window.select_cell(game.inventory.find_cell("potion_hp_r2"))
+			wait = 12
+			step = 1081
+		1081:
+			shot("190_bag_potion_ranks")
+			main.hud.close_window()
+			# Склад: золото на складе, вещи
+			_talk_view("storekeeper")
+			game.storage_gold = 12500
+			game.gold = 3400
+			for e in [["potion_mp_r2", 8], ["weapon_staff_2h_r2", 1], ["potion_speed_r1", 4]]:
+				game.storage.add(String(e[0]), int(e[1]))
+			main.economy.open_storage()
+			main.economy.window.select_store(game.storage.find_cell("potion_mp_r2"))
+			wait = 12
+			step = 1082
+		1082:
+			shot("191_storage_gold")
+			main.hud.close_window()
+			# Мешочки добычи у торговца: обычный зверь (2 предмета) и босс (4 — мешочек крупнее); ускорения со значками
+			var p: Player = main.player
+			var pos := Vector3(0.0, 0.0, 3.2)
+			if IslandWorld.current != null:
+				pos.y = IslandWorld.current.height_at(pos.x, pos.z) + 0.1
+			p.global_position = pos
+			p.hp = p.max_hp
+			main.cam_yaw = 0.25
+			main.cam_pitch = 0.3
+			main.cam_dist = 6.5
+			main.economy.spawn_drop(Vector3(-0.6, 0.0, -0.2), LootTable.roll("wolf", 12), 9)
+			main.economy.spawn_drop(Vector3(1.0, 0.0, -1.0), LootTable.roll("boss_panther", 24), 120)
+			for id in ["potion_aspd_r2", "potion_speed_r1"]:
+				check(main.economy.drink(String(id)), "кадр 192: выпито %s" % id)
+			wait = 30
+			step = 1083
+		1083:
+			shot("192_loot_drops")
 			ok_done()
 
 

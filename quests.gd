@@ -13,7 +13,9 @@ extends Node
 ## Сообщает на экране («Задание обновлено: Поймать душу 1/1», «… выполнено — вернитесь к Учителю Кирку»).
 ## Сдача (complete) — у NPC-сдающего: награды — опыт героя (Player.gain_xp: уровни и доля JP), золото, предметы
 ## (если не помещаются — «Освободите место в сумке», задание остаётся взятым), JP героя; предметы целей collect
-## с take = true забираются.
+## с take = true забираются. Сверх того — 1–2 случайных предмета (правило Максима; LootTable.quest_reward: зелья,
+## оружие для профессии, карта существа — с шансами вдвое ниже, чем в добыче, ранг по уровню героя); что выпало —
+## в сообщении о сдаче и в last_bonus.
 ## Журнал — QuestWindow (window; кнопка «Задания» в меню HUD, клавиша J), трекер отслеживаемого задания —
 ## компактный блок справа вверху под меню (tracker; касание — журнал). Значки над NPC — npc_mark (Npcs).
 
@@ -36,6 +38,8 @@ var tracker: PanelContainer
 
 var _tracker_box: VBoxContainer
 var _last_level := -1
+## Случайные предметы последней сдачи {id: количество} (сообщение, тесты).
+var last_bonus: Dictionary = {}
 
 
 func setup(m: Node) -> void:
@@ -294,9 +298,15 @@ func complete(id: String) -> bool:
 		_msg("Задание «%s» ещё не выполнено" % QuestData.quest_name(id))
 		return false
 	var items := QuestData.reward_items(id)
-	if not Game.inventory.room_for_all(items):
+	# Случайная награда (1–2 предмета): бросок при сдаче, место — вместе с наградой из данных
+	var bonus := LootTable.quest_reward(Game.level, Game.class_id)
+	var all_items: Dictionary = items.duplicate()
+	for k in bonus:
+		all_items[k] = int(all_items.get(k, 0)) + int(bonus[k])
+	if not Game.inventory.room_for_all(all_items):
 		_msg("Освободите место в сумке: награда не помещается")
 		return false
+	last_bonus = bonus
 	var goals := QuestData.goals(id)
 	Game.quests_active.erase(id)
 	Game.quests_done[id] = times_done(id) + 1
@@ -317,8 +327,8 @@ func complete(id: String) -> bool:
 	var gold := int(r.get("gold", 0))
 	var jp := int(r.get("jp", 0))
 	Game.gold += gold
-	for k in items:
-		Game.inventory.add(String(k), int(items[k]))
+	for k in all_items:
+		Game.inventory.add(String(k), int(all_items[k]))
 	if jp > 0:
 		HeroSkills.add_jp(Game.hero, float(jp))
 	var p: Node3D = main.get("player")
@@ -334,7 +344,10 @@ func complete(id: String) -> bool:
 		if text != "":
 			Util.float_text(main, p.global_position + Vector3(0, 3.0, 0), text, GOLD, 1.2)
 		Vfx.level_up(main, p.global_position)
-	_msg("Задание «%s» выполнено! Награда: %s" % [QuestData.quest_name(id), QuestData.reward_text(id)], 5.0)
+	var said := QuestData.reward_text(id)
+	if not bonus.is_empty():
+		said += ("; " if said != "" else "") + "случайная награда: " + LootDrop.describe(bonus)
+	_msg("Задание «%s» выполнено! Награда: %s" % [QuestData.quest_name(id), said], 5.0)
 	Game.changed.emit()
 	_changed()
 	Game.save_game()
@@ -675,10 +688,10 @@ static func _species_ok(g: Dictionary, species: String) -> bool:
 	return t == "" or t == species
 
 
-## Предмет подходит цели: items пусто — любой.
+## Предмет подходит цели: items пусто — любой; семья зелий ("potion_hp") — зелье этого вида любого ранга.
 static func _item_ok(g: Dictionary, id: String) -> bool:
 	var items: Array = g.get("items", [])
-	return items.is_empty() or items.has(id)
+	return items.is_empty() or items.has(id) or (ItemData.is_potion(id) and items.has(ItemData.potion_family(id)))
 
 
 ## Покупка или продажа подходит цели: предмет (items пусто — любой) и NPC (npc "" — любой).

@@ -147,13 +147,16 @@ func _unit_kind() -> void:
 	check(int(ItemData.get_item("card_centaur")["buy"]) == 0, "карта кентавра не продаётся")
 	for s in ["kirk", "merchant"]:
 		check(not (NpcData.npc(s).get("shop", []) as Array).has("card_centaur"), "%s не продаёт карту кентавра" % s)
-	var drop := 0.0
-	for e in MobData.get_type("centaur")["loot"]:
-		var entry: Array = e
-		check(not ItemData.get_item(String(entry[0])).is_empty(), "добыча кентавра есть в предметах: %s" % entry[0])
-		if String(entry[0]) == "card_centaur":
-			drop = float(entry[1])
-	check(drop > 0.0 and drop <= 0.05, "карта кентавра выпадает из него (%.0f%%)" % (drop * 100.0))
+	for e in MobData.materials("centaur"):
+		check(not ItemData.get_item(String(e)).is_empty(), "добыча кентавра есть в предметах: %s" % e)
+	var dropped := false
+	for e in LootTable.pool("card", "centaur", 14):
+		dropped = dropped or String((e as Array)[0]) == "card_centaur"
+	# Шанс карты в добыче — шанс приручения её тира (фиолетовая — 35 %), кентавр — минибосс («Редкий»): 3 предмета
+	var cats := LootTable.categories_for("centaur", 14)
+	check(dropped and is_equal_approx(float(cats.get("card", 0.0)), float(Taming.CHANCE["special"])),
+		"карта кентавра выпадает из него (вес %.0f%%)" % (float(cats.get("card", 0.0)) * 100.0))
+	check(MobData.is_mini_boss("centaur") and LootTable.item_count("centaur") == 3, "кентавр — минибосс: 3 предмета")
 	for it in ["spear_tip", "horse_hair"]:
 		check(ItemData.item_type(it) == "trophy" and int(ItemData.get_item(it)["sell"]) > 0, "трофей %s" % it)
 	var ic := ItemIcon.make("card_centaur_soul", 64.0)

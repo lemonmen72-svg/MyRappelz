@@ -44,7 +44,7 @@ func run_step() -> void:
 			check(game.level == OLD_LEVEL and game.xp == OLD_XP and game.gold == OLD_GOLD + 30,
 				"уровень, опыт и золото сохранены (+30 зол. за редкий кристалл): %d" % game.gold)
 			var inv: Inventory = game.inventory
-			check(inv.count("hp_potion") == 4 and inv.count("mirror_card") == 3 and inv.count("boar_tusk") == 5,
+			check(inv.count("potion_hp_r1") == 4 and inv.count("mirror_card") == 3 and inv.count("boar_tusk") == 5,
 				"сумка сохранена, кристаллы души стали зеркальными картами")
 			check(not inv.has("crystal_common") and not inv.has("crystal_rare"), "кристаллов в сумке нет")
 			for id in ItemData.STARTER_WEAPONS["assassin"]:

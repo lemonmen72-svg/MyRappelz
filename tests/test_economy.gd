@@ -1,10 +1,11 @@
 extends "res://tests/test_base.gd"
 ## Предметы и торговля: добыча мешочком и подбор, торговец и безопасная зона, покупка и продажа,
 ## окна торговца и сумки (InventoryWindow: сетка, карточка, кнопки действий), зелье с перезарядкой и счётчиком
-## на кнопке. Подробно сумка — tests/test_inventory.gd.
+## на кнопке, золото в мешочке. Подробно сумка — tests/test_inventory.gd, правила добычи — tests/test_loot.gd,
+## зелья — tests/test_potions.gd.
 
-## Сколько фазанов можно убить в поисках добычи (шанс пера 0.6, пустой мешок ~35%).
-const MAX_KILLS := 12
+## Сколько фазанов можно убить в поисках добычи (мешочек со зверя теперь всегда: золото и 2 предмета).
+const MAX_KILLS := 3
 
 var mob: Mob = null
 var kills := 0
@@ -12,6 +13,8 @@ var drop: LootDrop = null
 var drop_items: Dictionary = {}
 var counts_before: Dictionary = {}
 var old_drop: LootDrop = null
+var drop_gold := 0
+var gold_before := 0
 
 
 func run_step() -> void:
@@ -46,7 +49,18 @@ func run_step() -> void:
 				return
 			drop = found
 			drop_items = drop.items.duplicate()
-			check(not drop_items.is_empty(), "мешочек с добычей: %s (фазан %d)" % [LootDrop.describe(drop_items), kills])
+			drop_gold = drop.gold
+			check(not drop_items.is_empty(), "мешочек с добычей: %s (фазан %d)" % [LootDrop.describe(drop_items, drop_gold), kills])
+			var n := 0
+			for key in drop_items:
+				n += int(drop_items[key])
+			check(n >= LootTable.item_count("pheasant"), "со зверя — %d предмета (без квестовой добычи): %d" % [
+				LootTable.item_count("pheasant"), n])
+			var mlvl: int = mob.level if is_instance_valid(mob) else 1
+			var gr: Array = MobData.gold_range("pheasant", mlvl)
+			check(drop_gold >= int(gr[0]) and drop_gold <= int(gr[1]), "золото в мешочке всегда: %d (%d–%d)" % [
+				drop_gold, int(gr[0]), int(gr[1])])
+			gold_before = game.gold
 			counts_before = {}
 			for key in drop_items:
 				var id: String = key
@@ -62,6 +76,7 @@ func run_step() -> void:
 				var id: String = key
 				var before: int = counts_before[id]
 				check(game.inventory.count(id) == before, "издалека %s не подобран" % id)
+			check(game.gold == gold_before, "издалека золото не подобрано")
 			player.global_position = drop.global_position + Vector3(1.0, 0.1, 0)
 			wait = 10
 			step = 4
@@ -73,7 +88,8 @@ func run_step() -> void:
 				var n: int = drop_items[key]
 				var before: int = counts_before[id]
 				check(game.inventory.count(id) == before + n, "в сумке %s: %d -> %d" % [id, before, game.inventory.count(id)])
-			check(_button_label("potion") == "Зелье\n%d" % game.inventory.count("hp_potion"),
+			check(game.gold == gold_before + drop_gold, "золото из мешочка: %d → %d" % [gold_before, game.gold])
+			check(_button_label("potion") == "Зелье\n%d" % Economy.potion_count("hp"),
 				"счётчик зелий на кнопке обновился")
 			# Мешочек исчезает со временем
 			old_drop = eco.spawn_drop(player.global_position + Vector3(15, 0, 0), {"boar_tusk": 1})
@@ -115,10 +131,19 @@ func run_step() -> void:
 				"куплен свиток: золото %d, свитков %d" % [game.gold, game.inventory.count("revive_scroll")])
 			# Покупка ×5
 			game.gold = 100
-			var potions: int = game.inventory.count("hp_potion")
-			_press("good_hp_potion")
+			var potions: int = game.inventory.count("potion_hp_r1")
+			_press("good_potion_hp_r1")
 			_press("act_buy5")
-			check(game.gold == 50 and game.inventory.count("hp_potion") == potions + 5, "куплено 5 зелий")
+			check(game.gold == 50 and game.inventory.count("potion_hp_r1") == potions + 5, "куплено 5 зелий")
+			# Зелья 1-го и 2-го ранга всех видов (на острове — только они), ранг дороже
+			for kind in ItemData.POTION_KINDS:
+				for r in [1, 2]:
+					check(_find_button("good_" + ItemData.potion_id(String(kind), int(r))) != null,
+						"торговец продаёт %s" % ItemData.item_name(ItemData.potion_id(String(kind), int(r))))
+				check(_find_button("good_" + ItemData.potion_id(String(kind), 3)) == null, "3-й ранг на острове не продаётся")
+				check(int(ItemData.get_item(ItemData.potion_id(String(kind), 2))["buy"]) > int(ItemData.get_item(ItemData.potion_id(String(kind), 1))["buy"]),
+					"зелье 2-го ранга дороже 1-го")
+			check(_find_button("good_weapon_sword_1h_r2") == null, "оружие 2-го ранга на острове не продаётся")
 			# Не хватает золота
 			game.gold = 10
 			scrolls = game.inventory.count("revive_scroll")
@@ -153,16 +178,16 @@ func run_step() -> void:
 			# Зелье из сумки
 			check(eco.potion_cooldown_frac() == 0.0, "зелье готово")
 			player.hp = 10
-			var potions: int = game.inventory.count("hp_potion")
-			_press("cell_%d" % game.inventory.find_cell("hp_potion"))
+			var potions: int = game.inventory.count("potion_hp_r1")
+			_press("cell_%d" % game.inventory.find_cell("potion_hp_r1"))
 			_press("act_use")
-			check(player.hp > 10 and game.inventory.count("hp_potion") == potions - 1, "зелье из сумки лечит")
+			check(player.hp > 10 and game.inventory.count("potion_hp_r1") == potions - 1, "зелье из сумки лечит")
 			check(hud.is_window_open() and eco.is_bag_open(), "сумка открыта после использования")
 			check(_button_label("potion") == "Зелье\n%d" % (potions - 1), "счётчик зелий на кнопке")
 			# Перезарядка
 			player.hp = 10
 			main._on_action("potion")
-			check(player.hp == 10 and game.inventory.count("hp_potion") == potions - 1, "зелье на перезарядке")
+			check(player.hp == 10 and game.inventory.count("potion_hp_r1") == potions - 1, "зелье на перезарядке")
 			check(eco.potion_cooldown_frac() > 0.5, "доля перезарядки %.2f" % eco.potion_cooldown_frac())
 			# Закрытие кнопкой окна
 			var close := _find_text(hud._window, "Закрыть")

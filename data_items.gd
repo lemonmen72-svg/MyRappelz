@@ -7,7 +7,8 @@ extends RefCounted
 ## Оружие (type "weapon"): weapon — вид (WEAPON_KINDS: одноручный и двуручный меч, кинжал, одноручная и двуручная
 ## булава, топоры, посохи, арбалет, лук, щит), atk — физ. атака, matk — маг. атака, def — физ. защита и block — шанс
 ## блока (щит): действуют только те, что есть у вида (WEAPON_KINDS stats; там же скорость атаки и каста вида),
-## range — дальность, м, crit — прибавка к шансу крита, rank — ранг (1 — оружие 1–10 ур.). Кому подходит — по виду:
+## range — дальность, м, crit — прибавка к шансу крита, rank — ранг (EQUIP_RANKS: 1 — 1–20 ур., 2 — 21–50…; надеть —
+## с нижнего уровня ранга, level_block), model — файл модели в руках (Handheld; нет — модель вида). Кому подходит — по виду:
 ## ClassData weapons профессии (weapon_fits; Бродяге — любое). Надетое оружие — Game.weapon, вторая рука —
 ## Game.offhand (щит или второе такое же одноручное — пара, offhand_block); id предметов лежат в сумке,
 ## но в окне сумки показаны в слотах экипировки, а не в ячейках.
@@ -19,8 +20,11 @@ extends RefCounted
 ## душой (из неё формируется питомец). Пустая карта вида — card_<вид> (стопка до CARD_STACK), заполненная —
 ## card_<вид>_soul (по одной в ячейке), зеркальная карта mirror_card (без вида) — ломается вместо карты существа
 ## при неудачном приручении. Тир и цвет карты — по виду (MobData.card_tier, CARD_TIERS).
+## Зелья (potion_<вид>_r<ранг>: здоровье, мана, скорость атаки, каста, бега; ранги 1–15) — POTION_KINDS, строятся
+## в _static_init; ITEMS — BASE_ITEMS + зелья. Ранги предметов и требования уровня — «Ранги предметов» ниже.
+## Добыча со зверей и случайные награды заданий — LootTable.
 
-const ITEMS := {
+const BASE_ITEMS := {
 	# ---------- Карты существ: базовые продаёт Учитель Кирк, остальные выпадают из зверей своего вида ----------
 	"card_panther": {
 		"name": "Карта существа: Пантера", "type": "card", "species": "panther", "icon": "card", "stack": 20,
@@ -67,15 +71,12 @@ const ITEMS := {
 		"color": Color(0.82, 0.88, 0.98),
 		"desc": "Оберег для приручения: если попытка не удалась, ломается зеркальная карта, а карта существа остаётся цела.",
 	},
-	"hp_potion": {
-		"name": "Зелье здоровья", "type": "consumable", "icon": "flask", "buy": 10, "sell": 3,
-		"color": Color(0.9, 0.2, 0.25), "desc": "Восстанавливает 50% здоровья.",
-	},
+	# Зелья (potion_<вид>_r<ранг>) — не здесь: их 5 видов × 15 рангов строит _static_init (POTION_KINDS)
 	"revive_scroll": {
 		"name": "Свиток воскрешения", "type": "consumable", "icon": "scroll", "buy": 30, "sell": 10,
 		"color": Color(0.95, 0.9, 0.6), "desc": "Воскрешает погибшего питомца.",
 	},
-	# ---------- Оружие 1-го ранга (ур. 1–10): у торговца; стартовое у Бродяги и профессий (STARTER_WEAPONS) ----------
+	# ---------- Оружие 1-го ранга (ур. 1–20): у торговца; стартовое у Бродяги и профессий (STARTER_WEAPONS) ----------
 	# Бонусы — по виду (WEAPON_KINDS stats / aspd / cast): из чисел atk, matk, def, block действуют только те, что есть у вида.
 	"weapon_sword_1h_r1": {
 		"name": "Учебный меч", "type": "weapon", "icon": "sword", "weapon": "sword_1h", "rank": 1,
@@ -142,6 +143,75 @@ const ITEMS := {
 		"atk": 6, "range": 11.0, "crit": 0.0, "buy": 50, "sell": 10,
 		"color": Color(0.72, 0.52, 0.32), "desc": "Стреляет болтами издалека, но реже.",
 	},
+	# ---------- Оружие 2-го ранга (ур. 21–50): на острове не продаётся (только 1-й ранг), выпадает из зверей 21+ ур.
+	# и бывает в награде заданий. Числа — ×3.25 к 1-му рангу: атака героя без оружия в середине 2-го ранга (35 ур.,
+	# ≈ 90) в 3.3 раза выше, чем в середине 1-го (10 ур., ≈ 27) — доля оружия в атаке та же (≈ 15 %). Модель —
+	# assets/handheld/weapon_<вид>_r2.glb (поле model; нет файла — модель вида 1-го ранга, Handheld.model_for).
+	"weapon_sword_1h_r2": {
+		"name": "Меч стражника", "type": "weapon", "icon": "sword", "weapon": "sword_1h", "rank": 2,
+		"model": "weapon_sword_1h_r2", "atk": 13, "range": 2.6, "crit": 0.03, "buy": 0, "sell": 32,
+		"color": Color(0.82, 0.88, 0.96), "desc": "Надёжный одноручный меч стражи. Вторая рука свободна — для щита или второго меча.",
+	},
+	"weapon_sword_2h_r2": {
+		"name": "Двуручный меч ветерана", "type": "weapon", "icon": "swords", "weapon": "sword_2h", "rank": 2,
+		"model": "weapon_sword_2h_r2", "atk": 26, "range": 2.9, "crit": 0.03, "buy": 0, "sell": 48,
+		"color": Color(0.78, 0.84, 0.95), "desc": "Тяжёлый клинок бывалого бойца: бьёт реже, но рассекает надвое.",
+	},
+	"weapon_dagger_r2": {
+		"name": "Кинжал следопыта", "type": "weapon", "icon": "dagger", "weapon": "dagger", "rank": 2,
+		"model": "weapon_dagger_r2", "atk": 7, "matk": 7, "range": 2.2, "crit": 0.06, "buy": 0, "sell": 28,
+		"color": Color(0.76, 0.74, 0.95), "desc": "Узкий клинок с рунной канавкой: частые удары, много критов, помогает и магии.",
+	},
+	"weapon_mace_1h_r2": {
+		"name": "Булава стражника", "type": "weapon", "icon": "mace", "weapon": "mace_1h", "rank": 2,
+		"model": "weapon_mace_1h_r2", "atk": 13, "matk": 7, "range": 2.5, "crit": 0.0, "buy": 0, "sell": 32,
+		"color": Color(0.74, 0.72, 0.68), "desc": "Шипастая булава в одну руку. Хороша со щитом.",
+	},
+	"weapon_mace_2h_r2": {
+		"name": "Тяжёлая булава ветерана", "type": "weapon", "icon": "mace", "weapon": "mace_2h", "rank": 2,
+		"model": "weapon_mace_2h_r2", "atk": 23, "matk": 13, "range": 2.8, "crit": 0.0, "buy": 0, "sell": 48,
+		"color": Color(0.7, 0.68, 0.64), "desc": "Окованная двуручная булава: медленно, зато зверь чувствует каждый удар.",
+	},
+	"weapon_axe_1h_r2": {
+		"name": "Топор следопыта", "type": "weapon", "icon": "axe", "weapon": "axe_1h", "rank": 2,
+		"model": "weapon_axe_1h_r2", "atk": 13, "matk": 3, "range": 2.5, "crit": 0.04, "buy": 0, "sell": 32,
+		"color": Color(0.82, 0.74, 0.62), "desc": "Острый топор в одну руку. Во второй руке может быть ещё один.",
+	},
+	"weapon_axe_2h_r2": {
+		"name": "Секира ветерана", "type": "weapon", "icon": "axe", "weapon": "axe_2h", "rank": 2,
+		"model": "weapon_axe_2h_r2", "atk": 26, "matk": 7, "range": 2.9, "crit": 0.05, "buy": 0, "sell": 48,
+		"color": Color(0.8, 0.7, 0.56), "desc": "Широкая секира на длинном древке: самый тяжёлый удар среди оружия 2-го ранга.",
+	},
+	"weapon_staff_1h_r2": {
+		"name": "Жезл чародея", "type": "weapon", "icon": "staff", "weapon": "staff_1h", "rank": 2,
+		"model": "weapon_staff_1h_r2", "matk": 13, "range": 9.0, "crit": 0.0, "buy": 0, "sell": 32,
+		"color": Color(0.84, 0.7, 0.48), "desc": "Жезл с кристаллом в навершии: сгусток магии издалека, заклинания быстрее. Вторая рука свободна.",
+	},
+	"weapon_staff_2h_r2": {
+		"name": "Посох чародея", "type": "weapon", "icon": "staff", "weapon": "staff_2h", "rank": 2,
+		"model": "weapon_staff_2h_r2", "matk": 23, "range": 10.0, "crit": 0.0, "buy": 0, "sell": 48,
+		"color": Color(0.82, 0.66, 0.42), "desc": "Посох в две руки из старого дерева: магия сильнее, сгусток летит дальше.",
+	},
+	"weapon_spear_r2": {
+		"name": "Копьё ветерана", "type": "weapon", "icon": "spear", "weapon": "spear", "rank": 2,
+		"model": "weapon_spear_r2", "atk": 23, "range": 3.3, "crit": 0.04, "buy": 0, "sell": 48,
+		"color": Color(0.84, 0.82, 0.74), "desc": "Длинное копьё с широким наконечником: достаёт зверя дальше меча.",
+	},
+	"weapon_shield_r2": {
+		"name": "Окованный щит", "type": "weapon", "icon": "shield", "weapon": "shield", "rank": 2,
+		"model": "weapon_shield_r2", "def": 10, "block": 0.14, "range": 0.0, "crit": 0.0, "buy": 0, "sell": 28,
+		"color": Color(0.66, 0.5, 0.32), "desc": "Щит с железной оковкой во вторую руку (к одноручному оружию): защита выше, часть ударов приходится в щит.",
+	},
+	"weapon_bow_r2": {
+		"name": "Охотничий лук", "type": "weapon", "icon": "bow", "weapon": "bow", "rank": 2,
+		"model": "weapon_bow_r2", "atk": 29, "range": 13.0, "crit": 0.04, "buy": 0, "sell": 40,
+		"color": Color(0.66, 0.48, 0.28), "desc": "Тугой лук в две руки: стрелы летят дальше всех, но натягивать тетиву долго.",
+	},
+	"weapon_crossbow_r2": {
+		"name": "Арбалет стражника", "type": "weapon", "icon": "crossbow", "weapon": "crossbow", "rank": 2,
+		"model": "weapon_crossbow_r2", "atk": 20, "range": 11.5, "crit": 0.01, "buy": 0, "sell": 40,
+		"color": Color(0.74, 0.54, 0.34), "desc": "Арбалет с воротом: болты пробивают шкуру издалека, но заряжать его дольше.",
+	},
 	# ---------- Улучшенное оружие у торговца ----------
 	"dagger_steel": {
 		"name": "Стальной кинжал", "type": "weapon", "icon": "dagger", "rarity": "improved", "weapon": "dagger", "rank": 1,
@@ -183,6 +253,177 @@ const ITEMS := {
 	"thunder_spear": {"name": "Громовой наконечник", "type": "trophy", "icon": "spike", "rarity": "rare", "buy": 0, "sell": 130, "color": Color(1.0, 0.85, 0.45), "desc": "Наконечник копья Громового хана, звенит от прикосновения. Трофей босса."},
 	"bone_crown": {"name": "Костяной венец", "type": "trophy", "icon": "spike", "rarity": "unique", "buy": 0, "sell": 160, "color": Color(0.95, 0.9, 0.72), "desc": "Венец из костяных шипов Костяного владыки. Трофей босса."},
 }
+
+## Все предметы: BASE_ITEMS и зелья всех видов и рангов (_static_init). Читать через get_item / ITEMS.
+static var ITEMS: Dictionary = {}
+
+
+static func _static_init() -> void:
+	ITEMS = BASE_ITEMS.duplicate(true)
+	for k in POTION_KINDS:
+		for r in range(1, POTION_RANKS + 1):
+			var kind := String(k)
+			ITEMS[potion_id(kind, r)] = _make_potion(kind, r)
+
+
+# ---------- Ранги предметов ----------
+## Снаряжение (оружие, позже броня и украшения) — по рангам уровня героя (решение Максима): 1-й — 1–20 ур.,
+## 2-й — 21–50, 3-й — 51–80, дальше по 30 уровней до потолка 150 (4-й — 81–110, 5-й — 111–140, 6-й — 141–150).
+## Надеть снаряжение можно с нижнего уровня его ранга (required_level, level_block).
+## Зелья — ранг на каждые 10 уровней: 1-й — 1–10, 2-й — 11–20 … 15-й — 141–150; пить — с нижнего уровня ранга.
+## Добыча (LootTable): зелье — ранга по уровню зверя, оружие — ранга по уровню зверя (по таблице снаряжения),
+## награды заданий — по уровню героя.
+const EQUIP_RANKS := [[1, 20], [21, 50], [51, 80], [81, 110], [111, 140], [141, 150]]
+const MAX_LEVEL := 150
+const POTION_RANKS := 15
+const POTION_RANK_LEVELS := 10
+
+## Зелья (type "consumable", поле potion — вид, rank — ранг 1–15, id potion_<вид>_r<ранг>): name — название вида,
+## color — цвет колбы, buy — цена 1-го ранга (ранг N — × (1 + 1.5·(N − 1)); продажа — треть), order — порядок в сумке.
+## Здоровье и мана — мгновенно: POTION_PCT запаса + число по рангу (potion_flat ≈ четверть HP / MP героя на нижнем
+## уровне ранга: на нижнем уровне ранга зелье даёт ≈ 50 % запаса, на верхнем ≈ 35 %), перезарядка Economy.POTION_CD.
+## Скорость атаки, каста и бега — усиление на POTION_BUFF_TIME с: +10 % на 1-м ранге, +1 % за ранг (15-й — +24 %);
+## значок у полоски HP ("buff:potion_<вид>"), повтор того же вида — заменяет и продлевает.
+const POTION_KINDS := {
+	"hp": {"name": "Зелье здоровья", "color": Color(0.9, 0.2, 0.25), "buy": 10, "order": 0},
+	"mp": {"name": "Зелье маны", "color": Color(0.25, 0.48, 0.98), "buy": 12, "order": 1},
+	"aspd": {"name": "Зелье скорости атаки", "color": Color(0.98, 0.55, 0.15), "buy": 20, "order": 2},
+	"cast": {"name": "Зелье скорости каста", "color": Color(0.72, 0.38, 0.98), "buy": 20, "order": 3},
+	"speed": {"name": "Зелье скорости бега", "color": Color(0.3, 0.86, 0.45), "buy": 15, "order": 4},
+}
+const POTION_PCT := 0.25
+const POTION_BUFF_TIME := 60.0
+## Ключ бонуса героя (Player.timed_bonus → recalc_stats) у зелий-ускорений.
+const POTION_BUFF_KEYS := {"aspd": "aspd", "cast": "cast", "speed": "speed_pct"}
+const ROMAN := ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"]
+
+
+## Ранг снаряжения для уровня lvl (EQUIP_RANKS; выше потолка — последний).
+static func equip_rank_for_level(lvl: int) -> int:
+	for i in EQUIP_RANKS.size():
+		if lvl <= int((EQUIP_RANKS[i] as Array)[1]):
+			return i + 1
+	return EQUIP_RANKS.size()
+
+
+## Ранг зелья для уровня lvl: по 10 уровней на ранг, 1…15.
+static func potion_rank_for_level(lvl: int) -> int:
+	return clampi(ceili(float(maxi(1, lvl)) / float(POTION_RANK_LEVELS)), 1, POTION_RANKS)
+
+
+## Уровни ранга [от, до]: снаряжения (EQUIP_RANKS) или зелья (potion = true).
+static func rank_level_range(rank_n: int, potion: bool = false) -> Array:
+	if potion:
+		var r := clampi(rank_n, 1, POTION_RANKS)
+		return [(r - 1) * POTION_RANK_LEVELS + 1, r * POTION_RANK_LEVELS]
+	var e: Array = EQUIP_RANKS[clampi(rank_n, 1, EQUIP_RANKS.size()) - 1]
+	return [int(e[0]), int(e[1])]
+
+
+## С какого уровня можно надеть или выпить предмет: нижний уровень его ранга (снаряжение, зелья), иначе 1.
+static func required_level(id: String) -> int:
+	var it := get_item(id)
+	if it.has("level"):
+		return int(it["level"])
+	if is_potion(id):
+		return int(rank_level_range(rank(id), true)[0])
+	if is_equipment(id):
+		return int(rank_level_range(rank(id))[0])
+	return 1
+
+
+## Почему герою уровня lvl нельзя надеть или выпить предмет ("" — можно).
+static func level_block(id: String, lvl: int) -> String:
+	var need := required_level(id)
+	if lvl < need:
+		return "Нужен %d уровень: «%s» — %d-го ранга" % [need, item_name(id), rank(id)]
+	return ""
+
+
+## Снаряжение (оружие, броня, украшения): у него ранг по таблице EQUIP_RANKS.
+static func is_equipment(id: String) -> bool:
+	var t := item_type(id)
+	return t == "weapon" or t == "armor" or t == "jewelry"
+
+
+## Ранг римской цифрой (1 → «I»).
+static func roman(n: int) -> String:
+	return String(ROMAN[n - 1]) if n >= 1 and n <= ROMAN.size() else str(n)
+
+
+# ---------- Зелья ----------
+
+static func potion_id(kind: String, rank_n: int) -> String:
+	return "potion_%s_r%d" % [kind, rank_n]
+
+
+static func is_potion(id: String) -> bool:
+	return get_item(id).has("potion")
+
+
+## Вид зелья ("hp", "mp", "aspd", "cast", "speed"; "" — не зелье).
+static func potion_kind(id: String) -> String:
+	return String(get_item(id).get("potion", ""))
+
+
+## Семья зелья для целей заданий: "potion_hp" — любое зелье здоровья ("" — не зелье).
+static func potion_family(id: String) -> String:
+	var k := potion_kind(id)
+	return "potion_" + k if k != "" else ""
+
+
+## Размер колбы на значке: ранги 1–5 — 1, 6–10 — 2, 11–15 — 3 (картинка potion_<вид>_t<размер>.png).
+static func potion_tier(rank_n: int) -> int:
+	return clampi(1 + (rank_n - 1) / 5, 1, 3)
+
+
+## Сколько восстанавливает зелье здоровья или маны сверх доли POTION_PCT: ≈ четверть HP (MP) героя на нижнем
+## уровне ранга (HP героя ≈ 77 + 19·ур., MP ≈ 25 + 5·ур. — таблица Бродяги в tools/rappelz_strider_reference.md).
+static func potion_flat(kind: String, rank_n: int) -> int:
+	var l := float(rank_level_range(rank_n, true)[0])
+	if kind == "hp":
+		return roundi(19.25 + 4.75 * l)
+	if kind == "mp":
+		return roundi(6.25 + 1.25 * l)
+	return 0
+
+
+## Сколько HP (MP) вернёт зелье id при запасе max_value.
+static func potion_restore(id: String, max_value: int) -> int:
+	return roundi(float(max_value) * POTION_PCT) + potion_flat(potion_kind(id), rank(id))
+
+
+## Прибавка зелья-ускорения ранга rank_n (доля): +10 % на 1-м ранге, +1 % за ранг.
+static func potion_buff(rank_n: int) -> float:
+	return 0.10 + 0.01 * float(clampi(rank_n, 1, POTION_RANKS) - 1)
+
+
+## Цена покупки зелья вида kind ранга rank_n.
+static func potion_price(kind: String, rank_n: int) -> int:
+	return roundi(float(POTION_KINDS[kind]["buy"]) * (1.0 + 1.5 * float(rank_n - 1)))
+
+
+static func _make_potion(kind: String, r: int) -> Dictionary:
+	var pk: Dictionary = POTION_KINDS[kind]
+	var buy := potion_price(kind, r)
+	var desc := ""
+	var pct := roundi(POTION_PCT * 100.0)
+	var buff := roundi(potion_buff(r) * 100.0)
+	match kind:
+		"hp":
+			desc = "Восстанавливает %d%% здоровья и ещё %d HP." % [pct, potion_flat(kind, r)]
+		"mp":
+			desc = "Восстанавливает %d%% маны и ещё %d MP." % [pct, potion_flat(kind, r)]
+		"aspd":
+			desc = "Скорость атаки +%d%% на %d с." % [buff, int(POTION_BUFF_TIME)]
+		"cast":
+			desc = "Скорость каста +%d%% на %d с: заклинания и магическая атака быстрее." % [buff, int(POTION_BUFF_TIME)]
+		"speed":
+			desc = "Скорость бега +%d%% на %d с." % [buff, int(POTION_BUFF_TIME)]
+	return {
+		"name": "%s %s" % [String(pk["name"]), roman(r)], "type": "consumable", "icon": "flask", "potion": kind,
+		"rank": r, "buy": buy, "sell": maxi(1, buy / 3), "color": pk["color"], "desc": desc,
+	}
 
 
 ## Виды оружия: name — название, hands — 1 (одноручное: во вторую руку можно щит или второе такое же),
@@ -243,6 +484,8 @@ const RENAMED := {
 	"bear_claw": "panther_fang", "fairy_dust": "pheasant_feather", "spark_core": "shell_plate",
 	"crystal_common": "mirror_card", "crystal_rare": "mirror_card", "crystal_unique": "mirror_card",
 	"card_boar": "mirror_card", "card_boar_soul": "mirror_card", "card_golem": "mirror_card", "card_golem_soul": "mirror_card",
+	# Зелья получили ранги: прежнее зелье здоровья — 1-го ранга
+	"hp_potion": "potion_hp_r1",
 }
 ## Прежние парные предметы Наёмника (один предмет — пара клинков) → два одиночных (вторая рука): каждый прежний
 ## предмет становится двумя новыми, надетая пара — тем же оружием в обеих руках (Game.from_dict).
@@ -260,6 +503,9 @@ static func get_item(id: String) -> Dictionary:
 
 
 static func item_name(id: String) -> String:
+	if not ITEMS.has(id) and id.begins_with("potion_") and POTION_KINDS.has(id.substr(7)):
+		# Семья зелий в целях заданий ("potion_hp" — любое зелье здоровья)
+		return String(POTION_KINDS[id.substr(7)]["name"])
 	return String(get_item(id).get("name", id))
 
 
@@ -348,6 +594,7 @@ static func model_kind(kind: String) -> String:
 	return String(d.get("model", ""))
 
 
+## Ранг предмета (оружие — EQUIP_RANKS, зелья — по 10 уровней; у прочих 1).
 static func rank(id: String) -> int:
 	return int(get_item(id).get("rank", 1))
 
@@ -544,7 +791,10 @@ static func icon_shape(id: String) -> String:
 	return String(get_item(id).get("icon", ""))
 
 
+## Картинка значка: <id>.png; у зелий — одна на вид и размер колбы: potion_<вид>_t<1|2|3>.png (potion_tier).
 static func icon_path(id: String) -> String:
+	if is_potion(id):
+		return ICON_DIR + "potion_%s_t%d.png" % [potion_kind(id), potion_tier(rank(id))]
 	return ICON_DIR + id + ".png"
 
 
@@ -559,6 +809,15 @@ static func sort_before(a: String, b: String) -> bool:
 	var rb := _sort_rank(b)
 	if ra != rb:
 		return ra > rb
+	# Зелья: по виду (здоровье, мана, ускорения), старшие ранги раньше; оружие — старшие ранги раньше
+	var pa := potion_kind(a)
+	var pb := potion_kind(b)
+	if pa != "" and pb != "":
+		if pa != pb:
+			return int(POTION_KINDS[pa]["order"]) < int(POTION_KINDS[pb]["order"])
+		return rank(a) > rank(b)
+	if is_equipment(a) and is_equipment(b) and rank(a) != rank(b):
+		return rank(a) > rank(b)
 	var na := item_name(a)
 	var nb := item_name(b)
 	if na != nb:

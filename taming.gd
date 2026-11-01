@@ -169,7 +169,7 @@ static func where_to_get(card_id: String) -> String:
 	for k in MobData.TYPES:
 		if not lives_in_world(String(k)):
 			continue
-		for e in MobData.get_type(String(k)).get("loot", []):
+		for e in LootTable.pool("card", String(k), 1):
 			var entry: Array = e
 			if String(entry[0]) == card_id:
 				from.append(MobData.name_gen(String(k)))

@@ -192,7 +192,7 @@ func run_step() -> void:
 				"bag": [{"id": "crystal_common", "n": 2}, {"id": "hp_potion", "n": 1}, {}, {"id": "crystal_unique", "n": 1}],
 				"pets": [{"species": "boar", "name": "Хрюня", "level": 4}, {"species": "golem", "name": "Глыба", "level": 12}],
 			})
-			check(inv.count("mirror_card") == 4 and inv.count("hp_potion") == 1, "кристаллы стали зеркальными картами: %s"
+			check(inv.count("mirror_card") == 4 and inv.count("potion_hp_r1") == 1, "кристаллы стали зеркальными картами: %s"
 				% [inv.to_dict()])
 			check(not inv.has("crystal_common") and not inv.has("crystal_rare") and not inv.has("crystal_unique"),
 				"кристаллов не осталось")
@@ -264,8 +264,8 @@ func _unit_items() -> void:
 	for k in MobData.TYPES:
 		var id := String(k)
 		check(MobData.tameable(id) == (ItemData.card_for(id) != ""), "у приручаемого %s есть карта, у прочих нет" % id)
-		for e in MobData.get_type(id)["loot"]:
-			var it := String(e[0])
+		for e in LootTable.pool("card", id, 10):
+			var it := String((e as Array)[0])
 			check(ItemData.card_species(it) == "" or MobData.tameable(ItemData.card_species(it)),
 				"из %s не выпадает карта неприручаемого зверя: %s" % [id, it])
 	check(ItemData.card_tier_label("unique") == "жёлтая (уникальная)", "подпись тира: " + ItemData.card_tier_label("unique"))
@@ -283,13 +283,13 @@ func _unit_items() -> void:
 		var c := "card_" + String(sp)
 		check(int(ItemData.get_item(c)["buy"]) == 0, "%s не продаётся" % c)
 		var dropped := false
-		for e in MobData.get_type(sp)["loot"]:
-			if String(e[0]) == c:
+		for e in LootTable.pool("card", sp, 3):
+			if String((e as Array)[0]) == c:
 				dropped = true
 		check(dropped, "%s выпадает из своего зверя" % c)
 	for k in MobData.TYPES:
-		for e in MobData.get_type(String(k))["loot"]:
-			check(not ItemData.get_item(String(e[0])).is_empty(), "добыча %s есть в предметах: %s" % [k, e[0]])
+		for e in MobData.materials(String(k)) + MobData.special_materials(String(k)):
+			check(not ItemData.get_item(String(e)).is_empty(), "добыча %s есть в предметах: %s" % [k, e])
 	var ic := ItemIcon.make("card_wolf_soul", 64.0)
 	check(ic.item_id == "card_wolf_soul", "значок карты создаётся")
 	ic.free()

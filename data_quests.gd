@@ -28,7 +28,7 @@ extends RefCounted
 ##   xp_level — уровень, под который подобран опыт награды (по умолчанию level; у заданий, что сдаются много позже —
 ##   «достичь 10 ур.», вожаки);
 ##   goals — цели (см. ниже); rewards — {"xp": опыт героя, "gold": золото, "items": {id: количество},
-##   "jp": очки умений героя}.
+##   "jp": очки умений героя}. Сверх них при сдаче — 1–2 случайных предмета (LootTable.quest_reward, Quests.complete).
 ## Цель — словарь: type, n (сколько; у "level" — нужный уровень), text (подпись; по умолчанию — goal_text) и:
 ##   "kill"     — победить n зверей вида target ("" — любых), min_level — не ниже этого уровня;
 ##   "tame"     — поймать душу зверя вида target ("" — любого) в карту существа;
@@ -37,7 +37,7 @@ extends RefCounted
 ##   "pet_kill" — победить n зверей (вида target), пока призван живой питомец;
 ##   "buy"      — купить n штук любого из items у NPC npc ("" — у любого; items пусто — любые вещи);
 ##   "sell"     — продать n штук любого из items NPC npc (items пусто — любые вещи);
-##   "use"      — использовать n штук любого из items (зелье здоровья);
+##   "use"      — использовать n штук любого из items (семья зелий "potion_hp" — зелье здоровья любого ранга);
 ##   "store"    — положить n вещей на склад (Кладовщик Тобин; items пусто — любые);
 ##   "collect"  — иметь в сумке n штук любого из items; take = true — забрать при сдаче; drop_from — вид зверя:
 ##                пока цель не выполнена, с каждого такого зверя падает первый из items (квестовая добыча:
@@ -86,7 +86,7 @@ const QUESTS := {
 			{"type": "form", "target": "", "n": 1, "counts_existing": true, "text": "Сформировать существо из карты"},
 			{"type": "summon", "target": "", "n": 1, "counts_existing": true, "text": "Призвать питомца"},
 		],
-		"rewards": {"xp": 70, "items": {"hp_potion": 3}, "jp": 5},
+		"rewards": {"xp": 70, "items": {"potion_hp_r1": 3}, "jp": 5},
 	},
 	"kirk_bond_trial": {
 		"name": "Испытание связи", "giver": "kirk", "turn_in": "kirk", "level": 3, "prev": "kirk_new_friend",
@@ -131,7 +131,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "pheasant", "n": 3, "text": "Победить фазанов"},
 		],
-		"rewards": {"xp": 35, "gold": 10, "items": {"hp_potion": 2}},
+		"rewards": {"xp": 35, "gold": 10, "items": {"potion_hp_r1": 2}},
 	},
 	"elder_trophies": {
 		"name": "Шкуры для деревни", "giver": "@elder", "turn_in": "@elder", "level": 2, "prev": "elder_hunt",
@@ -171,7 +171,7 @@ const QUESTS := {
 		"name": "Глоток здоровья", "giver": "@elder", "turn_in": "@elder", "level": 2, "prev": "elder_trophies",
 		"desc": "Выпейте зелье здоровья, когда будете ранены: кнопка «Зелье» на экране (Q) или «Использовать» в сумке. При полном здоровье зелье не пьётся. Нет зелья — староста даст.",
 		"offer": "Выпей зелье, когда будешь ранен.", "progress": "Зелье — кнопка «Зелье».", "done": "Вот и славно.",
-		"give": {"hp_potion": 1},
+		"give": {"potion_hp_r1": 1},
 		"by_race": {
 			"human": {
 				"desc": "Староста Ольвин видел, как вы хромали после волков. Выпейте зелье здоровья, когда будете ранены: кнопка «Зелье» на экране (Q) или «Использовать» в сумке. При полном здоровье зелье не пьётся.",
@@ -193,9 +193,9 @@ const QUESTS := {
 			},
 		},
 		"goals": [
-			{"type": "use", "items": ["hp_potion"], "n": 1, "text": "Выпить зелье здоровья"},
+			{"type": "use", "items": ["potion_hp"], "n": 1, "text": "Выпить зелье здоровья"},
 		],
-		"rewards": {"xp": 55, "gold": 10, "items": {"hp_potion": 3}},
+		"rewards": {"xp": 55, "gold": 10, "items": {"potion_hp_r1": 3}},
 	},
 	"elder_grow": {
 		"name": "Крепкая рука", "giver": "@elder", "turn_in": "@elder", "level": 2, "prev": "elder_potion",
@@ -326,7 +326,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "wolf", "min_level": 6, "n": 20, "text": "Победить волков 6 уровня и выше"},
 		],
-		"rewards": {"xp": 400, "gold": 80, "items": {"hp_potion": 5}},
+		"rewards": {"xp": 400, "gold": 80, "items": {"potion_hp_r1": 5}},
 	},
 	"sage_first_job": {
 		"name": "Доклад мудрецу", "giver": "hunter", "turn_in": "sage", "level": 6, "prev": "hunter_hunt",
@@ -350,7 +350,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "boss_pheasant", "n": 1, "text": "Победить: Пламенный Златохвост"},
 		],
-		"rewards": {"xp": 1120, "gold": 150, "items": {"mirror_card": 1, "hp_potion": 5}},
+		"rewards": {"xp": 1120, "gold": 150, "items": {"mirror_card": 1, "potion_hp_r2": 5}},
 	},
 	"hunter_boss_wolf": {
 		"name": "Вожак: Седой Вожак бури", "giver": "hunter", "turn_in": "hunter", "level": 6, "prev": "hunter_hunt",
@@ -362,7 +362,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "boss_wolf", "n": 1, "text": "Победить: Седой Вожак бури"},
 		],
-		"rewards": {"xp": 1650, "gold": 180, "items": {"mirror_card": 1, "hp_potion": 5}},
+		"rewards": {"xp": 1650, "gold": 180, "items": {"mirror_card": 1, "potion_hp_r2": 5}},
 	},
 	"hunter_boss_turtle": {
 		"name": "Вожак: Тысячелетний Бастион", "giver": "hunter", "turn_in": "hunter", "level": 6, "prev": "hunter_hunt",
@@ -435,7 +435,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "talk", "npc": "hunter", "n": 1, "text": "Поговорить с Охотницей Яррой"},
 		],
-		"rewards": {"xp": 8000, "gold": 1500, "items": {"mirror_card": 3, "revive_scroll": 3, "hp_potion": 10}},
+		"rewards": {"xp": 8000, "gold": 1500, "items": {"mirror_card": 3, "revive_scroll": 3, "potion_hp_r3": 10}},
 	},
 	"hunter_to_sage": {
 		"name": "Вести для мудреца", "giver": "hunter", "turn_in": "sage", "level": 6, "prev": "hunter_bosses_done",
@@ -485,7 +485,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "talk", "npc": "merc_chief", "n": 1, "text": "Выслушать Корвена"},
 		],
-		"rewards": {"xp": 500, "gold": 50, "items": {"hp_potion": 5}},
+		"rewards": {"xp": 500, "gold": 50, "items": {"potion_hp_r2": 5}},
 	},
 }
 

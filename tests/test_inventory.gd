@@ -48,20 +48,20 @@ func run_step() -> void:
 			check(win.sel_kind == "equip" and win.sel_index == 0, "выбран слот «Оружие»")
 			check(_card_title() == ItemData.item_name(game.weapon), "карточка надетого: %s" % _card_title())
 			# Зелье: «Использовать»
-			var pc := inv.find_cell("hp_potion")
+			var pc := inv.find_cell("potion_hp_r1")
 			_press("cell_%d" % pc)
-			check(win.sel_kind == "cell" and win.sel_id == "hp_potion", "выбрано зелье")
-			check(_card_title() == ItemData.item_name("hp_potion"), "карточка зелья")
+			check(win.sel_kind == "cell" and win.sel_id == "potion_hp_r1", "выбрано зелье")
+			check(_card_title() == ItemData.item_name("potion_hp_r1"), "карточка зелья")
 			check(win.buttons.has("act_use") and win.buttons.has("act_move") and win.buttons.has("act_drop"),
 				"кнопки зелья: использовать, переместить, выбросить")
 			check(not win.buttons.has("act_sell"), "вдали от торговца продать нельзя")
 			check(not win.buttons.has("act_equip"), "зелье не надеть")
 			player.hp = 10
-			var potions: int = inv.count("hp_potion")
+			var potions: int = inv.count("potion_hp_r1")
 			_press("act_use")
-			check(player.hp > 10 and inv.count("hp_potion") == potions - 1, "зелье из карточки лечит")
+			check(player.hp > 10 and inv.count("potion_hp_r1") == potions - 1, "зелье из карточки лечит")
 			check(eco.is_bag_open(), "сумка открыта после использования")
-			check(String(inv.cell(pc).get("id", "")) == "hp_potion" and int(inv.cell(pc).get("n", 0)) == potions - 1,
+			check(String(inv.cell(pc).get("id", "")) == "potion_hp_r1" and int(inv.cell(pc).get("n", 0)) == potions - 1,
 				"в ячейке зелий стало меньше")
 			# Свиток без погибших питомцев
 			_press("cell_%d" % inv.find_cell("revive_scroll"))
@@ -101,7 +101,7 @@ func run_step() -> void:
 			var cc := inv.find_cell("crossbow_starter")
 			var slot: Button = win.buttons["equip_weapon"]
 			check(slot.call("_can_drop_data", Vector2.ZERO, {"inv_cell": cc}), "арбалет можно бросить в слот оружия")
-			var pc := inv.find_cell("hp_potion")
+			var pc := inv.find_cell("potion_hp_r1")
 			check(not slot.call("_can_drop_data", Vector2.ZERO, {"inv_cell": pc}), "зелье в слот оружия не бросить")
 			slot.call("_drop_data", Vector2.ZERO, {"inv_cell": cc})
 			check(game.weapon == "crossbow_starter" and String(inv.cell(cc).get("id", "")) == "weapon_sword_1h_r1",
@@ -124,9 +124,9 @@ func run_step() -> void:
 			check(cell31.call("_can_drop_data", Vector2.ZERO, {"inv_cell": 30}), "в пустую ячейку бросить можно")
 			cell31.call("_drop_data", Vector2.ZERO, {"inv_cell": 30})
 			check(String(inv.cell(31).get("id", "")) == "revive_scroll" and inv.cell(30).is_empty(), "свиток перетащен")
-			var pc := inv.find_cell("hp_potion")
+			var pc := inv.find_cell("potion_hp_r1")
 			(win.buttons["cell_%d" % pc] as Button).call("_drop_data", Vector2.ZERO, {"inv_cell": 31})
-			check(String(inv.cell(pc).get("id", "")) == "revive_scroll" and String(inv.cell(31).get("id", "")) == "hp_potion",
+			check(String(inv.cell(pc).get("id", "")) == "revive_scroll" and String(inv.cell(31).get("id", "")) == "potion_hp_r1",
 				"разные предметы меняются местами")
 			var drag: Variant = (win.buttons["cell_31"] as Button).call("_get_drag_data", Vector2(10, 10))
 			check(drag is Dictionary and int((drag as Dictionary).get("inv_cell", -1)) == 31, "из ячейки можно тащить значок")
@@ -205,7 +205,7 @@ func run_step() -> void:
 			# Окно торговца: товары, сумка и карточка
 			main._on_action("shop")
 			check(eco.is_shop_open(), "окно торговца открыто")
-			check(win.seller == "merchant" and win.buttons.has("good_hp_potion") and win.buttons.has("good_revive_scroll"),
+			check(win.seller == "merchant" and win.buttons.has("good_potion_hp_r1") and win.buttons.has("good_revive_scroll"),
 				"товары торговца: зелье, свиток воскрешения")
 			# Карты существ продаёт Учитель Кирк, у торговца их нет
 			for id in ["card_panther", "card_turtle", "card_pheasant", "mirror_card", "card_wolf", "card_wolf_soul",
@@ -218,12 +218,12 @@ func run_step() -> void:
 			check(win.buttons.has("good_dagger_steel") and win.buttons.has("good_crossbow_starter") and not win.buttons.has("good_weapon_bow_r1"), "оружие Наёмника в товарах, лука нет")
 			check(not win.buttons.has("good_boar_tusk"), "трофеи не продаются")
 			check(win.buttons.has("cell_0"), "сумка в окне торговца")
-			_press("good_hp_potion")
+			_press("good_potion_hp_r1")
 			check(win.sel_kind == "good" and win.buttons.has("act_buy") and win.buttons.has("act_buy5"), "карточка товара")
 			game.gold = 100
-			var potions: int = inv.count("hp_potion")
+			var potions: int = inv.count("potion_hp_r1")
 			_press("act_buy5")
-			check(game.gold == 50 and inv.count("hp_potion") == potions + 5, "куплено 5 зелий")
+			check(game.gold == 50 and inv.count("potion_hp_r1") == potions + 5, "куплено 5 зелий")
 			_press("good_dagger_steel")
 			check(not win.buttons.has("act_buy5"), "оружие — по одному")
 			check(_has_text_containing("разница с надетым"), "оружие сравнивается с надетым")
@@ -232,10 +232,12 @@ func run_step() -> void:
 			check(not inv.has("dagger_steel", 2) and game.gold == 10, "без золота не купить")
 			game.gold = 500
 			# Выше в сумку клали по одному каждому предмету игры (их стало больше 40 ячеек) — освободим место:
-			# уберём оружие 1-го ранга (не надетое)
+			# уберём оружие 1-го и 2-го ранга (не надетое) и зелья всех рангов
 			for key in ItemData.ITEMS:
 				var wid := String(key)
 				if wid.begins_with("weapon_") and wid != game.weapon and wid != game.offhand:
+					inv.remove(wid, inv.count(wid))
+				elif ItemData.is_potion(wid):
 					inv.remove(wid, inv.count(wid))
 			var steel: int = inv.count("dagger_steel")
 			var free_slots: int = inv.room_for("dagger_steel")
@@ -294,12 +296,12 @@ func _unit_stacks() -> void:
 	check(inv.used_cells() == 2 and int(inv.cell(0).get("n", 0)) == 99 and int(inv.cell(1).get("n", 0)) == 51,
 		"150 клыков — стопки 99 + 51")
 	check(inv.room_for("boar_tusk") == (Inventory.CAPACITY - 2) * 99 + 48, "место для клыков: %d" % inv.room_for("boar_tusk"))
-	check(ItemData.stack_size("dagger_steel") == 1 and ItemData.stack_size("hp_potion") == ItemData.STACK, "размер стопок")
+	check(ItemData.stack_size("dagger_steel") == 1 and ItemData.stack_size("potion_hp_r1") == ItemData.STACK, "размер стопок")
 	inv.add("dagger_steel", 3)
 	check(inv.used_cells() == 5, "оружие — по одному в ячейке")
 	inv.add("sword_steel", Inventory.CAPACITY - 5)
 	check(inv.is_full() and inv.used_cells() == Inventory.CAPACITY, "сумка полна")
-	check(inv.room_for("hp_potion") == 0 and inv.try_add("hp_potion", 3) == 0 and not inv.has("hp_potion"),
+	check(inv.room_for("potion_hp_r1") == 0 and inv.try_add("potion_hp_r1", 3) == 0 and not inv.has("potion_hp_r1"),
 		"в полную сумку новый предмет не кладётся")
 	check(inv.try_add("boar_tusk", 100) == 48 and inv.count("boar_tusk") == 198, "неполная стопка добирается до 99")
 	inv.add("wolf_pelt", 1)
@@ -320,20 +322,20 @@ func _unit_stacks() -> void:
 
 func _unit_move_sort() -> void:
 	var inv := Inventory.new()
-	inv.add("hp_potion", 10)
+	inv.add("potion_hp_r1", 10)
 	inv.add("boar_tusk", 3)
-	check(String(inv.cell(0).get("id", "")) == "hp_potion" and String(inv.cell(1).get("id", "")) == "boar_tusk",
+	check(String(inv.cell(0).get("id", "")) == "potion_hp_r1" and String(inv.cell(1).get("id", "")) == "boar_tusk",
 		"раскладка по порядку: расходники, затем трофеи")
-	check(inv.move(0, 5) and inv.cell(0).is_empty() and String(inv.cell(5).get("id", "")) == "hp_potion", "в пустую ячейку")
-	check(inv.move(1, 5) and String(inv.cell(5).get("id", "")) == "boar_tusk" and String(inv.cell(1).get("id", "")) == "hp_potion",
+	check(inv.move(0, 5) and inv.cell(0).is_empty() and String(inv.cell(5).get("id", "")) == "potion_hp_r1", "в пустую ячейку")
+	check(inv.move(1, 5) and String(inv.cell(5).get("id", "")) == "boar_tusk" and String(inv.cell(1).get("id", "")) == "potion_hp_r1",
 		"разные предметы меняются местами")
 	check(not inv.move(0, 3), "пустую ячейку не переложить")
-	inv.add("hp_potion", 95)
-	check(int(inv.cell(1).get("n", 0)) == 99 and String(inv.cell(0).get("id", "")) == "hp_potion" and int(inv.cell(0).get("n", 0)) == 6,
+	inv.add("potion_hp_r1", 95)
+	check(int(inv.cell(1).get("n", 0)) == 99 and String(inv.cell(0).get("id", "")) == "potion_hp_r1" and int(inv.cell(0).get("n", 0)) == 6,
 		"новое докладывается в неполную стопку, остаток — в первую пустую ячейку")
 	inv.remove_at(1, 10)
 	check(inv.move(0, 1) and int(inv.cell(1).get("n", 0)) == 95 and inv.cell(0).is_empty(), "стопки складываются")
-	inv.add("hp_potion", 10)
+	inv.add("potion_hp_r1", 10)
 	check(int(inv.cell(1).get("n", 0)) == 99 and int(inv.cell(0).get("n", 0)) == 6, "стопка 99 и 6")
 	inv.move(0, 12)
 	inv.remove_at(1, 3)
@@ -350,14 +352,14 @@ func _unit_move_sort() -> void:
 		var d: Dictionary = c
 		if not d.is_empty():
 			order.append(String(d["id"]))
-	check(order == ["dagger_steel", "hp_potion", "hp_potion", "card_wolf_soul", "card_panther", "mirror_card", "boar_tusk"],
+	check(order == ["dagger_steel", "potion_hp_r1", "potion_hp_r1", "card_wolf_soul", "card_panther", "mirror_card", "boar_tusk"],
 		"сортировка: оружие, расходники, карты (с душой раньше пустых, зеркальная в конце), трофеи: %s" % [order])
 	check(int(inv.cell(1).get("n", 0)) == 99 and int(inv.cell(2).get("n", 0)) == 3, "стопки собраны при сортировке")
 
 
 func _unit_layout() -> void:
 	var inv := Inventory.new()
-	inv.add("hp_potion", 3)
+	inv.add("potion_hp_r1", 3)
 	inv.add("wolf_pelt", 2)
 	inv.add("crossbow_starter", 1)
 	inv.move(inv.find_cell("wolf_pelt"), 17)
@@ -368,18 +370,18 @@ func _unit_layout() -> void:
 	inv2.load_layout(arr)
 	check(String(inv2.cell(17).get("id", "")) == "wolf_pelt" and int(inv2.cell(17).get("n", 0)) == 2, "раскладка: шкуры в 17")
 	check(String(inv2.cell(39).get("id", "")) == "crossbow_starter", "раскладка: арбалет в 39")
-	check(inv2.count("hp_potion") == 3, "количества восстановлены")
+	check(inv2.count("potion_hp_r1") == 3, "количества восстановлены")
 	# Старый формат: раскладки нет — по порядку сортировки
 	var old := Inventory.new()
-	old.from_dict({"boar_tusk": 2, "hp_potion": 3, "sword_steel": 1})
+	old.from_dict({"boar_tusk": 2, "potion_hp_r1": 3, "sword_steel": 1})
 	old.load_layout([])
-	check(String(old.cell(0).get("id", "")) == "sword_steel" and String(old.cell(1).get("id", "")) == "hp_potion"
+	check(String(old.cell(0).get("id", "")) == "sword_steel" and String(old.cell(1).get("id", "")) == "potion_hp_r1"
 		and String(old.cell(2).get("id", "")) == "boar_tusk", "старое сохранение разложено по порядку")
 	# Раскладка расходится с количествами: верят количествам
 	var bad := Inventory.new()
-	bad.from_dict({"hp_potion": 2})
-	bad.load_layout([{"id": "hp_potion", "n": 5}, {"id": "no_such_item", "n": 1}, {}, "мусор"])
-	check(bad.count("hp_potion") == 2 and int(bad.cell(0).get("n", 0)) == 2 and bad.used_cells() == 1,
+	bad.from_dict({"potion_hp_r1": 2})
+	bad.load_layout([{"id": "potion_hp_r1", "n": 5}, {"id": "no_such_item", "n": 1}, {}, "мусор"])
+	check(bad.count("potion_hp_r1") == 2 and int(bad.cell(0).get("n", 0)) == 2 and bad.used_cells() == 1,
 		"лишнее из раскладки отброшено")
 
 
@@ -405,7 +407,7 @@ func _save_load() -> void:
 		var d: Dictionary = e
 		if not d.is_empty():
 			ids.append(String(d["id"]))
-	check(ids.size() == game.inventory.used_cells() and ids.has("hp_potion") and ids.has("boar_tusk"),
+	check(ids.size() == game.inventory.used_cells() and ids.has("potion_hp_r1") and ids.has("boar_tusk"),
 		"старое сохранение без раскладки: %s" % [ids])
 	check(game.inventory.find_cell(game.weapon) == -1, "старое сохранение: надетое оружие не в ячейке")
 

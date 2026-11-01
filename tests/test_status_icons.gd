@@ -180,7 +180,7 @@ func _check_buttons(player: Player, hud: HUD) -> void:
 	check(ic1 != null and String(ic1.spec.get("path", "")) == HeroSkills.icon_path(s2), "значок кнопки 1 обновился")
 	check(not hud.is_button_visible("skill2"), "кнопка 2 опустела и скрыта")
 	var pot := hud.button_icon("potion")
-	check(pot != null and String(pot.spec.get("item", "")) == "hp_potion" and pot.count() == game.inventory.count("hp_potion"),
+	check(pot != null and String(pot.spec.get("item", "")) == "potion_hp_r1" and Economy.best_potion("hp") == "potion_hp_r1" and pot.count() == Economy.potion_count("hp"),
 		"«Зелье» — значок зелья и число %d" % (pot.count() if pot != null else -1))
 	var atk := hud.button_icon("attack")
 	check(atk != null and String(atk.spec.get("item", "")) == game.weapon and game.weapon != "",

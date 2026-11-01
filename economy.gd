@@ -12,6 +12,11 @@ extends Node
 ## withdraw; надетое оружие ячеек сумки не занимает, поэтому на склад не кладётся. Отошёл — окно закрывается.
 ## Квестовая добыча: пока у задания есть невыполненная цель collect с drop_from, нужный трофей падает всегда
 ## (Quests.quest_loot).
+## Добыча (правила Максима — LootTable): мешочек со зверя — золото всегда (± цена материала) и 2 предмета (минибосс 3,
+## босс 4, в подземелье +1) случайных категорий (зелья, карты, оружие, материалы, у боссов — особые материалы).
+## Зелья (ItemData.POTION_KINDS, ранги 1–15): здоровье — кнопка «Зелье» (лучшее, что можно пить по уровню) и сумка,
+## мана и ускорения — «Использовать» в сумке (drink); пить — с нижнего уровня ранга.
+## Золото на складе — Game.storage_gold (deposit_gold / withdraw_gold).
 
 ## Куплено n штук предмета id у NPC seller (слушают задания — Quests).
 signal bought(id: String, n: int, seller: String)
@@ -19,6 +24,8 @@ signal bought(id: String, n: int, seller: String)
 signal sold(id: String, n: int, buyer: String)
 ## Использован предмет id (выпито зелье).
 signal used(id: String)
+## Золото на складе изменилось.
+signal storage_gold_changed
 ## На склад положено n штук предмета id.
 signal stored(id: String, n: int)
 
@@ -26,9 +33,8 @@ signal stored(id: String, n: int)
 const MERCHANT_POS := Vector3(0, 0, -4)
 ## Кнопка «Торговец» видна, когда игрок ближе этого расстояния; дальше окно магазина закрывается.
 const SHOP_RANGE := 4.0
+## Перезарядка зелий здоровья и маны (у каждого вида своя), с.
 const POTION_CD := 5.0
-## Зелье лечит такую долю максимального здоровья.
-const POTION_HEAL := 0.5
 const GOLD_COLOR := Color(1.0, 0.85, 0.3)
 ## Кто хранит склад (NpcData).
 const STORAGE_NPC := "storekeeper"
@@ -38,7 +44,11 @@ var merchant: Merchant
 ## Окно сумки и торговца.
 var window: InventoryWindow
 
+## В подземелье добыча богаче (LootTable.DUNGEON_BONUS); подземелья пока нет.
+var dungeon := false
+
 var _potion_cd := 0.0
+var _mana_cd := 0.0
 var _shop_near := false
 
 
@@ -81,15 +91,10 @@ func handle_action(id: String) -> bool:
 	return false
 
 
-## Зверь убит: золото сразу в кошелёк, предметы — мешочком на землю.
+## Зверь убит: мешочек на землю — золото (всегда) и предметы (LootTable.roll: 2 / 3 / 4 по типу зверя).
 func on_mob_killed(mob: Mob) -> void:
-	# Золото растёт с уровнем зверя (MobData.gold_range) и с силой редкости вида (MobData.power); у боссов — своё
-	var gold_range := MobData.gold_range(mob.type_id, mob.level)
-	var g := roundi(float(randi_range(int(gold_range[0]), int(gold_range[1]))) * MobData.power(mob.type_id))
-	Game.gold += g
-	Util.float_text(main, mob.global_position + Vector3(0, 2.8, 0), "+%d зол." % g, GOLD_COLOR)
-	Game.changed.emit()
-	var loot := roll_loot(mob.type_id)
+	var g := LootTable.gold(mob.type_id, mob.level)
+	var loot := roll_loot(mob.type_id, mob.level, dungeon)
 	# Квестовая добыча: трофей для задания падает всегда, пока цель не выполнена
 	var q: Quests = main.get("quests")
 	if q != null:
@@ -97,32 +102,20 @@ func on_mob_killed(mob: Mob) -> void:
 		for k in extra:
 			if int(loot.get(k, 0)) <= 0:
 				loot[k] = int(extra[k])
-	if not loot.is_empty():
-		spawn_drop(mob.global_position, loot)
+	spawn_drop(mob.global_position, loot, g)
 
 
-## Бросок добычи по MobData loot: [id, шанс, мин., макс.]. Возвращает {id: количество}.
-static func roll_loot(type_id: String) -> Dictionary:
-	var res: Dictionary = {}
-	var d := MobData.get_type(type_id)
-	var loot: Array = d.get("loot", [])
-	for e in loot:
-		var entry: Array = e
-		var id: String = entry[0]
-		var chance: float = float(entry[1])
-		var lo: int = int(entry[2])
-		var hi: int = int(entry[3])
-		if randf() < chance:
-			var n := randi_range(lo, maxi(lo, hi))
-			if n > 0:
-				res[id] = int(res.get(id, 0)) + n
-	return res
+## Бросок добычи зверя type_id уровня lvl (LootTable.roll; lvl < 1 — базовый уровень вида). {id: количество}.
+static func roll_loot(type_id: String, lvl: int = -1, in_dungeon: bool = false) -> Dictionary:
+	var l := lvl if lvl > 0 else int(MobData.get_type(type_id)["level"])
+	return LootTable.roll(type_id, l, in_dungeon)
 
 
-## Кладёт мешочек с добычей на землю в точке pos.
-func spawn_drop(pos: Vector3, items: Dictionary) -> LootDrop:
+## Кладёт мешочек с добычей на землю в точке pos: предметы items и золото gold.
+func spawn_drop(pos: Vector3, items: Dictionary, gold: int = 0) -> LootDrop:
 	var drop := LootDrop.new()
 	drop.items = items.duplicate()
+	drop.gold = maxi(0, gold)
 	drop.position = Vector3(pos.x, 0.0, pos.z)
 	drop.picked_up.connect(_on_drop_picked)
 	drop.bag_full.connect(_on_bag_full)
@@ -132,23 +125,103 @@ func spawn_drop(pos: Vector3, items: Dictionary) -> LootDrop:
 
 # ---------- Зелья ----------
 
-## Выпить зелье здоровья. true, если выпито.
+## Выпить зелье здоровья (кнопка «Зелье», Q): лучшее из сумки, что можно пить по уровню. true, если выпито.
 func use_potion() -> bool:
+	var id := best_potion("hp")
+	if id == "":
+		if has_potion("hp"):
+			_msg("Зелья здоровья в сумке вам пока не по уровню")
+		else:
+			_msg("Нет зелий здоровья")
+		return false
+	return drink(id)
+
+
+## Лучшее (старший ранг) зелье вида kind в сумке, которое герой может выпить по уровню ("" — нет).
+static func best_potion(kind: String) -> String:
+	var best := ""
+	var best_r := 0
+	for k in Game.inventory.ids():
+		var id := String(k)
+		if ItemData.potion_kind(id) != kind or ItemData.level_block(id, Game.level) != "":
+			continue
+		if ItemData.rank(id) > best_r:
+			best_r = ItemData.rank(id)
+			best = id
+	return best
+
+
+## Есть ли в сумке зелья вида kind (любого ранга).
+static func has_potion(kind: String) -> bool:
+	for k in Game.inventory.ids():
+		if ItemData.potion_kind(String(k)) == kind:
+			return true
+	return false
+
+
+## Сколько зелий вида kind герой может выпить по уровню (все ранги).
+static func potion_count(kind: String) -> int:
+	var n := 0
+	for k in Game.inventory.ids():
+		var id := String(k)
+		if ItemData.potion_kind(id) == kind and ItemData.level_block(id, Game.level) == "":
+			n += Game.inventory.count(id)
+	return n
+
+
+## Выпить зелье id из сумки (ItemData.POTION_KINDS): здоровье и мана — сразу (перезарядка POTION_CD у каждого вида),
+## ускорения — усиление на время со значком у полоски HP (повтор того же вида заменяет и продлевает). Ранг выше
+## уровня героя — нельзя. true — выпито.
+func drink(id: String) -> bool:
 	var p: Player = main.player
-	if _potion_cd > 0.0:
-		_msg("Зелье ещё не готово: %.1f с" % _potion_cd)
+	var kind := ItemData.potion_kind(id)
+	if kind == "" or p == null:
+		_msg("Это не зелье")
 		return false
-	if p.hp >= p.max_hp:
-		_msg("Здоровье и так полное")
+	if not Game.inventory.has(id):
+		_msg("Нет такого зелья")
 		return false
-	if not Game.inventory.remove("hp_potion"):
-		_msg("Нет зелий здоровья")
+	var block := ItemData.level_block(id, Game.level)
+	if block != "":
+		_msg(block)
 		return false
-	p.heal(int(p.max_hp * POTION_HEAL))
-	_potion_cd = POTION_CD
-	main.hud.set_cooldown("potion", 1.0)
-	used.emit("hp_potion")
+	match kind:
+		"hp":
+			if _potion_cd > 0.0:
+				_msg("Зелье ещё не готово: %.1f с" % _potion_cd)
+				return false
+			if p.hp >= p.max_hp:
+				_msg("Здоровье и так полное")
+				return false
+			Game.inventory.remove(id)
+			p.heal(ItemData.potion_restore(id, p.max_hp))
+			_potion_cd = POTION_CD
+			main.hud.set_cooldown("potion", 1.0)
+		"mp":
+			if _mana_cd > 0.0:
+				_msg("Зелье маны ещё не готово: %.1f с" % _mana_cd)
+				return false
+			if p.max_mp <= 0 or p.mp >= p.max_mp:
+				_msg("Мана и так полная")
+				return false
+			Game.inventory.remove(id)
+			p.mp = mini(p.max_mp, p.mp + ItemData.potion_restore(id, p.max_mp))
+			p.stats_changed.emit()
+			_mana_cd = POTION_CD
+		_:
+			Game.inventory.remove(id)
+			var key := String(ItemData.POTION_BUFF_KEYS.get(kind, kind))
+			var pct := ItemData.potion_buff(ItemData.rank(id))
+			p.add_timed_bonus("potion_" + kind, ItemData.POTION_BUFF_TIME, {key: pct},
+				{"name": ItemData.item_name(id), "icon": IconView.item(id)})
+			_msg("%s: +%d%% на %d с" % [ItemData.item_name(id), roundi(pct * 100.0), int(ItemData.POTION_BUFF_TIME)])
+	used.emit(id)
 	return true
+
+
+## Доля оставшейся перезарядки зелья маны: 0 = готово.
+func mana_cooldown_frac() -> float:
+	return clampf(_mana_cd / POTION_CD, 0.0, 1.0)
 
 
 ## Доля оставшейся перезарядки зелья: 0 = готово, 1 = только что выпито.
@@ -159,9 +232,11 @@ func potion_cooldown_frac() -> float:
 func _update_potion_button() -> void:
 	if main == null or main.hud == null:
 		return
-	main.hud.set_button_text("potion", "Зелье\n%d" % Game.inventory.count("hp_potion"))
-	main.hud.set_button_icon("potion", IconView.item("hp_potion"))
-	main.hud.set_button_count("potion", Game.inventory.count("hp_potion"))
+	var n := potion_count("hp")
+	var id := best_potion("hp")
+	main.hud.set_button_text("potion", "Зелье\n%d" % n)
+	main.hud.set_button_icon("potion", IconView.item(id if id != "" else ItemData.potion_id("hp", 1)))
+	main.hud.set_button_count("potion", n)
 
 
 # ---------- Торговец ----------
@@ -351,6 +426,39 @@ func withdraw(i: int, n: int = -1) -> int:
 	return k
 
 
+## Положить на склад n золота (n < 0 — всё). Возвращает, сколько положено.
+func deposit_gold(n: int) -> int:
+	var k := Game.gold if n < 0 else mini(n, Game.gold)
+	if k <= 0:
+		_msg("Нет золота" if Game.gold <= 0 else "Сколько положить?")
+		return 0
+	Game.gold -= k
+	Game.storage_gold += k
+	_msg("На склад: %d зол. (на складе %d)" % [k, Game.storage_gold])
+	_gold_moved()
+	return k
+
+
+## Забрать со склада n золота (n < 0 — всё). Возвращает, сколько забрано.
+func withdraw_gold(n: int) -> int:
+	var k := Game.storage_gold if n < 0 else mini(n, Game.storage_gold)
+	if k <= 0:
+		_msg("На складе нет золота" if Game.storage_gold <= 0 else "Сколько забрать?")
+		return 0
+	Game.storage_gold -= k
+	Game.gold += k
+	_msg("Забрано со склада: %d зол." % k)
+	_gold_moved()
+	return k
+
+
+func _gold_moved() -> void:
+	storage_gold_changed.emit()
+	Game.changed.emit()
+	if window != null:
+		window.dirty = true
+
+
 func _close_window() -> void:
 	window.close()
 
@@ -404,9 +512,11 @@ func _on_storage_changed() -> void:
 		window.dirty = true
 
 
-func _on_drop_picked(items: Dictionary) -> void:
+func _on_drop_picked(items: Dictionary, gold: int) -> void:
 	if main != null and main.hud != null:
-		_msg("Подобрано: " + LootDrop.describe(items))
+		_msg("Подобрано: " + LootDrop.describe(items, gold))
+	if gold > 0:
+		Game.changed.emit()
 
 
 func _on_bag_full(_left: Dictionary) -> void:
@@ -419,6 +529,8 @@ func _process(delta: float) -> void:
 		return
 	if _potion_cd > 0.0:
 		_potion_cd = maxf(0.0, _potion_cd - delta)
+	if _mana_cd > 0.0:
+		_mana_cd = maxf(0.0, _mana_cd - delta)
 	main.hud.set_cooldown("potion", potion_cooldown_frac())
 
 	var near := is_near_merchant()

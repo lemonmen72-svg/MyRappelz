@@ -44,8 +44,8 @@ func run_step() -> void:
 				check(int(ItemData.get_item("card_" + id)["buy"]) > 0, "карта %s продаётся (у Учителя Кирка)" % id)
 				var names: Array = PetData.get_species(id)["stages"]
 				check(names.size() == 3, "у вида %s три стадии: %s" % [id, str(names)])
-				for e in MobData.get_type(id)["loot"]:
-					var it := String(e[0])
+				for e in MobData.materials(id):
+					var it := String(e)
 					check(not ItemData.get_item(it).is_empty(), "добыча %s есть в предметах: %s" % [id, it])
 			for id in ["boar", "golem"]:
 				check(not MobData.tameable(id) and ItemData.card_for(id) == "" and ItemData.soul_card_for(id) == "",
@@ -255,7 +255,7 @@ func _check_old_save() -> void:
 	var inv: Inventory = game.inventory
 	check(inv.count("panther_fang") == 3 and inv.count("pheasant_feather") == 1 and inv.count("shell_plate") == 3,
 		"старые трофеи переведены в новые: %s" % [inv.to_dict()])
-	check(not inv.has("bear_claw") and inv.count("hp_potion") == 2, "старых id в сумке нет, прочее на месте")
+	check(not inv.has("bear_claw") and inv.count("potion_hp_r1") == 2, "старых id в сумке нет, прочее на месте")
 
 
 ## Весь текст окна питомцев.

@@ -83,7 +83,7 @@ func run_step() -> void:
 			var win: InventoryWindow = eco.window
 			for id in ["card_panther", "card_pheasant", "card_turtle", "mirror_card"]:
 				check(win.buttons.has("good_" + id), "Кирк продаёт: %s" % id)
-			for id in ["hp_potion", "revive_scroll", "dagger_steel"]:
+			for id in ["potion_hp_r1", "revive_scroll", "dagger_steel"]:
 				check(not win.buttons.has("good_" + id), "Кирк не продаёт: %s" % id)
 			check(_has_text("Лавка Учителя Кирка"), "заголовок окна торговли")
 			# Продажа из сумки — и у Кирка
@@ -163,7 +163,9 @@ func run_step() -> void:
 			var mirrors := inv.count("mirror_card")
 			var g0: int = game.gold
 			check(q.complete("kirk_soul"), "«Душа в карте» сдано")
-			check(inv.count("mirror_card") == mirrors + 1 and game.gold == g0 + 20, "награда: зеркальная карта и 20 зол.")
+			check(inv.count("mirror_card") == mirrors + 1 + _bonus("mirror_card") and game.gold == g0 + 20,
+				"награда: зеркальная карта и 20 зол.")
+			_check_bonus("kirk_soul")
 			# «Новый друг»: формирование и призыв
 			check(q.accept("kirk_new_friend"), "взято «Новый друг»")
 			check(q.goal_progress("kirk_new_friend", 0) == 0 and q.goal_progress("kirk_new_friend", 1) == 0,
@@ -174,11 +176,13 @@ func run_step() -> void:
 				"сформировано и призвано: обе цели")
 			check(q.is_ready("kirk_new_friend"), "«Новый друг» выполнено")
 			var jp0 := int(game.hero["jp"])
-			var potions := inv.count("hp_potion")
+			var potions := inv.count("potion_hp_r1")
 			var xp0 := _total_xp()
 			check(q.complete("kirk_new_friend"), "«Новый друг» сдано")
 			check(int(game.hero["jp"]) >= jp0 + 5, "JP героя +5: %d → %d" % [jp0, int(game.hero["jp"])])
-			check(inv.count("hp_potion") == potions + 3 and _total_xp() == xp0 + 70, "награда: 3 зелья и 70 оп.")
+			check(inv.count("potion_hp_r1") == potions + 3 + _bonus("potion_hp_r1") and _total_xp() == xp0 + 70,
+				"награда: 3 зелья и 70 оп. (+ случайная %s)" % [q.last_bonus])
+			_check_bonus("kirk_new_friend")
 			# «Испытание связи» — с 3 уровня (за фазана и награды герой мог уже подрасти)
 			if game.level < 3:
 				check(kirk.mark_text() == "" and q.level_locked("kirk_bond_trial"), "«Испытание связи» — с 3 уровня")
@@ -241,12 +245,14 @@ func run_step() -> void:
 			check(_has_text("Все цели выполнены — вернитесь к Учителю Кирку"), "подсказка, кому сдавать")
 			check(_find_live(hud._window, "reward_revive_scroll") != null, "награда-предмет со значком")
 			check(_has_text("Золото: 40") and _has_text("Опыт: 100"), "награда: опыт и золото")
+			check(_find_live(hud._window, "reward_random") != null and _has_text("Случайная награда: 1–2 предмета"),
+				"в журнале — «Случайная награда: 1–2 предмета»")
 			_press_journal("tab_done")
 			check(w.tab == "done" and w.buttons.has("q_kirk_first_card") and w.buttons.has("q_kirk_new_friend"),
 				"вкладка «Выполненные»")
 			_press_journal("q_kirk_new_friend")
 			check(_has_text("Получено") and _has_text("Очки умений: 5 JP"), "выполненное: полученная награда с JP")
-			check(_find_live(hud._window, "reward_hp_potion") != null, "значок зелья в награде")
+			check(_find_live(hud._window, "reward_potion_hp_r1") != null, "значок зелья в награде")
 			_press_journal("tab_active")
 			# Отслеживание
 			_press_journal("track")
@@ -264,7 +270,8 @@ func run_step() -> void:
 				and game.gold == g0, "сообщение, задание осталось взятым")
 			inv.remove("sword_steel", inv.count("sword_steel"))
 			check(q.complete("kirk_bond_trial"), "«Испытание связи» сдано")
-			check(inv.count("revive_scroll") == 1 and game.gold == g0 + 40, "награда: свиток и 40 зол.")
+			check(inv.count("revive_scroll") == 1 + _bonus("revive_scroll") and game.gold == g0 + 40, "награда: свиток и 40 зол.")
+			_check_bonus("kirk_bond_trial")
 			for id in CHAIN:
 				check(q.state(String(id)) == "done", "цепочка: %s сдано" % id)
 			check(kirk.mark_text() == "", "все задания сданы — значка нет")
@@ -355,7 +362,7 @@ func _unit_data() -> void:
 	check(QuestData.goal_text({"type": "level", "n": 5}) == "Достичь 5 уровня", "подпись цели level")
 	check(QuestData.goal_text({"type": "sell", "items": [], "npc": "merchant", "n": 3}) == "Продать вещи торговцу Гордею",
 		"подпись цели sell: " + QuestData.goal_text({"type": "sell", "items": [], "npc": "merchant", "n": 3}))
-	check(QuestData.goal_text({"type": "use", "items": ["hp_potion"], "n": 1}) == "Использовать: Зелье здоровья", "подпись цели use")
+	check(QuestData.goal_text({"type": "use", "items": ["potion_hp"], "n": 1}) == "Использовать: Зелье здоровья", "подпись цели use")
 	check(QuestData.goal_text({"type": "store", "n": 1}) == "Положить вещь на склад", "подпись цели store")
 	check(QuestData.prereqs("sage_to_hunter").size() == 3 and QuestData.prereqs("kirk_first_card").is_empty(),
 		"предыдущие задания: строка или список")
@@ -365,17 +372,41 @@ func _unit_data() -> void:
 	var mg := InventoryWindow.goods("assassin", "merchant")
 	for id in mg:
 		check(ItemData.item_type(String(id)) != "card", "у торговца нет карт: %s" % id)
-	check(mg.has("hp_potion") and mg.has("revive_scroll") and mg.has("dagger_steel"), "у торговца зелья, свиток, оружие")
+	check(mg.has("potion_hp_r1") and mg.has("revive_scroll") and mg.has("dagger_steel"), "у торговца зелья, свиток, оружие")
 	check(NpcData.sellers_of("card_turtle") == ["kirk"], "карту черепахи продаёт только Кирк")
 	check(Taming.where_to_get("card_turtle") == "продаётся у Учителя Кирка в центре города", "где взять: "
 		+ Taming.where_to_get("card_turtle"))
 	# Место в сумке для нескольких наград сразу
 	var a := Inventory.new()
 	a.add("sword_steel", Inventory.CAPACITY - 1)
-	check(a.room_for_all({"hp_potion": 3}) and not a.room_for_all({"hp_potion": 3, "mirror_card": 1}),
+	check(a.room_for_all({"potion_hp_r1": 3}) and not a.room_for_all({"potion_hp_r1": 3, "mirror_card": 1}),
 		"одна свободная ячейка — одна стопка награды")
-	a.add("hp_potion", 1)
-	check(a.room_for_all({"hp_potion": 98}) and not a.room_for_all({"hp_potion": 99}), "неполная стопка принимает награду")
+	a.add("potion_hp_r1", 1)
+	check(a.room_for_all({"potion_hp_r1": 98}) and not a.room_for_all({"potion_hp_r1": 99}), "неполная стопка принимает награду")
+
+
+## Сколько штук id выпало случайной наградой последней сдачи (Quests.last_bonus).
+func _bonus(id: String) -> int:
+	var q: Quests = main.quests
+	return int(q.last_bonus.get(id, 0))
+
+
+## Случайная награда сдачи: 1–2 предмета (зелья, оружие, карты существ) ранга по уровню героя, есть в сумке
+## и в сообщении о сдаче.
+func _check_bonus(id: String) -> void:
+	var q: Quests = main.quests
+	var n := 0
+	for k in q.last_bonus:
+		var it := String(k)
+		n += int(q.last_bonus[k])
+		check(ItemData.is_potion(it) or ItemData.is_weapon(it) or ItemData.is_card(it), "%s: случайная награда — %s" % [id, it])
+		if ItemData.is_potion(it):
+			check(ItemData.rank(it) == ItemData.potion_rank_for_level(game.level), "зелье награды по уровню героя: %s" % it)
+		if ItemData.is_weapon(it):
+			check(ItemData.rank(it) == ItemData.equip_rank_for_level(game.level), "оружие награды по уровню героя: %s" % it)
+		check(game.inventory.has(it), "случайная награда в сумке: %s" % it)
+	check(n >= LootTable.QUEST_MIN and n <= LootTable.QUEST_MAX, "%s: случайных предметов %d (1–2)" % [id, n])
+	check(last_hud_text().contains("случайная награда"), "сообщение о случайной награде: " + last_hud_text())
 
 
 ## Кирк в центральной деревне: проходимая ровная земля, не на дороге, не в постройке, рядом с торговцем.
