@@ -154,12 +154,12 @@ func _check_weapons_data() -> void:
 		check(ItemData.is_weapon(id) and ItemData.rank(id) == 1, "%s: оружие 1-го ранга" % id)
 		check(ResourceLoader.exists(ItemData.icon_path(id)), "%s: значок есть" % id)
 		check(ItemData.weapon_fits(id, ClassData.WANDERER), "%s: подходит Бродяге" % id)
-		check(NpcData.shop("merchant").has(id), "%s: продаёт торговец" % id)
+		check(NpcData.shop("weaponsmith").has(id), "%s: продаёт оружейник" % id)
 	check(ItemData.weapon_attack("staff_2h") == "magic" and ItemData.weapon_attack("axe_2h") == "melee"
 		and ItemData.weapon_attack("crossbow") == "ranged", "посох — магия, топор — ближний бой, арбалет — стрельба")
 	check(ItemData.weapon_fits("crossbow_starter", ClassData.WANDERER) and ItemData.weapon_fits("weapon_bow_r1", ClassData.WANDERER)
 		and ItemData.weapon_fits("dagger_steel", ClassData.WANDERER), "Бродяге — любое оружие (и лук, и арбалет)")
-	check(ItemData.is_weapon("weapon_bow_r1") and NpcData.shop("merchant").has("weapon_bow_r1"), "лук новичка у торговца")
+	check(ItemData.is_weapon("weapon_bow_r1") and NpcData.shop("weaponsmith").has("weapon_bow_r1"), "лук новичка у оружейника")
 	for jid in ClassData.CLASSES:
 		var job := String(jid)
 		var st := ItemData.starter_weapons(job)

@@ -12,6 +12,7 @@ const NPCS := {
 	"merchant": ["m", 1.80], "kirk": ["m", 1.74], "sage": ["m", 1.72], "smith": ["m", 1.86],
 	"storekeeper": ["m", 1.72], "elder_human": ["m", 1.76], "elder_light": ["f", 1.74], "elder_dark": ["f", 1.80],
 	"hunter": ["f", 1.68], "merc_chief": ["m", 1.82],
+	"weaponsmith": ["m", 1.84], "armorer": ["f", 1.74], "jeweler": ["f", 1.70],
 }
 ## Клипы жителя (нижний регистр): покой и приветствие обязательны, остальные — общий набор героя.
 const CLIPS := ["idle", "wave", "walking", "running", "hit", "cast", "pickup"]

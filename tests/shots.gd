@@ -99,6 +99,8 @@ var _frames := 0
 var _fish: Variant = null
 ## Летающие рыбы в ряд рядом с героем — кадр 52.
 const FISH_ROW := ["flyfish", "flyfish_sail", "flyfish_drake"]
+## Жители-лавки города (кадры 280–286): оружейник, бронница, ювелир.
+const SHOP_NPCS := ["weaponsmith", "armorer", "jeweler"]
 ## Анатемы в ряд рядом с героем — кадр 56. Кентавр: стадии рядом с героем — кадр 55, в мире — кадр 58.
 const ANATHEMA_ROW := ["anathema", "anathema_blade", "anathema_chief"]
 ## Умения Наёмника для кадров окна героя [id, уровень].
@@ -137,7 +139,7 @@ const PART_ENTRIES := [
 	[814, 152, 72], [816, 59, 23], [818, 120, 29], [960, 45, 12], [963, 64, 14], [925, 141, 33],
 	[940, 33, 9], [943, 63, 47], [946, 95, 46], [980, 40, 46], [1000, 42, 18], [1002, 95, 83],
 	[1025, 102, 102], [1021, 126, 144], [1040, 141, 181], [1060, 66, 67], [1160, 124, 148], [1120, 98, 101],
-	[1080, 60, 58], [1200, 178, 224],
+	[1080, 60, 58], [1200, 180, 224], [1260, 224, 112],
 ]
 ## Сколько кадров до точки входа часть уже рисует (компиляция шейдеров, тени, окна интерфейса).
 const PART_WARMUP := 10
@@ -539,9 +541,9 @@ func run_step() -> void:
 			step = 30
 		30:
 			shot("27_inventory")
-			# Окно торговца: товары, сумка, карточка тяжёлого арбалета
+			# Окно торговца: товары, сумка, карточка зелья 2-го ранга (оружие — у оружейника, кадры 280–289)
 			main.economy.open_shop()
-			main.economy.window._on_cell("good", InventoryWindow.goods(game.class_id).find("crossbow_heavy"))
+			main.economy.window._on_cell("good", InventoryWindow.goods(game.class_id).find("potion_hp_r2"))
 			wait = 8
 			step = 31
 		31:
@@ -1815,6 +1817,59 @@ func run_step() -> void:
 			main.cam.current = true
 			main.hud.visible = true
 			main.player.visible = true
+			wait = 2
+			step = 1260
+		# ---------- Кадры 280–286: три лавки города (оружейник, бронница, ювелир) ----------
+		1260:
+			# Три торговца в ряд крупно — кадр 280
+			_heroes_row([], 1.3, 3.6)
+			_npc_row(SHOP_NPCS, 1.3)
+			wait = 60
+			step = 1261
+		1261:
+			shot("280_shop_npcs_row")
+			_clip_row_clear()
+			_top = Camera3D.new()
+			main.add_child(_top)
+			_top.current = true
+			_npc_view("weaponsmith")
+			wait = 40
+			step = 1262
+		1262:
+			shot("281_weaponsmith_place")
+			_npc_view("armorer")
+			wait = 40
+			step = 1263
+		1263:
+			shot("282_armorer_place")
+			_npc_view("jeweler")
+			wait = 40
+			step = 1264
+		1264:
+			shot("283_jeweler_place")
+			_top.queue_free()
+			_top = null
+			main.cam.current = true
+			main.hud.visible = true
+			main.player.visible = true
+			_shop_view("armorer")
+			wait = 12
+			step = 1265
+		1265:
+			shot("284_armorer_trade")
+			main.hud.close_window()
+			_shop_view("jeweler")
+			wait = 12
+			step = 1266
+		1266:
+			shot("285_jeweler_trade")
+			main.hud.close_window()
+			_shop_view("weaponsmith")
+			wait = 12
+			step = 1267
+		1267:
+			shot("286_weaponsmith_trade")
+			main.hud.close_window()
 			ok_done()
 
 
@@ -1878,11 +1933,14 @@ func _npc_view(id: String) -> void:
 
 
 ## Кадр 160: все жители (модели из файлов, CharacterModel.npc_spec) с предметами NpcProps в ряд в узле _heroes —
-## после _heroes_row([]) (камера и площадь те же).
-func _npc_row() -> void:
-	var ids: Array = NpcData.NPCS.keys()
+## после _heroes_row([]) (камера и площадь те же). only — только эти жители (кадр 280: три лавки), иначе все,
+## кроме лавок (кадр 160 — прежние десять); gap — шаг ряда, м.
+func _npc_row(only: Array = [], gap: float = 0.95) -> void:
+	var ids: Array = []
+	for k in NpcData.NPCS:
+		if (only.is_empty() and not SHOP_NPCS.has(k)) or only.has(k):
+			ids.append(String(k))
 	var base := Vector3(0.0, 0.0, 3.0)
-	var gap := 0.95
 	for i in ids.size():
 		var id := String(ids[i])
 		var m := CharacterModel.new()
@@ -1895,6 +1953,16 @@ func _npc_row() -> void:
 		m.global_position = gp
 		# Чётные — вполоборота вправо, нечётные — влево: видно предметы в обеих руках и за спиной
 		m.rotation.y = PI + (0.35 if i % 2 == 0 else -0.35)
+
+
+## Кадры 284–286: игрок перед жителем-лавкой (_talk_view), открыта его лавка, выбран первый товар.
+func _shop_view(id: String) -> void:
+	_talk_view(id)
+	main.economy.open_shop(id)
+	var goods := InventoryWindow.goods(game.class_id, id)
+	check(main.economy.is_shop_open() and main.economy.window.seller == id, "кадр лавки %s: окно открыто" % id)
+	if not goods.is_empty():
+		main.economy.window._on_cell("good", 0)
 
 
 ## Камера _top в 3 м за спиной жителя (игрок далеко впереди — житель не поворачивается).

@@ -6,11 +6,14 @@ extends "res://tests/test_base.gd"
 ## файла npc_<id>.glb с клипами Idle и Wave и предметами NpcProps или из примитивов, лёгкая); рядом — кнопка «Говорить» выбирает ближайшего, диалог
 ## открывается у каждого, пункты «скоро» и справочник мудреца показывают текст, «Склад» у кладовщика открывает
 ## окно склада; реплики по положению героя; задания мудреца после старосты (четыре сразу, «Взять все»), задание
-## «Городской склад» (поговорить с кладовщиком, положить вещь на склад) берётся и сдаётся.
+## «Городской склад» (поговорить с кладовщиком, положить вещь на склад) берётся и сдаётся. Три лавки города
+## (оружейник, бронница, ювелир): «Торговля» в диалоге открывает окно со своим ассортиментом 1-го ранга
+## (предметы, которых ещё нет в ItemData, пропускаются), у торговца Гордея — только зелья и свиток.
 
 ## Кто где стоит: id → [POI, ближайшая из POI этого вида должна быть она].
 const HOMES := {
 	"sage": "town", "smith": "town", "storekeeper": "town",
+	"weaponsmith": "town", "armorer": "town", "jeweler": "town",
 	"elder_human": "human_village", "elder_light": "light_elf_village", "elder_dark": "dark_elf_village",
 	"hunter": "tent_w1", "merc_chief": "cave",
 }
@@ -24,6 +27,21 @@ const PARTS := {
 	"merc_chief": ["", ["Scabbard", "Cape"]],
 	"elder_light": ["", []],
 	"elder_dark": ["", ["Cape"]],
+	"weaponsmith": ["", ["Scabbard"]],
+	"armorer": ["", ["Axe"]],
+	"jeweler": ["", ["Necklace", "Cape"]],
+}
+## Лавки города: житель → ассортимент (ItemData), всё — 1-го ранга.
+const SHOPS := {
+	"weaponsmith": ["weapon_sword_1h_r1", "weapon_sword_2h_r1", "weapon_dagger_r1", "weapon_mace_1h_r1",
+		"weapon_mace_2h_r1", "weapon_axe_1h_r1", "weapon_axe_2h_r1", "weapon_staff_1h_r1", "weapon_staff_2h_r1",
+		"weapon_spear_r1", "weapon_bow_r1", "crossbow_starter", "weapon_shield_r1", "dagger_steel", "sword_steel",
+		"crossbow_heavy"],
+	"armorer": ["armor_body_warrior_r1", "armor_body_mage_r1", "armor_body_summoner_r1", "armor_helmet_r1",
+		"armor_gloves_r1", "armor_boots_r1"],
+	"jeweler": ["ring_hp_r1", "ring_mp_r1", "ring_crit_r1", "ring_critdmg_r1", "ring_aspd_r1", "ring_cast_r1",
+		"earring_crit_r1", "earring_critdmg_r1", "earring_aspd_r1", "earring_cast_r1", "pendant_hp_r1", "pendant_mp_r1",
+		"pendant_pdef_r1", "pendant_mdef_r1", "belt_pdef_r1", "belt_mdef_r1", "belt_eva_r1", "belt_speed_r1"],
 }
 
 ## Порядок разговоров и номер текущего.
@@ -64,7 +82,11 @@ func run_step() -> void:
 			check(npcs.is_dialog_open() and npcs.dialog_npc == id and npcs.page == "main", "диалог с %s открыт" % id)
 			check(npcs.reply != "" and npcs.reply == npcs.greeting(id), "%s: реплика «%s»" % [id, npcs.reply])
 			check(_has_text(NpcData.npc_name(id)) and _has_text(String(NpcData.npc(id)["title"])), "%s: имя и титул в окне" % id)
-			check(npcs.buttons.has("opt_bye") and not npcs.buttons.has("opt_trade"), "%s: «До встречи», торговли нет" % id)
+			check(npcs.buttons.has("opt_bye") and npcs.buttons.has("opt_trade") == SHOPS.has(id),
+				"%s: «До встречи», «Торговля» — только у лавок" % id)
+			if SHOPS.has(id) and npcs.buttons.has("opt_trade"):
+				_check_trade(id)
+				npcs.open_dialog(id)
 			check(npcs.buttons.has("opt_quests") == Npcs.gives_quests(id), "%s: «Задания» — только если есть задания" % id)
 			for e in NpcData.talk_options(id):
 				var d: Dictionary = e
@@ -203,18 +225,80 @@ func _unit_data() -> void:
 				soon += 1
 		# Дела, которых ещё нет, — с пометкой «скоро» (кузница, подземелье); у мудреца, кладовщика (склад), старост
 		# и охотницы (задания) пункты рабочие
-		check(soon >= 1 or ["sage", "storekeeper", "elder_human", "elder_light", "elder_dark", "hunter"].has(id),
-			"%s: будущее дело с пометкой «скоро»" % id)
-		check(not NpcData.is_trader(id), "%s: не торгует" % id)
+		check(soon >= 1 or ["sage", "storekeeper", "elder_human", "elder_light", "elder_dark", "hunter"].has(id)
+			or SHOPS.has(id), "%s: будущее дело с пометкой «скоро»" % id)
+		check(NpcData.is_trader(id) == SHOPS.has(id), "%s: торгует — только лавка" % id)
 	check(String(NpcData.talk_entry("sage", "profession").get("text", "")).contains("десятого уровня")
 		and not bool(NpcData.talk_entry("sage", "profession").get("soon", false)), "мудрец о первой профессии (рабочий пункт)")
 	check(String(NpcData.talk_entry("sage", "guide/pets").get("text", "")).contains("Кирк"), "справочник мудреца: питомцы — к Кирку")
+	var shops_txt := String(NpcData.talk_entry("sage", "guide/shops").get("text", ""))
+	check(shops_txt.contains("Бранд") and shops_txt.contains("Хельга") and shops_txt.contains("Лиора"),
+		"справочник мудреца: три лавки города")
+	_unit_shops()
 	check(NpcData.talk_entry("sage", "guide/nope").is_empty() and NpcData.talk_entry("smith", "").is_empty(),
 		"неизвестный пункт — пусто")
 	check(not QuestData.has_quest("sage_town_tour"), "«Знакомство с городом» заменено заданиями мудреца")
 	check(String(NpcData.talk_entry("storekeeper", "storage").get("action", "")) == "storage", "у кладовщика — «Склад»")
 	check(NpcData.talk_entry("smith", "forge").get("soon", false) and NpcData.talk_entry("merc_chief", "dungeon").get("soon", false),
 		"кузница и подземелье — «скоро»")
+
+
+## Ассортимент: оружие ушло от Гордея к оружейнику, у бронницы — доспехи, у ювелира — украшения; всё 1-го ранга.
+func _unit_shops() -> void:
+	var gordey := NpcData.shop("merchant")
+	for k in gordey:
+		var id := String(k)
+		check(not ItemData.is_weapon(id), "у Гордея нет оружия: %s" % id)
+		check(ItemData.is_potion(id) or id == "revive_scroll", "у Гордея — зелья и свиток: %s" % id)
+	check(gordey.has("potion_hp_r1") and gordey.has("potion_speed_r2") and gordey.has("revive_scroll"),
+		"у Гордея зелья 1–2 ранга и свиток воскрешения")
+	for who in SHOPS:
+		var npc_id := String(who)
+		var want: Array = SHOPS[who]
+		check(NpcData.shop(npc_id) == want, "%s: ассортимент как задумано" % npc_id)
+		check(NpcData.shop_title(npc_id) != NpcData.npc_name(npc_id), "%s: своё название лавки" % npc_id)
+		var goods := InventoryWindow.goods(ClassData.WANDERER, npc_id)
+		for k in want:
+			var id := String(k)
+			var known := ItemData.ITEMS.has(id) and int(ItemData.get_item(id).get("buy", 0)) > 0
+			# Предметы, которых ещё нет в ItemData, окно торговли пропускает
+			check(goods.has(id) == known, "%s: %s в продаже — %s" % [npc_id, id, known])
+			if known:
+				check(ItemData.rank(id) == 1, "%s: %s — 1-го ранга" % [npc_id, id])
+				check(NpcData.sellers_of(id) == [npc_id], "%s продаёт только %s" % [id, npc_id])
+	# Всё оружие 1-го ранга (что продаётся) — у оружейника, 2-го ранга — ни у кого
+	for key in ItemData.ITEMS:
+		var id := String(key)
+		if not ItemData.is_weapon(id) or int(ItemData.get_item(id).get("buy", 0)) <= 0:
+			continue
+		if ItemData.rank(id) == 1:
+			check(NpcData.shop("weaponsmith").has(id), "оружейник продаёт %s" % id)
+		else:
+			check(NpcData.sellers_of(id).is_empty(), "%s (ранг %d) на острове не продаётся" % [id, ItemData.rank(id)])
+	# Задание «Лавка Гордея» (купить 3 и продать 3 у торговца) выполнимо: у Гордея есть что купить
+	check(InventoryWindow.goods(ClassData.WANDERER, "merchant").size() >= 3, "у Гордея есть товары для задания")
+
+
+## «Торговля» в диалоге лавки: окно торговли этого жителя, товары — его ассортимент; покупка у него.
+func _check_trade(id: String) -> void:
+	var eco: Economy = main.economy
+	_press("opt_trade")
+	check(not main.npcs.is_dialog_open() and eco.is_shop_open() and eco.window.seller == id,
+		"%s: «Торговля» открывает его лавку" % id)
+	check(_has_text(NpcData.shop_title(id)), "%s: заголовок «%s»" % [id, NpcData.shop_title(id)])
+	var goods := InventoryWindow.goods(game.class_id, id)
+	for k in goods:
+		check(eco.window.buttons.has("good_" + String(k)), "%s: товар %s в окне" % [id, k])
+	check(not eco.window.buttons.has("good_potion_hp_r1"), "%s: зелий нет — они у Гордея" % id)
+	if not goods.is_empty():
+		var first := String(goods[0])
+		game.gold = 100000
+		var n0 := game.inventory.count(first)
+		check(eco.buy(first, 1), "%s: куплено %s" % [id, first])
+		check(game.inventory.count(first) == n0 + 1, "%s: %s в сумке" % [id, first])
+		game.inventory.remove(first, 1)
+	check(not eco.buy("potion_hp_r1", 1), "%s: зелье здесь не купить" % id)
+	main.hud.close_window()
 
 
 func _check_world() -> void:

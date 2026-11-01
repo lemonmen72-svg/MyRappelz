@@ -3480,6 +3480,12 @@ def _arm_carrier(ch: list, gpos: np.ndarray, path: list, start: int, leg_set: se
 		side = [c for c in ch[path[k]] if c not in leg_set and c != nxt
 			and biped_arm_like(ch, gpos, c, float(gpos[path[k], 0]), height)]
 		if len(side) >= 2:
+			# Ветки с кистью (конец цепочки с развилкой — пальцы) важнее: у рига Meshy бывают длинные ленты плаща
+			# сбоку груди (npc_weaponsmith: Bone_039…034 висит у бедра), которые иначе обгоняют руку по X.
+			# Если кистей нет (риг без пальцев) — как раньше.
+			handed = [c for c in side if len(ch[_single_chain(ch, c)[-1]]) >= 2]
+			if len(handed) >= 2:
+				side = handed
 			side.sort(key=lambda c: gpos[c, 0])
 			return k, {"R": side[0], "L": side[-1]}
 	return None, None

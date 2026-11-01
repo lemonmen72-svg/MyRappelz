@@ -373,7 +373,8 @@ func _unit_data() -> void:
 	var mg := InventoryWindow.goods("assassin", "merchant")
 	for id in mg:
 		check(ItemData.item_type(String(id)) != "card", "у торговца нет карт: %s" % id)
-	check(mg.has("potion_hp_r1") and mg.has("revive_scroll") and mg.has("dagger_steel"), "у торговца зелья, свиток, оружие")
+	check(mg.has("potion_hp_r1") and mg.has("revive_scroll") and not mg.has("dagger_steel"), "у торговца зелья и свиток, оружия нет")
+	check(InventoryWindow.goods("assassin", "weaponsmith").has("dagger_steel"), "оружие — у Оружейника Бранда")
 	check(NpcData.sellers_of("card_turtle") == ["kirk"], "карту черепахи продаёт только Кирк")
 	check(Taming.where_to_get("card_turtle") == "продаётся у Учителя Кирка в центре города", "где взять: "
 		+ Taming.where_to_get("card_turtle"))
