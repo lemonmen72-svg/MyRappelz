@@ -149,7 +149,8 @@ func run_step() -> void:
 			mob.weaken(0.1, 20.0)
 			mob.effects.add("x1", 20.0, StatusEffects.effect_info("weak"))
 			mob.effects.add("x2", 20.0, StatusEffects.effect_info("weak"))
-			mob.effects.add("x3", 20.0, StatusEffects.effect_info("weak"))
+			for xi in range(3, 12):
+				mob.effects.add("x%d" % xi, 20.0, StatusEffects.effect_info("weak"))
 			wait = 2
 			step = 5
 		5:

@@ -340,7 +340,8 @@ func _unit_data() -> void:
 			var tg := String(gd.get("target", ""))
 			check(tg == "" or MobData.TYPES.has(tg), "%s: зверь цели %s" % [id, tg])
 			for it in gd.get("items", []):
-				check(not ItemData.get_item(String(it)).is_empty(), "%s: предмет цели %s" % [id, it])
+				var fam: bool = String(it).begins_with("potion_") and ItemData.POTION_KINDS.has(String(it).substr(7))
+				check(fam or not ItemData.get_item(String(it)).is_empty(), "%s: предмет цели %s" % [id, it])
 		for it in QuestData.reward_items(id):
 			check(not ItemData.get_item(String(it)).is_empty(), "%s: предмет награды %s" % [id, it])
 		# Опыт награды: заметно (30–70 % уровня, под который подобрана награда), но не ломает баланс

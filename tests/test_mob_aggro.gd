@@ -216,7 +216,7 @@ func _keep_near(m: Mob, dist: float) -> void:
 
 
 func _dist(m: Mob) -> float:
-	var d := m.global_position - main.player.global_position
+	var d: Vector3 = m.global_position - main.player.global_position
 	d.y = 0.0
 	return d.length()
 

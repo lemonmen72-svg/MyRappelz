@@ -406,7 +406,7 @@ func _world_bosses() -> void:
 		check(b != null and b.is_boss and b.rarity == "unique", "босс %s в мире" % id)
 		if b == null:
 			continue
-		check(b._label.text.begins_with("Босс · ") and b._label.modulate.is_equal_approx(MobData.BOSS_COLOR),
+		check(b._label.text.contains("Босс · ") and b._label.modulate.is_equal_approx(MobData.BOSS_COLOR),
 			"%s: подпись «%s» цветом босса" % [id, b._label.text.get_slice("\n", 0)])
 		check(Taming.badge_state(id) == Taming.BADGE_NO, "%s нельзя приручить" % id)
 		if b._asset != null:

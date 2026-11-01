@@ -831,10 +831,11 @@ func _build_overhead() -> void:
 	_over.place(_height + 0.12)
 
 
-## Цвет имени: по редкости (обычный — белый), у агрессивного зверя (Mob.aggressive, если есть) — красноватый.
+## Цвет имени: по редкости (обычный — белый), у агрессивного зверя (Mob.aggressive, если есть) — красноватый;
+## у босса — всегда цвет босса.
 func _name_color() -> Color:
 	var c := MobData.label_color(type_id) if rarity != "common" or is_boss else Color.WHITE
-	if get("aggressive") == true:
+	if get("aggressive") == true and not is_boss:
 		c = c.lerp(Color(1.0, 0.3, 0.25), 0.6 if c == Color.WHITE else 0.35)
 	return c
 
