@@ -426,7 +426,7 @@ func _find_arena() -> Vector3:
 	if w == null:
 		return Vector3.ZERO
 	var r := 20.0
-	while r < 200.0:
+	while r < 260.0:
 		for k in 32:
 			var ang := TAU * float(k) / 32.0
 			var q := Vector2(cos(ang), sin(ang)) * r
@@ -437,14 +437,14 @@ func _find_arena() -> Vector3:
 
 
 func _arena_ok(w: IslandWorld, q: Vector2) -> bool:
-	if not w.is_walkable(q.x, q.y) or w.in_safe_zone(Vector3(q.x, 0, q.y)) or w.water_distance(q.x, q.y) < 25.0:
+	if not w.is_walkable(q.x, q.y) or w.in_safe_zone(Vector3(q.x, 0, q.y)) or w.water_distance(q.x, q.y) < 12.0:
 		return false
 	var h0 := w.height_at(q.x, q.y)
 	for k in 8:
 		var ang := TAU * float(k) / 8.0
-		for rr in [8.0, 16.0, 22.0]:
+		for rr in [5.0, 10.0, 15.0]:
 			var p := q + Vector2(cos(ang), sin(ang)) * float(rr)
-			if not w.is_walkable(p.x, p.y) or w.in_safe_zone(Vector3(p.x, 0, p.y)) or absf(w.height_at(p.x, p.y) - h0) > 3.0:
+			if not w.is_walkable(p.x, p.y) or w.in_safe_zone(Vector3(p.x, 0, p.y)) or absf(w.height_at(p.x, p.y) - h0) > 4.0:
 				return false
 	return true
 

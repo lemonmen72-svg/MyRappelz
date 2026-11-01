@@ -162,6 +162,9 @@ func _make_rows(h: float) -> void:
 			var a: Array = groups[i]
 			var b: Array = groups[i + 1]
 			var gap := float(int(b[0]) - int(a[a.size() - 1])) + 0.01 * float(a.size() + b.size())
+			# Пререквизит и умение не сливаются в один ярус, пока есть другие пары (линия шла бы вбок)
+			if _pre_between(a, b):
+				gap += 1000.0
 			if gap < best_gap:
 				best_gap = gap
 				best = i
@@ -176,6 +179,21 @@ func _make_rows(h: float) -> void:
 			if ga.has(int(d.get("row", 1))):
 				ids.append(String(d["id"]))
 		rows.append({"from": int(ga[0]), "to": int(ga[ga.size() - 1]), "ids": ids})
+
+
+## Есть ли умение яруса b (требуемые уровни), чей пререквизит — в ярусе a.
+func _pre_between(a: Array, b: Array) -> bool:
+	for it in items:
+		var d: Dictionary = it
+		if not b.has(int(d.get("row", 1))):
+			continue
+		var pre := String(d.get("pre", ""))
+		if pre == "":
+			continue
+		var pd := _item(pre)
+		if not pd.is_empty() and a.has(int(pd.get("row", 1))):
+			return true
+	return false
 
 
 func _item(id: String) -> Dictionary:

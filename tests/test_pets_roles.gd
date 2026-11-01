@@ -186,25 +186,32 @@ func run_step() -> void:
 			ok_done()
 
 
+## Умения питомца в текущем бою (запоминается — питомец может пасть одновременно со зверем).
+var _uses := 0
+
+
 ## Бой призванного питомца роли role со зверем mob (питомец начинает в 6 м). true, когда зверь убит.
 func _fight(role: String) -> bool:
 	var player: Player = main.player
 	var pet: Pet = main.pets.active_pet
 	timer += 1
+	# Зверь убит — бой выигран, даже если питомец пал в тот же миг от других зверей рядом
+	if timer > 1 and mob.is_dead:
+		check(_uses > 0, "%s применил умение роли (%d)" % [role, _uses])
+		return true
 	if pet == null:
 		fail("питомец не призван")
 		return false
+	_uses = pet.skill_uses
 	if timer == 1:
 		check(pet.role == role, "роль питомца: %s" % role)
 		stand_near(mob, 2.0)
 		pet.global_position = mob.global_position + Vector3(6.0, 0.2, 0)
 		player.last_target = mob
-		# Бой с уже раненым зверем, чтобы тест шёл недолго
+		# Бой с уже раненым зверем, чтобы тест шёл недолго; команда «Атака» — именно по нему
 		mob.hp = maxi(1, mob.max_hp / 3)
+		pet.command_attack(mob)
 		return false
-	if mob.is_dead:
-		check(pet.skill_uses > 0, "%s применил умение роли (%d)" % [role, pet.skill_uses])
-		return true
 	stand_near(mob, 2.0)
 	player.last_target = mob
 	if timer > 60 * 40:
