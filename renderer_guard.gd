@@ -150,19 +150,36 @@ static func gpu_supports_vulkan(gpu: String) -> bool:
 	return false
 
 
-## Ответ плагина MyRappelzDownload vulkanSupported() (та же проверка, что у Godot: FEATURE_VULKAN_HARDWARE_VERSION
-## ≥ 1.0.3): 1 / 0, −1 — нет плагина или метода (старый AAR).
+## Ответ плагина MyRappelzDownload vulkanSupported() (та же проверка, что у Godot 4.3 перед Vulkan-видом —
+## Godot.kt meetsVulkanRequirements: Android 7+ и FEATURE_VULKAN_HARDWARE_VERSION ≥ 1.0.3; уровень
+## FEATURE_VULKAN_HARDWARE_LEVEL ≥ 1 Godot только пишет предупреждением): 1 / 0, −1 — нет плагина или метода
+## (старый AAR). Плагин — Assets.download_plugin() (тест — Assets.plugin_override).
 static func plugin_vulkan() -> int:
 	if plugin_override >= 0:
 		return plugin_override
 	if _plugin_answer > -2:
 		return _plugin_answer
 	_plugin_answer = -1
-	if OS.get_name() == "Android" and Engine.has_singleton(PLUGIN):
-		var v: Variant = Engine.get_singleton(PLUGIN).call("vulkanSupported")
-		if typeof(v) == TYPE_BOOL:
-			_plugin_answer = 1 if bool(v) else 0
+	var v: Variant = _plugin_call("vulkanSupported", [])
+	if typeof(v) == TYPE_BOOL:
+		_plugin_answer = 1 if bool(v) else 0
 	return _plugin_answer
+
+
+## Метод плагина (null — нет плагина или метода; JNISingleton без метода тоже ответит null).
+static func _plugin_call(method: String, args: Array) -> Variant:
+	var p := Assets.download_plugin()
+	if p == null or (not p.has_method(method) and p.get_class() != "JNISingleton"):
+		return null
+	return p.callv(method, args)
+
+
+## Пути файлов — плагину: при следующем запуске он до движка проверит их сам (RendererPreflight в плагине:
+## конструктор — файл на Vulkan, а прошлая проверка не подтвердилась или Vulkan 1.0.3 нет — файл на Compatibility;
+## onMainCreate — неподтверждённый Vulkan взводит страховку до запуска драйвера, который скрипты не застали бы).
+static func _remember_files() -> void:
+	_plugin_call("rememberRendererFiles", [ProjectSettings.globalize_path(state_path),
+		ProjectSettings.globalize_path(override_path)])
 
 
 ## Телефон подходит для Vulkan: видеочип из списка, и плагин (если он отвечает) не сказал «нет Vulkan». На Vulkan
@@ -271,6 +288,7 @@ static func startup() -> void:
 		if changed:
 			_save(st)
 		return
+	_remember_files()
 	if m == MOBILE and not bool(st["confirmed"]):
 		_arm(st)
 	else:

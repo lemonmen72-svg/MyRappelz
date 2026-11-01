@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.PowerManager;
 import android.provider.MediaStore;
 import android.util.Log;
+import android.view.View;
 
 import org.godotengine.godot.Dictionary;
 import org.godotengine.godot.Godot;
@@ -51,6 +52,46 @@ public class DownloadPlugin extends GodotPlugin {
 
 	public DownloadPlugin(Godot godot) {
 		super(godot);
+		// Рендерер: до чтения настроек движком (Main::setup) — страховка от вылета Vulkan (RendererPreflight)
+		try {
+			Context c = context();
+			if (c != null) {
+				RendererPreflight.beforeEngine(c);
+			}
+		} catch (Throwable t) {
+			Log.w(TAG, "renderer preflight failed", t);
+		}
+	}
+
+	/** Вид отрисовки создан, драйвер Vulkan ещё не поднят: неподтверждённый Vulkan — страховка заранее. */
+	@Override
+	public View onMainCreate(Activity activity) {
+		try {
+			if (activity != null) {
+				RendererPreflight.armBeforeVulkan(activity.getApplicationContext());
+			}
+		} catch (Throwable t) {
+			Log.w(TAG, "renderer arm failed", t);
+		}
+		return null;
+	}
+
+	/** Есть ли Vulkan, с которым Godot 4.3 запустится (RendererGuard.plugin_vulkan). */
+	@UsedByGodot
+	public boolean vulkanSupported() {
+		Context c = context();
+		return c != null && RendererPreflight.meetsVulkanRequirements(c.getPackageManager());
+	}
+
+	/** Полные пути файлов рендерера игры (RendererGuard.startup) — для проверки при следующем запуске до движка. */
+	@UsedByGodot
+	public boolean rememberRendererFiles(String statePath, String overridePath) {
+		Context c = context();
+		if (c == null) {
+			return false;
+		}
+		RendererPreflight.remember(c, statePath, overridePath);
+		return true;
 	}
 
 	@Override
@@ -301,6 +342,7 @@ public class DownloadPlugin extends GodotPlugin {
 			soc = (Build.SOC_MANUFACTURER + " " + Build.SOC_MODEL).trim();
 		}
 		d.put("soc", soc);
+		d.put("vulkan", vulkanText(c()));
 		return d;
 	}
 
@@ -433,6 +475,38 @@ public class DownloadPlugin extends GodotPlugin {
 			out.write(buf, 0, n);
 		}
 		out.flush();
+	}
+
+	private Context c() {
+		return context();
+	}
+
+	/** «1.1.0, уровень 1» — версия и уровень Vulkan из возможностей системы; "" — нет. */
+	private static String vulkanText(Context c) {
+		if (c == null || Build.VERSION.SDK_INT < 24) {
+			return "";
+		}
+		try {
+			int ver = -1;
+			int lvl = -1;
+			android.content.pm.FeatureInfo[] fs = c.getPackageManager().getSystemAvailableFeatures();
+			if (fs != null) {
+				for (android.content.pm.FeatureInfo f : fs) {
+					if (PackageManager.FEATURE_VULKAN_HARDWARE_VERSION.equals(f.name)) {
+						ver = f.version;
+					} else if (PackageManager.FEATURE_VULKAN_HARDWARE_LEVEL.equals(f.name)) {
+						lvl = f.version;
+					}
+				}
+			}
+			if (ver < 0) {
+				return "";
+			}
+			return String.format(java.util.Locale.ROOT, "%d.%d.%d, уровень %d", ver >> 22, (ver >> 12) & 0x3ff, ver & 0xfff,
+				lvl);
+		} catch (Exception e) {
+			return "";
+		}
 	}
 
 	private PowerManager powerManager() {

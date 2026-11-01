@@ -732,7 +732,8 @@
   нужен плагин). Исходники — `android/plugins/myrappelz_download/` (Java `DownloadPlugin`: `externalPath`, `start`,
   `query`, `remove`, `requestNotifications`, `notificationsAllowed`, `lastError`; температура для `ThermalGuard` —
   `thermalStatus`, `thermalHeadroom` (int); для тест-бота — `batteryTemp`, `deviceInfo`, `saveToDownloads`, `share`,
-  `openFile` и свой провайдер `ReportProvider` (раздел «Тест-бот»); только String/bool/int/Dictionary — JNI
+  `openFile` и свой провайдер `ReportProvider` (раздел «Тест-бот»); рендерер — `vulkanSupported`,
+  `rememberRendererFiles`, проверка до движка `RendererPreflight` (раздел «Рендерер»); только String/bool/int/Dictionary — JNI
   4.3 не умеет long-параметры и результаты; манифест AAR — meta-data `org.godotengine.plugin.v2.MyRappelzDownload`,
   POST_NOTIFICATIONS), плагин редактора `addons/myrappelz_download/` (включён в `project.godot`; отдаёт экспорту
   `bin/myrappelz_download-release.aar`, только если AAR есть — в репозитории его нет). В игре: `Assets.download_plugin()`
@@ -1386,17 +1387,25 @@
   get_video_adapter_name()`: Adreno ≥ 600 `ADRENO_MIN`, Mali-G кроме G71/G72 `MALI_BAD`, Immortalis, Xclipse; Adreno
   3xx–5xx, Mali-T, PowerVR, неизвестные — нет) и Vulkan на нём не падал → со **следующего** запуска Mobile (первый
   запуск — на Compatibility, при входе в мир сообщение «со следующего запуска…»). Плагин `MyRappelzDownload` может
-  только запретить: если в нём есть `vulkanSupported()` (bool) и он ответил false — Compatibility (`plugin_vulkan`;
-  в AAR такого метода пока нет — без него решает список видеочипов).
+  только запретить: `vulkanSupported()` (bool; та же проверка, что у Godot 4.3 перед Vulkan-видом — `Godot.kt`
+  `meetsVulkanRequirements`: Android 7+ и `FEATURE_VULKAN_HARDWARE_VERSION` ≥ 1.0.3, уровень
+  `FEATURE_VULKAN_HARDWARE_LEVEL` ≥ 1 Godot только пишет предупреждением) ответил false — Compatibility
+  (`plugin_vulkan`, плагин — `Assets.download_plugin()`; старый AAR без метода — решает список видеочипов).
 - **Страховка от вылета**: пока Vulkan на телефоне не подтверждён, в начале запуска на Vulkan файл заранее
   переписывается на Compatibility (`armed`). Мир отрисован `CONFIRM_WORLD_SEC` 8 с и `CONFIRM_FRAMES` 120 кадров
   (`main._start_world` → `world_started`) — подтверждён (`confirmed`), файл снова Mobile, дальше страховки нет. Игра
   ушла в фон / закрыта / «Назад» — страховка снимается (вылета не было), вернулась — снова взводится. Вылет во время
   проверки → следующий запуск на Compatibility, `failed` + 1, сообщение «Vulkan в прошлый раз не заработал…», «Авто»
-  больше Vulkan не включает (выбрать «Vulkan» вручную — `failed` сбрасывается). Чего без плагина не поймать: вылет до
-  запуска скриптов (окно «нет Vulkan», сбой драйвера при создании окна) — поэтому Vulkan только у видеочипов из
-  списка; надёжно поймать это можно только в Java до запуска движка (плагин: при создании прочитать
-  `renderer.cfg` и, если прошлый запуск на Vulkan не подтвердился, переписать файл рендерера на Compatibility).
+  больше Vulkan не включает (выбрать «Vulkan» вручную — `failed` сбрасывается). **Вылет до скриптов** (окно «нет
+  Vulkan», сбой драйвера при создании окна) ловит плагин — `RendererPreflight.java` (пути файлов игра передаёт ему в
+  `startup` — `rememberRendererFiles`, SharedPreferences; без них — `getFilesDir()`): в конструкторе плагина (Godot.kt
+  `onCreate` → реестр плагинов, до `Main::setup`, который читает файл рендерера) файл говорит «Vulkan», а в
+  `renderer.cfg` `armed=true` или Vulkan 1.0.3 нет — файл на Compatibility (+ `armed=true`); в `onMainCreate`
+  (`onInitRenderView`: настройки этого запуска прочитаны, Vulkan-вид создан, драйвер поднимается позже на потоке
+  отрисовки) неподтверждённый Vulkan — файл заранее на Compatibility и `armed=true` (как `_arm`, но до драйвера).
+  Упал драйвер — следующий запуск на Compatibility, `startup` засчитывает сбой. Текст файла Compatibility и признак
+  Vulkan у плагина и игры одинаковые (проверяет `tests/test_renderer.gd`). Список видеочипов остаётся (сбой драйвера
+  на телефоне, где Vulkan 1.0.3 «есть», один вылет всё же будет — следующий запуск уже на Compatibility).
 - **Настройки → Графика → «Рендерер»** (внизу вкладки): «Сейчас: …», кнопки `renderer_auto` / `renderer_vulkan`
   (недоступна, если видеочип не из списка и Vulkan ещё не работал) / `renderer_compat`, подсказка «Меняется после
   перезапуска» и «После перезапуска: …»; если рендерер сменится — `renderer_restart` «Сохранить и выйти (откройте игру

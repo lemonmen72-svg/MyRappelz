@@ -87,6 +87,8 @@ static func device_info() -> Dictionary:
 		os_text = "Android %s (API %d)" % [String(info.get("release", "?")), int(info.get("sdk", 0))]
 		if String(info.get("soc", "")) != "":
 			d["soc"] = String(info["soc"])
+		if String(info.get("vulkan", "")) != "":
+			d["vulkan"] = String(info["vulkan"])
 	d["model"] = model
 	d["os"] = os_text
 	d["cpu"] = "%s, ядер %d" % [OS.get_processor_name(), OS.get_processor_count()]
@@ -131,7 +133,7 @@ static func renderer_text() -> String:
 		driver = String(RenderingServer.call("get_current_rendering_driver_name"))
 	if driver == "":
 		driver = "Vulkan (RenderingDevice)" if RenderingServer.get_rendering_device() != null else "OpenGL"
-	return "%s, %s" % [method, driver]
+	return "%s, %s · выбор «%s»" % [method, driver, String(RendererGuard.CHOICE_NAMES.get(RendererGuard.choice(), "?"))]
 
 
 # ---------- Запись и отправка ----------
@@ -266,7 +268,8 @@ static func build_text(bot: TestBot) -> String:
 	L.append("  Процессор: %s%s" % [String(d.get("cpu", "?")), " · чип " + String(d["soc"]) if d.has("soc") else ""])
 	L.append("  Видеочип: %s · API %s" % [String(d.get("gpu", "?")), String(d.get("api", "?"))])
 	L.append("  Драйвер: %s" % String(d.get("driver", "—")))
-	L.append("  Рендерер: %s" % String(d.get("renderer", "?")))
+	L.append("  Рендерер: %s%s" % [String(d.get("renderer", "?")), " · Vulkan телефона " + String(d["vulkan"])
+		if d.has("vulkan") else ""])
 	L.append("  Экран: %s" % String(d.get("screen", "?")))
 	L.append("  Память: %s" % String(d.get("memory", "?")))
 	L.append("  Пакет ресурсов: %s · плагин Android: %s" % [String(d.get("pack", "?")), String(d.get("plugin", "?"))])
