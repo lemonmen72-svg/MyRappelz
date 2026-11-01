@@ -44,6 +44,7 @@ func run_step() -> void:
 				and (cs.slots[1] as Dictionary).is_empty(), "слот 1 — «Тест», слот 2 пуст")
 			check(cs.selected == 0 and not (cs.buttons["play"] as Button).disabled, "выбран первый персонаж, «Играть» доступна")
 			check(cs.buttons.has("create_1"), "у пустого слота — «Создать»")
+			check(cs.portrait_of(0) != null and cs.portrait_of(1) == null, "портрет у героя (арт Dark Pact), у пустого слота — нет")
 			(cs.buttons["create_1"] as Button).pressed.emit()
 			wait = 2
 			step = 3
@@ -51,6 +52,7 @@ func run_step() -> void:
 			_cc = main.screen as CharacterCreate
 			check(_cc != null and _cc.step == 0, "создание: шаг «Раса»")
 			check(_cc._race_cards.size() == 3, "три расы")
+			check(_cc.backdrop() != null, "шаг «Раса»: арт расы на фоне")
 			_cc._select_race("light_elf")
 			check(_cc.go_next() and _cc.step == 1 and _cc._job_cards.size() == 3, "шаг «Профессии»: три карточки")
 			check(_cc.go_next() and _cc.step == 2, "шаг «Пол»")

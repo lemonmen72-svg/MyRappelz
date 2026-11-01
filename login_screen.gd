@@ -1,6 +1,7 @@
 class_name LoginScreen
 extends CanvasLayer
-## Экран входа в аккаунт (первый экран после пакета ресурсов): поле логина (подставлен последний вошедший —
+## Экран входа в аккаунт (первый экран после пакета ресурсов): фон — главный арт Dark Pact, сверху логотип
+## (MenuKit.KEY_ART, MenuKit.LOGO; нет файлов — тёмный фон и заголовок), поле логина (подставлен последний вошедший —
 ## Accounts.last_login), «Войти» — существующий аккаунт, «Создать аккаунт» — новый логин (правила
 ## Accounts.name_error, занятость). Пока только логин: пароль появится вместе с сервером.
 ## Аккаунт Dedok_max — с админ-панелью в настройках. Успешный вход — сигнал logged_in (main → выбор персонажа).
@@ -8,13 +9,20 @@ extends CanvasLayer
 
 signal logged_in
 
+## Высота логотипа для «Среднего» размера интерфейса.
+const LOGO_H := 150.0
+
 var login_edit: LineEdit
 var error_label: Label
 
 
 func _ready() -> void:
-	var root := MenuKit.build_root(self)
-	root.add_child(MenuKit.title("Вход в игру"))
+	var root := MenuKit.build_root(self, MenuKit.KEY_ART)
+	var logo := MenuKit.logo(LOGO_H)
+	if logo != null:
+		root.add_child(logo)
+	else:
+		root.add_child(MenuKit.title("Dark Pact"))
 	var spacer_top := Control.new()
 	spacer_top.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(spacer_top)
@@ -29,7 +37,7 @@ func _ready() -> void:
 	panel.add_child(v)
 
 	# Подпись «Логин» — в самом поле (placeholder): экран влезает в 720 px на «Крупном»
-	v.add_child(MenuKit.label("Аккаунт", UiScale.FONT_NAME, MenuKit.GOLD))
+	v.add_child(MenuKit.label("Вход в игру", UiScale.FONT_NAME, MenuKit.GOLD))
 	login_edit = MenuKit.line_edit("Логин", Accounts.last_login())
 	login_edit.text_submitted.connect(func(_t: String) -> void: _on_login())
 	v.add_child(login_edit)

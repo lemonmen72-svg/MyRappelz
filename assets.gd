@@ -71,6 +71,12 @@ const PACKS := {
 		"assets/creatures/*_3.glb",
 		"assets/creatures/*_3.png",
 	],
+	# Арты Dark Pact для экранов создания персонажа: расы, профессии, портреты (MenuKit.race_art и др.;
+	# логотип и главный арт — в APK, assets/art/). Нет части — экраны без артов.
+	"art": [
+		"assets/art/pack/*.jpg",
+		"assets/art/pack/*.png",
+	],
 }
 ## Часть старого манифеста (один пакет на все файлы, до разбиения на части): подключена — готовы все части.
 const ALL := "all"

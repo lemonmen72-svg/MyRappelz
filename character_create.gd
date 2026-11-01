@@ -1,18 +1,21 @@
 class_name CharacterCreate
 extends CanvasLayer
 ## Создание персонажа по шагам (кнопки «Назад» / «Далее»):
-##   1. «Раса» — три карточки (Люди, Светлые эльфы, Тёмные эльфы): описание, сильные и слабые стороны
-##      (ClassData RACES strengths / weaknesses), профессии расы;
-##   2. «Профессии» — три профессии выбранной расы, только знакомство: роль, оружие, сильные стороны, особенности,
-##      ключевые умения (ClassData strengths / features / key_skills). Все начинают Бродягой, профессию предложит
-##      Мудрец Альдерик с 10 уровня;
+##   1. «Раса» — три карточки-вкладки (Люди, Светлые эльфы, Тёмные эльфы: название и профессии), под ними слева на
+##      затемнении — описание выбранной расы, сильные и слабые стороны (ClassData RACES strengths / weaknesses); фон
+##      экрана — арт расы (MenuKit.race_art_path: пара мужчина и женщина справа, левая треть спокойнее — под текст);
+##   2. «Профессии» — три профессии выбранной расы, только знакомство: вертикальные карточки — сверху арт профессии
+##      с названием внизу (MenuKit.job_art_head), под ним роль, оружие, сильные стороны, особенности, ключевые умения
+##      (ClassData strengths / features / key_skills). Все начинают Бродягой, профессию предложит Мудрец Альдерик
+##      с 10 уровня;
+##   Арты рас и профессий — в пакете ресурсов (часть «art»); нет части — те же шаги без артов (тёмный фон).
 ##   3. «Пол» — 3D-превью Бродяг-новичков расы обоих полов (CharacterModel, модель hero_<раса>_<пол>_starter
 ##      с откатом на запасные; медленно вращаются, перетаскивание крутит, касание — выбрать и показать атаку);
 ##   4. «Ник» — превью выбранного героя, ник (Accounts.nick_error: 3–16 символов, буквы, цифры, _, уникален на
 ##      устройстве) → «Войти в игру» (сигнал created). «Назад» с первого шага — сигнал cancelled (к выбору персонажа).
 ## Рассчитан на 1280×720 и касания пальцем; размеры — UiScale, содержимое шага прокручивается, если не влезло.
 ## Для тестов: step, set_step(i), go_next() / go_back(), _select_race, _select_gender, preview_model(ключ "f" / "m" /
-## "name"), _race_cards, _job_cards, _name_edit, _error.
+## "name"), _race_cards, _job_cards, _race_info (описание расы), _name_edit, _error; backdrop() — арт фона.
 
 signal created(char_name: String, race_id: String, gender: String)
 signal cancelled
@@ -22,6 +25,17 @@ const STEP_NAMES := ["Раса", "Профессии", "Пол", "Ник"]
 ## Превью на шаге «Пол» и «Ник» для «Среднего» размера интерфейса.
 const PREVIEW_SIZE := Vector2(250, 360)
 const NAME_PREVIEW_SIZE := Vector2(250, 360)
+## Арт профессии на карточке шага «Профессии»: наименьший размер («Средний»; три карточки влезают в 1280 px и на
+## «Крупном»), ширина растёт по карточке — окно арта сверху с соотношением сторон JOB_ART_ASPECT (≈ ширина карточки
+## на экране 1280 / высота).
+const JOB_ART_SIZE := Vector2(300, 270)
+const JOB_ART_ASPECT := 1.45
+## Затемнение арта расы: везде и дополнительно слева (под описанием); на других шагах — сильнее.
+const RACE_SHADE := 0.15
+const RACE_SHADE_LEFT := 0.5
+const STEP_SHADE := 0.78
+## Описание расы занимает слева столько от ширины (справа — персонажи арта).
+const RACE_INFO_RATIO := 0.46
 
 var step := 0
 var _race := "dark_elf"
@@ -33,6 +47,7 @@ var _error: Label
 var _back_btn: Button
 var _next_btn: Button
 var _race_cards: Dictionary = {}
+var _race_info: VBoxContainer
 var _job_cards: Array[PanelContainer] = []
 var _gender_cards: Dictionary = {}
 var _name_edit: LineEdit
@@ -97,6 +112,7 @@ func set_step(i: int) -> void:
 	_race_cards.clear()
 	_job_cards.clear()
 	_gender_cards.clear()
+	_race_info = null
 	_name_edit = null
 	_error.text = ""
 	_scroll.scroll_vertical = 0
@@ -109,6 +125,7 @@ func set_step(i: int) -> void:
 			_build_gender()
 		_:
 			_build_name()
+	_update_backdrop()
 	_back_btn.text = "К персонажам" if step == 0 else "Назад"
 	_next_btn.text = "Войти в игру" if step == STEPS.size() - 1 else "Далее"
 
@@ -142,9 +159,13 @@ func _select_race(rid: String) -> void:
 	for k in _race_cards:
 		(_race_cards[k] as PanelContainer).add_theme_stylebox_override("panel",
 			MenuKit.card_style(_race_color(String(k)), String(k) == _race))
-	# На других шагах — пересобрать (профессии и превью новой расы)
+	# Шаг «Раса»: описание и фон новой расы (карточки остаются — касание по ним не пересобирает экран);
+	# на других шагах — пересобрать (профессии и превью новой расы)
 	if step > 0:
 		set_step(step)
+	else:
+		_fill_race_info()
+		_update_backdrop()
 
 
 func _select_gender(g: String) -> void:
@@ -167,6 +188,21 @@ func preview_model(k: String) -> CharacterModel:
 	return null
 
 
+## Арт фона экрана (null — нет: другой шаг без арта расы или часть «art» не загружена).
+func backdrop() -> Texture2D:
+	var b := get_node_or_null("Backdrop") as TextureRect
+	return b.texture if b != null else null
+
+
+## Фон: арт выбранной расы — на шаге «Раса» ярко (слева затемнение под описанием), на остальных — приглушённо.
+func _update_backdrop() -> void:
+	var tex := MenuKit.art(MenuKit.race_art_path(_race))
+	if step == 0:
+		MenuKit.set_backdrop(self, tex, RACE_SHADE, RACE_SHADE_LEFT)
+	else:
+		MenuKit.set_backdrop(self, tex, STEP_SHADE)
+
+
 func _race_color(rid: String) -> Color:
 	var r := ClassData.race(rid)
 	var c: Color = r["eyes"]
@@ -177,7 +213,7 @@ func _race_color(rid: String) -> Color:
 
 func _build_race() -> void:
 	_content.add_child(MenuKit.label("Выберите расу. Каждый герой начинает Бродягой-новичком в деревне своей расы; "
-		+ "у каждой расы — три свои профессии.", UiScale.FONT_TEXT, MenuKit.MUTED, true))
+		+ "у каждой расы — три свои профессии.", UiScale.FONT_TEXT, MenuKit.TEXT, true))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", int(UiScale.px(10)))
 	_content.add_child(row)
@@ -189,16 +225,58 @@ func _build_race() -> void:
 		row.add_child(card)
 		_race_cards[id] = card
 		var v := card.get_child(0) as VBoxContainer
-		v.add_child(MenuKit.label(String(r["name"]), UiScale.FONT_NAME, _race_color(id).lightened(0.3)))
-		v.add_child(MenuKit.label(String(r["desc"]), UiScale.FONT_BODY, MenuKit.TEXT, true))
-		v.add_child(MenuKit.label("Сильные стороны", UiScale.FONT_TEXT, MenuKit.GOOD))
-		v.add_child(MenuKit.bullets(r.get("strengths", []), UiScale.FONT_SMALL, MenuKit.TEXT))
-		v.add_child(MenuKit.label("Слабые стороны", UiScale.FONT_TEXT, MenuKit.BAD))
-		v.add_child(MenuKit.bullets(r.get("weaknesses", []), UiScale.FONT_SMALL, MenuKit.TEXT))
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var n := MenuKit.label(String(r["name"]), UiScale.FONT_NAME, _race_color(id).lightened(0.3))
+		n.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(n)
 		var jobs: PackedStringArray = []
 		for jid in ClassData.jobs_of(id):
 			jobs.append(ClassData.job_name(String(jid)))
-		v.add_child(MenuKit.label("Профессии: " + ", ".join(jobs), UiScale.FONT_SMALL, MenuKit.GOLD, true))
+		var jl := MenuKit.label(", ".join(jobs), UiScale.FONT_SMALL, MenuKit.GOLD, true)
+		jl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(jl)
+	# Описание выбранной расы — слева на затемнении, справа виден арт (пара героев расы)
+	var body := HBoxContainer.new()
+	body.add_theme_constant_override("separation", 0)
+	_content.add_child(body)
+	var panel := PanelContainer.new()
+	panel.name = "RaceInfo"
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = RACE_INFO_RATIO
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.03, 0.04, 0.08, 0.55)
+	sb.set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
+	sb.set_content_margin_all(UiScale.px(12))
+	panel.add_theme_stylebox_override("panel", sb)
+	body.add_child(panel)
+	_race_info = VBoxContainer.new()
+	_race_info.add_theme_constant_override("separation", int(UiScale.px(5)))
+	panel.add_child(_race_info)
+	var rest := Control.new()
+	rest.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rest.size_flags_stretch_ratio = 1.0 - RACE_INFO_RATIO
+	rest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Без арта (часть «art» не загружена) справа пусто — описание во всю ширину
+	rest.visible = MenuKit.art(MenuKit.race_art_path(_race)) != null
+	body.add_child(rest)
+	_fill_race_info()
+
+
+## Описание выбранной расы: название, текст, сильные и слабые стороны, профессии.
+func _fill_race_info() -> void:
+	if _race_info == null or not is_instance_valid(_race_info):
+		return
+	for c in _race_info.get_children():
+		_race_info.remove_child(c)
+		c.queue_free()
+	var r := ClassData.race(_race)
+	_race_info.add_child(MenuKit.label(String(r["name"]), UiScale.FONT_TITLE, _race_color(_race).lightened(0.35)))
+	_race_info.add_child(MenuKit.label(String(r["desc"]), UiScale.FONT_BODY, MenuKit.TEXT, true))
+	_race_info.add_child(MenuKit.label("Сильные стороны", UiScale.FONT_TEXT, MenuKit.GOOD))
+	_race_info.add_child(MenuKit.bullets(r.get("strengths", []), UiScale.FONT_SMALL, MenuKit.TEXT))
+	_race_info.add_child(MenuKit.label("Слабые стороны", UiScale.FONT_TEXT, MenuKit.BAD))
+	_race_info.add_child(MenuKit.bullets(r.get("weaknesses", []), UiScale.FONT_SMALL, MenuKit.TEXT))
+	_race_info.add_child(MenuKit.label("Профессии: " + _jobs_text(), UiScale.FONT_SMALL, MenuKit.GOLD, true))
 
 
 # ---------- 2. Профессии ----------
@@ -224,7 +302,12 @@ func _build_jobs() -> void:
 		row.add_child(card)
 		_job_cards.append(card)
 		var v := card.get_child(0) as VBoxContainer
-		v.add_child(MenuKit.label(String(j["name"]), UiScale.FONT_NAME, jc.lightened(0.4)))
+		# Вертикальная карточка: арт профессии с названием внизу; без арта — название строкой
+		var head := MenuKit.job_art_head(id, JOB_ART_SIZE, String(j["name"]), jc.lightened(0.5), JOB_ART_ASPECT)
+		if head != null:
+			v.add_child(head)
+		else:
+			v.add_child(MenuKit.label(String(j["name"]), UiScale.FONT_NAME, jc.lightened(0.4)))
 		v.add_child(MenuKit.label(String(j["role"]), UiScale.FONT_BODY, MenuKit.MUTED, true))
 		v.add_child(MenuKit.label("Оружие: " + String(j["weapon_text"]), UiScale.FONT_SMALL, MenuKit.TEXT, true))
 		v.add_child(MenuKit.label("Сильные стороны", UiScale.FONT_TEXT, MenuKit.GOOD))
