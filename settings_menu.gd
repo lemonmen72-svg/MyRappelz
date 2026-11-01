@@ -4,7 +4,8 @@ extends RefCounted
 ## - «Графика»: общий пресет «Низкое / Среднее / Высокое / Максимальное» («Свои» — если настройку меняли вручную)
 ##   и отдельные настройки Quality.OPTIONS (разрешение 3D, тени, сглаживание, дальность, трава, текстуры, контуры,
 ##   постобработка, эффекты, тени на персонажах), предел кадров 30 / 45 / 60. Всё применяется сразу
-##   (Quality.apply), густота травы и цветов — при следующем запуске игры;
+##   (Quality.apply), густота травы и цветов — при следующем запуске игры; «Рендерер» Авто / Vulkan / Совместимость
+##   (RendererGuard) — после перезапуска игры;
 ## - «Интерфейс»: размер интерфейса «Мелкий / Средний / Крупный» (UiScale): тема, HUD (кнопки, джойстик, панели,
 ##   меню, трекер) — сразу, окно настроек открывается заново уже в новом размере; другие окна — при следующем
 ##   открытии, надписи в мире — у новых;
@@ -15,7 +16,8 @@ extends RefCounted
 ## Открытие: SettingsMenu.open(hud) (действие HUD "settings_window"), SettingsMenu.open(hud, "ui") — на вкладке.
 ## Кнопки открытого окна для тестов (buttons): вкладки "tab_<graphics|ui|other>", "ui_<0..2>", "quality_<0..3>"
 ## (пресеты), "<настройка>_<вариант>" (например "shadows_2", "aa_1" — Quality.OPTIONS), "fps_<30|45|60>",
-## "guard_<0|1>" (беречь телефон от перегрева),
+## "guard_<0|1>" (беречь телефон от перегрева), "renderer_<auto|vulkan|compat>" (рендерер), "renderer_restart"
+## (выйти для перезапуска — есть, только если рендерер изменится после перезапуска),
 ## "admin" (AdminPanel,
 ## только у аккаунта Dedok_max), "account" (сменить персонажа / выйти из аккаунта — main.back_to_menu).
 
@@ -145,6 +147,7 @@ static func _build_graphics(hud: HUD, page: VBoxContainer) -> void:
 			_fps_row(hud, page)
 
 	_guard_rows(hud, page)
+	_renderer_rows(hud, page)
 
 	var note := "Всё, кроме густоты травы, меняется сразу. Густота травы и цветов — при следующем запуске игры."
 	var built := IslandVegetation.built_grass(hud.get_tree())
@@ -189,6 +192,35 @@ static func _guard_rows(hud: HUD, page: VBoxContainer) -> void:
 	if on and Quality.throttle_level() > 0:
 		hint += "\nСейчас графика снижена: шаг %d из %d." % [Quality.throttle_level(), Quality.throttle_max()]
 	page.add_child(_wrap_label(hint, UiScale.FONT_SMALL, HINT_COLOR))
+
+
+## «Рендерер»: Авто / Vulkan / Совместимость (RendererGuard), сейчас — какой, после перезапуска — какой будет.
+static func _renderer_rows(hud: HUD, page: VBoxContainer) -> void:
+	page.add_child(_head("Рендерер: сейчас %s" % RendererGuard.method_name()))
+	var row := _row(page)
+	row.add_child(_side_label("Рендерер"))
+	var cur := RendererGuard.choice()
+	for c in RendererGuard.CHOICES:
+		var id := String(c)
+		_choice(row, "renderer_" + id, String(RendererGuard.CHOICE_NAMES[id]), id == cur,
+			func() -> void: SettingsMenu._select_renderer(hud, id))
+	var vk := buttons.get("renderer_vulkan") as Button
+	if vk != null and not RendererGuard.vulkan_allowed():
+		vk.disabled = true
+	var hint := "Vulkan — современный способ рисования: на большинстве телефонов меньше нагрев и ровнее кадры. " \
+		+ "«Совместимость» (OpenGL ES 3) — запасной, работает везде. «Авто» — Vulkan, если видеочип его надёжно " \
+		+ "поддерживает и он не давал сбоев. Меняется после перезапуска игры."
+	if not RendererGuard.is_android():
+		hint += "\nНа компьютере игра всегда рисует через «Совместимость»."
+	elif not RendererGuard.vulkan_allowed():
+		hint += "\nВидеочип «%s» не из списка надёжных для Vulkan — только «Совместимость»." % RendererGuard.gpu_name()
+	if RendererGuard.restart_needed():
+		hint += "\nПосле перезапуска: %s." % RendererGuard.method_name(RendererGuard.desired_method())
+	page.add_child(_wrap_label(hint, UiScale.FONT_SMALL, HINT_COLOR))
+	if RendererGuard.restart_needed():
+		var rrow := _row(page)
+		_choice(rrow, "renderer_restart", "Сохранить и выйти (откройте игру снова)", false,
+			func() -> void: RendererGuard.quit_for_restart(hud.get_tree()))
 
 
 # ---------- Интерфейс ----------
@@ -301,6 +333,14 @@ static func _select_guard(hud: HUD, on: bool) -> void:
 	if not on and ThermalGuard.current != null:
 		ThermalGuard.current.reset()
 	Quality.apply(hud.get_tree())
+	open(hud, "graphics", true)
+
+
+## Рендерер: записать выбор (файл для следующего запуска), окно — заново (подсказка о перезапуске).
+static func _select_renderer(hud: HUD, c: String) -> void:
+	if hud == null or not is_instance_valid(hud):
+		return
+	RendererGuard.set_choice(c)
 	open(hud, "graphics", true)
 
 

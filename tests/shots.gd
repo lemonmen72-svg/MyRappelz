@@ -1,7 +1,7 @@
 extends "res://tests/test_base.gd"
 ## Скриншоты ключевых сцен для проверки графики (CI с настоящим рендером, не headless).
 ## Сохраняет PNG в user://shots/. Запуск без --headless, например под xvfb:
-## godot --rendering-driver opengl3 --fixed-fps 30 --path . res://tests/runner.tscn -- res://tests/shots.gd
+## godot --rendering-method gl_compatibility --rendering-driver opengl3 --fixed-fps 30 --path . res://tests/runner.tscn -- res://tests/shots.gd
 
 const SHOTS_DIR := "user://shots/"
 
@@ -95,6 +95,8 @@ var _heroes: Node3D = null
 var _gcam: Camera3D = null
 ## Кадры 290–292: пресет до блока бережения телефона.
 var _thermal_level := -1
+## Кадры 310–311: файлы RendererGuard на время кадров (настоящий файл рендерера не трогается).
+const RENDERER_SHOTS_DIR := "user://shots_renderer/"
 const GFX_HERO := Vector2(4.5, -6.5)
 var _top: Camera3D = null
 var _row: Node3D = null
@@ -147,7 +149,8 @@ const PART_ENTRIES := [
 	[814, 152, 72], [816, 59, 23], [818, 120, 29], [960, 45, 12], [963, 64, 14], [925, 141, 33],
 	[940, 33, 9], [943, 63, 47], [946, 95, 46], [980, 40, 46], [1000, 42, 18], [1002, 95, 83],
 	[1025, 102, 102], [1021, 126, 144], [1040, 141, 181], [1060, 66, 67], [1160, 124, 148], [1120, 98, 101],
-	[1080, 60, 58], [1200, 181, 224], [1260, 224, 112], [1220, 103, 52], [1240, 76, 40], [1300, 55, 29],
+	[1080, 60, 58], [1200, 180, 224], [1260, 226, 112], [1220, 106, 52], [1240, 78, 40], [1300, 57, 29],
+	[1340, 25, 12],
 ]
 ## Сколько кадров до точки входа часть уже рисует (компиляция шейдеров, тени, окна интерфейса).
 const PART_WARMUP := 10
@@ -2074,7 +2077,72 @@ func run_step() -> void:
 			if _thermal_level >= Quality.LOW and _thermal_level <= Quality.ULTRA:
 				Quality.set_level(_thermal_level, false)
 			Quality.apply(get_tree())
+			wait = 2
+			step = 1340
+		1340:
+			# Рендерер (кадры 310–311): вкладка «Графика» на «подставном Android» (RendererGuard, свои файлы) —
+			# хороший видеочип на Compatibility: Vulkan со следующего запуска, кнопка «Сохранить и выйти»
+			_renderer_launch(RendererGuard.COMPAT, "Adreno (TM) 750", true)
+			SettingsMenu.open(main.hud, "graphics")
+			wait = 6
+			step = 1341
+		1341:
+			if is_instance_valid(SettingsMenu._scroll):
+				SettingsMenu._scroll.scroll_vertical = 100000
+			wait = 4
+			step = 1342
+		1342:
+			shot("310_settings_renderer")
+			check(SettingsMenu.buttons.has("renderer_restart"), "кадр 310: Vulkan со следующего запуска — кнопка перезапуска")
+			# Vulkan не подтверждён (страховка), игра вылетела — запуск на Compatibility, «Авто» больше не включает Vulkan
+			_renderer_launch(RendererGuard.MOBILE, "Adreno (TM) 750", false)
+			_renderer_launch(RendererGuard.COMPAT, "Adreno (TM) 750", false)
+			check(int(RendererGuard.state()["failed"]) == 1, "кадр 311: сбой Vulkan засчитан")
+			main.hud.close_window()
+			main.hud.show_message(RendererGuard.note, 8.0)
+			SettingsMenu.open(main.hud, "graphics")
+			wait = 6
+			step = 1343
+		1343:
+			if is_instance_valid(SettingsMenu._scroll):
+				SettingsMenu._scroll.scroll_vertical = 100000
+			wait = 4
+			step = 1344
+		1344:
+			shot("311_settings_renderer_fallback")
+			main.hud.close_window()
+			_renderer_restore()
 			ok_done()
+
+
+## Кадры 310–311: новый запуск «телефона» (RendererGuard: Android, рендерер m, видеочип gpu); fresh — с чистыми файлами.
+func _renderer_launch(m: String, gpu: String, fresh: bool) -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(RENDERER_SHOTS_DIR))
+	RendererGuard.override_path = RENDERER_SHOTS_DIR + "override.cfg"
+	RendererGuard.state_path = RENDERER_SHOTS_DIR + "state.cfg"
+	if fresh:
+		_renderer_clear()
+	RendererGuard.reset_session()
+	RendererGuard.platform_override = 1
+	RendererGuard.method_override = m
+	RendererGuard.gpu_override = gpu
+	RendererGuard.startup()
+
+
+func _renderer_clear() -> void:
+	for f in [RendererGuard.override_path, RendererGuard.state_path]:
+		if FileAccess.file_exists(String(f)):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(String(f)))
+
+
+func _renderer_restore() -> void:
+	_renderer_clear()
+	RendererGuard.override_path = RendererGuard.OVERRIDE_PATH
+	RendererGuard.state_path = RendererGuard.STATE_PATH
+	RendererGuard.platform_override = -1
+	RendererGuard.method_override = ""
+	RendererGuard.gpu_override = ""
+	RendererGuard.reset_session()
 
 
 ## Кадры 291–292: ThermalGuard с подставным статусом температуры status, n шагов логики по dt с (кадры в бюджете).

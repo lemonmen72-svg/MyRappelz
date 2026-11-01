@@ -19,7 +19,7 @@ if [ -n "${PERF_LEVELS:-}" ]; then
 	ARGS=(--perf-levels="$PERF_LEVELS")
 fi
 t0=$(date +%s)
-xvfb-run -a -s "-screen 0 1280x720x24" timeout 1800 godot --rendering-driver opengl3 \
+xvfb-run -a -s "-screen 0 1280x720x24" timeout 1800 godot --rendering-method gl_compatibility --rendering-driver opengl3 \
 	--path . res://tests/runner.tscn -- res://tests/perf.gd "${ARGS[@]}" > perf.log 2>&1
 status=$?
 t_done "замер нагрузки (пресеты ${PERF_LEVELS:-все})" "$t0"
