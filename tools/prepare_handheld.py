@@ -65,6 +65,10 @@ OUT = os.path.join(ROOT, "assets", "handheld")
 # frame — рамка осей (см. шапку), length — длина по оси Y (у щита и книг — высота, у арбалета — длина ложа),
 # tris — бюджет треугольников, tex — размер текстуры, grip / grip2 — доля длины от нижнего конца (рукоять),
 # rot — поворот вокруг Y до всего остального (градусы, как Basis(UP, a) в Godot).
+# Поправки для неудобных исходников: drop — список коробок [[x0, y0, z0], [x1, y1, z1]] в координатах исходника (до rot):
+# связные части, центр габаритов которых внутри коробки, убираются (лишние детали Meshy); back — Z задней стороны
+# щита в координатах исходника после rot (хват — от неё, а не от выступающих назад ручек); grip_back — у лука центр рукояти
+# ищется только у спинки (тетива в том же сечении не тянет точку хвата к себе).
 ITEMS = {
 	# Оружие 1-го ранга (модели Максима по промтам оружия 1-го ранга)
 	"weapon_sword_1h_r1": dict(src="Knight_s_Oath", kind="sword_1h", frame="blade", length=0.95, tris=3000,
@@ -91,6 +95,37 @@ ITEMS = {
 		tex=1024, grip=0.3),
 	"weapon_shield_r1": dict(src="Sunward_Aegis", kind="shield", frame="shield", length=0.75, tris=4000, tex=1024,
 		grip=0.58),
+	# Оружие 2-го ранга (модели Максима по промтам 2-го ранга; щит и двуручный меч чуть крупнее 1-го ранга). Модель
+	# без имени (…_texture_0cecb119) — двуручный меч с рубином в гарде и красной рукоятью (значок 2-го ранга).
+	"weapon_sword_1h_r2": dict(src="Azure_Oathblade", kind="sword_1h", frame="blade", length=0.95, tris=3000,
+		tex=512, grip=0.17),
+	"weapon_sword_2h_r2": dict(src="texture_0cecb119", kind="sword_2h", frame="blade", length=1.5, tris=3200,
+		tex=512, grip=0.27, grip2=0.14),
+	"weapon_dagger_r2": dict(src="Emerald_Dawnblade", kind="dagger", frame="blade", length=0.38, tris=2600, tex=512,
+		grip=0.26),
+	"weapon_mace_1h_r2": dict(src="Embercrest_Scepter", kind="mace_1h", frame="blade", length=0.75, tris=3500,
+		tex=512, grip=0.2),
+	"weapon_mace_2h_r2": dict(src="Sunforged_War_Scepter", kind="mace_2h", frame="blade", length=1.45, tris=4000,
+		tex=512, grip=0.55, grip2=0.22),
+	"weapon_axe_1h_r2": dict(src="Ruby_Sovereign_Axe", kind="axe_1h", frame="blade", length=0.7, tris=3500,
+		tex=512, grip=0.22, rot=180),
+	"weapon_axe_2h_r2": dict(src="Crimson_Crescent_Halberd", kind="axe_2h", frame="blade", length=1.45, tris=3500,
+		tex=512, grip=0.5, grip2=0.22, rot=180),
+	"weapon_staff_1h_r2": dict(src="Amethyst_Sovereign_Staff", kind="staff_1h", frame="blade", length=0.8,
+		tris=3500, tex=512, grip=0.2),
+	"weapon_staff_2h_r2": dict(src="Celestial_Sapphire_Scepter", kind="staff_2h", frame="blade", length=1.7,
+		tris=3500, tex=512, grip=0.46, grip2=0.29),
+	"weapon_spear_r2": dict(src="Azureleaf_Lance", kind="spear", frame="blade", length=2.0, tris=3000, tex=512,
+		grip=0.33, grip2=0.1),
+	"weapon_bow_r2": dict(src="Emeraldleaf_Bow", kind="bow", frame="bow", length=1.4, tris=4000, tex=512,
+		grip=0.5, rot=-90, thin=True, grip_back=True),
+	# У «Gilded Arbalest» Meshy сделал два одинаковых лука крест-накрест: лишний (дуги, наконечники, тетива вдоль Z
+	# исходника) убирается, остаётся лук поперёк ложа (вдоль X — там же ворот сбоку, как на эскизе)
+	"weapon_crossbow_r2": dict(src="Gilded_Arbalest", kind="crossbow", frame="crossbow", length=0.85, tris=6000,
+		tex=1024, grip=0.3, drop=[[[-0.04, 0.1, 0.15], [0.04, 0.51, 0.51]], [[-0.04, 0.1, -0.51], [0.04, 0.51, -0.15]]]),
+	# У «Sapphire Sunshield» сзади две ручки-скобы: хват — от задней стороны самого щита (back), а не от скоб
+	"weapon_shield_r2": dict(src="Sapphire_Sunshield", kind="shield", frame="shield", length=0.8, tris=4000, tex=1024,
+		grip=0.58, back=-0.011),
 	# Предметы жителей (id — договорённость с моделями жителей; лук — и у героев: Handheld.KIND_MODELS["bow"])
 	"npc_longbow": dict(src="Emberwood_Longbow", kind="npc", frame="bow", length=1.4, tris=4000, tex=512,
 		grip=0.5, rot=-90, thin=True),
@@ -114,6 +149,8 @@ ITEMS = {
 CROSSBOW_STOCK_UP = 0.06
 # Щит: ручка за щитом — на столько позади задней стороны
 SHIELD_HANDLE_BACK = 0.035
+# Лук (grip_back): рукоять — вершины сечения не дальше этой доли длины от спинки (у тетивы — нет)
+BOW_HANDLE_DEPTH = 0.045
 # Тонкие отдельные части (thin): доля площади, ниже которой часть упрощается отдельно, и допустимая ошибка
 # (доля габарита предмета)
 THIN_SHARE = 0.1
@@ -164,6 +201,38 @@ def _slice_center(p: np.ndarray, y: float, L: float) -> np.ndarray:
 	return np.array([(s[:, 0].min() + s[:, 0].max()) * 0.5, y, (s[:, 2].min() + s[:, 2].max()) * 0.5])
 
 
+def drop_parts(m: dict, boxes: list) -> dict:
+	"""Убрать связные части исходника (сварка по позиции), центр габаритов которых — в одной из коробок drop."""
+	from scipy.sparse import coo_matrix
+	from scipy.sparse.csgraph import connected_components
+	q = np.round(m["pos"] / 1e-5).astype(np.int64)
+	_, inv = np.unique(q, axis=0, return_inverse=True)
+	inv = inv.ravel()
+	nv = int(inv.max()) + 1
+	t = inv[m["tris"]]
+	e = np.concatenate([t[:, [0, 1]], t[:, [1, 2]], t[:, [2, 0]]])
+	nc, lab = connected_components(coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(nv, nv)), directed=False)
+	vlab = lab[inv]
+	flab = vlab[m["tris"][:, 0]]
+	lo = np.full((nc, 3), np.inf)
+	hi = np.full((nc, 3), -np.inf)
+	np.minimum.at(lo, vlab, m["pos"])
+	np.maximum.at(hi, vlab, m["pos"])
+	c = (lo + hi) * 0.5
+	bad = np.zeros(nc, dtype=bool)
+	for b0, b1 in boxes:
+		bad |= np.all((c >= np.array(b0)) & (c <= np.array(b1)), axis=1)
+	keep = ~bad[flab]
+	used, t2 = np.unique(m["tris"][keep].ravel(), return_inverse=True)
+	print("    убрано частей %d (%d тр. из %d)" % (int(bad.sum()), int((~keep).sum()), len(keep)))
+	out = dict(m)
+	out["pos"] = m["pos"][used]
+	out["nrm"] = m["nrm"][used]
+	out["uv"] = m["uv"][used]
+	out["tris"] = t2.reshape(-1, 3).astype(np.int64)
+	return out
+
+
 def orient(m: dict, cfg: dict) -> tuple:
 	"""Поворот, масштаб по длине (ось Y), начало координат — точка хвата, рамка осей вида. Возвращает
 	(меш, точки {grip2, tip, butt} в итоговых осях)."""
@@ -177,12 +246,21 @@ def orient(m: dict, cfg: dict) -> tuple:
 	frame = cfg["frame"]
 	gy = cfg["grip"] * L
 	if frame == "shield":
-		# За щитом напротив умбона, посередине ширины
-		grip = np.array([0.0, gy, p[:, 2].min() - SHIELD_HANDLE_BACK])
+		# За щитом напротив умбона, посередине ширины (back — задняя сторона самого щита, без ручек)
+		zb = p[:, 2].min()
+		if "back" in cfg:
+			zb = (cfg["back"] - (lo[2] + hi[2]) * 0.5) * s
+		grip = np.array([0.0, gy, zb - SHIELD_HANDLE_BACK])
 	elif frame == "book":
 		# Корешок (−X) посередине высоты и толщины
 		c = _slice_center(p, gy, L)
 		grip = np.array([p[:, 0].min(), gy, c[2]])
+	elif frame == "bow" and cfg.get("grip_back"):
+		# Рукоять у спинки лука (−Z): тетива в том же сечении не в счёт
+		h = max(0.015 * L, 0.004)
+		sl = p[np.abs(p[:, 1] - gy) < h]
+		sl = sl[sl[:, 2] < sl[:, 2].min() + BOW_HANDLE_DEPTH * L]
+		grip = np.array([(sl[:, 0].min() + sl[:, 0].max()) * 0.5, gy, (sl[:, 2].min() + sl[:, 2].max()) * 0.5])
 	else:
 		grip = _slice_center(p, gy, L)
 	if frame == "crossbow":
@@ -240,7 +318,10 @@ def build_one(dirs: list, iid: str, meta: dict) -> None:
 	cfg = ITEMS[iid]
 	path = find_src(dirs, cfg["src"])
 	print("%s ← %s" % (iid, os.path.relpath(path, os.path.dirname(os.path.dirname(path)))))
-	src, pts = orient(pp.load_source(path), cfg)
+	raw = pp.load_source(path)
+	if cfg.get("drop"):
+		raw = drop_parts(raw, cfg["drop"])
+	src, pts = orient(raw, cfg)
 	src["tex"] = np.asarray(src["img"])
 	# Пороги защиты тонких частей — под размер предмета (у построек — метры и квадратные метры)
 	L = cfg["length"]

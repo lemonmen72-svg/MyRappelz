@@ -13,6 +13,10 @@ const LENGTHS := {
 	"weapon_sword_1h_r1": 0.95, "weapon_sword_2h_r1": 1.45, "weapon_dagger_r1": 0.38, "weapon_mace_1h_r1": 0.75,
 	"weapon_mace_2h_r1": 1.4, "weapon_axe_1h_r1": 0.7, "weapon_axe_2h_r1": 1.4, "weapon_staff_1h_r1": 0.8,
 	"weapon_staff_2h_r1": 1.7, "weapon_spear_r1": 2.0, "weapon_crossbow_r1": 0.85, "weapon_shield_r1": 0.75,
+	"weapon_sword_1h_r2": 0.95, "weapon_sword_2h_r2": 1.5, "weapon_dagger_r2": 0.38, "weapon_mace_1h_r2": 0.75,
+	"weapon_mace_2h_r2": 1.45, "weapon_axe_1h_r2": 0.7, "weapon_axe_2h_r2": 1.45, "weapon_staff_1h_r2": 0.8,
+	"weapon_staff_2h_r2": 1.7, "weapon_spear_r2": 2.0, "weapon_bow_r2": 1.4, "weapon_crossbow_r2": 0.85,
+	"weapon_shield_r2": 0.8,
 	"npc_longbow": 1.4, "npc_grimoire": 0.3, "npc_tome": 0.3, "npc_cane": 0.95, "npc_wand": 0.45,
 	"npc_hammer": 0.6, "npc_antlerstaff": 1.7, "npc_quiver": 0.7, "npc_keys": 0.2, "npc_scroll": 0.3,
 }
@@ -21,7 +25,16 @@ const NPC_IDS := ["npc_grimoire", "npc_cane", "npc_wand", "npc_longbow", "npc_ha
 	"npc_scroll", "npc_tome", "npc_antlerstaff"]
 ## Двуручные (у них точка второй руки grip2).
 const TWO_HANDED := ["weapon_sword_2h_r1", "weapon_mace_2h_r1", "weapon_axe_2h_r1", "weapon_staff_2h_r1",
-	"weapon_spear_r1"]
+	"weapon_spear_r1", "weapon_sword_2h_r2", "weapon_mace_2h_r2", "weapon_axe_2h_r2", "weapon_staff_2h_r2",
+	"weapon_spear_r2"]
+## Оружие 2-го ранга (модели Максима, tools/prepare_handheld.py): id модели → вид оружия ItemData.
+const RANK2 := {
+	"weapon_sword_1h_r2": "sword_1h", "weapon_sword_2h_r2": "sword_2h", "weapon_dagger_r2": "dagger",
+	"weapon_mace_1h_r2": "mace_1h", "weapon_mace_2h_r2": "mace_2h", "weapon_axe_1h_r2": "axe_1h",
+	"weapon_axe_2h_r2": "axe_2h", "weapon_staff_1h_r2": "staff_1h", "weapon_staff_2h_r2": "staff_2h",
+	"weapon_spear_r2": "spear", "weapon_bow_r2": "bow", "weapon_crossbow_r2": "crossbow",
+	"weapon_shield_r2": "shield",
+}
 ## Бюджет треугольников модели в руке.
 const MAX_TRIS := 6500
 ## Вид хвата героя → [узел в руке, id модели] (что должно оказаться в руках модели из файла).
@@ -54,6 +67,7 @@ func run_step() -> void:
 	match step:
 		0:
 			_check_files()
+			_check_rank2()
 			_check_kinds()
 			_spawn_held()
 			wait = 10
@@ -115,12 +129,14 @@ func _check_files() -> void:
 					"%s: ложе вперёд (−Z), дуги вдоль X (%s)" % [id, bb])
 				check(bb.position.y > -0.03 and bb.position.y < 0.05, "%s: кулак под ложем (низ %.3f)" % [id, bb.position.y])
 			"shield":
-				check(bb.position.z > 0.0, "%s: щит перед ручкой, лицом к +Z (%.3f)" % [id, bb.position.z])
+				# Щит перед кулаком (ручки-скобы сзади щита могут заходить за кулак на несколько сантиметров)
+				check(bb.position.z > -0.05 and bb.position.z + bb.end.z > 0.0,
+					"%s: щит перед ручкой, лицом к +Z (%.3f…%.3f)" % [id, bb.position.z, bb.end.z])
 				check(bb.size.y > bb.size.x and bb.size.z < 0.2, "%s: верх +Y, тонкий по Z (%s)" % [id, bb.size])
 			"book":
 				check(bb.position.x > -0.01, "%s: корешок у хвата (−X; %.3f)" % [id, bb.position.x])
 	# Топоры и молот: лезвие / боёк к +X (как у процедурного хвата: +X — к костяшкам)
-	for id in ["weapon_axe_1h_r1", "weapon_axe_2h_r1"]:
+	for id in ["weapon_axe_1h_r1", "weapon_axe_2h_r1", "weapon_axe_1h_r2", "weapon_axe_2h_r2"]:
 		var bb := Handheld.mesh(id).get_aabb()
 		check(bb.end.x > -bb.position.x, "%s: лезвие к +X (%.3f / %.3f)" % [id, bb.end.x, bb.position.x])
 	for id in TWO_HANDED:
@@ -129,6 +145,55 @@ func _check_files() -> void:
 	for id in NPC_IDS:
 		check(Handheld.exists(String(id)) and Handheld.info(String(id)).get("kind", "") == "npc",
 			"предмет жителя %s" % id)
+
+
+## Оружие 2-го ранга: все 13 файлов, вид в handheld.json, готовый узел Handheld.make, хват внутри рукояти, у
+## двуручных — вторая рука ниже по рукояти, размеры — не меньше и не намного больше 1-го ранга того же вида (лук —
+## против лука жителя). Предметы ItemData с полем "model" держат именно эту модель (своего вида).
+func _check_rank2() -> void:
+	for k in RANK2:
+		var id := String(k)
+		var kind := String(RANK2[k])
+		check(Handheld.exists(id), "2-й ранг: модель %s есть" % id)
+		check(String(Handheld.info(id).get("kind", "")) == kind, "2-й ранг: %s — вид %s (%s)" % [id, kind,
+			Handheld.info(id).get("kind", "")])
+		var w := Handheld.make(id)
+		check(w != null and w.mesh != null and w.material_override != null and String(w.get_meta("handheld", "")) == id,
+			"2-й ранг: Handheld.make(%s) — узел с мешем и материалом" % id)
+		if w == null or w.mesh == null:
+			continue
+		var bb := w.mesh.get_aabb()
+		w.free()
+		check(Handheld.point(id, "grip", Vector3(9, 9, 9)) == Vector3.ZERO, "2-й ранг: %s — точка хвата в начале" % id)
+		check(bb.grow(0.07).has_point(Vector3.ZERO), "2-й ранг: %s — хват у предмета (%s)" % [id, bb])
+		var g2 := Handheld.point(id, "grip2", Vector3(9, 9, 9))
+		if TWO_HANDED.has(id):
+			check(g2.y < -0.1 and g2.y > bb.position.y and absf(g2.x) < 0.05 and absf(g2.z) < 0.05,
+				"2-й ранг: %s — вторая рука ниже хвата на рукояти (%s)" % [id, g2])
+		else:
+			check(Handheld.info(id).get("grip2", null) == null, "2-й ранг: %s — одноручное, без grip2" % id)
+		var r1 := "npc_longbow" if kind == "bow" else String(Handheld.KIND_MODELS.get(kind, ""))
+		check(Handheld.exists(r1), "2-й ранг: %s — есть модель 1-го ранга того же вида (%s)" % [id, r1])
+		if not Handheld.exists(r1):
+			continue
+		var b1 := Handheld.mesh(r1).get_aabb()
+		var big: float = bb.size[bb.size.max_axis_index()]
+		var big1: float = b1.size[b1.size.max_axis_index()]
+		check(big >= big1 * 0.95 and big <= big1 * 1.15, "2-й ранг: %s — размер %.2f м (1-й ранг %.2f)" % [id, big, big1])
+		check(bb.size.x <= b1.size.x * 1.6 + 0.05 and bb.size.z <= b1.size.z * 2.0 + 0.05,
+			"2-й ранг: %s — не шире 1-го ранга сверх меры (%s / %s)" % [id, bb.size, b1.size])
+	for k in ItemData.ITEMS:
+		var item := String(k)
+		var model := String(ItemData.get_item(item).get("model", ""))
+		if model == "" or not ItemData.is_weapon(item):
+			continue
+		check(Handheld.exists(model), "оружие «%s»: файл модели %s" % [ItemData.item_name(item), model])
+		check(Handheld.model_for(item) == model, "оружие «%s»: в руках модель %s (%s)" % [ItemData.item_name(item),
+			model, Handheld.model_for(item)])
+		var wk := String(ItemData.get_item(item).get("weapon", ""))
+		if wk != "":
+			check(String(Handheld.info(model).get("kind", "")) == ItemData.single_kind(wk),
+				"оружие «%s»: модель %s своего вида (%s)" % [ItemData.item_name(item), model, wk])
 
 
 ## У каждого вида оружия и каждого оружия-предмета — модель из файла.
