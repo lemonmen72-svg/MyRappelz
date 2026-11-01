@@ -398,6 +398,12 @@ func _process(delta: float) -> void:
 	for b in SKILL_BUTTONS:
 		var bid := String(b[0])
 		hud.set_cooldown(bid, player.cooldown_frac(bid))
+	# Полоса каста умения героя (название, сколько осталось)
+	if player.casting != "":
+		hud.update_cast(String(HeroSkills.get_skill(player.casting).get("name", player.casting)), player.cast_progress(),
+			player.cast_total - player.cast_elapsed)
+	else:
+		hud.update_cast("", 0.0, 0.0)
 
 	var want := player.global_position + _cam_offset()
 	# Не прятать камеру в холм

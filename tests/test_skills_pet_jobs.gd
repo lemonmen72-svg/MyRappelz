@@ -165,11 +165,11 @@ func _cast(sid: String, mp_check: bool = true) -> void:
 	var n := HeroSkills.skill_level(game.hero, sid)
 	mp_cost = HeroSkills.mp_cost(sid, n)
 	var mp0 := player.mp
-	check(player.use_skill(sid), "«%s» ур. %d применено" % [nm, n])
+	check(use_now(player, sid), "«%s» ур. %d применено" % [nm, n])
 	if mp_check:
 		check(player.mp == mp0 - mp_cost and mp_cost > 0, "«%s» тратит MP: %d" % [nm, mp_cost])
 	check(float(player.skill_cd.get(sid, 0.0)) > 0.0, "«%s» на перезарядке" % nm)
-	check(not player.use_skill(sid), "«%s»: повтор — нет (перезарядка)" % nm)
+	check(not use_now(player, sid), "«%s»: повтор — нет (перезарядка)" % nm)
 
 
 ## Включить / выключить переключаемое: включение тратит MP.
@@ -331,7 +331,7 @@ func _bm_life() -> void:
 	player.skill_cd.erase("second_wind")
 	player.mp = player.max_mp
 	var mp0 := player.mp
-	check(not player.use_skill("second_wind") and player.mp == mp0, "без погибших — не применяется, MP цел")
+	check(not use_now(player, "second_wind") and player.mp == mp0, "без погибших — не применяется, MP цел")
 	check(main.hud._msg_label.text.contains("жив"), "сообщение: питомец жив")
 	# «Небесный обмен»: питомец отдаёт силы
 	player.hp = player.max_hp / 4
@@ -339,7 +339,7 @@ func _bm_life() -> void:
 	var hp0 := player.hp
 	player.skill_cd.erase("sky_offering")
 	var mpb := player.mp
-	check(player.use_skill("sky_offering"), "«Небесный обмен» применён")
+	check(use_now(player, "sky_offering"), "«Небесный обмен» применён")
 	check(player.hp > hp0 + player.max_hp / 3, "герою +HP: %d → %d" % [hp0, player.hp])
 	check(player.mp > mpb, "герою +MP: %d → %d" % [mpb, player.mp])
 	check(bool(game.pets[0].get("dead", false)) and pet() == null, "питомец отдал силы и пал")
@@ -420,7 +420,7 @@ func _adept_blood_rain() -> void:
 	pt.bond_hp_changed()
 	player.skill_cd.erase("blood_rain")
 	player.mp = player.max_mp
-	check(not player.use_skill("blood_rain") and player.mp == player.max_mp, "слабый питомец — «Кровавый ливень» не применён")
+	check(not use_now(player, "blood_rain") and player.mp == player.max_mp, "слабый питомец — «Кровавый ливень» не применён")
 	pt.hp = pt.max_hp
 	pt.bond_hp_changed()
 
@@ -442,7 +442,7 @@ func _adept_sacrifices() -> void:
 		player.skill_cd.erase("borrowed_life")
 		player.hp = 1
 		player.mp = player.max_mp
-		player.use_skill("borrowed_life")
+		use_now(player, "borrowed_life")
 	check(pt.hp >= ceili(float(pt.max_hp) * PetBond.PET_FLOOR) and not pt.is_down,
 		"питомец не опускается ниже %d%% HP: %d / %d" % [roundi(PetBond.PET_FLOOR * 100.0), pt.hp, pt.max_hp])
 	pt.hp = pt.max_hp
@@ -459,13 +459,13 @@ func _adept_sacrifices() -> void:
 	player.hp = player.max_hp / 5
 	player.skill_cd.erase("abyss_blood")
 	player.mp = player.max_mp
-	check(player.use_skill("abyss_blood"), "«Кровь бездны» применена")
+	check(use_now(player, "abyss_blood"), "«Кровь бездны» применена")
 	check(player.hp == player.max_hp, "HP героя полное")
 	check(player.skill_guard >= 0.8 and player.effects.has("buff:abyss_blood"), "урон по герою −%d%% (значок)" %
 		roundi(player.skill_guard * 100.0))
 	check(pet() == null and bool(game.pets[0].get("dead", false)), "питомец пожертвовал собой")
 	player.skill_cd.erase("abyss_blood")
-	check(not player.use_skill("abyss_blood"), "без питомца «Кровь бездны» не применить")
+	check(not use_now(player, "abyss_blood"), "без питомца «Кровь бездны» не применить")
 	check(PetBond.revive(player, 1.0, 1.0), "питомец воскрешён")
 
 

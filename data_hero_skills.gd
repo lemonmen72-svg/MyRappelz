@@ -19,7 +19,7 @@ extends RefCounted
 ##   jp — стоимость каждого уровня в JP; start — 1-й уровень дан сразу (стартовое умение профессии);
 ##   pre — [умение, уровень]: что нужно изучить раньше (линия в древе);
 ##   числа по уровням умения — массивы (n-й элемент — уровень n).
-## Активные Наёмника: mp, cd (с; число или массив), target ("melee" — клинками рядом, "ranged" — болтом из арбалета,
+## Активные Наёмника: mp, cd (с; число или массив), cast (время каста, с — как у движка ниже), target ("melee" — клинками рядом, "ranged" — болтом из арбалета,
 ##   "self" — на себя, "dash" — рывок к цели, "near" — цель рядом в radius м), mult — доля атаки за удар,
 ##   flat — прибавка к урону за удар (база вики × FLAT_SCALE), hits — ударов, crit — всегда крит, heal — лечение
 ##   долей урона, sleep — сон (с, будит удар), fear — страх (с: зверь убегает, не бьёт), knock — отбросить на м,
@@ -39,6 +39,11 @@ const SLOTS := 4
 const SPARK_HITS := 4
 ## Базовый урон умений вики (сотни единиц) → наш масштаб атаки.
 const FLAT_SCALE := 0.06
+## Время каста вики (Cast Time, с) → наше поле cast: × CAST_WIKI_K, округлено до 0.1 с, не короче CAST_MIN (короче
+## полоса каста не читается) и не длиннее CAST_MAX (бой у нас 4–12 с); «Instant» / 0 вики — мгновенно (cast_from_wiki).
+const CAST_WIKI_K := 0.6
+const CAST_MIN := 0.5
+const CAST_MAX := 3.0
 const KIND_NAMES := {"active": "активное", "passive": "пассивное", "toggle": "переключаемое"}
 ## Вкладки древа Наёмника.
 const TABS := [["common", "Общие"], ["blades", "Мечи и кинжалы"], ["crossbow", "Арбалет"]]
@@ -150,7 +155,7 @@ const SKILLS := {
 		"bonus": {"basic_pct": [0.08, 0.16, 0.24, 0.32, 0.40], "aspd": [0.02, 0.04, 0.06, 0.08, 0.10]},
 	},
 	"sleeping_dust": {  # ← Sleeping Dust
-		"name": "Сонная пыльца", "kind": "active", "tab": "blades", "weapon": "", "glyph": "С",
+		"name": "Сонная пыльца", "kind": "active", "cast": 0.7, "tab": "blades", "weapon": "", "glyph": "С",
 		"color": Color(0.6, 0.5, 0.85),
 		"desc": "Горсть сонной пыльцы в морду зверю рядом: он засыпает, пока его не ударят.",
 		"jlv": [20, 20, 20, 30, 40], "jp": [1, 1, 2, 3, 4], "pre": ["bloody_blade", 1],
@@ -179,7 +184,7 @@ const SKILLS := {
 		"bonus": {"atk_pct": [0.04, 0.08, 0.12, 0.16, 0.20], "atk_flat": [1, 2, 2, 3, 4]},
 	},
 	"dual_shot": {  # ← Dual Shot
-		"name": "Сдвоенный болт", "kind": "active", "tab": "crossbow", "weapon": "crossbow", "glyph": "С",
+		"name": "Сдвоенный болт", "kind": "active", "cast": 0.5, "tab": "crossbow", "weapon": "crossbow", "glyph": "С",
 		"color": BOLT,
 		"desc": "Два болта разом в одну цель.",
 		"jlv": [5, 10, 20, 30, 40], "jp": [1, 1, 2, 3, 4], "pre": ["crossbow_mastery", 1],
@@ -187,7 +192,7 @@ const SKILLS := {
 		"mult": [2.35, 2.70, 3.05, 3.40, 3.75], "flat": [7, 9, 11, 13, 15],
 	},
 	"thrust_arrow": {  # ← Thrust Arrow (10 → 5 ур.)
-		"name": "Таранный болт", "kind": "active", "tab": "crossbow", "weapon": "crossbow", "glyph": "Т",
+		"name": "Таранный болт", "kind": "active", "cast": 0.5, "tab": "crossbow", "weapon": "crossbow", "glyph": "Т",
 		"color": Color(0.7, 0.6, 0.4),
 		"desc": "Тяжёлый болт отбрасывает зверя и на миг пригвождает к месту.",
 		"jlv": [10, 10, 20, 30, 40], "jp": [1, 2, 3, 4, 5], "pre": ["dual_shot", 1],
@@ -195,7 +200,7 @@ const SKILLS := {
 		"mult": [2.35, 2.95, 3.55, 4.15, 4.75], "flat": [2, 5, 7, 10, 12], "knock": 5.0, "root": 1.0,
 	},
 	"piercing_arrow": {  # ← Piercing Arrow (10 → 5 ур.)
-		"name": "Кровоточащий болт", "kind": "active", "tab": "crossbow", "weapon": "crossbow", "glyph": "К",
+		"name": "Кровоточащий болт", "kind": "active", "cast": 0.5, "tab": "crossbow", "weapon": "crossbow", "glyph": "К",
 		"color": Color(0.85, 0.2, 0.2),
 		"desc": "Болт с зазубринами: рана кровоточит 13 с, и зверь не может залечить её.",
 		"jlv": [15, 15, 20, 30, 40], "jp": [1, 2, 3, 4, 5], "pre": ["thrust_arrow", 1],
@@ -211,7 +216,7 @@ const SKILLS := {
 		"bonus": {"aspd": [0.03, 0.06, 0.09, 0.12, 0.15], "basic_pct": [0.03, 0.06, 0.09, 0.12, 0.15]},
 	},
 	"cursed_arrow": {  # ← Cursed Arrow
-		"name": "Чёрная метка", "kind": "active", "tab": "crossbow", "weapon": "crossbow", "glyph": "Ч",
+		"name": "Чёрная метка", "kind": "active", "cast": 0.5, "tab": "crossbow", "weapon": "crossbow", "glyph": "Ч",
 		"color": SHADE,
 		"desc": "Болт, пропитанный тьмой: удар и урон тьмой ещё 15 с.",
 		"jlv": [20, 30, 30, 30, 40], "jp": [1, 1, 2, 3, 4], "pre": ["piercing_arrow", 1],
@@ -220,7 +225,7 @@ const SKILLS := {
 		"dot": [0.2, 0.2, 0.2, 0.2, 0.2], "dot_flat": [1, 2, 4, 5, 6], "dot_time": 15.0,
 	},
 	"critical_shot": {  # ← Critical Shot
-		"name": "Выстрел в сердце", "kind": "active", "tab": "crossbow", "weapon": "crossbow", "glyph": "В",
+		"name": "Выстрел в сердце", "kind": "active", "cast": 0.5, "tab": "crossbow", "weapon": "crossbow", "glyph": "В",
 		"color": Color(0.95, 0.75, 0.3),
 		"desc": "Два прицельных болта — оба критические.",
 		"jlv": [35, 35, 35, 35, 40], "jp": [1, 1, 2, 3, 4], "pre": ["cursed_arrow", 1],
@@ -321,7 +326,9 @@ const STATUS_NAMES := {
 ## Активные (kind "active"): use — как выбирается цель: "melee" (удар оружием по цели рядом), "ranged" (снаряд
 ##   оружия), "magic" (заклинание по цели до range м; proj = true — летит сгусток, эффекты при попадании),
 ##   "near" (цель в radius м), "self" (без цели), "pet" (призванный питомец); anim — "attack" | "cast" | "bash" |
-##   "spin" | "buff" | "dash"; mp, cd — числа или массивы по уровням; fx — список эффектов по порядку:
+##   "spin" | "buff" | "dash"; mp, cd — числа или массивы по уровням; cast — время каста, с (число или массив; нет —
+##   мгновенно; Player: петля каста, полоса, ходьба прерывает, эффект — в конце; скорость каста героя сокращает его;
+##   числа — вики × CAST_WIKI_K, см. tools/rappelz_jobs_reference.md «Время каста»); fx — список эффектов по порядку:
 ##   {"do": "damage", "mult", "flat", "hits", "crit": bool, "power": "atk" | "matk", "area": радиус вокруг цели,
 ##     "leech": доля урона в HP героя};
 ##   {"do": "heal", "who": "self" | "pet" | "ally" (кому хуже), "pct": доля макс. HP, "mult": доля маг. атаки};
@@ -512,6 +519,35 @@ static func upkeep(id: String, n: int) -> int:
 
 static func cooldown(id: String, n: int) -> float:
 	return field(id, "cd", n)
+
+
+## Время каста умения уровня n, с (поле cast; нет — 0: мгновенно), без скорости каста героя (её учитывает
+## Player.skill_cast_time). Умения с тратой искр духа (spark_cost / spark_spend) — тоже по полю cast: запас
+## проверяется в начале каста, тратится в конце.
+static func cast_time(id: String, n: int) -> float:
+	return maxf(0.0, field(id, "cast", n))
+
+
+## Наше время каста по времени каста вики (с): правило переноса (CAST_WIKI_K, CAST_MIN, CAST_MAX).
+static func cast_from_wiki(wiki_sec: float) -> float:
+	if wiki_sec <= 0.0:
+		return 0.0
+	return clampf(snappedf(wiki_sec * CAST_WIKI_K, 0.1), CAST_MIN, CAST_MAX)
+
+
+## Строка карточки умения: «Каст: 1.2 с» / «Мгновенно» (cast_speed — скорость каста героя: со скоростью время
+## короче, в скобках — «сейчас …»). Пусто у пассивных и переключаемых.
+static func cast_text(id: String, n: int, cast_speed: float = 0.0) -> String:
+	if kind(id) != "active":
+		return ""
+	var c := cast_time(id, maxi(1, n))
+	if c <= 0.0:
+		return "Мгновенно"
+	var t := "Каст: %s с" % _num(c)
+	var now := c / (1.0 + maxf(cast_speed, -0.5))
+	if absf(now - c) >= 0.05:
+		t += " (сейчас %s с)" % _num(snappedf(now, 0.1))
+	return t
 
 
 static func kind(id: String) -> String:

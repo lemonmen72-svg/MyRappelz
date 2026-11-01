@@ -116,14 +116,14 @@ func _cast(sid: String, mp_exact: bool = true) -> bool:
 	p.mp = p.max_mp
 	var mp0 := p.mp
 	var cost := HeroSkills.mp_cost(sid, HeroSkills.skill_level(game.hero, sid))
-	var ok := p.use_skill("skill1")
+	var ok := use_now(p, "skill1")
 	check(ok, "«%s» применено (%s)" % [nm, main.hud._msg_label.text])
 	if not ok:
 		return false
 	if mp_exact:
 		check(p.mp == mp0 - cost and cost > 0, "«%s»: MP %d → %d (цена %d)" % [nm, mp0, p.mp, cost])
 	check(float(p.skill_cd.get(sid, 0.0)) > 0.5, "«%s» на перезарядке %.1f с" % [nm, float(p.skill_cd.get(sid, 0.0))])
-	check(not p.use_skill("skill1"), "«%s»: повтор сразу не срабатывает" % nm)
+	check(not use_now(p, "skill1"), "«%s»: повтор сразу не срабатывает" % nm)
 	return true
 
 
@@ -243,7 +243,7 @@ func _w_sparks_hits() -> int:
 	p.assign_slot("kindle_spark", 0)
 	p.skill_cd.erase("kindle_spark")
 	var mp0 := p.mp
-	check(not p.use_skill("skill1") and p.mp == mp0, "запас полон — «Разжечь искру» не тратит MP: %s" % main.hud._msg_label.text)
+	check(not use_now(p, "skill1") and p.mp == mp0, "запас полон — «Разжечь искру» не тратит MP: %s" % main.hud._msg_label.text)
 	return 1
 
 
@@ -258,9 +258,9 @@ func _w_kindle() -> int:
 	_cast("kindle_spark")
 	check(_sparks() == 1, "«Разжечь искру»: 1 искра")
 	p.skill_cd.erase("kindle_spark")
-	p.use_skill("skill1")
+	use_now(p, "skill1")
 	p.skill_cd.erase("kindle_spark")
-	p.use_skill("skill1")
+	use_now(p, "skill1")
 	check(_sparks() == 3 and int(p.effects.get_entry("spark:charges")["count"]) == 3, "три искры, на значке 3")
 	return 1
 
@@ -273,7 +273,7 @@ func _w_power_breath() -> int:
 	var mp0 := p.mp
 	p.assign_slot("power_breath", 0)
 	p.skill_cd.erase("power_breath")
-	check(p.use_skill("skill1"), "«Вдох силы» применён")
+	check(use_now(p, "skill1"), "«Вдох силы» применён")
 	check(_sparks() == 2, "«Вдох силы» 1 ур. тратит одну искру: осталось %d" % _sparks())
 	check(p.hp > hp0, "«Вдох силы»: HP %d → %d" % [hp0, p.hp])
 	check(p.mp > mp0 - HeroSkills.mp_cost("power_breath", 1), "«Вдох силы» вернул MP")
@@ -282,7 +282,7 @@ func _w_power_breath() -> int:
 	JobFxWarrior.add_sparks(p._fx, -9)
 	p.skill_cd.erase("power_breath")
 	var mp1 := p.mp
-	check(not p.use_skill("skill1") and p.mp == mp1 and float(p.skill_cd.get("power_breath", 0.0)) == 0.0,
+	check(not use_now(p, "skill1") and p.mp == mp1 and float(p.skill_cd.get("power_breath", 0.0)) == 0.0,
 		"без искр «Вдох силы» не применяется: %s" % main.hud._msg_label.text)
 	return 1
 
@@ -350,7 +350,7 @@ func _w_axe_storm() -> int:
 	# С двуручным топором «Буря топоров» не применяется
 	_equip("weapon_axe_2h_r1")
 	p.skill_cd.erase("axe_storm")
-	check(not p.use_skill("skill1") and p.slot_block("skill1") != "", "без двух топоров «Буря топоров» недоступна")
+	check(not use_now(p, "skill1") and p.slot_block("skill1") != "", "без двух топоров «Буря топоров» недоступна")
 	return 1
 
 
@@ -378,7 +378,7 @@ func _w_bow_cast(sid: String) -> int:
 		p.assign_slot(sid, 0)
 		p.skill_cd.erase(sid)
 		var mp0 := p.mp
-		check(not p.use_skill("skill1") and p.mp == mp0, "«%s» без искры не применяется" % String(HeroSkills.get_skill(sid)["name"]))
+		check(not use_now(p, "skill1") and p.mp == mp0, "«%s» без искры не применяется" % String(HeroSkills.get_skill(sid)["name"]))
 		JobFxWarrior.add_sparks(p._fx, 1)
 	cur = sid
 	val = m1.global_position.distance_to(p.global_position)
@@ -466,7 +466,8 @@ func _ttk(lvl: int, edge: String = "") -> Vector2:
 					"dot":
 						per += pw * HeroSkills.value_at(d.get("mult", 0.0), n) * HeroSkills.value_at(d.get("time", 10.0), n) * df
 			if per > 0.0:
-				sk_dps += per / maxf(1.0, HeroSkills.cooldown(sid, n))
+				# Цикл умения — перезарядка и время каста (пока кастует, герой не бьёт)
+				sk_dps += per / maxf(1.0, HeroSkills.cooldown(sid, n) + p.skill_cast_time(sid, n))
 		basic += float(mob["max_hp"]) / maxf(0.01, dps)
 		full += float(mob["max_hp"]) / maxf(0.01, dps + extra + sk_dps)
 	game.level = keep

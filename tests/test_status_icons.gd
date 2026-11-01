@@ -56,7 +56,7 @@ func run_step() -> void:
 			(rec["skills"] as Dictionary)["deep_evasion"] = 1
 			check(player.assign_slot("deep_evasion", 0), "«Танец теней» — на кнопку 1")
 			player.mp = player.max_mp
-			check(player.use_skill("skill1"), "«Танец теней» применён")
+			check(use_now(player, "skill1"), "«Танец теней» применён")
 			check(player.effects.has("shade"), "в реестре героя — «shade»")
 			# Баф от питомца: «Зов охотницы» — атака хозяина выше на 15 с
 			pet._apply_buff(PetSkills.get_skill("hunter_call"), 1, "hunter_call")

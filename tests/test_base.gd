@@ -175,3 +175,14 @@ func learn_skills(ids: Array) -> void:
 		check(HeroSkills.learn(game.hero, game.class_id, game.level, sid), "изучено «%s» %s" % [
 			String(HeroSkills.get_skill(sid).get("name", sid)), why])
 	main.player.refresh_skills()
+
+
+## Применить умение по кнопке или id и дождаться конца каста (у мгновенных — то же, что use_skill): оставшееся время
+## каста проходит одним тиком каста (Player._tick_cast — тот же путь, что в игре: проверки цели, выпуск, MP,
+## перезарядка). true — умение сработало (у каста — и начало, и конец). Каст по шагам — tests/test_skill_cast.gd.
+func use_now(p: Player, slot: String) -> bool:
+	var ok := p.use_skill(slot)
+	if not ok or p.casting == "":
+		return ok
+	p._tick_cast(p.cast_total - p.cast_elapsed + 0.0001)
+	return p.casting == "" and p.cast_ok

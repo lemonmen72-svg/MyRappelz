@@ -63,11 +63,11 @@ func run_step() -> void:
 			player.mp = player.max_mp
 			hp_before = mob.hp
 			var before := get_tree().get_nodes_in_group("projectiles").size()
-			check(player.use_skill("skill1"), "«Огненная искра» применена")
+			check(use_now(player, "skill1"), "«Огненная искра» применена")
 			check(get_tree().get_nodes_in_group("projectiles").size() > before, "огненный снаряд летит")
 			check(mob.hp == hp_before, "урон — при попадании снаряда")
 			check(player.cooldown_frac("skill1") > 0.9, "«Огненная искра» на перезарядке")
-			check(not player.use_skill("skill1"), "повтор не срабатывает")
+			check(not use_now(player, "skill1"), "повтор не срабатывает")
 			t0 = frame
 			step = 3
 		3:
@@ -82,7 +82,7 @@ func run_step() -> void:
 			place_far(mob, 8.0)
 			player.select_target(mob)
 			hp_before = mob.hp
-			check(player.use_skill("skill2"), "«Разряд» применён")
+			check(use_now(player, "skill2"), "«Разряд» применён")
 			check(not mob_ok(mob) or mob.hp < hp_before, "«Разряд» бьёт сразу: %d → %d" % [hp_before, mob.hp if mob_ok(mob) else 0])
 			step = 5
 		5:
@@ -97,7 +97,7 @@ func run_step() -> void:
 			player.hp_regen = 0.0
 			php_before = player.hp
 			hp_before = mob.hp
-			check(player.use_skill("skill3"), "«Глоток жизни» применён")
+			check(use_now(player, "skill3"), "«Глоток жизни» применён")
 			t0 = frame
 			step = 6
 		6:
@@ -125,7 +125,7 @@ func run_step() -> void:
 			player.select_target(mob)
 			player.mp = player.max_mp
 			hp_before = mob.hp
-			check(player.use_skill("skill1"), "«Световой толчок» применён")
+			check(use_now(player, "skill1"), "«Световой толчок» применён")
 			t0 = frame
 			step = 8
 		8:
@@ -139,20 +139,20 @@ func run_step() -> void:
 			player.regen_delay = 100.0
 			player.hp_regen = 0.0
 			player.mp = player.max_mp
-			check(player.use_skill("skill2"), "«Свет в ладонях» применён")
+			check(use_now(player, "skill2"), "«Свет в ладонях» применён")
 			check(player.hp >= 20 + int(player.max_hp * 0.15) - 1, "«Свет в ладонях» вылечил: 20 → %d" % player.hp)
 			player.hp = 20
-			check(not player.use_skill("skill2"), "повтор на перезарядке")
+			check(not use_now(player, "skill2"), "повтор на перезарядке")
 			check(player.hp == 20, "на перезарядке лечения нет")
-			check(player.use_skill("skill3"), "«Целительное касание» (питомца нет — герой)")
+			check(use_now(player, "skill3"), "«Целительное касание» (питомца нет — герой)")
 			check(player.hp > 20, "«Целительное касание» вылечило героя: %d" % player.hp)
 			# Аура «Дар силы»: Сила и атака выше
 			var str0 := int(player.hero_stats["stats"]["str"])
 			var atk0 := player.atk
-			check(player.use_skill("skill4") and HeroSkills.toggle_on(game.hero, "gift_strength"), "«Дар силы» включён")
+			check(use_now(player, "skill4") and HeroSkills.toggle_on(game.hero, "gift_strength"), "«Дар силы» включён")
 			check(int(player.hero_stats["stats"]["str"]) > str0 and player.atk > atk0,
 				"Сила %d → %d, атака %d → %d" % [str0, int(player.hero_stats["stats"]["str"]), atk0, player.atk])
-			check(player.use_skill("skill4") and not HeroSkills.toggle_on(game.hero, "gift_strength"), "«Дар силы» выключен")
+			check(use_now(player, "skill4") and not HeroSkills.toggle_on(game.hero, "gift_strength"), "«Дар силы» выключен")
 			ok_done()
 
 

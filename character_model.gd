@@ -119,9 +119,18 @@ const MQ_STRIKES := {
 const MQ_SPINS := {"dual_swords": ["mq_blade_spin"], "daggers": ["mq_blade_spin"], "dual_axes": ["mq_blade_spin"],
 	"spear": ["mq_reap"]}
 ## Заклинания ("cast"): на цель и на себя / питомца; усиления ("buff").
-const MQ_CASTS := ["mq_cast_wide", "mq_cast_beam", "mq_cast_up", "mq_charged_cast", "mq_cast_slam"]
+const MQ_CASTS := ["mq_cast_wide", "mq_cast_beam", "mq_cast_up", "mq_charged_cast", "mq_cast_slam", "mq_cast_release"]
 const MQ_CASTS_SELF := ["mq_cast_pray", "mq_cast_wide"]
-const MQ_BUFFS := ["mq_charged_cast1", "mq_cast_wide"]
+const MQ_BUFFS := ["mq_charged_cast1", "mq_cast_wide", "mq_charge_release"]
+## Петли каста умения героя (Player: время каста, пока идёт — играет петля; темп петли не зависит от длины каста):
+## "magic" — накопление силы (посох вверх), "charge" — заряд в ладонях (усиления, удары с замахом), "bow" —
+## прицеливание из лука, "crossbow" — из арбалета (нет своей петли — стойка Crossbow_Idle). Первый клип, что есть в модели.
+const MQ_CAST_LOOPS := {
+	"magic": ["mq_cast_loop", "mq_charge_loop"], "charge": ["mq_charge_loop", "mq_cast_loop"],
+	"bow": ["mq_bow_aim_loop"], "crossbow": ["mq_crossbow_aim_loop", "crossbow_idle"],
+}
+## Выпуск после каста: клип умения начинается за столько секунд до своего удара (замах уже был в петле), с.
+const MQ_RELEASE_LEAD := 0.2
 ## Своё движение у отдельных умений: «Вызов» и «Дикий рёв» — удар в грудь, удары по земле, обвал с неба и т. п.
 const MQ_SKILL_BY_ID := {
 	"challenge": "mq_taunt", "wild_roar": "mq_taunt", "shield_thunder": "mq_ground_slam",
@@ -406,6 +415,8 @@ var _mq_last := -100.0
 var _act_hit := -1.0
 var _shots := 0
 var _shot_gap := 1.0
+## Петля каста умения героя (настоящее имя клипа; "" — каста нет): play_cast_loop / stop_cast_loop.
+var _cast_loop := ""
 
 ## Массивы примитивов (одинаковые детали у всех персонажей).
 static var _arr_cache: Dictionary = {}
@@ -1809,8 +1820,8 @@ func play_hit() -> void:
 	_flash = 1.0
 	if _asset != null:
 		_asset_recoil()
-		# Клип реакции на удар — только когда стоит и ничего не делает
-		if _act_end < 0.0 and _asset_speed < 0.3:
+		# Клип реакции на удар — только когда стоит и ничего не делает (каст не сбивается и с виду)
+		if _act_end < 0.0 and _asset_speed < 0.3 and _cast_loop == "":
 			_asset_act("hit")
 		return
 	if _root == null or not is_inside_tree():
@@ -1978,7 +1989,7 @@ func _setup_asset(path: String) -> bool:
 			for an in _anim.get_animation_list():
 				var a := _anim.get_animation(an)
 				var k := String(an).to_lower()
-				if k.contains("walk") or k.ends_with("running") or k == "idle" or k == "crossbow_idle":
+				if k.contains("walk") or k.ends_with("running") or k == "idle" or k == "crossbow_idle" or k.ends_with("_loop"):
 					a.loop_mode = Animation.LOOP_LINEAR
 				_pin_root(a, skel)
 	return true
@@ -2115,6 +2126,13 @@ func _asset_process(delta: float) -> void:
 				return
 		_act_end = -1.0
 		_loco = ""
+	# Каст умения героя: петля, пока Player не снимет её (stop_cast_loop)
+	if _cast_loop != "":
+		if _loco != "cast" or not _anim.is_playing():
+			_loco = "cast"
+			_anim.speed_scale = 1.0
+			_anim.play(_cast_loop, 0.2)
+		return
 	var want := "idle"
 	if _asset_speed > 2.6:
 		want = "run"
@@ -2214,7 +2232,8 @@ func _mq_attack(interval: float) -> bool:
 ## sid — id умения (MQ_SKILL_BY_ID; из нескольких подходящих вариантов умение всегда берёт один и тот же), use — как
 ## применяется ("self"/"pet" — заклинание на себя или питомца, "ranged" — выстрел). false — подходящего клипа нет,
 ## играет прежний жест.
-func play_skill(kind: String, sid: String = "", use: String = "") -> bool:
+## release — выпуск после каста: клип с момента незадолго до удара (MQ_RELEASE_LEAD), замах уже был в петле.
+func play_skill(kind: String, sid: String = "", use: String = "", release: bool = false) -> bool:
 	if _asset == null or _anim == null or not is_inside_tree():
 		return false
 	var opts: Array = []
@@ -2241,7 +2260,39 @@ func play_skill(kind: String, sid: String = "", use: String = "") -> bool:
 		return false
 	var i := absi(hash(sid)) % names.size() if sid != "" else randi() % names.size()
 	_mq_play(names[i], 1.0)
+	if release:
+		_anim.seek(maxf(0.0, _act_hit - MQ_RELEASE_LEAD), true)
 	return true
+
+
+## Петля каста умения героя по виду (MQ_CAST_LOOPS): играет, пока не вызван stop_cast_loop. false — клипа нет
+## (модель из примитивов, старый файл): каст идёт без своего движения.
+func play_cast_loop(kind: String) -> bool:
+	if _anim == null or not is_inside_tree():
+		return false
+	var names := _mq_names(MQ_CAST_LOOPS.get(kind, []))
+	if names.is_empty():
+		return false
+	_cast_loop = names[0]
+	_anim.get_animation(_cast_loop).loop_mode = Animation.LOOP_LINEAR
+	_act_end = -1.0
+	_loco = "cast"
+	_anim.speed_scale = 1.0
+	_anim.play(_cast_loop, 0.2)
+	return true
+
+
+## Снять петлю каста (каст закончен или прерван): дальше — клип выпуска, покой или шаг.
+func stop_cast_loop() -> void:
+	if _cast_loop == "":
+		return
+	_cast_loop = ""
+	_loco = ""
+
+
+## Клип петли каста, что играет сейчас ("" — нет).
+func cast_loop_clip() -> String:
+	return _cast_loop
 
 
 ## Клип манекена с начала с темпом sp: до конца клипа шаг и бег не включаются, после момента удара (clips.<имя>.hit

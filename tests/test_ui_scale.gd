@@ -293,6 +293,20 @@ func _check_hud() -> void:
 			if near.distance_to(c) <= r:
 				check(false, "кнопка %s налезает на панель %s" % [id, rr])
 		check(c.distance_to(joy_home) > r + joy_r, "кнопка %s не на джойстике" % id)
+	# Полоса каста: на экране, не на круглых кнопках, джойстике, панелях и трекере
+	hud.update_cast("Огненный смерч", 0.5, 0.9)
+	var cr := hud.cast_rect()
+	check(hud.is_cast_visible() and screen.encloses(cr), "полоса каста на экране: %s" % cr)
+	for id in ids:
+		var c := button_center(String(id))
+		var near := Vector2(clampf(c.x, cr.position.x, cr.end.x), clampf(c.y, cr.position.y, cr.end.y))
+		check(near.distance_to(c) > float(hud._buttons[id]["r"]), "полоса каста не на кнопке %s: %s" % [id, cr])
+	var near_joy := Vector2(clampf(joy_home.x, cr.position.x, cr.end.x), clampf(joy_home.y, cr.position.y, cr.end.y))
+	check(near_joy.distance_to(joy_home) > joy_r, "полоса каста не на джойстике")
+	for rect in [mr, pr, tr, trk, hud._pet_btns.get_global_rect()]:
+		check(not cr.intersects(rect as Rect2), "полоса каста не на панели %s" % rect)
+	hud.update_cast("", 0.0, 0.0)
+	check(not hud.is_cast_visible(), "полоса каста скрывается")
 	# Значки эффектов: ряд игрока — до панели цели, ряд цели — не на меню, трекере и экране; значки кнопок — в круге
 	var fxp := hud.status_row("player")
 	var fxt := hud.status_row("target")

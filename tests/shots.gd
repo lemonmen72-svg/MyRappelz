@@ -146,7 +146,7 @@ func run_step() -> void:
 		2:
 			shot("02_mobs")
 			player.try_attack()
-			player.use_skill("skill1")
+			use_now(player, "skill1")
 			wait = 8
 			step = 3
 		3:
@@ -937,15 +937,15 @@ func run_step() -> void:
 			game.admin_set_look("human", "m")
 			_job_showcase("warrior", ["stonebreaker", "kindle_spark", "power_breath", "spin_strike"], ["savage_fury"], 1.8)
 			JobFxWarrior.add_sparks(main.player._fx, 2)
-			main.player.use_skill("skill1")
+			use_now(main.player, "skill1")
 			wait = 10
 			step = 818
 		818:
 			shot("98_skills_warrior_shaman")
 			# Умения Шамана (кадр 99): огненное лезвие и «Священный огонь» включены, «Обвал» по зверю, сгусток посоха
 			_job_showcase("shaman", ["rockslide", "fire_frenzy", "pure_spring", "earth_grip"], ["fire_edge", "sacred_fire"], 6.0)
-			main.player.use_skill("skill2")
-			main.player.use_skill("skill1")
+			use_now(main.player, "skill2")
+			use_now(main.player, "skill1")
 			main.player.try_attack()
 			wait = 14
 			step = 819
@@ -963,7 +963,7 @@ func run_step() -> void:
 				bp._teleport_to_owner()
 				bp.hp = bp.max_hp / 2
 				bp.bond_hp_changed()
-			main.player.use_skill("skill1")
+			use_now(main.player, "skill1")
 			wait = 14
 			step = 830
 		830:
@@ -975,7 +975,7 @@ func run_step() -> void:
 			if cp != null:
 				cp._teleport_to_owner()
 			main.player.set_toggle("soul_merge", true)
-			main.player.use_skill("skill1")
+			use_now(main.player, "skill1")
 			wait = 14
 			step = 831
 		831:
@@ -985,14 +985,14 @@ func run_step() -> void:
 			# «Теневая печать» включена; значки зоны и горения у панели цели
 			game.admin_set_look("dark_elf", "f")
 			_job_showcase("neophyte", ["burning_ground", "storm_circle", "flame_orb", "wildfire"], ["shadow_seal"], 6.0)
-			main.player.use_skill("skill1")
-			main.player.use_skill("skill2")
+			use_now(main.player, "skill1")
+			use_now(main.player, "skill2")
 			wait = 50
 			step = 832
 		832:
 			main.player.skill_cd.clear()
 			main.player.attack_cd = 0.0
-			main.player.use_skill("skill3")
+			use_now(main.player, "skill3")
 			wait = 8
 			step = 833
 		833:
@@ -1002,9 +1002,9 @@ func run_step() -> void:
 			# Мечник и Волшебник (кадр 97): «Гром щита» (провокация), «Колючий щит» и «Благодать»; затем светлая магия
 			game.admin_set_look("light_elf", "m")
 			_job_showcase("swordsman", ["shield_thunder", "thorn_shield", "dawn_cross", "armor_breach"], ["grace", "blessed_blade"], 1.8)
-			main.player.use_skill("skill2")
-			main.player.use_skill("skill1")
-			main.player.use_skill("skill3")
+			use_now(main.player, "skill2")
+			use_now(main.player, "skill1")
+			use_now(main.player, "skill3")
 			wait = 8
 			step = 834
 		834:
@@ -1348,6 +1348,54 @@ func run_step() -> void:
 			main.cam.current = true
 			main.hud.visible = true
 			main.player.visible = true
+			wait = 2
+			step = 1060
+		1060:
+			# Время каста (кадры 180–182): Неофитка в петле накопления силы («Огненный смерч», 1.8 с) — полоса каста
+			# с названием под героиней; лучник и арбалетчица в петле прицеливания
+			AdminPanel.god = true
+			game.admin_set_look("dark_elf", "f")
+			_job_showcase("neophyte", ["fire_tornado", "flame_orb", "zap", "thunderclap"], [], 7.0)
+			main.player.skill_cd.clear()
+			check(main.player.use_skill("skill1") and main.player.casting == "fire_tornado", "кадр 180: каст «Огненного смерча»")
+			wait = 30
+			step = 1061
+		1061:
+			check(main.hud.is_cast_visible(), "кадр 180: полоса каста видна")
+			shot("180_cast_magic_loop")
+			main.player.cancel_cast("")
+			game.admin_set_look("human", "m")
+			_job_showcase("warrior", ["sticky_arrow", "pin_down", "burning_arrow", "kindle_spark"], [], 8.0)
+			if game.inventory.count("weapon_bow_r1") < 1:
+				game.inventory.add("weapon_bow_r1", 1)
+			main.player.equip("weapon_bow_r1")
+			wait = 3
+			step = 1062
+		1062:
+			main.player.skill_cd.clear()
+			main.player.mp = main.player.max_mp
+			check(main.player.use_skill("skill1") and main.player.casting == "sticky_arrow", "кадр 181: прицеливание из лука")
+			wait = 11
+			step = 1063
+		1063:
+			shot("181_cast_bow_aim")
+			main.player.cancel_cast("")
+			game.admin_set_look("dark_elf", "f")
+			_job_showcase("assassin", ["dual_shot", "thrust_arrow", "piercing_arrow", "critical_shot"], [], 8.0)
+			if game.inventory.count("crossbow_starter") < 1:
+				game.inventory.add("crossbow_starter", 1)
+			main.player.equip("crossbow_starter")
+			wait = 3
+			step = 1064
+		1064:
+			main.player.skill_cd.clear()
+			main.player.mp = main.player.max_mp
+			check(main.player.use_skill("skill1") and main.player.casting == "dual_shot", "кадр 182: прицеливание из арбалета")
+			wait = 11
+			step = 1065
+		1065:
+			shot("182_cast_crossbow_aim")
+			main.player.cancel_cast("")
 			ok_done()
 
 

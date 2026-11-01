@@ -358,7 +358,7 @@ func _cast_step(sid: String) -> int:
 		JobFxNeophyte.corpses.clear()
 		p.assign_slot(sid, 0)
 		var mp_a := p.mp
-		check(not p.use_skill("skill1") and p.mp == mp_a and float(p.skill_cd.get(sid, 0.0)) == 0.0,
+		check(not use_now(p, "skill1") and p.mp == mp_a and float(p.skill_cd.get(sid, 0.0)) == 0.0,
 			"«%s» без тела зверя не применяется: %s" % [_nm(sid), main.hud._msg_label.text])
 		var weak: Mob = main.spawn_mob("pheasant", 1, _ground(p.global_position + Vector3(2.5, 0, 0)))
 		weak.take_damage(weak.hp + 10, p)
@@ -369,7 +369,7 @@ func _cast_step(sid: String) -> int:
 	if hs.has("revive_pet"):
 		p.assign_slot(sid, 0)
 		var mp_b := p.mp
-		check(not p.use_skill("skill1") and p.mp == mp_b, "«%s» без погибшего питомца не применяется" % _nm(sid))
+		check(not use_now(p, "skill1") and p.mp == mp_b, "«%s» без погибшего питомца не применяется" % _nm(sid))
 		_pet().take_damage(999999, null)
 		check(bool(game.pets[0].get("dead", false)) and _pet() == null, "питомец погиб")
 	if hs.has("ne_blood_gift"):
@@ -385,7 +385,7 @@ func _cast_step(sid: String) -> int:
 	var cost := HeroSkills.mp_cost(sid, HeroSkills.skill_level(game.hero, sid))
 	check(p.assign_slot(sid, 0), "«%s» на кнопке 1" % _nm(sid))
 	p.skill_cd.erase(sid)
-	var ok := p.use_skill("skill1")
+	var ok := use_now(p, "skill1")
 	check(ok, "«%s» применено (%s)" % [_nm(sid), main.hud._msg_label.text])
 	if hs.has("sw_mana") or hs.has("ne_corpse_mp"):
 		check(p.mp > pmp0 - cost, "«%s»: MP вернулось (%d → %d, цена %d)" % [_nm(sid), pmp0, p.mp, cost])
@@ -393,7 +393,7 @@ func _cast_step(sid: String) -> int:
 		check(p.mp == pmp0 - cost and cost > 0, "«%s»: MP %d → %d (цена %d)" % [_nm(sid), pmp0, p.mp, cost])
 	check(float(p.skill_cd.get(sid, 0.0)) > 0.5 and p.cooldown_frac("skill1") > 0.9,
 		"«%s» на перезарядке %.1f с" % [_nm(sid), float(p.skill_cd.get(sid, 0.0))])
-	check(not p.use_skill("skill1"), "«%s»: повтор сразу не срабатывает" % _nm(sid))
+	check(not use_now(p, "skill1"), "«%s»: повтор сразу не срабатывает" % _nm(sid))
 	# Сразу проверяемое
 	if hs.has("sw_rush"):
 		check(p.global_position.distance_to(pos0) > 4.0, "«%s»: рывок к зверю (%.1f м)" % [_nm(sid),
@@ -623,7 +623,8 @@ func _ttk(lvl: int) -> Vector2:
 							"ne_zone", "ne_burn_area":
 								per += pw * HeroSkills.value_at(d.get("mult", 0.0), n) * HeroSkills.value_at(d.get("time", 10.0), n) * df
 			if per > 0.0:
-				sk_dps += per / maxf(1.0, HeroSkills.cooldown(sid, n))
+				# Цикл умения — перезарядка и время каста (пока кастует, герой не бьёт)
+				sk_dps += per / maxf(1.0, HeroSkills.cooldown(sid, n) + p.skill_cast_time(sid, n))
 		basic += float(mob["max_hp"]) / maxf(0.01, dps)
 		full += float(mob["max_hp"]) / maxf(0.01, dps + sk_dps)
 	return Vector2(basic / 3.0, full / 3.0)

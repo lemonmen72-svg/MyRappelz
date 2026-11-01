@@ -197,7 +197,7 @@ func _check_wanderer(player: Player) -> void:
 	check(player.hero_stats.size() > 0 and player.max_mp > 0, "у Бродяги 7 статов и MP")
 	for i in 4:
 		check(not main.hud.is_button_visible("skill%d" % (i + 1)), "кнопка умения %d скрыта" % (i + 1))
-	check(not player.use_skill("skill1") and main.hud._msg_label.text.contains("10 уровне"), "умений нет: %s" % main.hud._msg_label.text)
+	check(not use_now(player, "skill1") and main.hud._msg_label.text.contains("10 уровне"), "умений нет: %s" % main.hud._msg_label.text)
 	check(player._model.spec.get("gender", "") == "m", "модель: мужской пол")
 	if player._model.spec.has("asset"):
 		check(String(player._model.spec["asset"]) == CharacterModel.hero_asset("human", "m", "wanderer"), "модель Бродяги по расе и полу")
@@ -361,7 +361,7 @@ func _check_engine(player: Player) -> void:
 	player.assign_slot("first_aid", 0)
 	player.hp = 10
 	player.mp = player.max_mp
-	check(player.use_skill("skill1") and player.hp > 10, "«Свет в ладонях» лечит героя: %d" % player.hp)
+	check(use_now(player, "skill1") and player.hp > 10, "«Свет в ладонях» лечит героя: %d" % player.hp)
 	# Группа созвучий: одно за раз
 	become_job("conjurer")
 	learn_skills(["beast_kinship", "chord_vitality", "chord_strength", "pet_mentor", "pet_vigor", "lullaby"])
@@ -383,7 +383,7 @@ func _check_engine(player: Player) -> void:
 		(game.hero["skills"] as Dictionary)[unready] = 1
 		player.assign_slot(unready, 1)
 		check(HeroSkills.effect_text(unready, 1).contains("следующем обновлении"), "в карточке — «в разработке»")
-		check(not player.use_skill("skill2") and main.hud._msg_label.text.contains("следующем обновлении"),
+		check(not use_now(player, "skill2") and main.hud._msg_label.text.contains("следующем обновлении"),
 			"не готовое умение не применяется")
 	check(HeroSkills.pet_aura_bonuses(game.hero, "conjurer", player.weapon_kind).has("str"), "аура созвучия — и питомцу")
 
