@@ -338,7 +338,15 @@
   `weapon_dagger_r1` ← Emberfang, `weapon_mace_1h_r1` ← Ironbound Scepter, `weapon_mace_2h_r1` ← Ironbound Warhammer,
   `weapon_axe_1h_r1` / `weapon_axe_2h_r1` ← два Mooncleaver, `weapon_staff_1h_r1` ← Crystalwood Scepter,
   `weapon_staff_2h_r1` ← Emberwood Staff, `weapon_spear_r1` ← Emberlance, `weapon_crossbow_r1` ← Ornate Crossbow,
-  `weapon_shield_r1` ← Sunward Aegis; лука среди оружия нет — у героев лук жителя `npc_longbow`. Предметы жителей
+  `weapon_shield_r1` ← Sunward Aegis; лука среди оружия нет — у героев лук жителя `npc_longbow`. **Оружие 2-го ранга**
+  (модели `weapon_<вид>_r2`, у предметов — поле `"model"`): `weapon_sword_1h_r2` ← Azure Oathblade, `weapon_sword_2h_r2`
+  ← модель без названия (`…_texture_0cecb119`, рубин в гарде), `weapon_dagger_r2` ← Emerald Dawnblade,
+  `weapon_mace_1h_r2` ← Embercrest Scepter, `weapon_mace_2h_r2` ← Sunforged War Scepter, `weapon_axe_1h_r2` ← Ruby
+  Sovereign Axe, `weapon_axe_2h_r2` ← Crimson Crescent Halberd, `weapon_staff_1h_r2` ← Amethyst Sovereign Staff,
+  `weapon_staff_2h_r2` ← Celestial Sapphire Scepter, `weapon_spear_r2` ← Azureleaf Lance, `weapon_bow_r2` ← Emeraldleaf
+  Bow (свой лук, хват у спинки — `grip_back`), `weapon_crossbow_r2` ← Gilded Arbalest (у Meshy два лука крест-накрест —
+  лишний убран, `drop`), `weapon_shield_r2` ← Sapphire Sunshield (ручки-скобы сзади, хват от задней стороны — `back`);
+  Gilded Moonbow не используется. Двуручный меч, булава, топор и щит 2-го ранга на 3–7 % крупнее 1-го. Предметы жителей
   (id — договорённость с моделями жителей): `npc_grimoire`, `npc_tome`, `npc_cane`, `npc_wand`, `npc_longbow`,
   `npc_hammer`, `npc_antlerstaff`, `npc_quiver`, `npc_keys`, `npc_scroll`. `handheld.gd` (`Handheld`): `model_for(предмет,
   вид)` — поле `"model"` предмета `ItemData` (оружие 2-го ранга — свой файл), иначе `KIND_MODELS` вида (1-й ранг);
@@ -346,8 +354,9 @@
   `point(id, "grip2")`, `force_missing` — тест отката. `CharacterModel.spec_for(…, weapon_item, offhand_item)` (игрок и
   окно героя передают `Game.weapon` / `Game.offhand`), `_hold_item` — модель из файла на метке кисти вместо
   процедурной, пары — один файл в обеих руках. Лежат в APK (~10 МБ исходников; не в пакете ресурсов — у запасных героев тоже настоящее оружие),
-  `assets/handheld/*.json` — в `include_filter` «Android». Тест `tests/test_handheld.gd`, кадры 150–153 в
-  `tests/shots.gd` (оружие и предметы в ряд, герои профессий с оружием; шаги 1000–1004).
+  `assets/handheld/*.json` — в `include_filter` «Android». Тест `tests/test_handheld.gd` (`_check_rank2` — 2-й ранг),
+  кадры 150–153 в `tests/shots.gd` (оружие и предметы в ряд, герои профессий с оружием; шаги 1000–1004), 230–232 —
+  оружие 2-го ранга в ряд и в руках героев (шаги 1160–1163).
 - **Хват второй рукой** (слова Максима: «Двуручное оружие должно быть в двух руках. Так же двумя руками используется
   арбалет и лук»): `two_hand_ik.gd` (`TwoHandIK` — свой `SkeletonModifier3D` Godot 4.3, ставит `CharacterModel._setup_asset`
   героям из файлов, `_ik`; вес — `_ik.update(delta)` по текущему клипу). После анимации двухзвенный IK плечо — предплечье

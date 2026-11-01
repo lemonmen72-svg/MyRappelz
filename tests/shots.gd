@@ -1421,6 +1421,26 @@ func run_step() -> void:
 		1065:
 			shot("182_cast_crossbow_aim")
 			main.player.cancel_cast("")
+			wait = 2
+			step = 1160
+		1160:
+			# Оружие 2-го ранга из файлов (кадры 230–232): ряд крупно, герои профессий с оружием 2-го ранга в руках
+			_handheld_row(HANDHELD_WEAPONS_R2)
+			wait = 20
+			step = 1161
+		1161:
+			shot("230_handheld_weapons_r2")
+			_weapon_heroes_r2(HANDHELD_HEROES_R2_A)
+			wait = 45
+			step = 1162
+		1162:
+			shot("231_heroes_weapons_r2_a")
+			_weapon_heroes_r2(HANDHELD_HEROES_R2_B)
+			wait = 45
+			step = 1163
+		1163:
+			shot("232_heroes_weapons_r2_b")
+			_handheld_clear()
 			ok_done()
 
 
@@ -1876,6 +1896,29 @@ const HANDHELD_HEROES_B := [
 	["hero_adept_f", "dagger", "weapon_dagger_r1", "weapon_shield_r1"],
 	["hero_swordsman_m", "spear", "weapon_spear_r1", ""],
 ]
+## Кадры 230–232: оружие 2-го ранга (модели weapon_*_r2) в ряд и в руках героев [модель героя, вид, модель
+## основной руки, модель второй руки].
+const HANDHELD_WEAPONS_R2 := ["weapon_dagger_r2", "weapon_sword_1h_r2", "weapon_sword_2h_r2", "weapon_axe_1h_r2",
+	"weapon_axe_2h_r2", "weapon_mace_1h_r2", "weapon_mace_2h_r2", "weapon_staff_1h_r2", "weapon_staff_2h_r2",
+	"weapon_spear_r2", "weapon_bow_r2", "weapon_shield_r2", "weapon_crossbow_r2"]
+const HANDHELD_HEROES_R2_A := [
+	["hero_swordsman_m", "sword_1h", "weapon_sword_1h_r2", "weapon_shield_r2"],
+	["hero_warrior_f", "axe_2h", "weapon_axe_2h_r2", ""],
+	["hero_wizard_f", "staff_2h", "weapon_staff_2h_r2", ""],
+	["hero_assassin_m", "daggers", "weapon_dagger_r2", "weapon_dagger_r2"],
+	["hero_beastmaster_m", "mace_2h", "weapon_mace_2h_r2", ""],
+	["hero_conjurer_m", "dual_axes", "weapon_axe_1h_r2", "weapon_axe_1h_r2"],
+]
+const HANDHELD_HEROES_R2_B := [
+	["hero_swordsman_f", "sword_2h", "weapon_sword_2h_r2", ""],
+	["hero_warrior_m", "bow", "weapon_bow_r2", ""],
+	["hero_assassin_f", "crossbow", "weapon_crossbow_r2", ""],
+	["hero_neophyte_m", "staff_1h", "weapon_staff_1h_r2", ""],
+	["hero_human_m_starter", "mace_1h", "weapon_mace_1h_r2", "weapon_shield_r2"],
+	["hero_swordsman_m", "spear", "weapon_spear_r2", ""],
+]
+## Узлы оружия второй руки у CharacterModel (остальные узлы с меткой "handheld" — основная рука).
+const OFFHAND_NODES := ["Shield", "DaggerL", "AxeL", "SwordL"]
 var _hh_row: Node3D = null
 var _hh_cam: Camera3D = null
 ## Хват второй рукой (кадры 170–172): [модель героя, вид ItemData, предмет, клип ("" — покой), момент клипа, с,
@@ -1973,6 +2016,55 @@ func _weapon_heroes(list: Array) -> void:
 			if (mi as Node).has_meta("handheld"):
 				held.append("%s=%s" % [mi.name, String((mi as Node).get_meta("handheld"))])
 		print("  %s (%s): %s" % [String(e[0]), String(e[1]), ", ".join(held)])
+
+
+## Предмет ItemData, у которого модель в руках — model_id (поле "model"); "" — такого предмета нет.
+func _item_with_model(model_id: String) -> String:
+	if model_id == "":
+		return ""
+	for k in ItemData.ITEMS:
+		if String(ItemData.get_item(String(k)).get("model", "")) == model_id:
+			return String(k)
+	return ""
+
+
+## Герои с оружием 2-го ранга (кадры 231–232): предмет с полем "model" — через CharacterModel.spec_for (как в игре);
+## нет такого предмета — герой с моделью вида, затем меш в руке заменяется моделью 2-го ранга (рамка осей та же).
+func _weapon_heroes_r2(list: Array) -> void:
+	var gap := 1.25
+	var base := _handheld_stage(1.0, 3.6)
+	for i in list.size():
+		var e: Array = list[i]
+		var main_id := String(e[2])
+		var off_id := String(e[3])
+		var main_item := _item_with_model(main_id)
+		var off_item := _item_with_model(off_id)
+		var shield := off_id != "" and Handheld.frame(off_id) == "shield"
+		var spec := CharacterModel.spec_for("dark_elf", "assassin", String(e[1]), "f", shield, main_item, off_item)
+		spec["asset"] = CharacterModel.HERO_ASSET_DIR + String(e[0]) + ".glb"
+		var m := CharacterModel.new()
+		m.setup(spec)
+		_hh_row.add_child(m)
+		var gp := base + Vector3((float(i) - float(list.size() - 1) * 0.5) * gap, 0, 0)
+		if IslandWorld.current != null:
+			gp.y = IslandWorld.current.height_at(gp.x, gp.z)
+		m.global_position = gp
+		m.rotation.y = PI + 0.3
+		var held: PackedStringArray = []
+		for n in m.find_children("*", "MeshInstance3D", true, false):
+			var w := n as MeshInstance3D
+			if not w.has_meta("handheld"):
+				continue
+			var want := off_id if OFFHAND_NODES.has(String(w.name)) else main_id
+			if want != "" and String(w.get_meta("handheld")) != want and Handheld.exists(want):
+				w.mesh = Handheld.mesh(want)
+				w.material_override = Handheld.material(want)
+				w.set_meta("handheld", want)
+			check(String(w.get_meta("handheld")) == want, "кадр оружия 2-го ранга: %s, %s — модель %s (%s)" % [
+				String(e[0]), String(w.name), want, String(w.get_meta("handheld"))])
+			held.append("%s=%s" % [w.name, String(w.get_meta("handheld"))])
+		check(not held.is_empty(), "кадр оружия 2-го ранга: у %s оружие в руках" % String(e[0]))
+		print("  %s (%s, предмет «%s»): %s" % [String(e[0]), String(e[1]), main_item, ", ".join(held)])
 
 
 ## Герои с двуручным, луком и арбалетом в ряд (кадры 170–172): покой или клип, замерший в момент (темп 0); камера
