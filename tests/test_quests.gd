@@ -406,6 +406,11 @@ func _check_kirk_place() -> void:
 	var lbl := kirk.get_node_or_null("NameLabel") as Label3D
 	check(lbl != null and lbl.text == "Учитель Кирк", "имя над головой: «Учитель Кирк»")
 	var m: CharacterModel = kirk._model
+	if m != null and m.spec.has("asset"):
+		# Модель из файла npc_kirk.glb, посох — предмет NpcProps (подробно — tests/test_npc_models.gd)
+		check(m._asset != null and String(m.spec["asset"]) == CharacterModel.npc_asset("kirk"), "модель Кирка из файла")
+		check(m.mesh_count() <= 4, "модель Кирка лёгкая: мешей %d" % m.mesh_count())
+		return
 	check(m != null and m.weapon_kind == "staff" and String(m.spec.get("outfit", "")) == "mentor", "модель Кирка: посох, мантия")
 	check(bool(m.spec.get("long_beard", false)) and m.spec != CharacterModel.merchant_spec(), "своя внешность (борода)")
 	check(m.mesh_count() <= 4 and m.surface_count() <= 5, "модель Кирка лёгкая: мешей %d, поверхностей %d"
