@@ -197,6 +197,8 @@ func _fight(role: String) -> bool:
 	timer += 1
 	# Зверь убит — бой выигран, даже если питомец пал в тот же миг от других зверей рядом
 	if timer > 1 and mob.is_dead:
+		if pet != null:
+			_uses = maxi(_uses, pet.skill_uses)
 		check(_uses > 0, "%s применил умение роли (%d)" % [role, _uses])
 		return true
 	if pet == null:
@@ -208,9 +210,8 @@ func _fight(role: String) -> bool:
 		stand_near(mob, 2.0)
 		pet.global_position = mob.global_position + Vector3(6.0, 0.2, 0)
 		player.last_target = mob
-		# Бой с уже раненым зверем, чтобы тест шёл недолго; команда «Атака» — именно по нему
+		# Бой с уже раненым зверем, чтобы тест шёл недолго
 		mob.hp = maxi(1, mob.max_hp / 3)
-		pet.command_attack(mob)
 		return false
 	stand_near(mob, 2.0)
 	player.last_target = mob
