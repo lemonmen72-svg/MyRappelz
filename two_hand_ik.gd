@@ -25,11 +25,13 @@ const TWO_HANDED_KINDS := ["sword_2h", "staff_2h", "mace_2h", "axe_2h", "spear"]
 ## Клипы, где у манекена Meshy обе руки на рукояти (проверено по всем кадрам: левый кулак у оси оружия правой руки).
 const TWO_HAND_CLIPS := ["mq_heavy_swing", "mq_leap_slam"]
 ## Покой и передвижение: двуручное наперевес.
-const CARRY_CLIPS := ["idle", "walking", "walking_woman", "running"]
+const CARRY_CLIPS := ["idle", "walking", "walking_woman", "running", "mq_walking", "mq_running",
+	"mq_running_b", "mq_sprint", "mq_turn_l90", "mq_turn_r90", "mq_turn_l180"]
 ## Арбалет: стойка на изготовку, выстрел и прицеливание (петля каста умения) — левая под ложем.
-const SUPPORT_CLIPS := ["crossbow_idle", "crossbow_shoot", "mq_crossbow_aim_hold"]
+const SUPPORT_CLIPS := ["crossbow_idle", "crossbow_shoot", "mq_crossbow_aim_hold", "mq_turn_l180"]
 ## Лук: выстрел, выстрел умением и прицеливание (петля каста умения) — правая на тетиве.
-const DRAW_CLIPS := ["mq_bow_shot", "mq_bow_draw", "mq_bow_aim_hold"]
+const DRAW_CLIPS := ["mq_bow_shot", "mq_bow_draw", "mq_bow_aim_hold", "mq_bow_draw_b", "mq_bow_draw_c",
+	"mq_bow_draw_d"]
 ## Скорость смены веса, 1/с (за 0.1 с — 70 %).
 const WEIGHT_RATE := 12.0
 ## Доля длины руки (плечо + предплечье), до которой рука тянется к цели; дальше — вес убывает на REACH_FADE м.

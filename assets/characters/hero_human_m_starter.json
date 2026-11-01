@@ -381,10 +381,10 @@
 			"hit": 0.45
 		},
 		"Mq_Jump": {
-			"length": 2.2,
+			"length": 1.2,
 			"loop": false,
 			"source": "mannequin m2:Basic_Jump [1.20–3.40]",
-			"hit": 0.7
+			"hit": 0.55
 		},
 		"Mq_Bow_Shot": {
 			"length": 0.95,
@@ -520,15 +520,108 @@
 			"source": "mannequin m1:Female_Bend_Over_Pick_Up_Inspect [0.20–2.75]",
 			"hit": 0.8
 		},
-		"Mq_Walking": {
-			"length": 1.157,
+		"Mq_Thrust_B": {
+			"length": 0.8,
+			"loop": false,
+			"source": "mannequin m3:Thrust_Slash [1.25–3.00]",
+			"hit": 0.3
+		},
+		"Mq_Blade_Spin_B": {
+			"length": 1.4,
+			"loop": false,
+			"source": "mannequin m2:Double_Blade_Spin [1.90–5.67]",
+			"hit": 0.7
+		},
+		"Mq_Bow_Draw_B": {
+			"length": 1.55,
+			"loop": false,
+			"source": "mannequin m2:Archery_Shot [0.10–4.90]",
+			"hit": 1.1
+		},
+		"Mq_Bow_Draw_C": {
+			"length": 1.7,
+			"loop": false,
+			"source": "mannequin m3:Draw_and_Shoot_from_Back [0.10–7.83]",
+			"hit": 1.2
+		},
+		"Mq_Bow_Draw_D": {
+			"length": 1.7,
+			"loop": false,
+			"source": "mannequin m3:Draw_and_Shoot_from_Back_1 [0.10–7.83]",
+			"hit": 1.2
+		},
+		"Mq_Pickup_B": {
+			"length": 2.2,
+			"loop": false,
+			"source": "mannequin m1:Female_Bend_Over_Pick_Up_Inspect [0.20–3.83]",
+			"hit": 0.8
+		},
+		"Mq_Guard": {
+			"length": 1.8,
+			"loop": false,
+			"source": "mannequin m2:Sword_Judgment [2.50–4.33]",
+			"hit": 1.1
+		},
+		"Mq_Rise": {
+			"length": 1.6,
+			"loop": false,
+			"source": "mannequin m1:Reaping_Swing [0.00–1.60]",
+			"hit": 1.0
+		},
+		"Mq_Bow_Scan_Hold": {
+			"length": 5.0,
 			"loop": true,
-			"source": "mannequin m1:Walking"
+			"source": "mannequin m3:Archery_Aim_with_Lateral_Scan [0.00–5.00]"
+		},
+		"Mq_Crouch_Charge_Hold": {
+			"length": 2.0,
+			"loop": true,
+			"source": "mannequin m2:Charged_Axe_Chop [0.40–2.40]"
+		},
+		"Mq_Turn_L90": {
+			"length": 0.667,
+			"loop": false,
+			"source": "mannequin m2:Walk_Turn_Left_with_Weapon [0.35–1.05]",
+			"turn": 74.9,
+			"hit": 0.556
+		},
+		"Mq_Turn_R90": {
+			"length": 0.667,
+			"loop": false,
+			"source": "mannequin m2:Walk_Turn_Right_Female [0.95–1.65]",
+			"turn": -98.5,
+			"hit": 0.556
+		},
+		"Mq_Turn_L180": {
+			"length": 1.467,
+			"loop": false,
+			"source": "mannequin m3:Gun_Hold_Left_Turn [1.15–2.65]",
+			"turn": 189.8,
+			"hit": 0.856
+		},
+		"Mq_Walking": {
+			"length": 1.033,
+			"loop": true,
+			"source": "mannequin m1:Walking",
+			"speed": 1.574
 		},
 		"Mq_Running": {
-			"length": 0.806,
+			"length": 0.633,
 			"loop": true,
-			"source": "mannequin m1:Running"
+			"source": "mannequin m1:Running",
+			"speed": 5.282
+		},
+		"Mq_Running_B": {
+			"length": 0.733,
+			"loop": true,
+			"source": "mannequin m2:run_fast_3_inplace",
+			"speed": 2.863
+		},
+		"Mq_Sprint": {
+			"length": 0.467,
+			"loop": true,
+			"source": "mannequin m2:RunFast",
+			"speed": 6.826
 		}
 	}
 }

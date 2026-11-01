@@ -92,12 +92,12 @@ const ASSET_ACTIONS := {
 ## Двуручное (меч, топор, булава, копьё) — только клипы, где у манекена обе руки на рукояти (TwoHandIK.TWO_HAND_CLIPS):
 ## остальные удары манекенов — одной рукой, вторая рука с рукояти бы слетала.
 const MQ_ATTACKS := {
-	"sword": ["mq_sword_a1", "mq_sword_a2", "mq_sword_a3"],
+	"sword": ["mq_sword_a1", "mq_sword_a2", "mq_sword_a3", "mq_left_slash"],
 	"sword_shield": ["mq_combo_b1", "mq_combo_b2", "mq_left_slash"],
 	"sword_2h": ["mq_heavy_swing"],
 	"dual_swords": ["mq_dual_a1", "mq_dual_a2", "mq_sword_a3"],
-	"daggers": ["mq_dual_a1", "mq_dual_a2", "mq_thrust"],
-	"dagger": ["mq_thrust", "mq_sword_a1", "mq_sword_a2"],
+	"daggers": ["mq_dual_a1", "mq_dual_a2", "mq_thrust", "mq_thrust_b"],
+	"dagger": ["mq_thrust", "mq_thrust_b", "mq_sword_a1", "mq_sword_a2"],
 	"axe": ["mq_combo_b1", "mq_combo_b2", "mq_combo_b3"],
 	"axe_2h": ["mq_heavy_swing"],
 	"dual_axes": ["mq_combo_b1", "mq_combo_b2", "mq_axe_spin"],
@@ -111,7 +111,7 @@ const MQ_ATTACKS := {
 const MQ_STRIKES := {
 	"sword": ["mq_charged_slash", "mq_judgment"], "sword_shield": ["mq_charged_slash", "mq_judgment"],
 	"sword_2h": ["mq_leap_slam", "mq_heavy_swing"], "dual_swords": ["mq_charged_slash", "mq_judgment"],
-	"daggers": ["mq_charged_slash", "mq_judgment"], "dagger": ["mq_charged_slash", "mq_judgment"],
+	"daggers": ["mq_charged_slash", "mq_judgment", "mq_kick"], "dagger": ["mq_charged_slash", "mq_judgment", "mq_kick"],
 	"axe": ["mq_axe_chop", "mq_leap_slam"], "axe_2h": ["mq_leap_slam", "mq_heavy_swing"],
 	"dual_axes": ["mq_axe_chop", "mq_leap_slam"], "mace": ["mq_axe_chop", "mq_leap_slam"],
 	"mace_2h": ["mq_leap_slam", "mq_heavy_swing"], "spear": ["mq_leap_slam", "mq_heavy_swing"],
@@ -119,8 +119,15 @@ const MQ_STRIKES := {
 }
 ## Круговые удары умений ("spin") по хвату; нет в списке — mq_axe_spin (одной рукой: у двуручного вторая рука на время
 ## отпускает рукоять — TwoHandIK).
-const MQ_SPINS := {"dual_swords": ["mq_blade_spin"], "daggers": ["mq_blade_spin"], "dual_axes": ["mq_blade_spin"],
-	"spear": ["mq_reap"]}
+const MQ_SPINS := {"dual_swords": ["mq_blade_spin", "mq_blade_spin_b"], "daggers": ["mq_blade_spin", "mq_blade_spin_b"],
+	"dual_axes": ["mq_blade_spin", "mq_blade_spin_b"], "spear": ["mq_reap"]}
+## Выстрел умением из лука: прицеливание с натяжением (варианты — разные клипы манекенов).
+const MQ_BOW_SKILLS := ["mq_bow_draw", "mq_bow_draw_b", "mq_bow_draw_c", "mq_bow_draw_d"]
+## Рывок к цели («dash»: «Шаг тени», натиск щита): клинками — прыжок с ударом или высокий прыжок; топор и булава —
+## прыжок с ударом в землю.
+const MQ_DASH_BLADES := ["mq_judgment", "mq_jump"]
+## Усиление у бойца ближнего боя — ещё стойка «клинок к врагу».
+const MQ_BUFFS_MELEE := ["mq_guard"]
 ## Заклинания ("cast"): на цель и на себя / питомца; усиления ("buff").
 const MQ_CASTS := ["mq_cast_wide", "mq_cast_beam", "mq_cast_up", "mq_charged_cast", "mq_cast_slam", "mq_cast_release"]
 const MQ_CASTS_SELF := ["mq_cast_pray", "mq_cast_wide"]
@@ -132,6 +139,9 @@ const MQ_CAST_LOOPS := {
 	"magic": ["mq_cast_hold", "mq_charge_hold"], "charge": ["mq_charge_hold", "mq_cast_hold"],
 	"bow": ["mq_bow_aim_hold"], "crossbow": ["mq_crossbow_aim_hold", "crossbow_idle"],
 }
+## Иногда (доля MQ_CAST_ALT) — другая петля того же вида: прицел из лука с обзором, заряд в приседе (ближний бой).
+const MQ_CAST_ALT := {"bow": "mq_bow_scan_hold", "charge": "mq_crouch_charge_hold"}
+const MQ_CAST_ALT_CHANCE := 0.35
 ## Выпуск после каста: клип умения начинается за столько секунд до своего удара (замах уже был в петле), с.
 const MQ_RELEASE_LEAD := 0.2
 ## Своё движение у отдельных умений: «Вызов» и «Дикий рёв» — удар в грудь, удары по земле, обвал с неба и т. п.
@@ -154,8 +164,34 @@ const ASSET_IDLE := [["idle", 0.0, 2.0, 1.0], ["regular_jump", 0.0, 0.07, 0.0],
 	["sword_judgment", 0.0, 0.22, 0.0]]
 ## Покой с арбалетом: оружие у лица на изготовку (цикл); нет клипа — обычный покой.
 const ASSET_IDLE_CROSSBOW := [["crossbow_idle", 0.0, 1.67, 1.0]]
+## Прежние шаг и бег (UAL; модели без клипов манекенов — запасные герои старых файлов, жители): по WALK_NATIVE / RUN_NATIVE.
 const ASSET_WALK := [["walking_woman"], ["walking"]]
 const ASSET_RUN := [["running"]]
+## Шаг и бег героя — движения манекенов Максима (клипы Mq_*, tools/retarget_mannequin.py MQ_LOCO) в родном темпе:
+## своя скорость клипа — clips.<имя>.speed в <модель>.json (опорная стопа едет назад ровно с ней), темп = скорость
+## героя / speed (MQ_LOCO_SCALE_MIN…MAX) — стопа не скользит. Бег UAL, растянутый под 4.2 м/с, шёл прыжками по 2.5–3 м.
+## По скорости героя: [вид, клипы (первый, что есть в модели), с какой скорости, м/с].
+## Порог переходится с запасом MQ_LOCO_HYST в обе стороны — на пороге вид не дёргается туда-обратно.
+const MQ_LOCO := [
+	["walk", ["mq_walking"], 0.3],
+	["jog", ["mq_running_b"], 2.6],
+	["run", ["mq_running"], 4.6],
+	["sprint", ["mq_sprint"], 8.6],
+]
+const MQ_LOCO_HYST := 0.08
+const MQ_LOCO_SCALE_MIN := 0.5
+const MQ_LOCO_SCALE_MAX := 2.0
+## Клипы манекенов, которые крутятся по кругу (шаг, бег; петли каста — по «_hold»).
+const MQ_LOCO_CLIPS := ["mq_walking", "mq_running", "mq_running_b", "mq_sprint"]
+## Поворот на месте (клипы Mq_Turn_*, угол корпуса — clips.<имя>.turn в .json, °, + — влево): стоящего героя
+## развернули дальше MQ_TURN_MIN (рад) — модель сначала смотрит по-старому, клип переступанием доворачивает корпус.
+const MQ_TURNS := ["mq_turn_l90", "mq_turn_r90", "mq_turn_l180"]
+const MQ_TURN_MIN := 0.95
+## Остаток поворота меньше порога модель догоняет сама, рад/с.
+const MQ_TURN_EASE := 2.5
+## Эмоции: "level" — новый уровень (усиление, выброс силы), "boss" — победа над боссом (удар в грудь, клинок к врагу).
+const MQ_EMOTES := {"level": ["mq_charged_cast1", "mq_charge_release"], "boss": ["mq_taunt", "mq_guard"]}
+const MQ_EMOTE_WAIT := 2.5
 ## Рамка отсечения модели из файла (с запасом на прыжок и взмахи); не больше нужного — по ней же
 ## выбирается уровень детализации меша.
 const ASSET_AABB := AABB(Vector3(-1.2, -0.2, -1.2), Vector3(2.4, 2.8, 2.4))
@@ -424,6 +460,25 @@ var _shots := 0
 var _shot_gap := 1.0
 ## Петля каста умения героя (настоящее имя клипа; "" — каста нет): play_cast_loop / stop_cast_loop.
 var _cast_loop := ""
+## Поворот на месте: смещение модели по вертикали (рад, rotation.y), начало и конец смещения за клип, остаток поворота
+## родителя, пока клип играет, клип поворота ("" — нет), прежний поворот родителя; покой после поворота — без перехода.
+var _turn_off := 0.0
+var _turn_from := 0.0
+var _turn_to := 0.0
+var _turn_extra := 0.0
+var _turn_clip := ""
+var _turn_yaw := 0.0
+var _turn_init := false
+var _turn_snap := false
+## Отложенная эмоция (play_emote) и до какого времени она ждёт.
+var _emote := ""
+var _emote_until := 0.0
+## Вид шага/бега манекена сейчас ("" — стоит); таблица видов модели ([вид, клип, с какой скорости, скорость клипа]).
+var _loco_kind := ""
+var _loco_table: Array = []
+var _loco_table_ok := false
+## Поворот на месте включает тот, кто ставит модель в мир (Player): у жителей модель поворачивает Npc, в окнах — нет.
+var turn_in_place := false
 ## Хват второй рукой (двуручное, арбалет, лук) — модификатор скелета модели из файла; null — не нужен.
 var _ik: TwoHandIK = null
 
@@ -702,6 +757,12 @@ func setup(s: Dictionary) -> CharacterModel:
 	_loco = ""
 	_mq_step = 0
 	_shots = 0
+	_turn_clip = ""
+	_turn_off = 0.0
+	_turn_init = false
+	_loco_kind = ""
+	_loco_table = []
+	_loco_table_ok = false
 	_ik = null
 	weapon_kind = String(s.get("weapon", ""))
 	two_handed = bool(s.get("two_handed", false))
@@ -1778,7 +1839,69 @@ func play_dash() -> void:
 ## чтобы не прерывать удар и не скользить в позе приседа на бегу.
 func play_pickup() -> void:
 	if _asset != null and _act_end < 0.0 and _asset_speed < 0.3:
-		_asset_act("pickup")
+		# Иногда — подбор с осмотром находки (Mq_Pickup_B)
+		var b := String(_clips.get("mq_pickup_b", ""))
+		if b != "" and randf() < 0.3:
+			_mq_play(b, 1.0)
+		else:
+			_asset_act("pickup")
+
+
+## Стоит без дела (модель из файла): только тогда — уклонение, блок, эмоции (удар и каст не сбиваются).
+func _idle_now() -> bool:
+	return _asset != null and _anim != null and is_inside_tree() and _act_end < 0.0 and _asset_speed < 0.3 and _cast_loop == ""
+
+
+## Оружие ближнего боя (не лук, не арбалет, не посох).
+func _melee() -> bool:
+	return not ["bow", "crossbow", "staff", ""].has(weapon_kind)
+
+
+## Уклонение от удара зверя: короткий отскок (Dodge из UAL), если герой стоит без дела.
+func play_dodge() -> void:
+	if _idle_now():
+		_asset_act("dodge")
+
+
+## Удар принят щитом: защитная стойка (Sword_Block из UAL), если герой стоит без дела.
+func play_block() -> void:
+	if _idle_now():
+		_asset_act("buff")
+
+
+## Эмоция (MQ_EMOTES): "level" — новый уровень, "boss" — победа над боссом. Герой занят (удар, которым он добил
+## зверя, ещё идёт) — эмоция ждёт до MQ_EMOTE_WAIT с, пока он не встанет без дела; пошёл — эмоции не будет.
+func play_emote(kind: String) -> void:
+	if _asset == null or _mq_names(MQ_EMOTES.get(kind, [])).is_empty():
+		return
+	_emote = kind
+	_emote_until = _t + MQ_EMOTE_WAIT
+	_emote_tick()
+
+
+## Отложенная эмоция: стоит без дела — играет, пошёл или ждать дольше нельзя — забыта.
+func _emote_tick() -> void:
+	if _emote == "":
+		return
+	if _t > _emote_until or _speed > 0.3:
+		_emote = ""
+		return
+	if not _idle_now():
+		return
+	var names := _mq_names(MQ_EMOTES.get(_emote, []))
+	_emote = ""
+	if not names.is_empty():
+		_mq_play(names[randi() % names.size()], 1.0)
+
+
+## Возрождение: подъём из приседа (Mq_Rise).
+func play_rise() -> void:
+	if _asset == null or _anim == null or not is_inside_tree():
+		return
+	var c := String(_clips.get("mq_rise", ""))
+	if c != "":
+		_cast_loop = ""
+		_mq_play(c, 1.0)
 
 
 ## Удар щитом: выпад левой рукой, щит остаётся лицом к врагу.
@@ -1832,7 +1955,7 @@ func play_hit() -> void:
 		_asset_recoil()
 		# Клип реакции на удар — только когда стоит и ничего не делает (каст не сбивается и с виду)
 		if _act_end < 0.0 and _asset_speed < 0.3 and _cast_loop == "":
-			_asset_act("hit")
+			_asset_act("hit", true)
 		return
 	if _root == null or not is_inside_tree():
 		return
@@ -2017,7 +2140,7 @@ func _setup_asset(path: String) -> bool:
 			for an in _anim.get_animation_list():
 				var a := _anim.get_animation(an)
 				var k := String(an).to_lower()
-				if k.contains("walk") or k.ends_with("running") or k == "idle" or k == "crossbow_idle" or k.ends_with("_loop") or k.ends_with("_hold"):
+				if k.contains("walk") or k.ends_with("running") or k == "idle" or k == "crossbow_idle" or k.ends_with("_loop") or k.ends_with("_hold") or MQ_LOCO_CLIPS.has(k):
 					a.loop_mode = Animation.LOOP_LINEAR
 				_pin_root(a, skel)
 	return true
@@ -2153,6 +2276,7 @@ func _asset_process(delta: float) -> void:
 		return
 	if _ik != null:
 		_ik.update(delta)
+	_turn_update(delta)
 	if _act_end >= 0.0:
 		# Действие доигрывается; герой пошёл после момента удара — шаг и бег сразу
 		if _anim.is_playing():
@@ -2161,6 +2285,11 @@ func _asset_process(delta: float) -> void:
 				return
 		_act_end = -1.0
 		_loco = ""
+		if _turn_clip != "":
+			_turn_finish()
+	_emote_tick()
+	if _act_end >= 0.0:
+		return
 	# Каст умения героя: петля, пока Player не снимет её (stop_cast_loop)
 	if _cast_loop != "":
 		if _loco != "cast" or not _anim.is_playing():
@@ -2191,11 +2320,31 @@ func _asset_process(delta: float) -> void:
 		var looped := float(idle[3]) > 0.0
 		if _loco != "idle":
 			_loco = "idle"
+			_loco_kind = ""
 			_anim.speed_scale = 1.0
-			_anim.play(String(idle[0]), 0.25, float(idle[3]))
+			# После поворота на месте — без перехода: корпус клипа уже довёрнут, смещение модели снято в тот же кадр
+			_anim.play(String(idle[0]), 0.0 if _turn_snap else 0.25, float(idle[3]))
+			_turn_snap = false
 		if not looped:
 			var t0 := float(idle[1])
 			_anim.seek(t0 + (0.5 - 0.5 * cos(_t * 1.6)) * (float(idle[2]) - t0), true)
+		return
+	# Движения манекенов: вид по скорости (с запасом на пороге), темп — по своей скорости клипа
+	var tab := _mq_loco_table()
+	if not tab.is_empty():
+		var e: Array = tab[_mq_loco_index(tab)]
+		var mc := String(e[1])
+		if _loco != String(e[0]):
+			# Фаза шага сохраняется: новый клип с той же доли цикла (ноги не перескакивают)
+			var ph := 0.0
+			if _loco_kind != "" and _loco == _loco_kind and _anim.current_animation_length > 0.0:
+				ph = fposmod(_anim.current_animation_position / _anim.current_animation_length, 1.0)
+			_loco = String(e[0])
+			_loco_kind = _loco
+			_turn_snap = false
+			_anim.play(mc, 0.25)
+			_anim.seek(ph * _anim.get_animation(mc).length, false)
+		_anim.speed_scale = clampf(_asset_speed / float(e[3]), MQ_LOCO_SCALE_MIN, MQ_LOCO_SCALE_MAX)
 		return
 	var loco := _pick(ASSET_WALK if want == "walk" else ASSET_RUN)
 	if loco.is_empty():
@@ -2207,11 +2356,144 @@ func _asset_process(delta: float) -> void:
 	_anim.speed_scale = clampf(_asset_speed / (WALK_NATIVE if want == "walk" else RUN_NATIVE), 0.6, 1.7)
 
 
+## Шаг и бег манекенов модели: [[вид, клип, с какой скорости, своя скорость клипа], …] по MQ_LOCO — только клипы,
+## что есть в модели и у которых в .json записана скорость; [] — прежние шаг и бег.
+func _mq_loco_table() -> Array:
+	if _loco_table_ok:
+		return _loco_table
+	_loco_table_ok = true
+	_loco_table = []
+	var info: Dictionary = asset_rig(String(spec.get("asset", ""))).get("clips", {})
+	for e in MQ_LOCO:
+		for k in e[1]:
+			var c := String(_clips.get(String(k), ""))
+			var sp := float((info.get(c, {}) as Dictionary).get("speed", 0.0))
+			if c != "" and sp > 0.1:
+				_loco_table.append([String(e[0]), c, float(e[2]), sp])
+				break
+	# Без шага или бега манекена — прежние клипы целиком (смешивать наборы не к чему)
+	if _loco_table.size() < 2 or String(_loco_table[0][0]) != "walk":
+		_loco_table = []
+	return _loco_table
+
+
+## Строка таблицы шага/бега для нынешней скорости: вид держится, пока скорость не уйдёт за порог соседнего вида
+## дальше MQ_LOCO_HYST. Скорость — настоящая (_speed): разгон с места сразу в бег, без промежуточных шагов; пока
+## герой останавливается (_speed 0, сглаженная ещё не упала), вид прежний.
+func _mq_loco_index(tab: Array) -> int:
+	var v := _speed if _speed > 0.3 else _asset_speed
+	var i := -1
+	for k in tab.size():
+		if _loco != "" and String(tab[k][0]) == _loco_kind and _loco == _loco_kind:
+			i = k
+	if i < 0:
+		i = 0
+		while i + 1 < tab.size() and v >= float(tab[i + 1][2]):
+			i += 1
+		return i
+	if _speed <= 0.3:
+		return i
+	while i + 1 < tab.size() and v > float(tab[i + 1][2]) * (1.0 + MQ_LOCO_HYST):
+		i += 1
+	while i > 0 and v < float(tab[i][2]) * (1.0 - MQ_LOCO_HYST):
+		i -= 1
+	return i
+
+
+## Клип шага/бега, который играет сейчас ("" — стоит или действие): для тестов и кадров.
+func loco_clip() -> String:
+	if _loco_kind == "" or _anim == null:
+		return ""
+	return _anim.current_animation
+
+
+## Поворот на месте (MQ_TURNS): родитель (герой) повернулся, пока модель стоит без дела, — модель смотрит по-старому
+## (rotation.y = −поворот), дальше MQ_TURN_MIN — клип поворота, смещение за клип сходится к −углу клипа (стопы клипа
+## стоят на земле), в конце — покой без перехода (_turn_finish). Меньше порога — модель догоняет сама. Пошёл,
+## ударил, колдует — смещение снимается сразу.
+func _turn_update(delta: float) -> void:
+	if not turn_in_place or _asset == null:
+		return
+	var p := get_parent() as Node3D
+	if p == null:
+		return
+	var yaw := p.global_rotation.y
+	if not _turn_init:
+		_turn_init = true
+		_turn_yaw = yaw
+	var d := wrapf(yaw - _turn_yaw, -PI, PI)
+	_turn_yaw = yaw
+	var standing := _speed < 0.3 and _asset_speed < 0.3 and _cast_loop == "" and (_act_end < 0.0 or _turn_clip != "")
+	if _turn_clip != "" and _anim.current_animation != _turn_clip:
+		_turn_clip = ""
+	if not standing or _mq_names(MQ_TURNS).is_empty():
+		_turn_clip = ""
+		_turn_off = 0.0
+		_turn_extra = 0.0
+	elif _turn_clip != "":
+		_turn_extra -= d
+		var s := clampf(_anim.current_animation_position / maxf(_anim.current_animation_length, 0.01), 0.0, 1.0)
+		_turn_off = _turn_from + (_turn_to - _turn_from) * s + _turn_extra
+	else:
+		_turn_off = wrapf(_turn_off - d, -PI, PI)
+		if absf(_turn_off) > MQ_TURN_MIN:
+			_turn_start()
+		else:
+			_turn_off = move_toward(_turn_off, 0.0, MQ_TURN_EASE * delta)
+	rotation.y = _turn_off
+
+
+## Клип поворота под нужный угол (−_turn_off): той же стороны и ближе всех по величине; 180° — в любую сторону.
+func _turn_start() -> void:
+	var need := -_turn_off
+	var info: Dictionary = asset_rig(String(spec.get("asset", ""))).get("clips", {})
+	var best := ""
+	var best_a := 0.0
+	var best_err := INF
+	for c in _mq_names(MQ_TURNS):
+		var a := deg_to_rad(float((info.get(c, {}) as Dictionary).get("turn", 0.0)))
+		if absf(a) < 0.5:
+			continue
+		var err := absf(wrapf(a - need, -PI, PI))
+		if err < best_err:
+			best_err = err
+			best = c
+			best_a = a
+	if best == "" or best_err > 1.2:
+		return
+	_mq_play(best, 1.0)
+	_act_hit = 0.0
+	_turn_clip = best
+	_turn_from = _turn_off
+	# Смещение в конце: ≡ −угол клипа, ближайшее к нынешнему (180° в «чужую» сторону — без лишнего оборота)
+	_turn_to = _turn_off + wrapf(-best_a - _turn_off, -PI, PI)
+	_turn_extra = 0.0
+
+
+## Поворот доигран: корпус клипа довёрнут — смещение модели снимается (остаётся только то, на что родитель повернулся
+## во время клипа), покой включается без перехода.
+func _turn_finish() -> void:
+	_turn_clip = ""
+	_turn_off = wrapf(_turn_extra, -PI, PI)
+	_turn_extra = 0.0
+	rotation.y = _turn_off
+	_turn_snap = true
+
+
 ## Действие модели из файла: отрезок клипа (см. ASSET_ACTIONS).
-func _asset_act(kind: String) -> void:
+func _asset_act(kind: String, any: bool = false) -> void:
 	if _anim == null or not is_inside_tree():
 		return
 	var a := _pick(ASSET_ACTIONS[kind])
+	if any:
+		# Любой из вариантов, что есть в модели (реакции на удар — то манекен, то UAL)
+		var all: Array = []
+		for o in ASSET_ACTIONS[kind]:
+			var one := _pick([o])
+			if not one.is_empty():
+				all.append(one)
+		if not all.is_empty():
+			a = all[randi() % all.size()]
 	if a.is_empty():
 		return
 	var c := String(a[0])
@@ -2283,14 +2565,14 @@ func play_skill(kind: String, sid: String = "", use: String = "", release: bool 
 			"cast":
 				opts = MQ_CASTS_SELF if use == "self" or use == "pet" else MQ_CASTS
 			"buff":
-				opts = MQ_BUFFS
+				opts = MQ_BUFFS + (MQ_BUFFS_MELEE if _melee() else [])
 			"spin":
 				opts = MQ_SPINS.get(g, ["mq_axe_spin"])
 			"dash":
-				opts = ["mq_leap_slam"] if ["axe", "mace", "dual_axes"].has(weapon_kind) else ["mq_judgment"]
+				opts = ["mq_leap_slam"] if ["axe", "mace", "dual_axes"].has(weapon_kind) else MQ_DASH_BLADES
 			_:
 				if use == "ranged":
-					opts = ["mq_bow_draw"] if weapon_kind == "bow" else []
+					opts = MQ_BOW_SKILLS if weapon_kind == "bow" else []
 				else:
 					opts = MQ_STRIKES.get(g, ["mq_charged_slash"])
 	var names := _mq_names(opts)
@@ -2312,6 +2594,9 @@ func play_cast_loop(kind: String) -> bool:
 	if names.is_empty():
 		return false
 	_cast_loop = names[0]
+	var alt := String(_clips.get(String(MQ_CAST_ALT.get(kind, "")), ""))
+	if alt != "" and randf() < MQ_CAST_ALT_CHANCE and (kind != "charge" or _melee()):
+		_cast_loop = alt
 	_anim.get_animation(_cast_loop).loop_mode = Animation.LOOP_LINEAR
 	_act_end = -1.0
 	_loco = "cast"

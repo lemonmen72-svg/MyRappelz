@@ -49,6 +49,33 @@ const MQ_SKILL_ROW := [
 	["res://assets/characters/hero_neophyte_m.glb", "staff_2h", false, "mq_cast_beam"],
 	["res://assets/characters/hero_adept_f.glb", "dagger", false, "mq_judgment"],
 ]
+## Шаг и бег из манекенов (кадры 250–256): Воин и Волшебница — [модель, вид оружия, щит, клип, доля цикла (−1 —
+## момент удара из .json)]; раскадровка цикла бега — по 6 фаз.
+const LOCO_HERO := "res://assets/characters/hero_warrior_m.glb"
+const LOCO_HEROINE := "res://assets/characters/hero_wizard_f.glb"
+const MQ_LOCO_ROW := [
+	[LOCO_HERO, "axe_1h", false, "mq_walking", 0.25], [LOCO_HERO, "axe_1h", false, "mq_running_b", 0.25],
+	[LOCO_HERO, "axe_1h", false, "mq_sprint", 0.25], [LOCO_HEROINE, "staff_1h", false, "mq_walking", 0.25],
+	[LOCO_HEROINE, "staff_1h", false, "mq_running_b", 0.25], [LOCO_HEROINE, "staff_1h", false, "mq_sprint", 0.25],
+]
+## Новые удары и умения (кадр 254): вторая часть выпада, кручение с колена, пинок, прыжок, стойка, подъём.
+const MQ_NEW_ROW := [
+	[LOCO_HEROINE, "daggers", false, "mq_thrust_b", -1.0], [LOCO_HERO, "dual_swords", false, "mq_blade_spin_b", -1.0],
+	[LOCO_HEROINE, "dagger", false, "mq_kick", -1.0], [LOCO_HERO, "daggers", false, "mq_jump", 0.45],
+	[LOCO_HEROINE, "sword_1h", false, "mq_guard", -1.0], [LOCO_HERO, "axe_1h", false, "mq_rise", 0.3],
+]
+## Лук и петли (кадр 255): прицеливания манекенов, прицел с обзором, заряд в приседе.
+const MQ_BOW_ROW := [
+	[LOCO_HEROINE, "bow", false, "mq_bow_draw_b", -1.0], [LOCO_HERO, "bow", false, "mq_bow_draw_c", -1.0],
+	[LOCO_HEROINE, "bow", false, "mq_bow_draw_d", 0.3], [LOCO_HERO, "bow", false, "mq_bow_scan_hold", 0.1],
+	[LOCO_HEROINE, "axe_1h", false, "mq_crouch_charge_hold", 0.5], [LOCO_HERO, "sword_1h", true, "mq_pickup_b", 0.75],
+]
+## Повороты на месте и эмоции (кадр 256): середина поворота, усиление нового уровня, удар в грудь после босса.
+const MQ_TURN_ROW := [
+	[LOCO_HERO, "axe_1h", false, "mq_turn_l90", 0.5], [LOCO_HEROINE, "staff_1h", false, "mq_turn_r90", 0.5],
+	[LOCO_HERO, "crossbow", false, "mq_turn_l180", 0.5], [LOCO_HEROINE, "staff_1h", false, "mq_turn_l180", 0.7],
+	[LOCO_HERO, "axe_1h", false, "mq_charged_cast1", -1.0], [LOCO_HEROINE, "staff_1h", false, "mq_taunt", -1.0],
+]
 ## Оружие героев (кадр 91): [модель, вид оружия ItemData, щит во второй руке] — одноручное со щитом, лук, пары,
 ## посох, двуручное.
 const WEAPON_ROW := [
@@ -1571,6 +1598,64 @@ func run_step() -> void:
 			step = 1083
 		1083:
 			shot("192_loot_drops")
+			wait = 2
+			step = 1200
+		1200:
+			# Бег из манекенов: раскадровка цикла Mq_Running — Воин (6 фаз сбоку) — кадр 250
+			_clip_row(_phases(LOCO_HERO, "axe_1h", "mq_running", 6), PI * 0.5)
+			wait = 20
+			step = 1201
+		1201:
+			shot("250_run_cycle_hero")
+			_clip_row_clear()
+			_clip_row(_phases(LOCO_HEROINE, "staff_1h", "mq_running", 6), PI * 0.5)
+			wait = 20
+			step = 1202
+		1202:
+			shot("251_run_cycle_heroine")
+			_clip_row_clear()
+			# Герой и героиня бегут вживую со скоростью героя (7 м/с, темп — по своей скорости клипа) — кадр 252
+			_heroes_row([LOCO_HERO, LOCO_HEROINE], 1.4, 4.2)
+			for c in _heroes.get_children():
+				var m := c as CharacterModel
+				m.rotation.y = PI * 0.5
+				m.set_move_speed(7.0)
+			wait = 50
+			step = 1203
+		1203:
+			for c in _heroes.get_children():
+				var m := c as CharacterModel
+				check(m.loco_clip().to_lower() == "mq_running", "кадр 252: бег — клип манекена (%s)" % m.loco_clip())
+			shot("252_run_live")
+			_clip_row_clear()
+			# Шаг, трусца и быстрый бег (кадр 253)
+			_clip_row(MQ_LOCO_ROW, PI * 0.5)
+			wait = 20
+			step = 1204
+		1204:
+			shot("253_walk_jog_sprint")
+			_clip_row_clear()
+			_clip_row(MQ_NEW_ROW, PI + 0.6)
+			wait = 20
+			step = 1205
+		1205:
+			shot("254_mq_new_moves")
+			_clip_row_clear()
+			_clip_row(MQ_BOW_ROW, PI + 0.6)
+			wait = 20
+			step = 1206
+		1206:
+			shot("255_mq_bow_loops")
+			_clip_row_clear()
+			_clip_row(MQ_TURN_ROW, PI + 0.6)
+			wait = 20
+			step = 1207
+		1207:
+			shot("256_mq_turns_emotes")
+			_clip_row_clear()
+			main.cam.current = true
+			main.hud.visible = true
+			main.player.visible = true
 			ok_done()
 
 
@@ -1930,6 +2015,56 @@ func _mq_row(rows: Array) -> void:
 		m._anim.speed_scale = 0.0
 		m._act_end = 99.0
 		m._act_hit = 99.0
+
+
+## Строки для _clip_row: одна модель в n фазах клипа (раскадровка цикла).
+func _phases(path: String, weapon: String, clip: String, n: int) -> Array:
+	var rows: Array = []
+	for k in n:
+		rows.append([path, weapon, false, clip, float(k) / float(n)])
+	return rows
+
+
+## Герои в ряд (кадры 250–256), каждый замер в своём клипе: [модель, вид оружия, щит, клип, доля клипа (−1 — момент
+## удара из .json)]; rot — поворот моделей (PI/2 — боком к камере).
+func _clip_row(rows: Array, rot: float) -> void:
+	var paths: Array = []
+	var weapons: Array = []
+	for r in rows:
+		var row: Array = r
+		paths.append(row[0])
+		weapons.append([row[0], row[1], row[2]])
+	_heroes_row(paths, 1.25, 7.0, weapons)
+	_top.global_position += Vector3(0, 0.2, 0)
+	for i in rows.size():
+		var row: Array = rows[i]
+		var m := _heroes.get_child(i) as CharacterModel
+		if m == null or m._anim == null:
+			continue
+		m.rotation.y = rot
+		var c := String(m._clips.get(String(row[3]), ""))
+		check(c != "", "%s: есть клип %s" % [String(row[0]), String(row[3])])
+		if c == "":
+			continue
+		var info: Dictionary = CharacterModel.asset_rig(String(row[0])).get("clips", {}).get(c, {})
+		var a := m._anim.get_animation(c)
+		var at := float(row[4]) * a.length
+		if float(row[4]) < 0.0:
+			at = float(info.get("hit", 0.3))
+		m._anim.play(c, 0.0)
+		m._anim.seek(at, true)
+		m._anim.speed_scale = 0.0
+		m._act_end = 99.0
+		m._act_hit = 99.0
+
+
+func _clip_row_clear() -> void:
+	if _heroes != null and is_instance_valid(_heroes):
+		_heroes.queue_free()
+	if _top != null and is_instance_valid(_top):
+		_top.queue_free()
+	_heroes = null
+	_top = null
 
 
 ## Игрок в dist м от ближайшей рыбы вида id, рыба — цель, камера за игроком смотрит на рыбу. Возвращает рыбу.

@@ -1424,10 +1424,14 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 	# Уклонение — только от ударов зверей
 	if attacker is Mob and cur_eva() > 0.0 and randf() < cur_eva():
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "Уклонение", Color(0.7, 0.95, 1.0))
+		if _has_model():
+			_model.play_dodge()
 		return
 	# Блок щитом: удар зверя приходится в щит
 	if attacker is Mob and block > 0.0 and randf() < block:
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "Блок", Color(0.75, 0.85, 1.0))
+		if _has_model():
+			_model.play_block()
 		return
 	# Удар зверя уже прошёл через защиту героя (Combat.damage у зверя); прочий урон — по-старому
 	if not (attacker is Mob):
@@ -1454,6 +1458,8 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 		Game.gold = int(Game.gold * 0.8)
 		global_position = respawn_point()
 		Vfx.heal_sparkles(get_parent(), global_position, 1.3)
+		if _has_model():
+			_model.play_rise()
 		last_target = null
 		_set_target(null)
 		clear_buffs()
@@ -1480,6 +1486,7 @@ func gain_xp(amount: int) -> void:
 	if amount > 0:
 		HeroSkills.add_jp(Game.hero, float(HeroSkills.JP_PER_LEVEL) * float(amount) / float(Game.xp_to_next(Game.level)))
 	Game.xp += amount
+	var level0 := Game.level
 	while Game.xp >= Game.xp_to_next(Game.level):
 		Game.xp -= Game.xp_to_next(Game.level)
 		Game.level += 1
@@ -1488,6 +1495,8 @@ func gain_xp(amount: int) -> void:
 		mp = max_mp
 		message.emit("Новый уровень: %d!" % Game.level)
 		Vfx.level_up(get_parent(), global_position)
+	if Game.level > level0:
+		play_emote("level")
 	Game.changed.emit()
 	stats_changed.emit()
 
@@ -1502,6 +1511,8 @@ func _build_model() -> void:
 	_model.setup(CharacterModel.spec_for(Game.race_id, Game.class_id, weapon_kind, Game.gender, has_shield,
 		Game.weapon, Game.offhand))
 	_weapon_kind = _model.weapon_kind
+	# Развернули стоящего героя — переступает на месте (клипы поворота манекенов)
+	_model.turn_in_place = true
 	add_child(_model)
 
 	# Сияние «Щита света»
@@ -1554,6 +1565,12 @@ func _anim_dash() -> void:
 func _anim_cast() -> void:
 	if _has_model():
 		_model.play_cast()
+
+
+## Эмоция модели героя: "level" — новый уровень, "boss" — победа над боссом (модель сама решает, уместно ли сейчас).
+func play_emote(kind: String) -> void:
+	if _has_model():
+		_model.play_emote(kind)
 
 
 ## Подбор добычи: присесть и поднять (модель сама решает, уместно ли сейчас).
