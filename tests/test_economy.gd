@@ -254,7 +254,7 @@ func run_step() -> void:
 					and _find_button("good_weapon_dagger_r1") == null, "Воину — лук и топоры, без кинжала")
 			var wid := String(InventoryWindow.goods(game.class_id, "weaponsmith")[0])
 			game.gold = 1000
-			var have := game.inventory.count(wid)
+			var have: int = game.inventory.count(wid)
 			_press("good_" + wid)
 			_press("act_buy")
 			check(game.inventory.count(wid) == have + 1 and game.gold == 1000 - int(ItemData.get_item(wid)["buy"]),

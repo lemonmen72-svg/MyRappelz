@@ -65,7 +65,7 @@ const DM_FAILED := 16
 const NOTIFY_TITLE := "Dark Pact — загрузка ресурсов"
 const NOTIFY_TEXT := "Пакет моделей, часть %d из %d, %s"
 ## Высота логотипа Dark Pact над окном загрузки («Средний»).
-const LOGO_H := 140.0
+const LOGO_H := 90.0
 
 var state := State.START
 ## Манифест: {version, parts: [{name, hash, sha256, size, url, file}]} (Assets.manifest_from).

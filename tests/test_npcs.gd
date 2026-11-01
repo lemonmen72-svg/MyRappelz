@@ -293,7 +293,7 @@ func _check_trade(id: String) -> void:
 	if not goods.is_empty():
 		var first := String(goods[0])
 		game.gold = 100000
-		var n0 := game.inventory.count(first)
+		var n0: int = game.inventory.count(first)
 		check(eco.buy(first, 1), "%s: куплено %s" % [id, first])
 		check(game.inventory.count(first) == n0 + 1, "%s: %s в сумке" % [id, first])
 		game.inventory.remove(first, 1)

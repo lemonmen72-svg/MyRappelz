@@ -765,8 +765,9 @@ func _check_fallback() -> void:
 					bad.append("%s/%s/%s → %s" % [r, g, j, path])
 	check(bad.is_empty(), "без пакета все герои — запасная модель пола (%s)" % str(bad))
 	for sp in STAGED:
-		check(CreatureAsset.model_for(sp, 1) == sp and CreatureAsset.model_for(sp, 2) == sp and CreatureAsset.has_asset(sp),
-			"%s: без пакета старшие стадии — модель 1-й стадии" % sp)
+		# звери 1-й стадии теперь тоже в пакете (creatures_base): без пакета — модель из примитивов, стадии — та же
+		check(CreatureAsset.model_for(sp, 1) == sp and CreatureAsset.model_for(sp, 2) == sp and not CreatureAsset.has_asset(sp),
+			"%s: без пакета старшие стадии — модель 1-й стадии (из примитивов)" % sp)
 	var m := CharacterModel.new()
 	m.setup(CharacterModel.spec_for("dark_elf", "assassin", "", "m"))
 	main.add_child(m)
