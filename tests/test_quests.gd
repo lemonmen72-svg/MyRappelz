@@ -401,7 +401,8 @@ func _check_bonus(id: String) -> void:
 	for k in q.last_bonus:
 		var it := String(k)
 		n += int(q.last_bonus[k])
-		check(ItemData.is_potion(it) or ItemData.is_weapon(it) or ItemData.is_card(it), "%s: случайная награда — %s" % [id, it])
+		check(ItemData.is_potion(it) or ItemData.is_weapon(it) or ItemData.is_card(it) or ItemData.is_armor(it)
+			or ItemData.is_jewelry(it), "%s: случайная награда — %s" % [id, it])
 		if ItemData.is_potion(it):
 			check(ItemData.rank(it) == ItemData.potion_rank_for_level(game.level), "зелье награды по уровню героя: %s" % it)
 		if ItemData.is_weapon(it):

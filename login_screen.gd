@@ -10,7 +10,7 @@ extends CanvasLayer
 signal logged_in
 
 ## Высота логотипа для «Среднего» размера интерфейса.
-const LOGO_H := 150.0
+const LOGO_H := 100.0
 
 var login_edit: LineEdit
 var error_label: Label

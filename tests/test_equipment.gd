@@ -252,7 +252,7 @@ func _unit_quest_rewards() -> void:
 	var ch := LootTable.quest_chances(12, "wizard", rng)
 	check(is_equal_approx(float((ch["armor"] as Array)[0]), 0.125), "награда: броня 12.5 % (вдвое ниже добычи)")
 	check(is_equal_approx(float((ch["jewelry"] as Array)[0]), 0.075), "награда: украшения 7.5 % (половина шанса босса)")
-	for p in (ch["armor"] as Array):
+	for p in ((ch["armor"] as Array)[1] as Array):
 		var id := String((p as Array)[0])
 		check(ItemData.armor_fits(id, "wizard") and ItemData.rank(id) == 1, "Волшебнику 12 ур.: %s — подходит, 1-й ранг" % id)
 	var got: Dictionary = {}

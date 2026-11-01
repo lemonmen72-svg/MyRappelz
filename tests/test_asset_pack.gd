@@ -307,7 +307,7 @@ func run_step() -> void:
 				var st: Array = fake.started[0]
 				check(String(st[0]) == String(_part(PB, H4)["url"]) and String(st[1]) == Assets.download_rel_path(PB, H4),
 					"адрес и файл загрузки части: %s" % str(st))
-				check(String(st[2]).contains("MyRappelz") and String(st[3]).contains("МБ") and String(st[3]).contains("1 из 2"),
+				check(String(st[2]).contains("Dark Pact") and String(st[3]).contains("МБ") and String(st[3]).contains("1 из 2"),
 					"уведомление: %s" % str(st))
 				check(String((fake.started[1] as Array)[1]) == Assets.download_rel_path(PC, H5), "вторая часть")
 			id_b = _job_id(PB)

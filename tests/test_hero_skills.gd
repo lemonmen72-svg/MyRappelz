@@ -15,6 +15,7 @@ const MainScript := preload("res://main.gd")
 
 var mob: Mob = null
 var timer := 0
+var _bolt_tries := 0
 var hp_before := 0
 var mp_before := 0
 var dist_before := 0.0
@@ -77,7 +78,15 @@ func run_step() -> void:
 				step = 3
 				return
 			if timer > 120:
-				fail("болт не долетел за 2 с")
+				# Промах (попадание ≈ 95 %, бросок случайный) — ещё выстрел, до 3 раз
+				if _bolt_tries < 3 and mob_ok(mob):
+					_bolt_tries += 1
+					player.attack_cd = 0.0
+					player.select_target(mob)
+					player.try_attack()
+					timer = 0
+					return
+				fail("болт не долетел за 2 с (выстрелов %d)" % (_bolt_tries + 1))
 		3:
 			# Привязка умений к оружию: «Удар в спину» (клинки) с арбалетом нельзя, «Шаг тени» (общее) можно
 			check(player.slot_block("skill1") == "Нужны клинки", "кнопка 1 с арбалетом: «%s»" % player.slot_block("skill1"))
