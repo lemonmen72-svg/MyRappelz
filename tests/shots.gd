@@ -1244,6 +1244,43 @@ func run_step() -> void:
 			_gcam.queue_free()
 			main.cam.current = true
 			main.hud.visible = true
+			# Жители из Meshy (кадры 160–164): все десять в ряд с предметами, крупно в городе, у лагеря, в деревне
+			# эльфов, охотница со спины (колчан)
+			_heroes_row([], 1.0, 6.2)
+			_npc_row()
+			wait = 60
+			step = 1020
+		1020:
+			shot("160_npc_row")
+			_heroes.queue_free()
+			_top.queue_free()
+			_top = Camera3D.new()
+			main.add_child(_top)
+			_top.current = true
+			_npc_view("storekeeper")
+			wait = 40
+			step = 1021
+		1021:
+			shot("161_npc_storekeeper")
+			_npc_view("smith")
+			wait = 40
+			step = 1022
+		1022:
+			shot("162_npc_smith")
+			_npc_view("elder_light")
+			wait = 40
+			step = 1023
+		1023:
+			shot("163_npc_elder_light")
+			_npc_back_view("hunter")
+			wait = 40
+			step = 1024
+		1024:
+			shot("164_npc_hunter_back")
+			_top.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
+			main.player.visible = true
 			ok_done()
 
 
@@ -1289,6 +1326,43 @@ func _npc_view(id: String) -> void:
 	_top.global_position = from
 	_top.look_at(c + Vector3(0, 1.15, 0))
 	print("  %s: (%.1f, %.1f)" % [id, c.x, c.z])
+
+
+## Кадр 160: все жители (модели из файлов, CharacterModel.npc_spec) с предметами NpcProps в ряд в узле _heroes —
+## после _heroes_row([]) (камера и площадь те же).
+func _npc_row() -> void:
+	var ids: Array = NpcData.NPCS.keys()
+	var base := Vector3(0.0, 0.0, 3.0)
+	var gap := 0.95
+	for i in ids.size():
+		var id := String(ids[i])
+		var m := CharacterModel.new()
+		m.setup(CharacterModel.npc_spec(id))
+		_heroes.add_child(m)
+		NpcProps.attach(m, id)
+		var gp := base + Vector3((float(i) - float(ids.size() - 1) * 0.5) * gap, 0, 0)
+		if IslandWorld.current != null:
+			gp.y = IslandWorld.current.height_at(gp.x, gp.z)
+		m.global_position = gp
+		# Чётные — вполоборота вправо, нечётные — влево: видно предметы в обеих руках и за спиной
+		m.rotation.y = PI + (0.35 if i % 2 == 0 else -0.35)
+
+
+## Камера _top в 3 м за спиной жителя (игрок далеко впереди — житель не поворачивается).
+func _npc_back_view(id: String) -> void:
+	var n: Npc = main.npcs.npc(id)
+	if n == null:
+		return
+	var player: Player = main.player
+	var c := n.global_position
+	var fwd := Vector3(-sin(n.face_yaw), 0, -cos(n.face_yaw))
+	player.visible = false
+	player.global_position = c + fwd * 14.0 + Vector3(0, 0.5, 0)
+	n._model.rotation.y = n.face_yaw
+	var from := c - fwd.rotated(Vector3.UP, 0.4) * 3.0
+	from.y = c.y + 1.6
+	_top.global_position = from
+	_top.look_at(c + Vector3(0, 1.1, 0))
 
 
 ## Кадры 110–114: игрок в 2.6 м перед жителем id (кнопка «Говорить» видна, диалог не закрывается), камера

@@ -3,7 +3,7 @@ extends "res://tests/test_base.gd"
 ## над головой; стоят в своих деревнях / городе / лагере / у пещеры (по зоне и ближайшей POI), на проходимой
 ## земле, не на дороге, не в постройках и мелочах, в безопасных зонах (звери туда не заходят, не в логове анатем),
 ## не ближе 3 м друг к другу и к торговцу / Кирку, вдали от точек старта; своя внешность у каждого (модель из
-## примитивов, лёгкая; заготовка npc_<id>.glb); рядом — кнопка «Говорить» выбирает ближайшего, диалог
+## файла npc_<id>.glb с клипами Idle и Wave и предметами NpcProps или из примитивов, лёгкая); рядом — кнопка «Говорить» выбирает ближайшего, диалог
 ## открывается у каждого, пункты «скоро» и справочник мудреца показывают текст, «Склад» у кладовщика открывает
 ## окно склада; реплики по положению героя; задания мудреца после старосты (четыре сразу, «Взять все»), задание
 ## «Городской склад» (поговорить с кладовщиком, положить вещь на склад) берётся и сдаётся.
@@ -330,6 +330,12 @@ func _check_models() -> void:
 		check(path == "res://assets/characters/npc_%s.glb" % id, "заготовка модели из файла: " + path)
 		if ResourceLoader.exists(path):
 			check(String(m.spec.get("asset", "")) == path, "%s: модель из файла %s" % [id, path])
+			# Подробно (рост, клипы, кости, предметы) — tests/test_npc_models.gd
+			check(m._asset != null and m._clips.has("idle") and m._clips.has("wave"), "%s: модель из файла с клипами Idle и Wave" % id)
+			for e in NpcProps.items_of(id):
+				var item := String((e as Dictionary)["item"])
+				var has_item := m.find_child(NpcProps.node_name(item), true, false) != null
+				check(has_item == ResourceLoader.exists(NpcProps.item_path(item)), "%s: предмет %s — есть, если есть файл" % [id, item])
 			continue
 		check(not m.spec.has("asset"), "%s: файла нет — модель из примитивов" % id)
 		check(m.mesh_count() <= 4 and m.surface_count() <= 5, "%s: модель лёгкая (мешей %d, поверхностей %d)"

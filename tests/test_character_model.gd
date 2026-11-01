@@ -142,7 +142,11 @@ func run_step() -> void:
 				"торговец — CharacterModel без оружия")
 			check(mer._model.mesh_count() <= MAX_MESHES, "мешей у торговца: %d" % mer._model.mesh_count())
 			check(mer._model.surface_count() <= MAX_SURFACES, "поверхностей у торговца: %d" % mer._model.surface_count())
-			_check_skin(mer._model, "торговец")
+			if mer._model._asset != null:
+				# Модель из файла npc_merchant.glb (подробно — tests/test_npc_models.gd)
+				check(mer._model._clips.has("idle") and mer._model._clips.has("wave"), "торговец из файла: клипы Idle и Wave")
+			else:
+				_check_skin(mer._model, "торговец")
 			# Урон по игроку запускает анимацию получения урона без ошибок
 			player.take_damage(1, null)
 			player.hp = player.max_hp

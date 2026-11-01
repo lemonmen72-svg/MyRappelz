@@ -1,14 +1,18 @@
 class_name Npc
 extends StaticBody3D
-## Житель-NPC в мире (данные — NpcData по npc_id): аниме-модель CharacterModel.npc_spec(npc_id), имя над головой,
+## Житель-NPC в мире (данные — NpcData по npc_id): аниме-модель CharacterModel.npc_spec(npc_id) — из файла
+## npc_<id>.glb (пакет ресурсов; предметы в руках — NpcProps) или из примитивов, имя над головой,
 ## значок задания над именем («!» — можно взять задание, «?» золотой — задание готово к сдаче, «?» серый — взято,
-## но не выполнено; ставит Npcs по Quests.npc_mark). Поворачивается к игроку и машет рукой, когда тот подходит.
+## но не выполнено; ставит Npcs по Quests.npc_mark). Поворачивается к игроку и машет рукой, когда тот подходит
+## и когда с ним заговорили (greet).
 ## Группы: "npc", торгующие — ещё "trader" (Economy). Коллизия — цилиндр (слой 1, мир).
 ## Наследники (Merchant) добавляют свои мелочи в _build_extra().
 
 const TURN_RANGE := 10.0
 const WAVE_RANGE := 6.0
 const WAVE_COOLDOWN := 8.0
+## Сколько длится взмах рукой, с (повторно в разговоре не машет, пока не закончил).
+const WAVE_TIME := 2.0
 ## Высота подписи с именем, м.
 const LABEL_Y := 2.55
 const MARK_GOLD := Color(1.0, 0.82, 0.18)
@@ -49,6 +53,8 @@ func _ready() -> void:
 	_model.setup(CharacterModel.npc_spec(npc_id))
 	_model.rotation.y = face_yaw
 	add_child(_model)
+	# Модель из файла (npc_<id>.glb): предметы в руках, на поясе и за спиной — отдельные файлы (NpcProps)
+	NpcProps.attach(_model, npc_id)
 
 	_build_extra()
 
@@ -75,6 +81,14 @@ func _ready() -> void:
 	_mark.visible = false
 	add_child(_mark)
 	set_mark(mark_kind)
+
+
+## Приветствие в начале разговора: машет рукой, если не машет прямо сейчас (Npcs.open_dialog).
+func greet() -> void:
+	if _model == null or _wave_cd > WAVE_COOLDOWN - WAVE_TIME:
+		return
+	_model.play_wave()
+	_wave_cd = WAVE_COOLDOWN
 
 
 ## Мелочи вокруг модели (у торговца — ящик с товаром). Переопределяется наследниками.

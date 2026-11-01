@@ -286,6 +286,11 @@ func talk_to(npc_id: String) -> void:
 ## Открыть (перестроить) диалог с NPC на странице pg ("main" | "quests" | "quest" | "info"; для "quest" —
 ## задание qid, для "info" — путь пункта о делах NPC в qid: "forge", "guide/pets").
 func open_dialog(npc_id: String, pg: String = "main", qid: String = "") -> void:
+	# Новый разговор — житель машет рукой (если только что не махал при приближении)
+	if dialog_npc != npc_id or not is_dialog_open():
+		var n := npc(npc_id)
+		if n != null:
+			n.greet()
 	dialog_npc = npc_id
 	page = pg
 	page_quest = qid if pg == "quest" else ""

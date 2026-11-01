@@ -550,7 +550,9 @@ static func merc_chief_spec() -> Dictionary:
 	}
 
 
-## Путь модели NPC из файла (Meshy со скелетом Mixamo и клипами Idle / Wave): есть — грузится вместо примитивов.
+## Путь модели NPC из файла (Meshy с родным скелетом, tools/prepare_npcs.py → prepare_hero.py: клипы Idle, Wave и
+## другие, роли костей в npc_<id>.json; в пакете ресурсов — Assets.exists): есть — грузится вместо примитивов,
+## предметы в руках вешает NpcProps.
 static func npc_asset(npc_id: String) -> String:
 	return "res://assets/characters/npc_%s.glb" % npc_id
 
