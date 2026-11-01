@@ -70,7 +70,7 @@ func run_step() -> void:
 			check(q.state("kirk_first_card") == "active" and game.quests_active.has("kirk_first_card"), "задание взято")
 			check(game.quest_tracked == "kirk_first_card", "взятое задание отслеживается")
 			check(npcs.reply == String(QuestData.get_quest("kirk_first_card")["progress"]), "реплика — напоминание")
-			check(kirk.mark_kind == "active" and kirk.mark_text() == "?", "над Кирком серый «?»")
+			check(kirk.mark_kind == "active" and kirk.mark_text() == "?", "над Кирком «?» (взято)")
 			check(q.tracker.visible and _tracker_has("Первая карта") and _tracker_has("0/1"), "трекер: %s" % [q.tracker_lines()])
 			check(not q.accept("kirk_first_card"), "дважды не взять")
 			# «Назад» → «Торговля»: окно лавки Кирка с картами существ
@@ -101,7 +101,7 @@ func run_step() -> void:
 			check(inv.count("card_pheasant") == 1 and game.gold == 75, "куплена карта фазана")
 			check(q.is_ready("kirk_first_card") and q.goal_progress("kirk_first_card", 0) == 1, "цель выполнена 1/1")
 			check(last_hud_text().contains("вернитесь к Учителю Кирку"), "сообщение: " + last_hud_text())
-			check(kirk.mark_kind == "ready" and kirk.mark_text() == "?", "над Кирком золотой «?»")
+			check(kirk.mark_kind == "ready" and kirk.mark_text() == "=", "над Кирком «=» (можно сдать)")
 			check(_tracker_has("Сдать: Учитель Кирк"), "трекер: сдать Кирку %s" % [q.tracker_lines()])
 			# Торговец карт не продаёт
 			check(not InventoryWindow.goods(game.class_id, "merchant").has("card_pheasant"), "у торговца карт нет")
@@ -109,7 +109,7 @@ func run_step() -> void:
 			# Сдача в диалоге: «Задания» → «?» → «Сдать задание»
 			main._on_action("talk")
 			check(npcs.reply == NpcData.greet("kirk", "ready"), "реплика — есть что сдать")
-			check((npcs.buttons["opt_quests"] as Button).text.contains("(?)"), "у «Задания» отметка сдачи")
+			check((npcs.buttons["opt_quests"] as Button).text.contains("(=)"), "у «Задания» отметка сдачи «=»")
 			_press_dialog("opt_quests")
 			check(npcs.buttons.has("dq_kirk_first_card"), "задание в списке на сдачу")
 			_press_dialog("dq_kirk_first_card")
@@ -423,7 +423,8 @@ func _check_hud_layout() -> void:
 	var mb := hud.menu_buttons()
 	for id in ["hero_window", "pets_window", "bag_window", "quest_window", "settings_window"]:
 		check(mb.has(id), "кнопка меню: %s" % id)
-	check((mb["quest_window"] as Button).text == "Задания", "кнопка «Задания» в меню")
+	check((mb["quest_window"] as Button).tooltip_text == "Задания" and (mb["quest_window"] as Button).icon != null,
+		"кнопка «Задания» в меню — значок с подсказкой")
 	var view: Vector2 = hud._view
 	var mr := hud.menu_rect()
 	check(mr.position.x >= 0.0 and mr.end.x <= view.x, "меню помещается по ширине: %s (экран %s)" % [mr, view])

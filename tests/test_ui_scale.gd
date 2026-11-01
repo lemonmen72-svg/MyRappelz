@@ -255,6 +255,7 @@ func _check_hud() -> void:
 	var mr := hud.menu_rect()
 	var pr := hud.player_rect()
 	var tr := hud.target_rect()
+	_check_panels(hud)
 	check(screen.encloses(mr), "меню на экране: %s" % mr)
 	check(not tr.intersects(mr) and tr.position.x >= pr.end.x, "панель цели не на меню и не на панели игрока: %s / %s / %s"
 		% [tr, mr, pr])
@@ -322,6 +323,32 @@ func _check_hud() -> void:
 		check(ic != null and ic.size.x <= rr * 2.0 and ic.size.x >= rr * 1.6,
 			"значок кнопки %s вписан в круг: %.0f / Ø %.0f" % [id, ic.size.x if ic != null else 0.0, rr * 2.0])
 	print("  кнопки: атака r %.0f, мельчайшая Ø %.0f, зазор ≥ %.1f; меню %s; трекер %s" % [attack_r, min_d, min_gap, mr, trk])
+
+
+## Панели игрока и питомца: числа HP / MP / опыта — внутри полосок (по центру), кружок уровня у начала полосок,
+## ник над полосками; панели не выше прежних; кнопки меню — значки без текста, с подсказкой.
+func _check_panels(hud: HUD) -> void:
+	for e in [[hud._hp_text, hud._hp_bar, "HP"], [hud._mp_text, hud._mp_bar, "MP"], [hud._xp_text, hud._xp_bar, "опыт"],
+			[hud._pet_hp_text, hud._pet_bar, "HP питомца"], [hud._pet_mp_text, hud._pet_mp_bar, "MP питомца"]]:
+		var l := e[0] as Label
+		var bar := e[1] as ProgressBar
+		var br := bar.get_global_rect()
+		var lr := l.get_global_rect()
+		check(l.get_parent() == bar and l.text != "" and absf(lr.get_center().y - br.get_center().y) <= 1.5
+			and absf(lr.get_center().x - br.get_center().x) <= 1.5,
+			"%s: число «%s» внутри полоски по центру (%s в %s)" % [e[2], l.text, lr, br])
+	var pr := hud.player_rect()
+	check(pr.size.y <= UiScale.px(56.0) + 2.0 and pr.size.x <= UiScale.px(290.0),
+		"панель игрока компактная: %s (было ≈ 56 × 380)" % pr)
+	var lv := hud._lvl.get_global_rect()
+	check(lv.end.x <= hud._hp_bar.get_global_rect().position.x and hud._lvl_text.text == str(game.level),
+		"кружок уровня у начала полосок: %s, «%s»" % [lv, hud._lvl_text.text])
+	check(hud._name_label.get_global_rect().end.y <= hud._hp_bar.get_global_rect().position.y + 4.0
+		and hud._name_label.text == game.char_name, "ник над полосками: «%s»" % hud._name_label.text)
+	print("  панель игрока: %s; %s" % [pr, hud.player_summary()])
+	for id in hud.menu_buttons():
+		var b := hud.menu_buttons()[id] as Button
+		check(b.text == "" and b.icon != null and b.tooltip_text != "", "кнопка меню %s — значок «%s»" % [id, b.tooltip_text])
 
 
 # ---------- Окна ----------
@@ -465,3 +492,17 @@ func _check_world_labels() -> void:
 	var mark := kirk.get_node_or_null("QuestMark") as Label3D
 	check(lbl != null and lbl.pixel_size < 0.006 * 0.75 and mark != null and mark.pixel_size < 0.008 * 0.75,
 		"имя и значок над NPC компактнее")
+	# Значок задания — сразу над именем, не перекрывает его
+	if lbl != null and mark != null:
+		var name_top := lbl.position.y + 0.5 * float(lbl.font_size) * lbl.pixel_size
+		var mark_bottom := kirk.mark_height() - 0.5 * float(mark.font_size) * mark.pixel_size
+		check(mark_bottom >= name_top and mark_bottom - name_top < 0.2,
+			"значок над именем NPC не перекрывает его: низ значка %.2f м, верх имени %.2f м" % [mark_bottom, name_top])
+	# Подпись зверя — одна строка «Ур. N Имя», под ней тонкая полоска HP, значок задания — над строкой
+	if m != null:
+		check(m._label.text.begins_with("Ур. %d " % m.level) and not m._label.text.contains("\n"),
+			"подпись зверя в одну строку: «%s»" % m._label.text)
+		var ov: Overhead = m._over
+		var bar_h := float(Overhead.TEX_H) * ov.bar_bg.pixel_size
+		check(bar_h <= 0.07 and ov.bar_bg.position.y < m._label.position.y and ov.mark.position.y > m._label.position.y,
+			"полоска HP зверя тонкая (%.3f м) и под строкой, значок задания — над строкой" % bar_h)

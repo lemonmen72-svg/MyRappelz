@@ -109,7 +109,11 @@ var _wander_to := Vector3.ZERO
 var _wander_wait := 0.0
 var _regen_acc := 0.0
 var _mat: Material
+## Подпись над головой (Overhead): «Ур. N Имя», тонкая полоска HP, красный значок цели задания; _label — её строка.
+var _over: Overhead
 var _label: Label3D
+## Зверь нужен по взятому заданию (красный значок над ним; ставит Quests.refresh_mob_marks).
+var quest_target := false
 ## Путь в обход реки через мосты (погоня и возврат домой).
 var _route := IslandWorld.Route.new()
 var _model: Node3D
@@ -180,18 +184,7 @@ func _ready() -> void:
 		hover_y = CreatureAsset.hover_for(model_id, body_scale)
 	_anim_t = randf() * 10.0
 
-	_label = Label3D.new()
-	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_label.no_depth_test = true
-	_label.pixel_size = UiScale.world_px(0.01)
-	_label.font_size = 40
-	_label.outline_size = 10
-	_label.position = Vector3(0, _height + 0.35, 0)
-	if rarity != "common" or is_boss:
-		_label.modulate = MobData.label_color(type_id)
-	if is_boss:
-		_label.font_size = 48
-	add_child(_label)
+	_build_overhead()
 	_wander_to = home
 	_update_label()
 
@@ -758,7 +751,7 @@ func _die() -> void:
 	effects.clear()
 	remove_from_group("mobs")
 	collision_layer = 0
-	_label.hide()
+	_over.hide()
 	if _mark != null:
 		_mark.hide()
 	_hit_target = null
@@ -816,5 +809,42 @@ func mid_point() -> Vector3:
 	return global_position + Vector3(0, hover_y if hover_y > 0.0 else maxf(0.5, _height * 0.5), 0)
 
 
+# ---------- Подпись над головой ----------
+
+func _build_overhead() -> void:
+	_over = Overhead.new()
+	_over.name = "Overhead"
+	add_child(_over)
+	_over.setup(1.0, _name_color(), Color(0.92, 0.26, 0.2))
+	_label = _over.label
+	if is_boss:
+		_label.font_size = roundi(Overhead.FONT * 1.2)
+	_over.place(_height + 0.12)
+
+
+## Цвет имени: по редкости (обычный — белый), у агрессивного зверя (Mob.aggressive, если есть) — красноватый.
+func _name_color() -> Color:
+	var c := MobData.label_color(type_id) if rarity != "common" or is_boss else Color.WHITE
+	if get("aggressive") == true:
+		c = c.lerp(Color(1.0, 0.3, 0.25), 0.6 if c == Color.WHITE else 0.35)
+	return c
+
+
 func _update_label() -> void:
-	_label.text = "%s%s  Ур.%d\n%d/%d" % ["Босс · " if is_boss else "", mob_name, level, hp, max_hp]
+	if _over == null:
+		return
+	_over.set_text("Ур. %d %s%s" % [level, "Босс · " if is_boss else "", mob_name])
+	_over.set_hp(hp, max_hp)
+	_over.set_name_color(_name_color())
+
+
+## Красный значок над зверем — цель взятого задания (Quests.refresh_mob_marks).
+func set_quest_target(on: bool) -> void:
+	quest_target = on
+	if _over != null:
+		_over.set_mark(on and not is_dead)
+
+
+## Виден ли красный значок цели задания (для тестов).
+func quest_mark_visible() -> bool:
+	return _over != null and _over.mark_visible()

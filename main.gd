@@ -55,7 +55,8 @@ const PET_BUTTONS := [
 ]
 ## Цвет кнопки включённого переключаемого умения.
 const TOGGLE_ON_COLOR := Color(0.3, 0.85, 0.45, 0.6)
-## Значки круглых кнопок без своего источника (IconView): облачко речи, мешочек торговца.
+## Значки круглых кнопок без своего источника (IconView): облачко речи, мешочек торговца, команды питомца.
+## Картинка UiIcons ([id кнопки, id значка UiIcons]) — если файл есть, иначе рисунок IconView ниже.
 ## Умения — значок умения, «Атака» — надетое оружие, «Зелье» — зелье с числом, «Приручить» — карта существа цели.
 const BUTTON_ICONS := {
 	"talk": {"shape": "talk", "color": Color(0.95, 0.6, 0.25)},
@@ -64,6 +65,10 @@ const BUTTON_ICONS := {
 	"pet_attack": {"shape": "pet_attack", "color": Color(1.0, 0.4, 0.3)},
 	"pet_defend": {"shape": "pet_defend", "color": Color(0.35, 0.65, 0.45)},
 	"pet_follow": {"shape": "pet_follow", "color": Color(0.85, 0.68, 0.4)},
+}
+const BUTTON_UI_ICONS := {
+	"talk": "btn_talk", "shop": "btn_merchant", "pet_auto": "pet_auto", "pet_attack": "pet_attack",
+	"pet_defend": "pet_defend", "pet_follow": "pet_follow",
 }
 ## Карта на кнопке «Приручить», пока у цели своей карты нет.
 const TAME_ICON_CARD := "card_panther"
@@ -259,7 +264,7 @@ func _build_hud() -> void:
 	hud.set_button_visible("shop", false)
 	hud.set_button_visible("talk", false)
 	for id in BUTTON_ICONS:
-		hud.set_button_icon(String(id), BUTTON_ICONS[id])
+		hud.set_button_icon(String(id), UiIcons.icon_spec(String(BUTTON_UI_ICONS.get(id, "")), BUTTON_ICONS[id]))
 	refresh_tame_icon(null)
 
 
@@ -458,6 +463,10 @@ func refresh_tame_icon(t: Node3D) -> void:
 		var own := "card_" + String(t.get("type_id"))
 		if not ItemData.get_item(own).is_empty():
 			card = own
+	# Без своей карты у цели — картинка «Приручить» (UiIcons btn_tame), если она есть
+	if card == TAME_ICON_CARD and UiIcons.has_file("btn_tame"):
+		hud.set_button_icon("tame", {"path": UiIcons.path("btn_tame")})
+		return
 	hud.set_button_icon("tame", IconView.item(card))
 
 

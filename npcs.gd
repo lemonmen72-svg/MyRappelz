@@ -12,9 +12,13 @@ extends Node
 ## которых ещё нет, — «— скоро»: страница с рассказом, что будет; пункт с action открывает окно — «Склад»
 ## у кладовщика), «До встречи». Страница «Задания» — задания NPC (Quests.npc_quests): взять, посмотреть прогресс,
 ## сдать; два и больше доступных — ещё «Взять все». Отошёл дальше — диалог закрывается.
-## Значки над NPC («!», «?») — Quests.npc_mark, обновляются по Quests.updated и раз в MARK_PERIOD.
+## Значки над NPC («!» — можно взять, «?» — взято, «=» — можно сдать) — Quests.npc_mark, обновляются по
+## Quests.updated и раз в MARK_PERIOD; там же — красные значки над зверями-целями заданий (Quests.refresh_mob_marks).
 ## Кнопки открытого диалога для тестов (buttons): "opt_quests", "opt_trade", "opt_bye", "opt_<пункт talk>",
 ## "dq_<id>", "accept", "accept_all", "complete", "back".
+
+## Значки пунктов о делах NPC в диалоге (id пункта NpcData talk → id значка UiIcons).
+const DIALOG_ICONS := {"storage": "btn_storage", "forge": "btn_forge", "craft": "btn_craft"}
 
 ## Кнопка «Говорить» видна ближе этого расстояния, м; диалог закрывается дальше TALK_RANGE + 1.
 const TALK_RANGE := 4.0
@@ -270,6 +274,8 @@ func refresh_marks() -> void:
 		var n := v as Npc
 		if n != null:
 			n.set_mark(main.quests.npc_mark(String(k)))
+	# Красные значки над зверями — целями взятых заданий (новые звери появляются — тоже здесь)
+	main.quests.refresh_mob_marks()
 
 
 # ---------- Диалог ----------
@@ -400,12 +406,16 @@ func _page_main() -> void:
 		if q != null:
 			match q.npc_mark(dialog_npc):
 				"ready":
-					qt += "  (?) — можно сдать"
+					qt += "  (=) — можно сдать"
 				"offer":
 					qt += "  (!) — есть новое"
-		opts.add_child(_option(qt, "opt_quests", _on_quests))
+		var qb := _option(qt, "opt_quests", _on_quests)
+		UiIcons.add_icon(qb, "menu_quests")
+		opts.add_child(qb)
 	if NpcData.is_trader(dialog_npc):
-		opts.add_child(_option("Торговля", "opt_trade", _on_trade))
+		var tb := _option("Торговля", "opt_trade", _on_trade)
+		UiIcons.add_icon(tb, "btn_merchant")
+		opts.add_child(tb)
 	for e in NpcData.talk_options(dialog_npc):
 		var d: Dictionary = e
 		var id := String(d.get("id", ""))
@@ -414,6 +424,9 @@ func _page_main() -> void:
 			_on_npc_action.bind(action) if action != "" else _on_info.bind(id))
 		if bool(d.get("soon", false)):
 			b.add_theme_color_override("font_color", SOON)
+		# Значки дел (UiIcons): склад, кузница
+		if DIALOG_ICONS.has(id):
+			UiIcons.add_icon(b, String(DIALOG_ICONS[id]))
 		opts.add_child(b)
 	opts.add_child(_option("До встречи", "opt_bye", close_dialog))
 

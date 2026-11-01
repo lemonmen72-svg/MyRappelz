@@ -10,6 +10,8 @@ extends RefCounted
 ##   открытии, надписи в мире — у новых;
 ## - «Прочее»: версия игры и пакет ресурсов, админ-панель (AdminPanel.ADMIN_TOOLS = false — убрать).
 ## Все вкладки строятся сразу (неоткрытые скрыты), поэтому кнопки всех вкладок есть в buttons.
+## Вкладки — значками UiIcons (tab_graphics, tab_interface, tab_other; подсказка — название), название открытой
+## вкладки — заголовком её страницы.
 ## Открытие: SettingsMenu.open(hud) (действие HUD "settings_window"), SettingsMenu.open(hud, "ui") — на вкладке.
 ## Кнопки открытого окна для тестов (buttons): вкладки "tab_<graphics|ui|other>", "ui_<0..2>", "quality_<0..3>"
 ## (пресеты), "<настройка>_<вариант>" (например "shadows_2", "aa_1" — Quality.OPTIONS), "fps_<30|45|60>",
@@ -23,8 +25,11 @@ const TEXT_COLOR := Color(0.98, 0.96, 0.9)
 const HINT_COLOR := Color(0.78, 0.8, 0.86)
 ## Ширина подписи настройки слева от кнопок, px («Средний»).
 const LABEL_W := 180.0
-## Вкладки: [id, название].
-const TABS := [["graphics", "Графика"], ["ui", "Интерфейс"], ["other", "Прочее"]]
+## Вкладки: [id, название, значок UiIcons]. Кнопки вкладок — значками (подсказка — название), название вкладки —
+## заголовком в начале её страницы.
+const TABS := [["graphics", "Графика", "tab_graphics"], ["ui", "Интерфейс", "tab_interface"], ["other", "Прочее", "tab_other"]]
+## Высота значка на кнопке вкладки («Средний»).
+const TAB_ICON := 30.0
 
 static var buttons: Dictionary = {}
 ## Открытая (последняя) вкладка.
@@ -91,9 +96,8 @@ static func _add_tabs(_hud: HUD, body: VBoxContainer) -> void:
 		body.add_child(bar)
 	for t in TABS:
 		var id := String(t[0])
-		var b := Button.new()
-		b.text = String(t[1])
-		b.focus_mode = Control.FOCUS_NONE
+		var b := UiIcons.icon_button(String(t[2]), TAB_ICON)
+		b.tooltip_text = String(t[1])
 		b.toggle_mode = true
 		b.button_pressed = id == tab
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -110,6 +114,15 @@ static func _page(body: VBoxContainer, id: String) -> VBoxContainer:
 	page.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	body.add_child(page)
 	_pages[id] = page
+	# Название вкладки — заголовком страницы (кнопка вкладки — только значок)
+	for t in TABS:
+		if String(t[0]) == id:
+			var title := Label.new()
+			title.name = "TabTitle"
+			title.text = String(t[1])
+			title.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_NAME))
+			title.add_theme_color_override("font_color", NOTE_COLOR)
+			page.add_child(title)
 	return page
 
 

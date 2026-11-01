@@ -124,6 +124,8 @@ var _scan_t := 0.0
 var _aura_t := 0.0
 var _col: CollisionShape3D = null
 var _mat: Material = null
+## Подпись над головой (Overhead: «Ур. N Имя» и тонкая полоска HP); _label — её строка.
+var _over: Overhead = null
 var _label: Label3D = null
 var _color := Color.WHITE
 var _scale := 1.0
@@ -174,16 +176,13 @@ func _ready() -> void:
 	add_to_group("pets")
 	collision_layer = 2
 	collision_mask = 1
-	_label = Label3D.new()
-	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_label.no_depth_test = true
 	# Питомец всегда рядом с камерой (в 2–3 м от героя), поэтому подпись мельче, чем у зверей
 	# (LABEL_PX от их размера): на экране она не крупнее подписей зверей поблизости и имён жителей
-	_label.pixel_size = UiScale.world_px(0.01 * LABEL_PX)
-	_label.font_size = 40
-	_label.outline_size = 10
-	_label.modulate = Color(0.6, 0.9, 1.0)
-	add_child(_label)
+	_over = Overhead.new()
+	_over.name = "Overhead"
+	add_child(_over)
+	_over.setup(LABEL_PX, Color(0.6, 0.9, 1.0), Color(0.3, 0.78, 1.0))
+	_label = _over.label
 	_build_model()
 	_update_label()
 	_update_aura()
@@ -1277,8 +1276,8 @@ func _build_model() -> void:
 	ring.material_override = CreatureModels.flat_mat(Color(0.3, 0.8, 1.0))
 	ring.set_meta("no_outline", true)
 	_model.add_child(ring)
-	if _label != null:
-		_label.position = Vector3(0, _height + 0.35, 0)
+	if _over != null:
+		_over.place(_height + 0.1)
 
 
 func _evolve_fx() -> void:
@@ -1330,8 +1329,9 @@ func _flash() -> void:
 
 
 func _update_label() -> void:
-	if _label != null:
-		_label.text = "%s  Ур.%d\n%d/%d" % [pet_name, level, hp, max_hp]
+	if _over != null:
+		_over.set_text("Ур. %d %s" % [level, pet_name])
+		_over.set_hp(hp, max_hp)
 
 
 # ---------- Связь с героем (PetBond: ауры, усиления, «Нить жизни», жертвы, слияние и облик — этап 2) ----------
@@ -1400,8 +1400,8 @@ func bond_sacrifice() -> void:
 
 ## Подпись над питомцем (в «Зверином облике» скрыта: это герой).
 func set_label_visible(on: bool) -> void:
-	if _label != null:
-		_label.visible = on
+	if _over != null:
+		_over.visible = on
 
 
 ## Снять ослабления (значки-дебафы, кроме перезарядки «Нити жизни»). Возвращает, сколько снято.

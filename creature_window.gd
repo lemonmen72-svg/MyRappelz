@@ -147,17 +147,20 @@ func _add_tabs(body: VBoxContainer) -> void:
 		root.move_child(bar, 1)
 	else:
 		body.add_child(bar)
-	_tab_button(bar, "tab_stats", "Существо", tab == "stats", _on_tab.bind("stats"))
-	_tab_button(bar, "tab_skills", "Умения", tab == "skills", _on_tab.bind("skills"))
+	# Вкладки — значок и короткая подпись (UiIcons: menu_creature, tab_skills, back)
+	_tab_button(bar, "tab_stats", "Существо", tab == "stats", _on_tab.bind("stats"), "menu_creature")
+	_tab_button(bar, "tab_skills", "Умения", tab == "skills", _on_tab.bind("skills"), "tab_skills")
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(spacer)
-	_tab_button(bar, "back", "К питомцам", false, _on_back)
+	_tab_button(bar, "back", "К питомцам", false, _on_back, "back")
 
 
-func _tab_button(bar: HBoxContainer, key: String, text: String, active: bool, cb: Callable) -> void:
+func _tab_button(bar: HBoxContainer, key: String, text: String, active: bool, cb: Callable, icon_id: String = "") -> void:
 	var b := Button.new()
 	b.text = text
+	if icon_id != "":
+		UiIcons.add_icon(b, icon_id)
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(UiScale.px(130), UiScale.px(UiScale.TAB_H))
 	b.toggle_mode = key != "back"

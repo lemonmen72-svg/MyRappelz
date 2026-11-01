@@ -15,7 +15,8 @@ extends Node
 ## (если не помещаются — «Освободите место в сумке», задание остаётся взятым), JP героя; предметы целей collect
 ## с take = true забираются.
 ## Журнал — QuestWindow (window; кнопка «Задания» в меню HUD, клавиша J), трекер отслеживаемого задания —
-## компактный блок справа вверху под меню (tracker; касание — журнал). Значки над NPC — npc_mark (Npcs).
+## компактный блок справа вверху под меню (tracker; касание — журнал). Значки над NPC — npc_mark (Npcs), красные
+## значки над зверями-целями — target_species / refresh_mob_marks (Mob.set_quest_target).
 
 ## Задание взято, сдано, прогресс изменился.
 signal updated
@@ -187,8 +188,8 @@ func done_ids() -> Array:
 	return Game.quests_done.keys()
 
 
-## Значок над NPC: "ready" — у него можно сдать выполненное задание (золотой «?»), "offer" — у него есть задание,
-## которое можно взять («!»), "active" — взятое у него задание ещё не выполнено (серый «?»), "" — ничего.
+## Значок над NPC: "ready" — у него можно сдать выполненное задание («=»), "offer" — у него есть задание,
+## которое можно взять («!»), "active" — взятое задание, которое сдавать ему, ещё не выполнено («?»), "" — ничего.
 func npc_mark(npc_id: String) -> String:
 	var best := ""
 	for k in QuestData.all_ids():
@@ -201,6 +202,49 @@ func npc_mark(npc_id: String) -> String:
 		elif st == "active" and QuestData.turn_in(id) == npc_id and best == "":
 			best = "active"
 	return best
+
+
+## Звери — цели взятых заданий: {вид зверя: наименьший уровень} по невыполненным целям kill (вид задан, с min_level)
+## и collect с drop_from (квестовая добыча). Цели «любой зверь» (target "") и pet_kill не в счёт — иначе значок
+## был бы над каждым зверем.
+func target_species() -> Dictionary:
+	var res: Dictionary = {}
+	for k in Game.quests_active.keys():
+		var id := String(k)
+		var goals := QuestData.goals(id)
+		for gi in goals.size():
+			var g: Dictionary = goals[gi]
+			if goal_done(id, gi):
+				continue
+			var sp := ""
+			var lvl := 0
+			match String(g.get("type", "")):
+				"kill":
+					sp = String(g.get("target", ""))
+					lvl = int(g.get("min_level", 0))
+				"collect":
+					sp = String(g.get("drop_from", ""))
+			if sp == "":
+				continue
+			res[sp] = mini(int(res.get(sp, lvl)), lvl)
+	return res
+
+
+## Нужен ли зверь (вид species, уровень lvl) по взятому заданию — красный значок над ним.
+func is_mob_target(species: String, lvl: int, targets: Dictionary = {}) -> bool:
+	var t := targets if not targets.is_empty() else target_species()
+	return t.has(species) and lvl >= int(t[species])
+
+
+## Обновить красные значки над зверями (Mob.set_quest_target): по Quests.updated и раз в Npcs.MARK_PERIOD.
+func refresh_mob_marks() -> void:
+	if not is_inside_tree():
+		return
+	var t := target_species()
+	for n in get_tree().get_nodes_in_group("mobs"):
+		var m := n as Mob
+		if m != null and not m.is_dead:
+			m.set_quest_target(t.has(m.type_id) and m.level >= int(t[m.type_id]))
 
 
 ## Задания NPC для диалога: готовые к сдаче, доступные, взятые и следующее, закрытое уровнем.
