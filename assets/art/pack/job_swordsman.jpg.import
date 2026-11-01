@@ -1,0 +1,16 @@
+[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+
+[deps]
+
+source_file="res://assets/art/pack/job_swordsman.jpg"
+
+[params]
+
+compress/mode=1
+compress/high_quality=false
+compress/lossy_quality=0.85
+mipmaps/generate=true
+detect_3d/compress_to=0

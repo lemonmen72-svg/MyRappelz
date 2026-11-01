@@ -7,6 +7,7 @@ test_anathema 4
 test_asset_fallback 8
 test_asset_pack 3
 test_balance_start 5
+test_branding 6
 test_bridge 4
 test_centaur 3
 test_character_model 4

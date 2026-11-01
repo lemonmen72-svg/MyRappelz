@@ -1,7 +1,8 @@
 class_name JobWindow
 extends Node
 ## Окно выбора первой профессии (сдача задания «Доклад мудрецу» мудрецу, QuestData "sage_first_job"):
-## три карточки профессий расы героя — название, роль, оружие, описание, 3–4 ключевых умения (значки и названия),
+## три карточки профессий расы героя — арт профессии с названием внизу (MenuKit.job_art_head; часть пакета «art» не
+## загружена — название строкой), роль, оружие, описание, 3–4 ключевых умения (значки и названия),
 ## кнопка «Выбрать»; затем подтверждение («Сменить профессию позже нельзя», бонус сверх-эволюции
 ## ClassData.over_jp). «Да» — задание сдаётся (Quests.complete: награды), профессия меняется (Game.change_job:
 ## древо, стартовое оружие профессии в сумку и в руки), игрок пересчитывается, сообщение на экране.
@@ -11,6 +12,8 @@ extends Node
 ## Размер окна для «Среднего» размера интерфейса.
 const WINDOW_SIZE := Vector2(1060, 600)
 const CARD_W := 330.0
+## Арт профессии в карточке («Средний»): во всю ширину карточки, окно сверху.
+const ART_H := 190.0
 const GOLD := Color(1.0, 0.85, 0.45)
 const MUTED := Color(0.78, 0.8, 0.9)
 const GOOD := Color(0.55, 1.0, 0.6)
@@ -83,7 +86,12 @@ func _card(job: String) -> Control:
 	box.add_theme_constant_override("separation", int(UiScale.px(3)))
 	panel.add_child(box)
 	var w := UiScale.px(CARD_W - 24.0)
-	box.add_child(_label(String(c["name"]), UiScale.FONT_NAME, col.lightened(0.4), w))
+	var head := MenuKit.job_art_head(job, Vector2(CARD_W - 24.0, ART_H), String(c["name"]), col.lightened(0.5),
+		(CARD_W - 24.0) / ART_H)
+	if head != null:
+		box.add_child(head)
+	else:
+		box.add_child(_label(String(c["name"]), UiScale.FONT_NAME, col.lightened(0.4), w))
 	box.add_child(_label("Роль: " + String(c["role"]), UiScale.FONT_BODY, MUTED, w))
 	box.add_child(_label("Оружие: " + String(c["weapon_text"]), UiScale.FONT_BODY, MUTED, w))
 	box.add_child(_label(String(c["desc"]), UiScale.FONT_SMALL, Color.WHITE, w))

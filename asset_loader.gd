@@ -17,7 +17,7 @@ extends CanvasLayer
 ## Сигнал finished(with_pack) — можно продолжать (main.gd). Если ресурсы уже есть (Assets.available()),
 ## экран не нужен — main.gd его не создаёт.
 ## Фоновая загрузка (Android, плагин MyRappelzDownload — Assets.download_plugin()): «Загрузить» отдаёт системному
-## DownloadManager все недостающие части сразу (файлы — во внешнюю папку приложения, уведомление «MyRappelz —
+## DownloadManager все недостающие части сразу (файлы — во внешнюю папку приложения, уведомление «Dark Pact —
 ## загрузка ресурсов» с ходом загрузки у каждой, на Android 13+ при первом нажатии спрашивается разрешение на
 ## уведомления), игру можно свернуть или закрыть — качает Android. Экран опрашивает загрузки (_poll_dm раз в
 ## POLL_TIME): МБ из МБ всех частей, скорость, ожидание сети; часть готова — проверка sha256 с копированием в
@@ -62,8 +62,10 @@ const DM_PAUSED := 4
 const DM_SUCCESS := 8
 const DM_FAILED := 16
 ## Уведомление системы о загрузке.
-const NOTIFY_TITLE := "MyRappelz — загрузка ресурсов"
+const NOTIFY_TITLE := "Dark Pact — загрузка ресурсов"
 const NOTIFY_TEXT := "Пакет моделей, часть %d из %d, %s"
+## Высота логотипа Dark Pact над окном загрузки («Средний»).
+const LOGO_H := 140.0
 
 var state := State.START
 ## Манифест: {version, parts: [{name, hash, sha256, size, url, file}]} (Assets.manifest_from).
@@ -771,13 +773,23 @@ func _build_ui() -> void:
 	bg.color = Color(0.05, 0.07, 0.1)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
+	# Dark Pact: главный арт на фоне и логотип над окном (в APK — видны до загрузки пакета; фоновому узлу не нужны)
+	var logo: TextureRect = null
+	if not background:
+		MenuKit.set_backdrop(self, MenuKit.art(MenuKit.KEY_ART), MenuKit.KEY_SHADE)
+		logo = MenuKit.logo(LOGO_H)
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.theme = Util.ui_theme()
 	add_child(center)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", int(UiScale.px(14)))
+	center.add_child(col)
+	if logo != null:
+		col.add_child(logo)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = UiScale.v2(660, 0)
-	center.add_child(panel)
+	col.add_child(panel)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", int(UiScale.px(12)))
 	panel.add_child(v)

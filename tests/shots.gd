@@ -14,8 +14,10 @@ const SHOWCASE_SKILLS := [
 ]
 
 var _create: Node = null
-## Экран до мира для кадров 102–109 (вход, выбор, создание персонажа).
+## Экран до мира для кадров 102–109 (вход, выбор, создание персонажа) и 260–269 (арты Dark Pact).
 var _menu: CanvasLayer = null
+## Подставной sha256 частей манифеста для кадра 260 (экран загрузки без сети).
+const SHOT_SHA := "0000000000000000000000000000000000000000000000000000000000000000"
 ## Герои в ряд (кадр 86): прежняя героиня и герои из Meshy (tools/prepare_hero.py).
 const HERO_ROW := ["res://assets/characters/dark_elf_wanderer.glb", "res://assets/characters/hero_assassin_m.glb",
 	"res://assets/characters/hero_swordsman_f.glb", "res://assets/characters/hero_warrior_m.glb",
@@ -139,7 +141,7 @@ const PART_ENTRIES := [
 	[814, 152, 72], [816, 59, 23], [818, 120, 29], [960, 45, 12], [963, 64, 14], [925, 141, 33],
 	[940, 33, 9], [943, 63, 47], [946, 95, 46], [980, 40, 46], [1000, 42, 18], [1002, 95, 83],
 	[1025, 102, 102], [1021, 126, 144], [1040, 141, 181], [1060, 66, 67], [1160, 124, 148], [1120, 98, 101],
-	[1080, 60, 58], [1200, 180, 224], [1260, 224, 112],
+	[1080, 60, 58], [1200, 180, 224], [1260, 224, 112], [1220, 103, 52],
 ]
 ## Сколько кадров до точки входа часть уже рисует (компиляция шейдеров, тени, окна интерфейса).
 const PART_WARMUP := 10
@@ -1870,6 +1872,102 @@ func run_step() -> void:
 		1267:
 			shot("286_weaponsmith_trade")
 			main.hud.close_window()
+			wait = 2
+			step = 1220
+		1220:
+			# Арты Dark Pact (кадры 260–269): экран загрузки ресурсов (как без пакета: части «не загружены»,
+			# предупреждение о размере) — главный арт и логотип
+			main.hud.close_window()
+			Assets.simulate_missing(true)
+			var ld := AssetLoader.new()
+			ld.offline = true
+			ld.preset_manifest = Assets.manifest_from({"format": 2, "version": "0.25.0", "parts": [
+				{"name": "heroes_dark", "hash": "1234567890abcdef", "sha256": SHOT_SHA, "size": 84000000,
+					"url": "https://example.invalid/a.pck"},
+				{"name": "art", "hash": "abcdef1234567890", "sha256": SHOT_SHA, "size": 4200000,
+					"url": "https://example.invalid/b.pck"}]})
+			get_tree().root.add_child(ld)
+			_menu = ld
+			wait = 10
+			step = 1221
+		1221:
+			shot("260_loader_art")
+			_menu.queue_free()
+			Assets.simulate_missing(false)
+			_menu = LoginScreen.new()
+			get_tree().root.add_child(_menu)
+			wait = 10
+			step = 1222
+		1222:
+			shot("261_login_art")
+			_menu.queue_free()
+			# Выбор персонажа с портретами: профессия и пол, Бродяга — раса и пол; слот 4 пуст (без портрета)
+			Accounts.save_slot(1, {"name": "Лиара", "race": "light_elf", "class": "wizard", "level": 24, "gender": "f"})
+			Accounts.save_slot(2, {"name": "Гром_топор", "race": "human", "class": "warrior", "level": 31, "gender": "m"})
+			_menu = CharacterSelect.new()
+			get_tree().root.add_child(_menu)
+			(_menu as CharacterSelect).select(1)
+			wait = 10
+			step = 1223
+		1223:
+			for i in 3:
+				check((_menu as CharacterSelect).portrait_of(i) != null, "кадр 262: портрет у слота %d" % (i + 1))
+			shot("262_select_portraits")
+			_menu.queue_free()
+			Accounts.delete_slot(1)
+			Accounts.delete_slot(2)
+			# Шаг «Раса»: арт расы на фоне, описание слева
+			_menu = CharacterCreate.new()
+			get_tree().root.add_child(_menu)
+			(_menu as CharacterCreate)._select_race("dark_elf")
+			wait = 10
+			step = 1224
+		1224:
+			check((_menu as CharacterCreate).backdrop() != null, "кадр 263: арт расы на фоне")
+			shot("263_create_race_dark")
+			(_menu as CharacterCreate)._select_race("light_elf")
+			wait = 6
+			step = 1225
+		1225:
+			shot("264_create_race_light")
+			(_menu as CharacterCreate)._select_race("human")
+			wait = 6
+			step = 1226
+		1226:
+			shot("265_create_race_human")
+			(_menu as CharacterCreate).go_next()
+			wait = 10
+			step = 1227
+		1227:
+			shot("266_create_jobs_human")
+			(_menu as CharacterCreate).go_back()
+			(_menu as CharacterCreate)._select_race("dark_elf")
+			(_menu as CharacterCreate).go_next()
+			wait = 10
+			step = 1228
+		1228:
+			shot("267_create_jobs_dark")
+			_menu.queue_free()
+			_menu = null
+			# Окно выбора профессии у мудреца — карточки с артами профессий
+			main.job_window.open("")
+			wait = 10
+			step = 1229
+		1229:
+			shot("268_sage_job_window")
+			main.hud.close_window()
+			# Без пакета ресурсов (часть «art» не загружена): шаг «Раса» без арта — прежний тёмный фон
+			Assets.simulate_missing(true)
+			_menu = CharacterCreate.new()
+			get_tree().root.add_child(_menu)
+			wait = 10
+			step = 1230
+		1230:
+			check((_menu as CharacterCreate).backdrop() == null, "кадр 269: без пакета — без арта")
+			shot("269_create_race_no_pack")
+			_menu.queue_free()
+			_menu = null
+			Assets.simulate_missing(false)
 			ok_done()
 
 

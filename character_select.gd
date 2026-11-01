@@ -1,7 +1,9 @@
 class_name CharacterSelect
 extends CanvasLayer
 ## Выбор персонажа: 4 карточки слотов вошедшего аккаунта (Accounts.list_slots) — ник, раса, профессия, уровень,
-## пол; пустой слот — «Создать». Касание карточки выбирает её; «Играть» — сигнал play(слот), «Удалить» —
+## пол, сверху портрет (MenuKit.portrait: по профессии и полу, у Бродяги — по расе и полу; часть пакета «art» не
+## загружена — без портрета); пустой слот — «Создать», без портрета. Фон — главный арт (MenuKit.KEY_ART), затемнённый.
+## Касание карточки выбирает её; «Играть» — сигнал play(слот), «Удалить» —
 ## подтверждение вводом ника (Accounts.delete_slot), «Сменить аккаунт» — сигнал switch_account.
 ## Для тестов: select(i), cards (панели), buttons ("play", "delete", "switch", "create_<i>", "delete_yes", "delete_no"),
 ## confirm_delete(текст) — удалить выбранного, если ник совпал.
@@ -11,7 +13,11 @@ signal create(slot: int)
 signal switch_account
 
 ## Карточка слота для «Среднего» размера интерфейса.
-const CARD_SIZE := Vector2(225, 190)
+const CARD_SIZE := Vector2(225, 300)
+## Сторона портрета на карточке («Средний»).
+const PORTRAIT := 118.0
+## Затемнение главного арта на фоне (карточки поверх).
+const SHADE := 0.6
 
 ## Сообщение над карточками (перенос старого сохранения и т. п.).
 var note := ""
@@ -28,7 +34,7 @@ var _bottom: HBoxContainer
 
 
 func _ready() -> void:
-	var root := MenuKit.build_root(self)
+	var root := MenuKit.build_root(self, MenuKit.KEY_ART, SHADE)
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", int(UiScale.px(10)))
 	root.add_child(head)
@@ -116,6 +122,14 @@ func show_error(text: String) -> void:
 	_info.add_theme_color_override("font_color", MenuKit.BAD)
 
 
+## Портрет карточки слота i (null — пустой слот или нет картинки).
+func portrait_of(i: int) -> TextureRect:
+	if i < 0 or i >= cards.size():
+		return null
+	var found := cards[i].find_child("Portrait", true, false)
+	return found as TextureRect
+
+
 func _card_color(s: Dictionary) -> Color:
 	if s.is_empty():
 		return Color(0.4, 0.42, 0.5)
@@ -155,6 +169,9 @@ func _card(i: int) -> PanelContainer:
 		return panel
 	var cls := String(s.get("class", ClassData.WANDERER))
 	var col := _card_color(s)
+	var pic := MenuKit.portrait(cls, String(s.get("race", "")), String(s.get("gender", "f")), PORTRAIT)
+	if pic != null:
+		v.add_child(pic)
 	var nick := _pass(MenuKit.label(String(s.get("name", "")), UiScale.FONT_NAME + 2, MenuKit.GOLD))
 	# Длинный ник (до 16 букв) не раздвигает карточку: обрезается многоточием, полностью — в подсказке
 	nick.clip_text = true
