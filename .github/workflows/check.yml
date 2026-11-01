@@ -1,15 +1,75 @@
-# Проверка кода: импорт проекта и автотест. APK здесь НЕ собирается.
+# Проверка кода: импорт проекта, автотесты, скриншоты и замер нагрузки. APK здесь НЕ собирается.
+# Задачи идут параллельно (репозиторий публичный — до 20 задач сразу):
+#   plan        — нужны ли скриншоты (только если изменились файлы, влияющие на картинку; ci_plan.py) и какие части;
+#   smoke       — автотесты, матрица частей (matrix.part; деление по времени тестов — split_tests.py);
+#   visual      — скриншоты, матрица из SHOTS_PARTS частей сценария tests/shots.gd (PART_ENTRIES в shots.gd);
+#   perf        — замер нагрузки tests/perf.gd по группам пресетов PERF_PARTS;
+#   shots-publish — собирает PNG частей и perf.txt в ветку ci-screenshots (как раньше, с README).
+# Импорт Godot у всех из кэша .godot/imported (import.sh, import_cache.py); сохраняет кэш часть 1 smoke.
 name: Проверка кода
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      shots:
+        description: "Части скриншотов: all, none или номера через запятую (1–6)"
+        required: false
+        default: "all"
+      perf:
+        description: "Замер нагрузки (perf)"
+        type: boolean
+        required: false
+        default: true
+
+# actions: read — время шагов задачи из API (step_times.py)
+permissions:
+  contents: read
+  actions: read
+
+env:
+  GODOT_VERSION: "4.3"
+  # Число частей скриншотов (матрица visual; поле shots ручного запуска — номера 1…SHOTS_PARTS) и группы
+  # пресетов замера (задачи perf). Части автотестов — список matrix.part задачи smoke.
+  SHOTS_PARTS: "6"
+  PERF_PARTS: "0,1 2,3"
 
 jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      visual: ${{ steps.plan.outputs.visual }}
+      shots: ${{ steps.plan.outputs.shots }}
+      perf: ${{ steps.plan.outputs.perf }}
+      full: ${{ steps.plan.outputs.full }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
+          filter: blob:none
+
+      - name: Что запускать
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          INPUT_SHOTS: ${{ inputs.shots }}
+          INPUT_PERF: ${{ inputs.perf }}
+        run: python3 -I .github/scripts/ci_plan.py
+
   smoke:
     runs-on: ubuntu-24.04
-    env:
-      GODOT_VERSION: "4.3"
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3, 4]
+    name: smoke (${{ matrix.part }})
     steps:
       - uses: actions/checkout@v4
 
@@ -21,48 +81,198 @@ jobs:
       - name: Установка Godot
         run: .github/scripts/setup_godot.sh
 
+      # Кэш импорта: точный ключ — те же исходники и .import; иначе ближайший прежний (Godot переимпортирует
+      # изменённое сам, import_cache.py — файлы с изменёнными параметрами .import)
+      - name: Ключ кэша импорта
+        id: ikey
+        run: .github/scripts/import_key.sh
+
+      - name: Кэш импорта Godot
+        id: import-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .godot/imported
+            .godot/ci_import_state.json
+            .godot/ci_import_files
+          key: ${{ steps.ikey.outputs.key }}
+          restore-keys: ${{ steps.ikey.outputs.restore }}
+
+      - name: Импорт проекта
+        run: .github/scripts/import.sh
+
+      - name: Сохранение кэша импорта
+        if: always() && matrix.part == 1 && steps.import-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .godot/imported
+            .godot/ci_import_state.json
+            .godot/ci_import_files
+          key: ${{ steps.ikey.outputs.key }}
+
       - name: Автотест
+        env:
+          SMOKE_PART: ${{ matrix.part }}
+          SMOKE_PARTS: ${{ strategy.job-total }}
         run: .github/scripts/smoke_test.sh
 
-  # Настоящий рендер: ошибки шейдеров + скриншоты в ветку ci-screenshots (APK не собирается)
+      - name: Время этапов
+        if: always()
+        env:
+          TOKEN: ${{ github.token }}
+        run: python3 -I .github/scripts/step_times.py
+
+  # Настоящий рендер: ошибки шейдеров + скриншоты (APK не собирается). Каждая часть — свои кадры.
   visual:
+    needs: plan
+    if: needs.plan.outputs.visual == 'true' && needs.plan.outputs.shots != '[]'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJSON(needs.plan.outputs.shots) }}
+    name: visual (${{ matrix.part }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Точки входа частей
+        run: python3 -I tools/shots_parts.py --check && python3 -I tools/shots_parts.py --parts "$SHOTS_PARTS"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/godot-dl
+          key: godot-${{ env.GODOT_VERSION }}-bin
+
+      - name: Установка Godot
+        run: .github/scripts/setup_godot.sh
+
+      - name: Ключ кэша импорта
+        id: ikey
+        run: .github/scripts/import_key.sh
+
+      - name: Кэш импорта Godot
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .godot/imported
+            .godot/ci_import_state.json
+            .godot/ci_import_files
+          key: ${{ steps.ikey.outputs.key }}
+          restore-keys: ${{ steps.ikey.outputs.restore }}
+
+      - name: Скриншоты
+        env:
+          SHOTS_PART: ${{ matrix.part }}
+        run: .github/scripts/screenshots.sh
+
+      - name: Кадры части
+        if: always()
+        run: |
+          OUT="$RUNNER_TEMP/out"
+          mkdir -p "$OUT"
+          cp "$HOME/.local/share/godot/app_userdata/MyRappelz/shots/"*.png "$OUT"/ 2>/dev/null || true
+          cp shots.log "$OUT"/ 2>/dev/null || true
+          ls "$OUT" | wc -l
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shots-part-${{ matrix.part }}
+          path: ${{ runner.temp }}/out
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Время этапов
+        if: always()
+        env:
+          TOKEN: ${{ github.token }}
+        run: python3 -I .github/scripts/step_times.py
+
+  # Замер нагрузки на настоящем рендере по группам пресетов (tests/perf.gd --perf-levels)
+  perf:
+    needs: plan
+    if: needs.plan.outputs.visual == 'true' && needs.plan.outputs.perf != '[]'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        levels: ${{ fromJSON(needs.plan.outputs.perf) }}
+    name: perf (${{ matrix.levels }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/godot-dl
+          key: godot-${{ env.GODOT_VERSION }}-bin
+
+      - name: Установка Godot
+        run: .github/scripts/setup_godot.sh
+
+      - name: Ключ кэша импорта
+        id: ikey
+        run: .github/scripts/import_key.sh
+
+      - name: Кэш импорта Godot
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .godot/imported
+            .godot/ci_import_state.json
+            .godot/ci_import_files
+          key: ${{ steps.ikey.outputs.key }}
+          restore-keys: ${{ steps.ikey.outputs.restore }}
+
+      - name: Замер нагрузки
+        env:
+          PERF_LEVELS: ${{ matrix.levels }}
+        run: .github/scripts/perf.sh
+
+      - name: Имя артефакта
+        if: always()
+        run: echo "PERF_NAME=perf-$(echo '${{ matrix.levels }}' | tr ',' '-')" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ env.PERF_NAME }}
+          path: |
+            perf.txt
+            perf.log
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Время этапов
+        if: always()
+        env:
+          TOKEN: ${{ github.token }}
+        run: python3 -I .github/scripts/step_times.py
+
+  # Скриншоты и perf.txt — в ветку ci-screenshots (только push и ручной запуск, как раньше — не для PR)
+  shots-publish:
+    needs: [plan, visual, perf]
+    if: always() && needs.plan.outputs.visual == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
-    env:
-      GODOT_VERSION: "4.3"
+      actions: read
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/cache@v4
         with:
-          path: ~/godot-dl
-          key: godot-${{ env.GODOT_VERSION }}-bin
+          sparse-checkout: .github
+          filter: blob:none
 
-      - name: Установка Godot
-        run: .github/scripts/setup_godot.sh
-
-      - name: Скриншоты
-        run: .github/scripts/screenshots.sh
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/art
 
       - name: Публикация скриншотов
-        if: always() && github.event_name == 'push'
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FULL: ${{ needs.plan.outputs.full }}
         run: |
-          SRC="$HOME/.local/share/godot/app_userdata/MyRappelz/shots"
-          [ -d "$SRC" ] || exit 0
-          OUT="$RUNNER_TEMP/shots-branch"
-          mkdir -p "$OUT" && cp "$SRC"/*.png "$OUT"/ && cp shots.log "$OUT"/ && cp perf.txt "$OUT"/ || true
-          cd "$OUT"
-          {
-            echo "# Скриншоты CI"
-            echo
-            echo "Коммит: \`${GITHUB_SHA}\`, ветка \`${GITHUB_REF_NAME}\`."
-            echo
-            for f in *.png; do echo "## $f"; echo; echo "![$f]($f)"; echo; done
-          } > README.md
-          git init -q -b ci-screenshots
-          git add -A
-          git -c user.name="CI" -c user.email="ci@users.noreply.github.com" commit -qm "Скриншоты ${GITHUB_SHA}"
-          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-screenshots
+          ls -R "$RUNNER_TEMP/art" | head -n 50 || true
+          .github/scripts/publish_shots.sh "$RUNNER_TEMP/art"
