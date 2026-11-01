@@ -2,7 +2,8 @@ class_name Handheld
 extends RefCounted
 ## Оружие и предметы в руках из файлов (модели Meshy Максима, конвейер tools/prepare_handheld.py):
 ## assets/handheld/<id>.glb (меш без материала) + <id>.png (текстура), handheld.json — вид, рамка осей, точки.
-## Лежат в APK (не в пакете ресурсов): ~10 МБ исходников, без них герой держал бы процедурное оружие.
+## Модели — в части «handheld» пакета ресурсов (Assets; handheld.json — в APK): без неё exists() ложно — герои
+## держат процедурное оружие CharacterModel, жители — без предметов (NpcProps).
 ##
 ## Контракт осей (шапка tools/prepare_handheld.py): начало координат — точка хвата (центр кулака на рукояти;
 ## у двуручного — ведущая правая рука, вторая — точка grip2 в handheld.json);
@@ -79,11 +80,17 @@ static func info(id: String) -> Dictionary:
 	return d if d is Dictionary else {}
 
 
-## Модель есть (файл и запись в handheld.json).
+## Модель есть (файл и запись в handheld.json; файл — через Assets.exists: без части пакета его «нет»).
 static func exists(id: String) -> bool:
 	if force_missing or id == "":
 		return false
-	return items().has(id) and ResourceLoader.exists(DIR + id + ".glb")
+	return items().has(id) and Assets.exists(DIR + id + ".glb")
+
+
+## Забыть загруженные меши и материалы (Assets.reset_caches). Уже надетое не меняется.
+static func reset_cache() -> void:
+	_meshes.clear()
+	_mats.clear()
 
 
 ## Рамка осей модели ("blade", "bow", "crossbow", "shield", "book").
@@ -150,7 +157,7 @@ static func material(id: String) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.metallic = 0.0
 	var tex_path := DIR + id + ".png"
-	if ResourceLoader.exists(tex_path):
+	if Assets.exists(tex_path):
 		m.albedo_texture = load(tex_path) as Texture2D
 	m.albedo_color = Color.WHITE
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED

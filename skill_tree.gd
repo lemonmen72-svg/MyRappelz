@@ -62,17 +62,23 @@ static func icon_min() -> float:
 	return UiScale.px(ICON_MIN)
 
 
-## Картинка значка по пути или null (файла нет). Проверка через ResourceLoader — работает и в собранном APK.
+## Картинка значка по пути или null (файла нет). Проверка через Assets.exists — значки лежат в части «icons»
+## пакета ресурсов (без неё — кружок с буквой); работает и в собранном APK.
 static func load_icon(path: String) -> Texture2D:
 	if path == "":
 		return null
 	if _tex_cache.has(path):
 		return _tex_cache[path]
 	var tex: Texture2D = null
-	if ResourceLoader.exists(path):
+	if Assets.exists(path):
 		tex = load(path) as Texture2D
 	_tex_cache[path] = tex
 	return tex
+
+
+## Забыть картинки (Assets.reset_caches).
+static func reset_cache() -> void:
+	_tex_cache.clear()
 
 
 ## Строит древо в прямоугольнике sz. sel — выделенное умение.

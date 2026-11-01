@@ -4,6 +4,7 @@ smoke_test 8
 test_accounts 5
 test_admin_panel 14
 test_anathema 4
+test_asset_fallback 8
 test_asset_pack 3
 test_balance_start 5
 test_bridge 4

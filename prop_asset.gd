@@ -5,7 +5,8 @@ extends RefCounted
 ## props.json — размеры, страница, точки: «lamp» — фонарь, «glow» — центр свечения, «front» — самая
 ## передняя точка, у башни мельницы — ступица крыльев).
 ## Если файла нет (или PropAsset.enabled = false), IslandPois и IslandVegetation ставят процедурные
-## модели PoiModels / свои — они остаются запасом.
+## модели PoiModels / свои — они остаются запасом. Модели и атласы — в части «world» пакета ресурсов (Assets):
+## наличие — только через Assets.exists (без части файла «нет»), props.json — в APK.
 ##
 ## Материал — prop.gdshader: атлас страницы, cel-shading, свечение из альфы цвета вершин. Все объекты
 ## страницы — один материал, поэтому экземпляры склеиваются (IslandPois — по зонам, IslandVegetation —
@@ -68,6 +69,8 @@ static var _meta_loaded := false
 static var _meshes := {}
 static var _bases := {}
 static var _mats := {}
+## has(): id → есть ли файл модели (сбрасывает reset_cache после подключения части пакета).
+static var _has := {}
 ## Материалы мелочей зон: контур включается по качеству (apply_quality).
 static var _near_mats: Array[ShaderMaterial] = []
 
@@ -97,7 +100,17 @@ static func info(id: String) -> Dictionary:
 static func has(id: String) -> bool:
 	if not enabled or info(id).is_empty():
 		return false
-	return ResourceLoader.exists(DIR + id + ".glb")
+	if not _has.has(id):
+		_has[id] = Assets.exists(DIR + id + ".glb")
+	return bool(_has[id])
+
+
+## Забыть наличие файлов и загруженное (Assets.reset_caches: подключена часть пакета, тест без пакета).
+static func reset_cache() -> void:
+	_has.clear()
+	_meshes.clear()
+	_bases.clear()
+	_mats.clear()
 
 
 ## Модель из файла для процедурного вида PoiModels ("" — нет, ставить процедурную).
@@ -142,7 +155,9 @@ static func mesh(id: String) -> Mesh:
 	if _meshes.has(id):
 		return _meshes[id]
 	var m: Mesh = null
-	var ps := load(DIR + id + ".glb") as PackedScene
+	var ps: PackedScene = null
+	if Assets.exists(DIR + id + ".glb"):
+		ps = load(DIR + id + ".glb") as PackedScene
 	if ps != null:
 		var root := ps.instantiate()
 		var mis := root.find_children("*", "MeshInstance3D", true, false)
@@ -196,7 +211,7 @@ static func material(pg: String, outline: Color = Color(0, 0, 0, 0), width: floa
 	var pages: Dictionary = _meta.get("pages", {})
 	var pinfo: Dictionary = pages.get(pg, {})
 	var path := DIR + String(pinfo.get("file", "props_%s.png" % pg))
-	if ResourceLoader.exists(path):
+	if Assets.exists(path):
 		m.set_shader_parameter("albedo_tex", load(path) as Texture2D)
 	m.set_meta("toon_done", true)
 	if outline.a > 0.0:

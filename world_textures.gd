@@ -23,6 +23,8 @@ extends RefCounted
 ## «Высокое» (Quality.rich_shaders()) — земля: две выборки травы и дорог против заметного повтора,
 ## triplanar на скалах; постройки: triplanar (у боксов всё равно одна выборка — веса 0 пропускаются).
 ## Текстуры загружаются только при включённом флаге. Смена качества — apply_quality().
+## Файлы — в части «world» пакета ресурсов (Assets): без неё текстур нет (available() ложно) — флаг textures
+## выключен при любом качестве (шейдеры — как на «Низком»), иначе пустые сэмплеры удвоили бы яркость.
 
 const DIR := "res://assets/textures/"
 
@@ -59,11 +61,28 @@ static var _terrain: Array[WeakRef] = []
 static var _toon: Array[WeakRef] = []
 
 
-## Текстура по имени (кэш).
+## Текстура по имени (кэш); null — файла нет (часть «world» пакета не подключена).
 static func texture(tex_name: String) -> Texture2D:
 	if not _cache.has(tex_name):
-		_cache[tex_name] = load(DIR + tex_name + ".png") as Texture2D
+		var path := DIR + tex_name + ".png"
+		var tex: Texture2D = null
+		if Assets.exists(path):
+			tex = load(path) as Texture2D
+		_cache[tex_name] = tex
 	return _cache[tex_name]
+
+
+## Все текстуры окружения есть (пакет ресурсов: часть «world»).
+static func available() -> bool:
+	for t in ALL:
+		if texture(String(t)) == null:
+			return false
+	return true
+
+
+## Забыть загруженные текстуры (Assets.reset_caches). Материалы уже построенного мира не меняются.
+static func reset_cache() -> void:
+	_cache.clear()
 
 
 ## Альфа цвета вершины с номером текстуры (читает toon.gdshader).
@@ -101,7 +120,7 @@ static func _apply_all(list: Array[WeakRef], samplers: Dictionary, terrain: bool
 
 
 static func _apply(m: ShaderMaterial, samplers: Dictionary, terrain: bool) -> void:
-	var on := Quality.textures()
+	var on := Quality.textures() and available()
 	if on:
 		for param in samplers:
 			if m.get_shader_parameter(param) == null:

@@ -17,6 +17,10 @@ extends "res://tests/test_base.gd"
 ## переживают перезапуск (следующий экран сразу следит за ними; запись старой версии игры и другого хэша
 ## убираются); «Играть, пока грузится» — фоновый AssetLoader допроверяет часть, кладёт в кэш (не подключая посреди
 ## игры) и пишет в HUD; плагин Android и его включение в проекте на месте.
+## Части мира, зверей 1-й стадии, оружия и значков (world, creatures_base, handheld, icons): какие файлы в какой
+## части, .json — в APK; порядок загрузки Assets.LOAD_ORDER (мир первым). Быстрый старт при загрузке HTTPRequest:
+## мир загружен — «Играть, пока грузится» подключает его сразу, остальные части загружает фоновый AssetLoader
+## (http_resume), кладёт в кэш, не подключая посреди игры. Игра целиком без пакета — tests/test_asset_fallback.gd.
 
 const TEST_DIR := "user://test_packs/"
 const SRC_DIR := "user://test_pack_src/"
@@ -35,6 +39,8 @@ const H6 := "f6f6f6f6f6f6f6f6"
 const PLUGIN_DIR := "res://android/plugins/myrappelz_download/"
 const STAGED := ["panther", "pheasant", "turtle", "wolf", "centaur"]
 const RACE_PART := {"dark_elf": "heroes_dark", "light_elf": "heroes_light", "human": "heroes_human"}
+## Часть «мир» теста быстрого старта (файл — тестовый .pck части PC).
+const PW := "world"
 
 var loader: AssetLoader
 var results: Array = []
@@ -480,6 +486,62 @@ func run_step() -> void:
 				"сообщение в HUD: " + String(main.hud._msg_label.text))
 			Assets.loaded = saved_loaded
 			_cleanup()
+			# Быстрый старт (HTTPRequest): мир первым, «Играть, пока грузится» после него
+			Assets.packs_dir = TEST_DIR
+			Assets.ensure_dir()
+			Assets.simulate_missing(true)
+			main.hud.show_message("", 0.1)
+			_new_loader(_man([_part(PA, H1), _world_part()]))
+			check(loader.state == AssetLoader.State.CONFIRM and _names(loader.todo) == [PW, PA],
+				"мир загружается первым: %s" % str(_names(loader.todo)))
+			(loader.buttons["main"] as Button).pressed.emit()
+			check(loader.state == AssetLoader.State.DOWNLOAD and String(loader.current.get("name", "")) == PW,
+				"первая загружается часть «мир»")
+			check(loader._skip_btn.visible and loader._skip_btn.text == "Играть, пока грузится"
+				and loader._text.text.contains("Можно играть и сейчас"), "HTTPRequest — можно играть, пока грузится")
+			_write(Assets.part_path(PW, H3), _bytes(PC))
+			loader._on_download_completed(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), PackedByteArray())
+			wait = 3
+			step = 17
+		17:
+			if loader.state == AssetLoader.State.VERIFY:
+				return
+			check(loader.state == AssetLoader.State.DOWNLOAD and String(loader.current.get("name", "")) == PA
+				and FileAccess.file_exists(Assets.pack_path(PW, H3)), "мир в кэше, загружается следующая часть")
+			(loader.buttons["skip"] as Button).pressed.emit()
+			check(Assets.skipped and String(Assets.loaded.get(PW, "")) == Assets.pack_path(PW, H3),
+				"«Играть, пока грузится» — мир подключён сразу: %s" % str(Assets.loaded))
+			wait = 2
+			step = 18
+		18:
+			check(results == [true], "экран загрузки закрыт с пакетом: %s" % str(results))
+			loader.queue_free()
+			bg = null
+			for n in get_tree().root.get_children():
+				if n is AssetLoader and (n as AssetLoader).background and (n as AssetLoader).http_resume:
+					bg = n as AssetLoader
+			check(bg != null and not bg.visible, "фоновый узел загрузки HTTPRequest у корня дерева")
+			if bg == null:
+				return
+			check(bg.state == AssetLoader.State.DOWNLOAD and String(bg.current.get("name", "")) == PA
+				and _names(bg.todo) == [PA], "фоновый узел загружает оставшуюся часть без вопроса")
+			_write(Assets.part_path(PA, H1), _bytes(PA))
+			bg._on_download_completed(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), PackedByteArray())
+			wait = 3
+			step = 19
+		19:
+			if is_instance_valid(bg) and (bg.state == AssetLoader.State.DOWNLOAD or bg.state == AssetLoader.State.VERIFY):
+				return
+			check(FileAccess.file_exists(Assets.pack_path(PA, H1)), "фоновая загрузка HTTPRequest — часть в кэше")
+			check(not Assets.loaded.has(PA), "посреди игры часть не подключается")
+			check(not Assets.skipped, "при следующем входе в мир экран загрузки возьмёт части из кэша")
+			wait = 3
+			step = 20
+		20:
+			check(not is_instance_valid(bg), "фоновый узел удалён")
+			check(String(main.hud._msg_label.text).contains("Пакет ресурсов загружен"),
+				"сообщение в HUD: " + String(main.hud._msg_label.text))
+			_cleanup()
 			ok_done()
 
 
@@ -549,7 +611,8 @@ func _check_plugin_files() -> void:
 
 
 ## Какие файлы в какой части: герои профессий — в части своей расы, стартовые эльфов — тоже, прежняя героиня —
-## у тёмных эльфов, жители — npcs, стадии зверей — creatures; запасные герои и постройки — в APK.
+## у тёмных эльфов, жители — npcs, стадии зверей — creatures, звери 1-й стадии — creatures_base, постройки, текстуры
+## и овца — world, оружие — handheld, значки — icons; запасные герои и все .json — в APK; порядок загрузки частей.
 func _check_files() -> void:
 	check(Assets.part_of(Assets.PROBE) != "" and ResourceLoader.exists(Assets.PROBE), "файл-признак пакета — в пакете")
 	for g in CharacterModel.FALLBACK_HEROES:
@@ -583,12 +646,33 @@ func _check_files() -> void:
 	for f in _list("res://assets/creatures/", ".glb"):
 		var p: String = "res://assets/creatures/" + String(f)
 		var stage: bool = String(f).ends_with("_2.glb") or String(f).ends_with("_3.glb")
-		var want_part := "creatures" if stage else ""
+		var want_part := "creatures" if stage else "creatures_base"
+		if String(f) == "sheep.glb":
+			want_part = "world"
 		check(Assets.part_of(p) == want_part and Assets.part_of(p.get_basename() + ".png") == want_part,
-			"%s — %s" % [f, "в части creatures" if stage else "в APK"])
-	check(not Assets.is_packed("res://assets/creatures/creatures.json"), "creatures.json — в APK")
-	check(not Assets.is_packed("res://assets/props/town_hall.glb") and not Assets.is_packed("res://assets/props/props_town.png"),
-		"постройки — в APK")
+			"%s — в части %s (%s)" % [f, want_part, Assets.part_of(p)])
+	var dirs := {"res://assets/props/": "world", "res://assets/textures/": "world", "res://assets/handheld/": "handheld",
+		"res://assets/icons/items/": "icons", "res://assets/icons/skills/": "icons", "res://assets/icons/ui/": "icons",
+		"res://assets/icons/pets/wolf/": "icons"}
+	for d in dirs:
+		var n := 0
+		for ext in [".glb", ".png"]:
+			for f in _list(String(d), String(ext)):
+				var p: String = String(d) + String(f)
+				check(Assets.part_of(p) == String(dirs[d]), "%s — в части %s (%s)" % [p.trim_prefix("res://"), dirs[d],
+					Assets.part_of(p)])
+				n += 1
+		check(n > 0, "%s: файлов %d" % [d, n])
+	for j in ["res://assets/creatures/creatures.json", "res://assets/props/props.json", "res://assets/handheld/handheld.json",
+			"res://assets/characters/npc_kirk.json"]:
+		check(not Assets.is_packed(String(j)) and FileAccess.file_exists(String(j)), "%s — в APK" % String(j).get_file())
+	# Порядок загрузки: мир, значки, оружие, звери, затем остальные по порядку манифеста
+	var order := Assets.load_ordered([{"name": "heroes_dark"}, {"name": "icons"}, {"name": "npcs"}, {"name": "world"},
+		{"name": "creatures_base"}, {"name": "handheld"}, {"name": "art"}])
+	check(_names(order) == ["world", "icons", "handheld", "creatures_base", "heroes_dark", "npcs", "art"],
+		"порядок загрузки частей: %s" % str(_names(order)))
+	for n in Assets.LOAD_ORDER:
+		check(Assets.PACKS.has(n), "часть порядка загрузки %s есть в Assets.PACKS" % n)
 
 
 ## Часть подключена, другая нет: модели первой «есть», второй — нет; старый пакет целиком — все части.
@@ -739,6 +823,14 @@ func _prepare_packs() -> void:
 func _part(pname: String, h: String) -> Dictionary:
 	return {"name": pname, "hash": h, "sha256": String(packs[pname]["sha"]), "size": int(packs[pname]["size"]),
 		"url": "https://example.invalid/%s-%s.pck" % [pname, h], "file": "%s.pck" % pname}
+
+
+## Часть «мир» (файл — тестовый .pck части PC, хэш H3).
+func _world_part() -> Dictionary:
+	var w := _part(PC, H3)
+	w["name"] = PW
+	w["url"] = "https://example.invalid/world-%s.pck" % H3
+	return w
 
 
 func _man(parts: Array) -> Dictionary:
