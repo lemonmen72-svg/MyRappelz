@@ -49,6 +49,9 @@ const HITCH := 0.4
 const HITCH_SETTLE := 3.0
 
 static var current: ThermalGuard = null
+## Авто-снижение приостановлено тест-ботом (TestBot: снижение испортило бы замер; бот сам следит за температурой и
+## уходит на остывание). Статическое — переживает перезапуск главной сцены.
+static var suspended := false
 
 ## Источники (подмена в тестах): статус температуры Android (−1 — неизвестно) и прогноз запаса, ‰ (−1).
 var status_source: Callable
@@ -91,9 +94,9 @@ func _exit_tree() -> void:
 		current = null
 
 
-## Работает ли авто-снижение (настройка; в автотестах — только с force).
+## Работает ли авто-снижение (настройка; в автотестах — только с force; не во время тест-бота).
 func active() -> bool:
-	return Quality.guard_enabled() and (force or not _in_tests)
+	return Quality.guard_enabled() and (force or not _in_tests) and not suspended
 
 
 func _process(delta: float) -> void:

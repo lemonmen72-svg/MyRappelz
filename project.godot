@@ -18,6 +18,10 @@ config/project_settings_override="user://renderer_override.cfg"
 
 Game="*res://game_state.gd"
 
+[debug]
+
+file_logging/enable_file_logging=true
+
 [display]
 
 window/size/viewport_width=1280

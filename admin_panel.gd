@@ -27,6 +27,9 @@ extends RefCounted
 ##     любого вида MobData уровня N в 5 м перед героем (свой зверь, slot −1 — не возрождается); скорость бега героя
 ##     ×1/×2/×3 (только на эту игру); перенос в точку — постройки и места острова и зоны зверей из
 ##     world/training_island.json (свободная ровная точка рядом; деревни и город — точки старта рас).
+##   «Тест-бот» (TestBot, папка bot/): режим (сейчас «Производительность»; «Быстрый», «Полный», «По разделам» — скоро),
+##     «Начать» (бот играет отдельным тестовым героем в своём хранилище — сохранения игрока не трогает; по окончании
+##     игрок возвращается в свой аккаунт и слот), «Стоп», состояние, «Открыть отчёт», «Поделиться».
 ## Выключить панель — ADMIN_TOOLS = false (кнопка в «Настройках» пропадёт, множитель опыта из сохранения — ×1).
 ## Панель есть только у аккаунта администратора — логин Dedok_max без учёта регистра (Accounts.is_admin, enabled());
 ## у других логинов кнопки нет, множитель опыта из сохранения — ×1. Автотесты входят тестовым аккаунтом Dedok_max
@@ -41,7 +44,9 @@ extends RefCounted
 ##   «Питомцы»: "pet_<вид>_<ур.>", "pet_lvl_minus5", "pet_lvl_minus", "pet_lvl_plus", "pet_lvl_plus5", "pet_full",
 ##     "pet_revive", "pets_clear", "pets_clear_yes", "pets_clear_no";
 ##   «Мир»: "kill_target", "kill_around", "respawn_all", "mob_lvl_minus5", "mob_lvl_minus", "mob_lvl_plus",
-##     "mob_lvl_plus5", "mob_lvl_hero", "spawn_<вид>", "speed_<1|2|3>", "tp_poi_<id>", "tp_zone_<id>" (teleports()).
+##     "mob_lvl_plus5", "mob_lvl_hero", "spawn_<вид>", "speed_<1|2|3>", "tp_poi_<id>", "tp_zone_<id>" (teleports());
+##   «Тест-бот»: "bot_mode_<id>" (BotScenario.MODES; «скоро» — недоступны), "bot_start", "bot_stop", "bot_open",
+##     "bot_share".
 
 const ADMIN_TOOLS := true
 ## Размер окна для «Среднего» размера интерфейса.
@@ -53,7 +58,8 @@ const INFO := Color(0.85, 0.88, 0.95)
 ## Задание на профессию (сбрасывается вместе с профессией, как и задания после неё — QuestData.JOB_RESET).
 const JOB_QUEST := QuestData.JOB_QUEST
 ## Вкладки: [id, подпись].
-const TABS := [["hero", "Герой"], ["xp", "Опыт"], ["items", "Предметы"], ["pets", "Питомцы"], ["world", "Мир"]]
+const TABS := [["hero", "Герой"], ["xp", "Опыт"], ["items", "Предметы"], ["pets", "Питомцы"], ["world", "Мир"],
+	["bot", "Тест-бот"]]
 const XP_MULTS := [1, 2, 5, 10, 20, 50]
 const SPEED_MULTS := [1, 2, 3]
 const LEVEL_PRESETS := [1, 10, 15, 20, 30, 40]
@@ -77,6 +83,8 @@ static var god := false
 static var speed_mult := 1
 ## Уровень зверя, которого ставит «Мир».
 static var spawn_level := 5
+## Режим тест-бота на вкладке «Тест-бот» (BotScenario.MODES).
+static var bot_mode := "perf"
 ## Ждёт подтверждения: "clear_bag" | "pets_clear" | "".
 static var _confirm := ""
 static var _scroll: ScrollContainer = null
@@ -121,6 +129,8 @@ static func open(main: Node, which: String = "") -> void:
 			_build_pets(main, body)
 		"world":
 			_build_world(main, body)
+		"bot":
+			_build_bot(main, body)
 		_:
 			_build_hero(main, body)
 	if keep > 0 and _scroll != null:
@@ -884,6 +894,84 @@ static func free_spot(w: IslandWorld, c: Vector2) -> Vector3:
 
 static func _flat_dist(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x - b.x, a.z - b.z).length()
+
+
+# ---------- Вкладка «Тест-бот» ----------
+
+static func _build_bot(main: Node, body: VBoxContainer) -> void:
+	body.add_child(_text("Бот сам играет отдельным тестовым героем в своём хранилище (ваш герой и сохранения не "
+		+ "меняются), меряет кадры, вызовы, треугольники и температуру, снимает экран и пишет отчёт: "
+		+ "Загрузки/DarkPact_test (архив .zip и .txt). По окончании вы вернётесь к своему герою. При нагреве бот "
+		+ "сам уходит на паузу «остывание», при сильном — останавливается.", UiScale.FONT_SMALL, MUTED))
+	_head(body, "Режим")
+	var g := _grid(body, 2)
+	for e in BotScenario.MODES:
+		var md: Dictionary = e
+		var mid := String(md["id"])
+		var avail := bool(md.get("ready", false))
+		var label := String(md["name"])
+		if avail:
+			label += " — до %d мин" % int(md.get("minutes", 12))
+		else:
+			label += " — скоро"
+		_choice(g, "bot_mode_" + mid, label, mid == bot_mode, func() -> void: AdminPanel.set_bot_mode(main, mid))
+		(buttons["bot_mode_" + mid] as Button).disabled = not avail
+	var running := TestBot.is_running()
+	_head(body, "Состояние: " + TestBot.status_text())
+	var r := _row(body)
+	_btn(r, "bot_start", "Начать", func() -> void: AdminPanel.bot_start(main), 140.0)
+	_btn(r, "bot_stop", "Стоп", func() -> void: AdminPanel.bot_stop(main), 140.0)
+	(buttons["bot_start"] as Button).disabled = running
+	(buttons["bot_stop"] as Button).disabled = not running
+	var last := TestBot.last_result()
+	_head(body, "Последний отчёт")
+	var where := String(last.get("public", ""))
+	if where == "" and not last.is_empty():
+		var f := String(last.get("zip", ""))
+		if f == "":
+			f = String(last.get("txt", ""))
+		where = ProjectSettings.globalize_path(f) if f != "" else ""
+	body.add_child(_text(where if where != "" else "Отчётов ещё нет.", UiScale.FONT_SMALL, INFO))
+	var r2 := _row(body)
+	_btn(r2, "bot_open", "Открыть отчёт", func() -> void: AdminPanel.bot_report(main, false), 160.0)
+	_btn(r2, "bot_share", "Поделиться", func() -> void: AdminPanel.bot_report(main, true), 160.0)
+	(buttons["bot_open"] as Button).disabled = last.is_empty()
+	(buttons["bot_share"] as Button).disabled = last.is_empty()
+
+
+static func set_bot_mode(main: Node, mode_id: String) -> void:
+	if BotScenario.create(mode_id) == null:
+		return
+	bot_mode = mode_id
+	if is_open(main):
+		open(main)
+
+
+## «Начать»: окно закрывается (открытое окно ограничивает кадры — испортило бы замер), бот переключает героя.
+static func bot_start(main: Node) -> String:
+	var hud := main.get("hud") as HUD
+	if hud != null:
+		hud.close_window()
+	var err := TestBot.start(main, bot_mode)
+	if err != "" and hud != null:
+		hud.show_message("Тест-бот: " + err)
+	return err
+
+
+static func bot_stop(main: Node) -> void:
+	TestBot.stop_current("Остановлен в админ-панели")
+	var hud := main.get("hud") as HUD
+	if hud != null and is_instance_valid(hud):
+		hud.close_window()
+
+
+## «Открыть отчёт» (share = false) или «Поделиться» последним отчётом.
+static func bot_report(main: Node, share: bool) -> void:
+	var last := TestBot.last_result()
+	var msg := BotReport.share_report(last) if share else BotReport.open_report(last)
+	var hud := main.get("hud") as HUD
+	if hud != null:
+		hud.show_message(msg, 6.0)
 
 
 # ---------- Общее ----------

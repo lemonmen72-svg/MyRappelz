@@ -11,9 +11,27 @@ extends "res://tests/test_base.gd"
 ##   «Авто» больше не включает Vulkan, ручной выбор Vulkan, подтверждение в мире, фон снимает и возвращает
 ##   страховку, выбор «Совместимость», на ПК файл не пишется, текст файла читается как настройки проекта;
 ## - вкладка «Графика»: кнопки рендерера, «Сохранить и выйти» — только если рендерер сменится после перезапуска;
-## - шейдеры игры без возможностей только Forward+ (в Mobile 4.3 их нет).
+## - шейдеры игры без возможностей только Forward+ (в Mobile 4.3 их нет);
+## - плагин MyRappelzDownload (подставной): vulkanSupported() «нет» — «Авто» не включает Vulkan, «да» — включает;
+##   игра передаёт плагину пути своих файлов (rememberRendererFiles); договор с RendererPreflight.java (проверка до
+##   движка): текст файла Compatibility и признак Vulkan те же, armed=true, дописанный плагином сразу под [renderer],
+##   читается игрой — вылет до скриптов засчитывается при следующем запуске.
 
 const DIR := "user://test_renderer/"
+const PREFLIGHT_JAVA := "res://android/plugins/myrappelz_download/src/main/java/com/lemonmen/myrappelz/download/RendererPreflight.java"
+
+
+## Плагин MyRappelzDownload понарошку: ответ о Vulkan и запомненные пути файлов.
+class FakeVulkanPlugin extends RefCounted:
+	var answer := true
+	var files: Array = []
+
+	func vulkanSupported() -> bool:
+		return answer
+
+	func rememberRendererFiles(state_file: String, override_file: String) -> bool:
+		files = [state_file, override_file]
+		return true
 
 var _saved_level := -1
 
@@ -38,6 +56,7 @@ func run_step() -> void:
 			_use_test_files()
 			_check_gpu_list()
 			_check_guard_flow()
+			_check_plugin()
 			wait = 2
 			step = 3
 		3:
@@ -265,6 +284,51 @@ func _check_guard_flow() -> void:
 	RendererGuard.method_override = RendererGuard.COMPAT
 
 
+## Плагин: ответ vulkanSupported, пути файлов, договор с проверкой до движка (RendererPreflight.java).
+func _check_plugin() -> void:
+	var fake := FakeVulkanPlugin.new()
+	Assets.plugin_override = fake
+	RendererGuard.plugin_override = -1
+	fake.answer = false
+	_clear_files()
+	_launch(RendererGuard.COMPAT, "Adreno (TM) 750")
+	check(RendererGuard.plugin_vulkan() == 0 and RendererGuard.override_method() == RendererGuard.COMPAT
+		and not RendererGuard.restart_needed(), "плагин: vulkanSupported() = false — «Авто» на Compatibility")
+	check(fake.files.size() == 2 and String(fake.files[0]) == ProjectSettings.globalize_path(RendererGuard.state_path)
+		and String(fake.files[1]) == ProjectSettings.globalize_path(RendererGuard.override_path),
+		"плагину переданы пути файлов рендерера: %s" % str(fake.files))
+	fake.answer = true
+	_clear_files()
+	_launch(RendererGuard.COMPAT, "Adreno (TM) 750")
+	check(RendererGuard.plugin_vulkan() == 1 and RendererGuard.override_method() == RendererGuard.MOBILE,
+		"плагин: vulkanSupported() = true — Vulkan со следующего запуска")
+	# Договор с RendererPreflight.java: тот же текст файла Compatibility и признак Vulkan
+	var java := FileAccess.get_file_as_string(PREFLIGHT_JAVA)
+	check(java != "", "исходник RendererPreflight.java читается")
+	for line in RendererGuard.override_text(RendererGuard.COMPAT).split("\n", false):
+		check(java.contains(String(line).replace("\"", "\\\"")), "в плагине та же строка файла: %s" % line)
+	check(java.contains("MOBILE_MARK = \"rendering_method.mobile=\\\"mobile\\\"\"")
+		and RendererGuard.override_text(RendererGuard.MOBILE).contains("rendering_method.mobile=\"mobile\""),
+		"признак Vulkan в файле — тот же у плагина и игры")
+	# Плагин взвёл страховку до драйвера (armed=true сразу под [renderer]), Vulkan упал до скриптов — следующий
+	# запуск на Compatibility засчитывает сбой
+	var st := FileAccess.get_file_as_string(RendererGuard.state_path)
+	check(st.contains("[renderer]") and st.contains("armed=false"), "состояние — ConfigFile с armed=false")
+	var f := FileAccess.open(RendererGuard.state_path, FileAccess.WRITE)
+	f.store_string(st.replace("armed=false\n", "").replace("[renderer]\n", "[renderer]\narmed=true\n"))
+	f.close()
+	f = FileAccess.open(RendererGuard.override_path, FileAccess.WRITE)
+	f.store_string(RendererGuard.override_text(RendererGuard.COMPAT))
+	f.close()
+	check(bool(RendererGuard.state()["armed"]), "armed=true от плагина читается игрой")
+	_launch(RendererGuard.COMPAT, "Adreno (TM) 750")
+	check(int(RendererGuard.state()["failed"]) == 1 and not bool(RendererGuard.state()["armed"])
+		and RendererGuard.note.contains("не заработал") and RendererGuard.desired_method() == RendererGuard.COMPAT,
+		"вылет Vulkan до скриптов: сбой засчитан, «Авто» остаётся на Compatibility")
+	Assets.plugin_override = null
+	RendererGuard.reset_session()
+
+
 ## Вкладка «Графика»: кнопки рендерера; «Сохранить и выйти» — только когда рендерер сменится после перезапуска.
 func _check_menu() -> void:
 	_clear_files()
@@ -310,6 +374,7 @@ func _restore() -> void:
 	RendererGuard.method_override = ""
 	RendererGuard.gpu_override = ""
 	RendererGuard.plugin_override = -1
+	Assets.plugin_override = null
 	RendererGuard.reset_session()
 	Quality.renderer_override = -1
 	if _saved_level >= Quality.LOW and _saved_level <= Quality.ULTRA:
