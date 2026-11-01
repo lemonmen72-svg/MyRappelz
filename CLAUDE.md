@@ -23,7 +23,9 @@
 (авторское право и товарный знак). Берём механики и общую структуру, всё содержимое своё и оригинальное.
 
 ## Решения, принятые с пользователем
-- Платформа: Android. Движок: Godot 4.3 (GDScript), рендерер GL Compatibility. Графика: 3D.
+- Платформа: Android. Движок: Godot 4.3 (GDScript). Графика: 3D. Рендерер (решение Максима, третья сборка): на
+  телефонах с нормальным Vulkan — Mobile (Vulkan), иначе и при сбое — запасной GL Compatibility; ПК и CI —
+  Compatibility (раздел «Рендерер»).
 - Начинаем офлайн, без сервера и мультиплеера. Приоритеты: бой, питомцы, мир.
 - Сервер и мультиплеер: позже, когда основа станет играбельной.
 
@@ -115,6 +117,8 @@
   лечение со временем, «burn:<id>» — горение «Неистовства огня» на шамане. Тест `tests/test_status_icons.gd`.
 - Бережение телефона: `thermal_guard.gd` (`ThermalGuard`: фон, авто-снижение графики при нагреве), `model_lod.gd`
   (`ModelLod`: контур дальних моделей) — раздел «Бережение телефона».
+- Рендерер: `renderer_guard.gd` (`RendererGuard`, узел главной сцены: Vulkan (Mobile) или Compatibility, файл
+  рендерера следующего запуска, страховка от вылета Vulkan, выбор в «Настройки → Графика») — раздел «Рендерер».
 - Тест-бот на устройстве: папка `bot/` (`TestBot`, `BotScenario`, режим «Производительность» — `bot_scenario_perf.gd`,
   `BotMetrics`, `BotReport`, `BotOverlay`) — раздел «Тест-бот».
 - `ui_scale.gd` (`UiScale`): масштаб интерфейса — единая точка настройки размеров: шрифты (`FONT` 17 темы,
@@ -461,9 +465,9 @@
   `quality.gd` (`Quality`: пресеты «Низкое / Среднее (по умолчанию) / Высокое / Максимальное» `LOW…ULTRA`, «Свои» `CUSTOM` —
   если настройку меняли вручную и она не совпала ни с одним пресетом; настройки `Quality.OPTIONS` — номер варианта
   (`option(key)`, `set_option(key, v)`, подписи `LABELS`, значения пресетов `PRESETS`): `render` разрешение 3D
-  540p/720p/900p/родное (`Viewport.scaling_3d_scale`, билинейно; интерфейс всегда в родном, canvas_items 1280×720),
+  540p/720p/900p/родное (`Viewport.scaling_3d_scale`, билинейно, в Mobile 720p/900p — FSR 1.0; интерфейс всегда в родном, canvas_items 1280×720),
   `shadows` выкл/низкие/средние/высокие (`SHADOW_LEVELS`: атлас 2048, 2 каскада PSSM, дальность 32/45/60 м, границы
-  каскадов, фильтр PCF, тени кустов и камней — только «Высокие»), `aa` выкл/FXAA/MSAA 2×/4× (`Viewport.msaa_3d`; FXAA — проход PostFx),
+  каскадов, фильтр PCF, тени кустов и камней — только «Высокие»), `aa` выкл/FXAA/MSAA 2×/4× (`Viewport.msaa_3d`; FXAA — проход PostFx, в Mobile — встроенный `screen_space_aa`),
   `view` дальность (`VIEW_LEVELS`: трава, кусты, деревья, мелочи построек — группа `poi_props`, колосья — `poi_decor`),
   `grass` густота (при следующем запуске; `IslandVegetation.built_grass`), `textures` (0 — без рисованных, 2 — `rich`),
   `outlines`, `postfx` выкл/цвет/свечение, `effects` (доля частиц `Vfx` — `Quality.particles`), `model_shadows` (тени
@@ -1352,7 +1356,81 @@
   проходы — у второго и следующих источников с тенями), зато каждый каскад — свой проход всех отбрасывающих тень;
   «Низкое» без теней. Сглаживание: MSAA 3D-кадра (на телефонах — `EXT_multisampled_render_to_texture`, дёшево),
   alpha to coverage в Compatibility 4.3 не работает (растительность у нас геометрией, без alpha scissor), встроенного
-  FXAA нет — свой в `postfx.gdshader`.
+  FXAA нет — свой в `postfx.gdshader`. В Mobile (раздел «Рендерер») фильтр теней — по выборкам RD (`filter_mobile`),
+  FXAA встроенный, растяжение 3D — FSR 1.0.
+
+## Рендерер: Mobile (Vulkan) с запасным Compatibility
+Решение Максима (третья сборка): S24 Ultra грелся на «Максимальном» в Compatibility (OpenGL ES) — на телефонах с
+нормальным Vulkan рисовать через Mobile, на остальных игра должна всё равно запускаться. `renderer_guard.gd`
+(`RendererGuard`), ветки `Quality` по рендереру, тест `tests/test_renderer.gd`, кадры 310–311 (шаги 1340–1344).
+- **Что умеет Godot 4.3** (проверено по исходникам 4.3-stable): автоматического отката на OpenGL нет — настройки
+  `rendering/rendering_device/fallback_to_opengl3` в 4.3 ещё нет (в `main.cpp` только `fallback_to_vulkan` /
+  `fallback_to_d3d12` для Windows). На Android `Godot.kt` (`onInitRenderView` → `usesVulkan()`) по настройке
+  `rendering/renderer/rendering_method` (с учётом `.mobile`) создаёт Vulkan-вид; у телефона без Vulkan 1.0.3
+  (`meetsVulkanRequirements`) — `IllegalStateException`, окно «нет Vulkan» и выход; Vulkan есть, но драйвер не
+  поднялся (`DisplayServerAndroid` → `ERR_UNAVAILABLE`) — `Main::setup2` не проверяют, вылет. Скрипты в таком
+  запуске не работают, `--rendering-method` в командной строке на Android не помогает (Java читает настройку проекта),
+  а `OS.set_restart_on_exit` на Android 4.3 не перезапускает (`GodotActivity` не обрабатывает
+  `onNewGodotInstanceRequested`). Экспорт с Mobile пишет в манифест `android.hardware.vulkan.version`
+  `required="true"` (Google Play отсёк бы телефоны без Vulkan).
+- **Как сделано**: в `project.godot` рендерер по умолчанию — Compatibility везде (`rendering_method` и
+  `rendering_method.mobile`): первый запуск идёт на любом телефоне, манифест без требования Vulkan (поэтому
+  `uses-feature` в `android-apk.yml` не нужен), шаблоны 4.3 те же — в `libgodot_android.so` оба драйвера.
+  `application/config/project_settings_override = "user://renderer_override.cfg"` — Godot читает этот файл при каждом
+  запуске (`ProjectSettings::setup`, после project.godot, до создания окна и до `usesVulkan()` в Java; редактор и
+  экспорт его не читают, `user://` на Android — папка приложения). Пишет его только игра и только на Android
+  (`RendererGuard.override_text`: `[rendering]` `renderer/rendering_method` и `.mobile` = "mobile" / "gl_compatibility",
+  `rendering_device/driver.android="vulkan"`; запись через `.tmp` и переименование). Состояние — `user://renderer.cfg`
+  `[renderer]`: `choice` (auto / vulkan / compat), `armed`, `confirmed`, `failed`, `gpu`.
+- **«Авто»** (по умолчанию): видеочип из списка надёжных (`gpu_supports_vulkan` по имени `RenderingServer.
+  get_video_adapter_name()`: Adreno ≥ 600 `ADRENO_MIN`, Mali-G кроме G71/G72 `MALI_BAD`, Immortalis, Xclipse; Adreno
+  3xx–5xx, Mali-T, PowerVR, неизвестные — нет) и Vulkan на нём не падал → со **следующего** запуска Mobile (первый
+  запуск — на Compatibility, при входе в мир сообщение «со следующего запуска…»). Плагин `MyRappelzDownload` может
+  только запретить: если в нём есть `vulkanSupported()` (bool) и он ответил false — Compatibility (`plugin_vulkan`;
+  в AAR такого метода пока нет — без него решает список видеочипов).
+- **Страховка от вылета**: пока Vulkan на телефоне не подтверждён, в начале запуска на Vulkan файл заранее
+  переписывается на Compatibility (`armed`). Мир отрисован `CONFIRM_WORLD_SEC` 8 с и `CONFIRM_FRAMES` 120 кадров
+  (`main._start_world` → `world_started`) — подтверждён (`confirmed`), файл снова Mobile, дальше страховки нет. Игра
+  ушла в фон / закрыта / «Назад» — страховка снимается (вылета не было), вернулась — снова взводится. Вылет во время
+  проверки → следующий запуск на Compatibility, `failed` + 1, сообщение «Vulkan в прошлый раз не заработал…», «Авто»
+  больше Vulkan не включает (выбрать «Vulkan» вручную — `failed` сбрасывается). Чего без плагина не поймать: вылет до
+  запуска скриптов (окно «нет Vulkan», сбой драйвера при создании окна) — поэтому Vulkan только у видеочипов из
+  списка; надёжно поймать это можно только в Java до запуска движка (плагин: при создании прочитать
+  `renderer.cfg` и, если прошлый запуск на Vulkan не подтвердился, переписать файл рендерера на Compatibility).
+- **Настройки → Графика → «Рендерер»** (внизу вкладки): «Сейчас: …», кнопки `renderer_auto` / `renderer_vulkan`
+  (недоступна, если видеочип не из списка и Vulkan ещё не работал) / `renderer_compat`, подсказка «Меняется после
+  перезапуска» и «После перезапуска: …»; если рендерер сменится — `renderer_restart` «Сохранить и выйти (откройте игру
+  снова)» (`quit_for_restart`: сохранение героя, страховка снята, `get_tree().quit()`). На ПК выбор только
+  запоминается — всегда Compatibility.
+- **Ветки `Quality` по рендереру** (`Quality.mobile_renderer()` — `RendererGuard.is_vulkan()`: есть
+  `RenderingServer.get_rendering_device()`; тесты — `Quality.renderer_override`; `render_params(высота экрана)` —
+  что уйдёт окну и солнцу): разрешение 3D 720p / 900p ниже экрана — **FSR 1.0** (`use_fsr`, `FSR_SHARPNESS` 0.3; в
+  Compatibility 4.3 только билинейное), 540p (и шаг 5 авто-снижения) и родное — билинейно; **FXAA** — встроенный
+  `Viewport.screen_space_aa` в проходе тонмаппинга Mobile, свой проход PostFx — только в Compatibility
+  (`postfx_fxaa()`); цветокоррекция и свечение — тот же PostFx в обоих (одна картинка, проверена снимками CI);
+  MSAA 2×/4× — как было (на тайловых видеочипах дёшево); **фильтр теней** — `SHADOW_LEVELS` `filter_mobile`
+  (RD 4.3: SOFT_LOW 4 выборки, SOFT_MEDIUM 8; PCF Compatibility — 5 / 13); атлас и фильтр теней передаются
+  `RenderingServer` только при изменении (в Mobile смена фильтра пересобирает специализации шейдеров).
+  `ThermalGuard` — без изменений (шаги снижения те же).
+- **Шейдеры** проверены на Mobile: все свои (`toon`, `prop`, `island_terrain`, трава и цветы, вода, `postfx`, `sky`,
+  `creature*`, `outline`, `veg_outline`, `crystal`, `flag`) используют только то, что есть и в Mobile, и в
+  Compatibility (`light()` с `ATTENUATION`, `LIGHT_COLOR / PI` — одинаково в обоих, `world_vertex_coords`,
+  `CAMERA_POSITION_WORLD`, `hint_screen_texture` с мипами в canvas — в RD мипы экранной текстуры размыты по Гауссу,
+  свечение PostFx чуть мягче). Тест проверяет, что нет возможностей только Forward+ (`hint_normal_roughness_texture`,
+  `vertex_lighting` — в Mobile 4.3 их нет, `SSS_*`). Небо с `TIME` (облака): в Mobile карта отражений неба
+  пересчитывается каждый кадр (32 px — копейки), как и в Compatibility.
+- **CI** — всегда Compatibility: автотесты headless (рендера нет, `get_rendering_device()` = null), снимки и замер —
+  `--rendering-method gl_compatibility --rendering-driver opengl3` (`screenshots.sh`, `perf.sh`); на ПК файл
+  рендерера не пишется. Ветка Mobile проверяется функциями `Quality` и логикой `RendererGuard` на «подставном
+  Android» (`platform_override`, `method_override`, `gpu_override`, свои файлы).
+- **Что проверить на телефоне** (S24 Ultra): первый запуск новой версии — Compatibility, в мире сообщение «со
+  следующего запуска…», в «Настройки → Графика» внизу «Рендерер: сейчас Совместимость», «После перезапуска: Vulkan»;
+  «Сохранить и выйти», открыть снова — «сейчас Vulkan (Mobile)»; побыть в мире > 8 с (подтверждение), перезапустить —
+  Vulkan без страховки; сравнить нагрев на «Максимальном» с прошлой версией (ThermalGuard: шаги снижения реже?),
+  картинку (цвета, тени, контуры, вода, небо, свечение «Высокого»), первую минуту в мире (в 4.3 Mobile шейдеры
+  компилируются при первом показе — заминки в первый раз, дальше кэш `user://` и кэш конвейеров), «Совместимость» →
+  перезапуск → снова OpenGL. На телефоне без Vulkan / со слабым видеочипом — игра на Совместимости, «Vulkan»
+  недоступен.
 
 ## Проверка и сборка
 - Автотест локально: `godot --headless --path . --import`, затем

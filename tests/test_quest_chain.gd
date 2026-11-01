@@ -193,6 +193,9 @@ func _elder_chain(race: String) -> void:
 	check(q.quest_loot("wolf") == {"wolf_pelt": 1} and q.quest_loot("pheasant").is_empty(), "квестовая добыча: шкура с волка")
 	inv.remove("wolf_pelt", inv.count("wolf_pelt"))
 	for i in 3:
+		# Шкура бывает и обычной добычей (материал волка) — цель могла выполниться раньше третьего волка: тогда
+		# квестовой добычи больше нет, но волков для цели «убить 3» всё равно добиваем
+		var need_pelt := not q.goal_done("elder_trophies", 1)
 		var m := find_mob("wolf")
 		check(m != null, "волк %d" % (i + 1))
 		if m == null:
@@ -202,7 +205,8 @@ func _elder_chain(race: String) -> void:
 		var before := _drop_ids()
 		m.take_damage(m.hp + 5, player)
 		var drop := _drop_near(pos, before)
-		check(drop != null and int(drop.items.get("wolf_pelt", 0)) >= 1, "с волка %d упала шкура" % (i + 1))
+		if need_pelt:
+			check(drop != null and int(drop.items.get("wolf_pelt", 0)) >= 1, "с волка %d упала шкура" % (i + 1))
 		if drop != null:
 			drop.pick_up()
 	check(q.goal_done("elder_trophies", 0) and q.goal_done("elder_trophies", 1), "три волка и три шкуры: %d/3, %d/3"

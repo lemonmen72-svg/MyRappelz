@@ -121,6 +121,8 @@ func _ready() -> void:
 	Quality.apply_fps()
 	# Бережение телефона: фон, авто-снижение графики при нагреве, контур дальних моделей
 	add_child(ThermalGuard.new())
+	# Рендерер: Vulkan (Mobile) или запасной Compatibility, страховка от вылета Vulkan (CLAUDE.md «Рендерер»)
+	add_child(RendererGuard.new())
 	get_tree().node_added.connect(_on_node_added)
 	# Пакет ресурсов (модели героев профессий, стадии зверей) — до первого обращения к моделям.
 	# В редакторе и автотестах ресурсы встроены (Assets.available) — экрана нет, всё как раньше.
@@ -252,6 +254,12 @@ func _start_world() -> void:
 		hud.update_player(player)
 		refresh_skill_buttons())
 	_started = true
+	# Vulkan проверяется: время в мире до подтверждения; сообщение о рендерере (откат после вылета, Vulkan со
+	# следующего запуска) — один раз
+	RendererGuard.world_started()
+	if RendererGuard.note != "":
+		hud.show_message(RendererGuard.note, 8.0)
+		RendererGuard.note = ""
 	# Старое сохранение переведено (герой стал Наёмником): сказать игроку и сохранить уже в новом виде
 	if Game.load_note != "":
 		hud.show_message(Game.load_note, 8.0)

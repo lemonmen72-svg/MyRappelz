@@ -43,6 +43,7 @@ test_props 3
 test_quest_chain 6
 test_quest_marks 3
 test_quests 3
+test_renderer 3
 test_skill_cast 3
 test_skills_light_dark_casters 5
 test_skills_pet_jobs 4

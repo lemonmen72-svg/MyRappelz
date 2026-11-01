@@ -22,7 +22,7 @@ if [ "$PARTS" -gt 1 ]; then
 	ARGS=(--shots-part="$PART" --shots-parts="$PARTS")
 fi
 t0=$(date +%s)
-xvfb-run -a -s "-screen 0 1280x720x24" timeout 4200 godot --rendering-driver opengl3 --fixed-fps 30 \
+xvfb-run -a -s "-screen 0 1280x720x24" timeout 4200 godot --rendering-method gl_compatibility --rendering-driver opengl3 --fixed-fps 30 \
 	--path . res://tests/runner.tscn -- res://tests/shots.gd "${ARGS[@]}" > shots.log 2>&1
 status=$?
 t_done "скриншоты, часть $PART/$PARTS" "$t0"
