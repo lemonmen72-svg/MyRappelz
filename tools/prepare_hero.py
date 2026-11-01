@@ -751,6 +751,7 @@ def build(cid: str, src_path: str, height: float, out_dir: str, preview: str = "
 	print("   записано: %s (%.1f МБ), рост %.3f м, %d треуг." % (glb_path, os.path.getsize(glb_path) / 1e6,
 		meta["height"], meta["tris"]))
 	ok = verify(rt, rig, roles, mesh, clips, meta)
+	ok = pc.uv_check(glb_path) and ok  # треугольники, растянутые через атлас (углы с разных участков развёртки)
 	if preview:
 		write_preview(preview, cid, rt, rig, mesh, tex, clips, gr, cb)
 	return {"ok": ok, "meta": meta}

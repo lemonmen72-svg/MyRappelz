@@ -5,6 +5,8 @@ extends "res://tests/test_base.gd"
 ## модель меняется, окно существа показывает модель стадии; дикие звери — на модели 1-й стадии.
 ## Редкость «Обычный» (uncommon): название, ранг, синяя карта; дикий волк сильнее базового зверя того же уровня,
 ## питомец-волк — с силой редкости, Ловкость — его главный стат; у базовых видов сила 1.0.
+## UV моделей зверей (_check_uv): нет треугольников, растянутых через атлас (у centaur_3 после упрощения «по сваренным
+## позициям» было 14 % — пёстрые клочки чужих частей текстуры на теле); та же мера, что uv_check в prepare_creatures.py.
 
 const STAGED := ["panther", "pheasant", "turtle", "wolf"]
 
@@ -25,6 +27,7 @@ func run_step() -> void:
 	match step:
 		0:
 			_check_files()
+			_check_uv()
 			_check_rarity()
 			_check_wild()
 			step = 1
@@ -125,6 +128,80 @@ func _check_files() -> void:
 	var wa := CreatureModels.asset_of(w)
 	check(wa != null and wa.species == "wolf" and not wa.stage_model, "дикий волк — модель wolf из файла")
 	box.queue_free()
+
+
+## UV всех зверей из creatures.json: доля треугольников, растянутых через атлас (разброс UV > 0.25 и плотность UV
+## на метр в 4 раза выше средней по мешу), меньше 0.5 %; 99-й перцентиль разброса у centaur_3 — меньше 0.1.
+func _check_uv() -> void:
+	var info: Variant = JSON.parse_string(FileAccess.get_file_as_string(CreatureAsset.INFO_PATH))
+	check(info is Dictionary and (info as Dictionary).has("centaur_3"), "creatures.json читается, в нём centaur_3")
+	if not info is Dictionary:
+		return
+	for k in (info as Dictionary).keys():
+		var id := String(k)
+		var path := CreatureAsset.path_for(id)
+		if not Assets.exists(path):
+			continue
+		var ps := load(path) as PackedScene
+		check(ps != null, "%s: модель загружается" % id)
+		if ps == null:
+			continue
+		var root := ps.instantiate()
+		var meshes := root.find_children("*", "MeshInstance3D", true, false)
+		check(meshes.size() > 0, "%s: есть меш" % id)
+		var bad := 0
+		var total := 0
+		var spreads := PackedFloat32Array()
+		for mi in meshes:
+			var m := (mi as MeshInstance3D).mesh
+			if m == null:
+				continue
+			for si in m.get_surface_count():
+				var arr := m.surface_get_arrays(si)
+				var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+				var uvs: PackedVector2Array = arr[Mesh.ARRAY_TEX_UV]
+				var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
+				if uvs.size() != verts.size() or idx.is_empty():
+					continue
+				var area_uv := 0.0
+				var area_3d := 0.0
+				var t := 0
+				while t + 2 < idx.size():
+					var a := uvs[idx[t]]
+					var b := uvs[idx[t + 1]]
+					var c := uvs[idx[t + 2]]
+					area_uv += absf((b - a).cross(c - a)) * 0.5
+					var p := verts[idx[t]]
+					area_3d += (verts[idx[t + 1]] - p).cross(verts[idx[t + 2]] - p).length() * 0.5
+					t += 3
+				var dens := sqrt(area_uv / maxf(area_3d, 1e-12))
+				t = 0
+				while t + 2 < idx.size():
+					var ua := uvs[idx[t]]
+					var ub := uvs[idx[t + 1]]
+					var uc := uvs[idx[t + 2]]
+					var sp := maxf(maxf(ua.x, maxf(ub.x, uc.x)) - minf(ua.x, minf(ub.x, uc.x)),
+						maxf(ua.y, maxf(ub.y, uc.y)) - minf(ua.y, minf(ub.y, uc.y)))
+					spreads.append(sp)
+					var pa := verts[idx[t]]
+					var pb := verts[idx[t + 1]]
+					var pc := verts[idx[t + 2]]
+					var per_uv := ua.distance_to(ub) + ub.distance_to(uc) + uc.distance_to(ua)
+					var per_3d := pa.distance_to(pb) + pb.distance_to(pc) + pc.distance_to(pa)
+					if sp > 0.25 and per_uv / maxf(per_3d, 1e-9) > 4.0 * dens:
+						bad += 1
+					total += 1
+					t += 3
+		root.free()
+		check(total > 0, "%s: треугольники с UV есть" % id)
+		if total == 0:
+			continue
+		var share := float(bad) / float(total)
+		check(share < 0.005, "%s: растянутых через атлас треугольников %.2f %% (< 0.5 %%)" % [id, share * 100.0])
+		if id == "centaur_3":
+			spreads.sort()
+			var p99 := spreads[int(spreads.size() * 0.99)]
+			check(p99 < 0.1, "centaur_3: 99-й перцентиль разброса UV в треугольнике %.3f (< 0.1)" % p99)
 
 
 ## Редкость «Обычный»: название, ранг, тир карты, сила; базовые виды без изменений.
