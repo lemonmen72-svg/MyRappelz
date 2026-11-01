@@ -76,6 +76,9 @@ func race_class() -> Array:
 func before_start() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SHOTS_DIR))
 	Quality.set_level(Quality.HIGH, false)
+	# MSAA на программном рендере CI в разы медленнее — сценарий не укладывался в предел; сглаживание — FXAA
+	# (MSAA снимается отдельно в кадрах 128–129)
+	Quality.set_option("aa", 1, false)
 	# Звери острова до 30 ур. сильнее героя-новичка: на кадрах рядом со зверями герой не должен погибать
 	AdminPanel.god = true
 	game.add_pet("wolf", "Серохвост", 5)
@@ -215,6 +218,7 @@ func run_step() -> void:
 		15:
 			shot("14_town_low")
 			Quality.set_level(Quality.HIGH, false)
+			Quality.set_option("aa", 1, false)
 			Quality.apply(get_tree())
 			_build_row()
 			wait = 30

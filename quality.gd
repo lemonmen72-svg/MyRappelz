@@ -543,6 +543,7 @@ static func _alive(list: Array[WeakRef]) -> Array[WeakRef]:
 
 static func _apply_models() -> void:
 	var recv := not model_shadows()
+	var ol := outlines()
 	var alive: Array[WeakRef] = []
 	for wr in _model_mats:
 		var m := wr.get_ref() as BaseMaterial3D
@@ -551,12 +552,16 @@ static func _apply_models() -> void:
 		alive.append(wr)
 		if m.disable_receive_shadows != recv:
 			m.disable_receive_shadows = recv
+		# Контур модели — здесь же (модель героя или зверя с контуром: meta "outline")
+		if m.has_meta("outline"):
+			var mw: Material = (m.get_meta("outline") as Material) if ol else null
+			if m.next_pass != mw:
+				m.next_pass = mw
 	_model_mats = alive
-	var ol := outlines()
 	var alive_ol: Array[WeakRef] = []
 	for wr in _outline_mats:
 		var om := wr.get_ref() as Material
-		if om == null:
+		if om == null or not om.has_meta("outline"):
 			continue
 		alive_ol.append(wr)
 		var want: Material = (om.get_meta("outline") as Material) if ol else null
