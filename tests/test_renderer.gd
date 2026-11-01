@@ -4,8 +4,8 @@ extends "res://tests/test_base.gd"
 ##   рендерер следующего запуска — из application/config/project_settings_override = RendererGuard.OVERRIDE_PATH;
 ## - в CI (headless, Compatibility): Quality как было — билинейное растяжение, FXAA своим проходом PostFx, фильтр
 ##   теней "filter"; окно после Quality.apply — без встроенного FXAA и FSR;
-## - ветка Mobile (Quality.renderer_override = 1, без настоящего Vulkan): FSR 1.0 на 720p/900p ниже экрана,
-##   билинейно на 540p и родном, встроенный FXAA вместо прохода PostFx, фильтр теней "filter_mobile";
+## - ветка Mobile (Quality.renderer_override = 1, без настоящего Vulkan): растяжение 3D билинейное при любом
+##   разрешении (FSR 1.0 в Godot 4.3 — только Forward+), встроенный FXAA вместо прохода PostFx, фильтр теней "filter_mobile";
 ## - RendererGuard на «подставном Android» (свои файлы в user://test_renderer/): список видеочипов, «Авто» на
 ##   хорошем и плохом видеочипе, страховка неподтверждённого Vulkan (файл заранее на Compatibility), вылет → откат и
 ##   «Авто» больше не включает Vulkan, ручной выбор Vulkan, подтверждение в мире, фон снимает и возвращает
@@ -121,9 +121,9 @@ func _check_mobile_quality() -> void:
 	Quality.renderer_override = 1
 	check(Quality.mobile_renderer(), "подстановка рендерера Mobile")
 	Quality.set_level(Quality.MEDIUM, false)
-	# Разрешение 3D: FSR на 720p и 900p ниже экрана, 540p и родное — билинейно
-	var want_1080 := [Viewport.SCALING_3D_MODE_BILINEAR, Viewport.SCALING_3D_MODE_FSR, Viewport.SCALING_3D_MODE_FSR,
-		Viewport.SCALING_3D_MODE_BILINEAR]
+	# Разрешение 3D: всегда билинейно (FSR 1.0 в Godot 4.3 только в Forward+ — Mobile отказывает с ошибкой)
+	var want_1080 := [Viewport.SCALING_3D_MODE_BILINEAR, Viewport.SCALING_3D_MODE_BILINEAR,
+		Viewport.SCALING_3D_MODE_BILINEAR, Viewport.SCALING_3D_MODE_BILINEAR]
 	for v in Quality.option_count("render"):
 		Quality.set_option("render", v, false)
 		var p := Quality.render_params(1080.0)
@@ -161,7 +161,7 @@ func _check_mobile_quality() -> void:
 	Quality.apply(get_tree())
 	var win := get_tree().root
 	check(win.screen_space_aa == Viewport.SCREEN_SPACE_AA_FXAA, "Mobile: окно с встроенным FXAA")
-	check(is_equal_approx(win.fsr_sharpness, Quality.FSR_SHARPNESS), "Mobile: резкость FSR")
+	check(win.scaling_3d_mode == Viewport.SCALING_3D_MODE_BILINEAR, "Mobile: окно без FSR (в 4.3 — только Forward+)")
 	var fx := _fx()
 	var sh: Shader = fx.current_shader() if fx != null else null
 	check(sh != null and not sh.code.contains("#define USE_FXAA") and sh.code.contains("#define USE_GRADE"),

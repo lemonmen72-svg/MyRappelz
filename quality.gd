@@ -32,8 +32,8 @@ extends RefCounted
 ##
 ## Рендерер (RendererGuard; на Android с нормальным Vulkan — Mobile, иначе и в CI — Compatibility): настройки те же,
 ## различия — ветками по mobile_renderer():
-## - разрешение 3D ниже экрана (720p, 900p) — FSR 1.0 вместо билинейного растяжения (в Compatibility 4.3 его нет);
-##   540p (слабый телефон, шаг 5 авто-снижения) — билинейно, дешевле всего;
+## - разрешение 3D ниже экрана — билинейно, как в Compatibility: FSR 1.0 в Godot 4.3 есть только в Forward+
+##   (RendererViewport::viewport_set_scaling_3d_mode отказывает Mobile — ошибка в логе 0.25.1 с S24 Ultra);
 ## - FXAA — встроенный (Viewport.screen_space_aa, в проходе тонмаппинга Mobile, почти бесплатно), свой проход PostFx
 ##   — только в Compatibility (postfx_fxaa());
 ## - фильтр теней — по числу выборок RD (SHADOW_LEVELS "filter_mobile": SOFT_LOW 4 / SOFT_MEDIUM 8 выборок вместо
@@ -598,12 +598,11 @@ static func screen_aa() -> Viewport.ScreenSpaceAA:
 	return Viewport.SCREEN_SPACE_AA_DISABLED
 
 
-## FSR 1.0 для экрана высотой screen_h px: Mobile, 720p или 900p и кадр заметно меньше экрана.
-static func use_fsr(screen_h: float) -> bool:
-	if not mobile_renderer():
-		return false
-	var r := effective("render")
-	return r >= 1 and RENDER_HEIGHTS[r] > 0 and render_scale_for(screen_h) < FSR_MAX_SCALE
+## FSR 1.0 для экрана высотой screen_h px. В Godot 4.3 FSR 1.0 есть только в Forward+ (в Mobile и Compatibility
+## viewport_set_scaling_3d_mode отказывает с ошибкой «FSR1 is only available when using the Forward+ renderer»),
+## а Forward+ игра не использует — всегда билинейно. Оставлено на случай перехода на Godot с FSR в Mobile.
+static func use_fsr(_screen_h: float) -> bool:
+	return false
 
 
 ## Способ растяжения 3D-кадра: FSR 1.0 (use_fsr) или билинейно.
@@ -745,7 +744,7 @@ static func apply(tree: SceneTree) -> void:
 
 ## Разрешение и сглаживание окна. Интерфейс рисуется в родном разрешении (растяжение canvas_items, база
 ## 1280×720 — раскладка та же), 3D-мир — с высотой render_height() и растягивается билинейно
-## (Viewport.scaling_3d_scale; в GL Compatibility 4.3 есть только билинейное), в Mobile — FSR 1.0 (use_fsr).
+## (Viewport.scaling_3d_scale; в Godot 4.3 FSR есть только в Forward+ — в Mobile и Compatibility билинейно).
 ## MSAA — у 3D-кадра; FXAA в Mobile — встроенный (screen_aa).
 static func apply_resolution(tree: SceneTree) -> void:
 	var win := tree.root

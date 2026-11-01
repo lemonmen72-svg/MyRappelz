@@ -484,7 +484,7 @@
   `quality.gd` (`Quality`: пресеты «Низкое / Среднее (по умолчанию) / Высокое / Максимальное» `LOW…ULTRA`, «Свои» `CUSTOM` —
   если настройку меняли вручную и она не совпала ни с одним пресетом; настройки `Quality.OPTIONS` — номер варианта
   (`option(key)`, `set_option(key, v)`, подписи `LABELS`, значения пресетов `PRESETS`): `render` разрешение 3D
-  540p/720p/900p/родное (`Viewport.scaling_3d_scale`, билинейно, в Mobile 720p/900p — FSR 1.0; интерфейс всегда в родном, canvas_items 1280×720),
+  540p/720p/900p/родное (`Viewport.scaling_3d_scale`, билинейно и в Mobile — FSR 1.0 в Godot 4.3 только в Forward+; интерфейс всегда в родном, canvas_items 1280×720),
   `shadows` выкл/низкие/средние/высокие (`SHADOW_LEVELS`: атлас 2048, 2 каскада PSSM, дальность 32/45/60 м, границы
   каскадов, фильтр PCF, тени кустов и камней — только «Высокие»), `aa` выкл/FXAA/MSAA 2×/4× (`Viewport.msaa_3d`; FXAA — проход PostFx, в Mobile — встроенный `screen_space_aa`),
   `view` дальность (`VIEW_LEVELS`: трава, кусты, деревья, мелочи построек — группа `poi_props`, колосья — `poi_decor`),
@@ -1458,7 +1458,7 @@
   «Низкое» без теней. Сглаживание: MSAA 3D-кадра (на телефонах — `EXT_multisampled_render_to_texture`, дёшево),
   alpha to coverage в Compatibility 4.3 не работает (растительность у нас геометрией, без alpha scissor), встроенного
   FXAA нет — свой в `postfx.gdshader`. В Mobile (раздел «Рендерер») фильтр теней — по выборкам RD (`filter_mobile`),
-  FXAA встроенный, растяжение 3D — FSR 1.0.
+  FXAA встроенный, растяжение 3D — билинейное (FSR 1.0 в 4.3 — только Forward+).
 
 ## Рендерер: Mobile (Vulkan) с запасным Compatibility
 Решение Максима (третья сборка): S24 Ultra грелся на «Максимальном» в Compatibility (OpenGL ES) — на телефонах с
@@ -1551,8 +1551,9 @@
   снова)», `get_tree().quit()`). На ПК выбор только запоминается — всегда Compatibility.
 - **Ветки `Quality` по рендереру** (`Quality.mobile_renderer()` — `RendererGuard.is_vulkan()`: есть
   `RenderingServer.get_rendering_device()`; тесты — `Quality.renderer_override`; `render_params(высота экрана)` —
-  что уйдёт окну и солнцу): разрешение 3D 720p / 900p ниже экрана — **FSR 1.0** (`use_fsr`, `FSR_SHARPNESS` 0.3; в
-  Compatibility 4.3 только билинейное), 540p (и шаг 5 авто-снижения) и родное — билинейно; **FXAA** — встроенный
+  что уйдёт окну и солнцу): растяжение 3D — билинейное при любом разрешении (`use_fsr` всегда
+  false: FSR 1.0 в Godot 4.3 есть только в Forward+, `viewport_set_scaling_3d_mode` в Mobile отказывает — ошибка
+  «FSR1 is only available when using the Forward+ renderer» в логе бота 0.25.1); **FXAA** — встроенный
   `Viewport.screen_space_aa` в проходе тонмаппинга Mobile, свой проход PostFx — только в Compatibility
   (`postfx_fxaa()`); цветокоррекция и свечение — тот же PostFx в обоих (одна картинка, проверена снимками CI);
   MSAA 2×/4× — как было (на тайловых видеочипах дёшево); **фильтр теней** — `SHADOW_LEVELS` `filter_mobile`
