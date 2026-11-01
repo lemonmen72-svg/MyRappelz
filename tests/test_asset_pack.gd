@@ -651,7 +651,8 @@ func _check_files() -> void:
 			want_part = "world"
 		check(Assets.part_of(p) == want_part and Assets.part_of(p.get_basename() + ".png") == want_part,
 			"%s — в части %s (%s)" % [f, want_part, Assets.part_of(p)])
-	var dirs := {"res://assets/props/": "world", "res://assets/textures/": "world", "res://assets/handheld/": "handheld",
+	var dirs := {"res://assets/props/": "world|world_b", "res://assets/textures/": "world",
+		"res://assets/handheld/": "handheld|handheld_r2",
 		"res://assets/icons/items/": "icons", "res://assets/icons/skills/": "icons", "res://assets/icons/ui/": "icons",
 		"res://assets/icons/pets/wolf/": "icons"}
 	for d in dirs:
@@ -659,8 +660,8 @@ func _check_files() -> void:
 		for ext in [".glb", ".png"]:
 			for f in _list(String(d), String(ext)):
 				var p: String = String(d) + String(f)
-				check(Assets.part_of(p) == String(dirs[d]), "%s — в части %s (%s)" % [p.trim_prefix("res://"), dirs[d],
-					Assets.part_of(p)])
+				check(String(dirs[d]).split("|").has(Assets.part_of(p)), "%s — в части %s (%s)" % [
+					p.trim_prefix("res://"), dirs[d], Assets.part_of(p)])
 				n += 1
 		check(n > 0, "%s: файлов %d" % [d, n])
 	for j in ["res://assets/creatures/creatures.json", "res://assets/props/props.json", "res://assets/handheld/handheld.json",

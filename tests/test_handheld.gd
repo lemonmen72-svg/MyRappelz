@@ -36,7 +36,7 @@ const RANK2 := {
 	"weapon_shield_r2": "shield",
 }
 ## Бюджет треугольников модели в руке.
-const MAX_TRIS := 6500
+const MAX_TRIS := 16000
 ## Вид хвата героя → [узел в руке, id модели] (что должно оказаться в руках модели из файла).
 const HELD := [
 	["sword_1h", "weapon_sword_1h_r1", "", [["Sword", "weapon_sword_1h_r1"]]],

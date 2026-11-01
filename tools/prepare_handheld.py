@@ -8,7 +8,8 @@ tools/prepare_props.py (его функции: упрощение по форм�
 Для каждого предмета пишет в assets/handheld/:
   <id>.glb  (+ .import) — упрощённый меш (бюджет tris), реальный размер, оси по контракту (ниже), нормали плавные на
                           скруглённом и резкие на рёбрах; без картинок и материала (материал задаёт игра: Handheld).
-  <id>.png  (+ .import) — запечённая текстура своей развёртки (tex×tex, VRAM-сжатие, мипмапы).
+  <id>.png  (+ .import) — запечённая текстура своей развёртки (tex×tex: TEX_ONE 1024 / TEX_BIG 2048; VRAM-сжатие
+                          высокого качества, мипмапы).
 handheld.json — для игры и тестов: на каждый id вид (kind: вид оружия ItemData.WEAPON_KINDS или "npc"), рамка осей
 (frame), длина, размеры, min/max, точки (grip — всегда [0, 0, 0], grip2 — вторая рука у двуручного, tip — верхний
 конец, butt — нижний), треугольники, текстура, источник.
@@ -61,6 +62,15 @@ pc = pp.pc
 ROOT = os.path.dirname(_HERE)
 OUT = os.path.join(ROOT, "assets", "handheld")
 
+# Текстуры (решение Максима «на максимум от исходного»): 1024 у одноручного оружия и предметов жителей, 2048 — у
+# двуручного (меч, булава, топор, посох, копьё), луков, арбалетов, щитов и посоха Кирка (исходники Meshy — 2048);
+# сжатие высокого качества (ASTC 4×4 на телефоне). Прежде было 512 / 1024.
+TEX_ONE = 1024
+TEX_BIG = 2048
+# Треугольники (слова Максима «все модельки максимально к исходному качеству»): исходники Meshy — 9–10 тыс. у оружия
+# 1-го ранга и предметов жителей, 12–15 тыс. у 2-го ранга; бюджеты 8.5 / 12 тыс. (арбалет 2-го ранга — 10.5) — почти
+# исходник. Прежде было 2–6 тыс.
+
 # src — часть пути к исходнику (у двух «Mooncleaver» — хэш папки), kind — вид (ItemData.WEAPON_KINDS) или "npc",
 # frame — рамка осей (см. шапку), length — длина по оси Y (у щита и книг — высота, у арбалета — длина ложа),
 # tris — бюджет треугольников, tex — размер текстуры, grip / grip2 — доля длины от нижнего конца (рукоять),
@@ -71,77 +81,77 @@ OUT = os.path.join(ROOT, "assets", "handheld")
 # ищется только у спинки (тетива в том же сечении не тянет точку хвата к себе).
 ITEMS = {
 	# Оружие 1-го ранга (модели Максима по промтам оружия 1-го ранга)
-	"weapon_sword_1h_r1": dict(src="Knight_s_Oath", kind="sword_1h", frame="blade", length=0.95, tris=3000,
-		tex=512, grip=0.17),
-	"weapon_sword_2h_r1": dict(src="Gilded_Oathblade", kind="sword_2h", frame="blade", length=1.45, tris=3200,
-		tex=512, grip=0.27, grip2=0.13),
-	"weapon_dagger_r1": dict(src="Emberfang", kind="dagger", frame="blade", length=0.38, tris=2600, tex=512,
+	"weapon_sword_1h_r1": dict(src="Knight_s_Oath", kind="sword_1h", frame="blade", length=0.95, tris=8500,
+		tex=TEX_ONE, grip=0.17),
+	"weapon_sword_2h_r1": dict(src="Gilded_Oathblade", kind="sword_2h", frame="blade", length=1.45, tris=8500,
+		tex=TEX_BIG, grip=0.27, grip2=0.13),
+	"weapon_dagger_r1": dict(src="Emberfang", kind="dagger", frame="blade", length=0.38, tris=8500, tex=TEX_ONE,
 		grip=0.23),
-	"weapon_mace_1h_r1": dict(src="Ironbound_Scepter", kind="mace_1h", frame="blade", length=0.75, tris=3500,
-		tex=512, grip=0.19),
-	"weapon_mace_2h_r1": dict(src="Ironbound_Warhammer", kind="mace_2h", frame="blade", length=1.4, tris=4000,
-		tex=512, grip=0.55, grip2=0.2),
+	"weapon_mace_1h_r1": dict(src="Ironbound_Scepter", kind="mace_1h", frame="blade", length=0.75, tris=8500,
+		tex=TEX_ONE, grip=0.19),
+	"weapon_mace_2h_r1": dict(src="Ironbound_Warhammer", kind="mace_2h", frame="blade", length=1.4, tris=8500,
+		tex=TEX_BIG, grip=0.55, grip2=0.2),
 	"weapon_axe_1h_r1": dict(src="Mooncleaver_20261101_texture_c2e20c45", kind="axe_1h", frame="blade",
-		length=0.7, tris=3500, tex=512, grip=0.2, rot=180),
+		length=0.7, tris=8500, tex=TEX_ONE, grip=0.2, rot=180),
 	"weapon_axe_2h_r1": dict(src="Mooncleaver_20261101_texture_e850e3a2", kind="axe_2h", frame="blade",
-		length=1.4, tris=3500, tex=512, grip=0.55, grip2=0.2, rot=180),
-	"weapon_staff_1h_r1": dict(src="Crystalwood_Scepter", kind="staff_1h", frame="blade", length=0.8, tris=3500,
-		tex=512, grip=0.17),
-	"weapon_staff_2h_r1": dict(src="Emberwood_Staff", kind="staff_2h", frame="blade", length=1.7, tris=3500,
-		tex=512, grip=0.35, grip2=0.18),
-	"weapon_spear_r1": dict(src="Emberlance", kind="spear", frame="blade", length=2.0, tris=3000, tex=512,
+		length=1.4, tris=8500, tex=TEX_BIG, grip=0.55, grip2=0.2, rot=180),
+	"weapon_staff_1h_r1": dict(src="Crystalwood_Scepter", kind="staff_1h", frame="blade", length=0.8, tris=8500,
+		tex=TEX_ONE, grip=0.17),
+	"weapon_staff_2h_r1": dict(src="Emberwood_Staff", kind="staff_2h", frame="blade", length=1.7, tris=8500,
+		tex=TEX_BIG, grip=0.35, grip2=0.18),
+	"weapon_spear_r1": dict(src="Emberlance", kind="spear", frame="blade", length=2.0, tris=8500, tex=TEX_BIG,
 		grip=0.33, grip2=0.1),
-	"weapon_crossbow_r1": dict(src="Ornate_Crossbow", kind="crossbow", frame="crossbow", length=0.85, tris=6000,
-		tex=1024, grip=0.3),
-	"weapon_shield_r1": dict(src="Sunward_Aegis", kind="shield", frame="shield", length=0.75, tris=4000, tex=1024,
+	"weapon_crossbow_r1": dict(src="Ornate_Crossbow", kind="crossbow", frame="crossbow", length=0.85, tris=8500,
+		tex=TEX_BIG, grip=0.3),
+	"weapon_shield_r1": dict(src="Sunward_Aegis", kind="shield", frame="shield", length=0.75, tris=8500, tex=TEX_BIG,
 		grip=0.58),
 	# Оружие 2-го ранга (модели Максима по промтам 2-го ранга; щит и двуручный меч чуть крупнее 1-го ранга). Модель
 	# без имени (…_texture_0cecb119) — двуручный меч с рубином в гарде и красной рукоятью (значок 2-го ранга).
-	"weapon_sword_1h_r2": dict(src="Azure_Oathblade", kind="sword_1h", frame="blade", length=0.95, tris=3000,
-		tex=512, grip=0.17),
-	"weapon_sword_2h_r2": dict(src="texture_0cecb119", kind="sword_2h", frame="blade", length=1.5, tris=3200,
-		tex=512, grip=0.27, grip2=0.14),
-	"weapon_dagger_r2": dict(src="Emerald_Dawnblade", kind="dagger", frame="blade", length=0.38, tris=2600, tex=512,
+	"weapon_sword_1h_r2": dict(src="Azure_Oathblade", kind="sword_1h", frame="blade", length=0.95, tris=12000,
+		tex=TEX_ONE, grip=0.17),
+	"weapon_sword_2h_r2": dict(src="texture_0cecb119", kind="sword_2h", frame="blade", length=1.5, tris=12000,
+		tex=TEX_BIG, grip=0.27, grip2=0.14),
+	"weapon_dagger_r2": dict(src="Emerald_Dawnblade", kind="dagger", frame="blade", length=0.38, tris=12000, tex=TEX_ONE,
 		grip=0.26),
-	"weapon_mace_1h_r2": dict(src="Embercrest_Scepter", kind="mace_1h", frame="blade", length=0.75, tris=3500,
-		tex=512, grip=0.2),
-	"weapon_mace_2h_r2": dict(src="Sunforged_War_Scepter", kind="mace_2h", frame="blade", length=1.45, tris=4000,
-		tex=512, grip=0.55, grip2=0.22),
-	"weapon_axe_1h_r2": dict(src="Ruby_Sovereign_Axe", kind="axe_1h", frame="blade", length=0.7, tris=3500,
-		tex=512, grip=0.22, rot=180),
-	"weapon_axe_2h_r2": dict(src="Crimson_Crescent_Halberd", kind="axe_2h", frame="blade", length=1.45, tris=3500,
-		tex=512, grip=0.5, grip2=0.22, rot=180),
+	"weapon_mace_1h_r2": dict(src="Embercrest_Scepter", kind="mace_1h", frame="blade", length=0.75, tris=12000,
+		tex=TEX_ONE, grip=0.2),
+	"weapon_mace_2h_r2": dict(src="Sunforged_War_Scepter", kind="mace_2h", frame="blade", length=1.45, tris=12000,
+		tex=TEX_BIG, grip=0.55, grip2=0.22),
+	"weapon_axe_1h_r2": dict(src="Ruby_Sovereign_Axe", kind="axe_1h", frame="blade", length=0.7, tris=12000,
+		tex=TEX_ONE, grip=0.22, rot=180),
+	"weapon_axe_2h_r2": dict(src="Crimson_Crescent_Halberd", kind="axe_2h", frame="blade", length=1.45, tris=12000,
+		tex=TEX_BIG, grip=0.5, grip2=0.22, rot=180),
 	"weapon_staff_1h_r2": dict(src="Amethyst_Sovereign_Staff", kind="staff_1h", frame="blade", length=0.8,
-		tris=3500, tex=512, grip=0.2),
+		tris=12000, tex=TEX_ONE, grip=0.2),
 	"weapon_staff_2h_r2": dict(src="Celestial_Sapphire_Scepter", kind="staff_2h", frame="blade", length=1.7,
-		tris=3500, tex=512, grip=0.46, grip2=0.29),
-	"weapon_spear_r2": dict(src="Azureleaf_Lance", kind="spear", frame="blade", length=2.0, tris=3000, tex=512,
+		tris=12000, tex=TEX_BIG, grip=0.46, grip2=0.29),
+	"weapon_spear_r2": dict(src="Azureleaf_Lance", kind="spear", frame="blade", length=2.0, tris=12000, tex=TEX_BIG,
 		grip=0.33, grip2=0.1),
-	"weapon_bow_r2": dict(src="Emeraldleaf_Bow", kind="bow", frame="bow", length=1.4, tris=4000, tex=512,
+	"weapon_bow_r2": dict(src="Emeraldleaf_Bow", kind="bow", frame="bow", length=1.4, tris=12000, tex=TEX_BIG,
 		grip=0.5, rot=-90, thin=True, grip_back=True),
 	# У «Gilded Arbalest» Meshy сделал два одинаковых лука крест-накрест: лишний (дуги, наконечники, тетива вдоль Z
 	# исходника) убирается, остаётся лук поперёк ложа (вдоль X — там же ворот сбоку, как на эскизе)
-	"weapon_crossbow_r2": dict(src="Gilded_Arbalest", kind="crossbow", frame="crossbow", length=0.85, tris=6000,
-		tex=1024, grip=0.3, drop=[[[-0.04, 0.1, 0.15], [0.04, 0.51, 0.51]], [[-0.04, 0.1, -0.51], [0.04, 0.51, -0.15]]]),
+	"weapon_crossbow_r2": dict(src="Gilded_Arbalest", kind="crossbow", frame="crossbow", length=0.85, tris=10500,
+		tex=TEX_BIG, grip=0.3, drop=[[[-0.04, 0.1, 0.15], [0.04, 0.51, 0.51]], [[-0.04, 0.1, -0.51], [0.04, 0.51, -0.15]]]),
 	# У «Sapphire Sunshield» сзади две ручки-скобы: хват — от задней стороны самого щита (back), а не от скоб
-	"weapon_shield_r2": dict(src="Sapphire_Sunshield", kind="shield", frame="shield", length=0.8, tris=4000, tex=1024,
+	"weapon_shield_r2": dict(src="Sapphire_Sunshield", kind="shield", frame="shield", length=0.8, tris=12000, tex=TEX_BIG,
 		grip=0.58, back=-0.011),
 	# Предметы жителей (id — договорённость с моделями жителей; лук — и у героев: Handheld.KIND_MODELS["bow"])
-	"npc_longbow": dict(src="Emberwood_Longbow", kind="npc", frame="bow", length=1.4, tris=4000, tex=512,
+	"npc_longbow": dict(src="Emberwood_Longbow", kind="npc", frame="bow", length=1.4, tris=8500, tex=TEX_BIG,
 		grip=0.5, rot=-90, thin=True),
-	"npc_grimoire": dict(src="Astral_Grimoire", kind="npc", frame="book", length=0.3, tris=3000, tex=512,
+	"npc_grimoire": dict(src="Astral_Grimoire", kind="npc", frame="book", length=0.3, tris=8500, tex=TEX_ONE,
 		grip=0.5),
-	"npc_tome": dict(src="Leatherbound_Tome", kind="npc", frame="book", length=0.3, tris=3000, tex=512, grip=0.5),
-	"npc_cane": dict(src="Carved_Wooden_Cane", kind="npc", frame="blade", length=0.95, tris=2000, tex=512,
+	"npc_tome": dict(src="Leatherbound_Tome", kind="npc", frame="book", length=0.3, tris=8500, tex=TEX_ONE, grip=0.5),
+	"npc_cane": dict(src="Carved_Wooden_Cane", kind="npc", frame="blade", length=0.95, tris=8500, tex=TEX_ONE,
 		grip=0.88),
-	"npc_wand": dict(src="Crystalvine_Wand", kind="npc", frame="blade", length=0.45, tris=2500, tex=512, grip=0.25),
-	"npc_hammer": dict(src="Ironbound_Hammer", kind="npc", frame="blade", length=0.6, tris=2500, tex=512, grip=0.3),
-	"npc_antlerstaff": dict(src="Verdant_Antlerstaff", kind="npc", frame="blade", length=1.7, tris=4500, tex=512,
+	"npc_wand": dict(src="Crystalvine_Wand", kind="npc", frame="blade", length=0.45, tris=8500, tex=TEX_ONE, grip=0.25),
+	"npc_hammer": dict(src="Ironbound_Hammer", kind="npc", frame="blade", length=0.6, tris=8500, tex=TEX_ONE, grip=0.3),
+	"npc_antlerstaff": dict(src="Verdant_Antlerstaff", kind="npc", frame="blade", length=1.7, tris=8500, tex=TEX_BIG,
 		grip=0.5, grip2=0.32),
-	"npc_quiver": dict(src="Quiver_of_Arrows", kind="npc", frame="blade", length=0.7, tris=4500, tex=512, grip=0.45),
-	"npc_keys": dict(src="Ring_of_Forgotten_Keys", kind="npc", frame="blade", length=0.2, tris=4000, tex=512,
+	"npc_quiver": dict(src="Quiver_of_Arrows", kind="npc", frame="blade", length=0.7, tris=8500, tex=TEX_ONE, grip=0.45),
+	"npc_keys": dict(src="Ring_of_Forgotten_Keys", kind="npc", frame="blade", length=0.2, tris=8500, tex=TEX_ONE,
 		grip=0.9),
-	"npc_scroll": dict(src="Sealed_Shadow_Scroll", kind="npc", frame="blade", length=0.3, tris=2500, tex=512,
+	"npc_scroll": dict(src="Sealed_Shadow_Scroll", kind="npc", frame="blade", length=0.3, tris=8500, tex=TEX_ONE,
 		grip=0.5),
 }
 
