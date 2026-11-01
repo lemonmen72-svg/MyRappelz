@@ -1,0 +1,37 @@
+// AAR плагина: build/outputs/aar/myrappelz_download-release.aar → addons/myrappelz_download/bin/.
+// Версии — как у шаблона сборки Godot 4.3 (AGP 8.2.0, compileSdk 34, minSdk 21, Java 17).
+// Классы Godot (GodotPlugin, UsedByGodot, Dictionary) нужны только для компиляции: -Pgodot_lib_jar=<classes.jar
+// из android/build/libs/release/godot-lib.template_release.aar> — та же версия, что в APK; без него — Maven Central.
+plugins {
+    id 'com.android.library' version '8.2.0'
+}
+
+android {
+    namespace 'com.lemonmen.myrappelz.download'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 21
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig false
+    }
+}
+
+String godotLibJar = project.findProperty("godot_lib_jar") ?: ""
+
+dependencies {
+    if (godotLibJar != "" && file(godotLibJar).isFile()) {
+        compileOnly files(godotLibJar)
+        compileOnly "org.jetbrains.kotlin:kotlin-stdlib:1.9.20"
+    } else {
+        compileOnly "org.godotengine:godot:4.3.0.stable"
+    }
+    compileOnly "androidx.annotation:annotation:1.7.1"
+}

@@ -414,8 +414,9 @@
 
 ### Прочее
 - `icon.svg`: иконка приложения (своя).
-- `export_presets.cfg`: пресет «Android» (пакет `com.lemonmen.myrappelz`, armeabi-v7a + arm64-v8a, без Gradle,
-  разрешение INTERNET — для пакета ресурсов) и пресет «Assets» (пакет ресурсов `.pck`, см. ниже).
+- `export_presets.cfg`: пресет «Android» (пакет `com.lemonmen.myrappelz`, armeabi-v7a + arm64-v8a, в репозитории без
+  Gradle — сборка APK включает Gradle ради плагина фоновой загрузки, разрешение INTERNET — для пакета ресурсов,
+  `addons/*` не в APK) и пресет «Assets» (пакет ресурсов `.pck`, см. ниже).
 - `tests/test_base.gd`: основа автотестов; `tests/smoke_test.gd` и `tests/test_*.gd`: сценарии.
 - `android/dev.keystore`: ключ разработчика (alias `myrappelz`, пароль `myrappelz-dev`). Для Google Play нужен свой ключ в секретах.
 - `.github/workflows/check.yml`: все автотесты на каждый пуш (APK не собирает).
@@ -460,6 +461,28 @@
   всё как раньше. `Assets.simulate_missing(true)` — вести себя как без пакета (тест отката). Тест
   `tests/test_asset_pack.gd`: пресеты, какие файлы в пакете, откат на запасные модели, экран без сети (настоящий .pck
   из `PCKPacker`, битый файл, обрыв, кэш по хэшу, удаление старых, манифест из сети).
+- **Фоновая загрузка на Android** (задача Максима «загрузка в фоне, чтобы в уведомлениях отражалось»): системный
+  DownloadManager через плагин Godot v2 `MyRappelzDownload` (JavaClassWrapper в 4.3 не создаёт объекты Java —
+  нужен плагин). Исходники — `android/plugins/myrappelz_download/` (Java `DownloadPlugin`: `externalPath`, `start`,
+  `query`, `remove`, `requestNotifications`, `notificationsAllowed`, `lastError`; только String/bool/Dictionary — JNI
+  4.3 не умеет long-параметры и результаты; манифест AAR — meta-data `org.godotengine.plugin.v2.MyRappelzDownload`,
+  POST_NOTIFICATIONS), плагин редактора `addons/myrappelz_download/` (включён в `project.godot`; отдаёт экспорту
+  `bin/myrappelz_download-release.aar`, только если AAR есть — в репозитории его нет). В игре: `Assets.download_plugin()`
+  (null не на Android / без плагина → прежний HTTPRequest; тест — `Assets.plugin_override`). «Загрузить» → файл
+  `packs/assets-<хэш>.pck.download` во внешней папке приложения (`getExternalFilesDir`, без разрешений), уведомление
+  системы «MyRappelz — загрузка ресурсов» с ходом, на Android 13+ — запрос разрешения на уведомления; запись о загрузке
+  `user://packs/download.cfg` (`Assets.read_job` / `save_job` / `clear_job`) — следующий запуск сразу следит за ней.
+  Экран опрашивает раз в 0.5 с (МБ из МБ, скорость, «ожидание сети»), готово → `Verifier` с `copy_to` (sha256 и копия
+  в `.pck.part` за один проход; место — на две копии) → `install` → подключение; ошибка, отмена в уведомлении —
+  «Повторить»; не принял DownloadManager — HTTPRequest. «Играть, пока грузится» — загрузку не останавливает: невидимый
+  `AssetLoader` (`background`) у корня дерева допроверяет и кладёт пакет в кэш, сообщение в HUD; посреди игры пакет
+  не подключается (готовые модели остались бы запасными) — при следующем входе в мир («Сменить персонажа», запуск).
+  **Сборка** (`android-apk.yml`, `BACKGROUND_DOWNLOAD: "1"` — выключить «0»): после экспорта пакета — sdkmanager
+  (платформа 34, build-tools 34.0.0, NDK 23.2.8568313), шаблон Gradle `android_source.zip` → `android/build`
+  (+ `android/.build_version` = `4.3.stable`, `.gdignore`), AAR — `android/build/gradlew -p android/plugins/…
+  assembleRelease -Pgodot_lib_jar=<classes.jar из godot-lib шаблона>`, `use_gradle_build=true` только у «Android».
+  Не вышло (шаг `continue-on-error`, или экспорт Gradle упал) — APK по-старому без Gradle, `::warning::`; после
+  экспорта — проверка класса плагина в `classes*.dex`. Проверить на телефоне: уведомление, сворачивание, перезапуск.
 - Первая настоящая проверка (экспорт .pck, загрузка с GitHub на телефоне) — при следующей сборке APK.
 
 ## Механики (ориентир: гайды rz.gamexp.com, своё оформление)

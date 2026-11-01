@@ -1,0 +1,18 @@
+// Плагин Godot v2 «MyRappelzDownload» (AAR). Собирается в .github/workflows/android-apk.yml обёрткой Gradle
+// шаблона сборки Godot: android/build/gradlew -p android/plugins/myrappelz_download assembleRelease.
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "myrappelz_download"

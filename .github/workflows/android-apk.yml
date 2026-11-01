@@ -27,6 +27,10 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       GODOT_VERSION: "4.3"
+      # Фоновая загрузка пакета ресурсов (Android DownloadManager, ход загрузки — в уведомлении): плагин Godot v2
+      # android/plugins/myrappelz_download, APK собирается Gradle. "0" — APK как раньше (без Gradle; пакет качается
+      # внутри игры через HTTPRequest). Не вышла Gradle-сборка — сборка не падает, APK собирается по-старому.
+      BACKGROUND_DOWNLOAD: "1"
       RAW_VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || '' }}
     steps:
       - uses: actions/checkout@v4
@@ -143,14 +147,77 @@ jobs:
           cp build/assets-manifest.json assets_pack.json
           echo "ASSETS_PCK=$PCK" >> "$GITHUB_ENV"
 
+      # Плагин фоновой загрузки: шаблон Gradle-сборки Godot в android/build (как «Проект → Установить шаблон сборки
+      # Android»), AAR плагина → addons/myrappelz_download/bin (его подключает плагин редактора), Gradle-сборка у
+      # пресета «Android» (пакет ресурсов уже экспортирован). Шаг не роняет сборку: без GRADLE_BUILD=1 — обычный экспорт.
+      - name: Плагин фоновой загрузки (Gradle)
+        if: env.BACKGROUND_DOWNLOAD == '1'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          export ANDROID_HOME="$SDK"
+          # Что просит шаблон Godot 4.3 (config.gradle): платформа 34, build-tools 34.0.0, NDK r23c
+          SDKM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$SDKM" ]; then
+            yes | "$SDKM" --sdk_root="$SDK" "platforms;android-34" "build-tools;34.0.0" "ndk;23.2.8568313" > sdkmanager.log 2>&1 \
+              || { tail -n 20 sdkmanager.log; echo "::warning::sdkmanager: не всё установлено"; }
+          fi
+          TPL="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          test -f "$TPL/android_source.zip"
+          rm -rf android/build
+          mkdir -p android/build
+          unzip -q -o "$TPL/android_source.zip" -d android/build
+          echo "${GODOT_VERSION}.stable" > android/.build_version
+          touch android/build/.gdignore
+          chmod +x android/build/gradlew
+          # Классы Godot для компиляции плагина — из godot-lib шаблона (та же версия, что в APK), иначе Maven Central
+          EXTRA=()
+          GODOT_AAR=$(ls android/build/libs/release/godot-lib*.aar 2>/dev/null | head -n 1 || true)
+          if [ -n "$GODOT_AAR" ]; then
+            mkdir -p "$RUNNER_TEMP/godot-lib"
+            unzip -q -o "$GODOT_AAR" classes.jar -d "$RUNNER_TEMP/godot-lib"
+            EXTRA=(-Pgodot_lib_jar="$RUNNER_TEMP/godot-lib/classes.jar")
+          fi
+          android/build/gradlew --no-daemon -p android/plugins/myrappelz_download assembleRelease "${EXTRA[@]}"
+          AAR=android/plugins/myrappelz_download/build/outputs/aar/myrappelz_download-release.aar
+          test -s "$AAR"
+          mkdir -p addons/myrappelz_download/bin
+          cp "$AAR" addons/myrappelz_download/bin/
+          ls -la addons/myrappelz_download/bin
+          sed -i '/^\[preset\.0\.options\]/,/^\[preset\.1\]/ s|^gradle_build/use_gradle_build=.*|gradle_build/use_gradle_build=true|' export_presets.cfg
+          grep -n "use_gradle_build" export_presets.cfg
+          echo "GRADLE_BUILD=1" >> "$GITHUB_ENV"
+
       - name: Экспорт APK
         run: |
           set -uo pipefail
           mkdir -p build
-          timeout 600 godot --headless --path . --export-release "Android" "build/MyRappelz-$VERSION.apk" 2>&1 | tee export.log
-          ls -la build
           APK="build/MyRappelz-$VERSION.apk"
+          GRADLE="${GRADLE_BUILD:-0}"
+          if [ "$GRADLE" = "1" ]; then
+            # Gradle-сборка с плагином фоновой загрузки (первый раз Gradle качает зависимости — дольше)
+            timeout 1800 godot --headless --path . --export-release "Android" "$APK" 2>&1 | tee export.log
+            if [ ! -s "$APK" ]; then
+              echo "::warning::Gradle-сборка APK не удалась — APK без фоновой загрузки (пакет качается внутри игры)"
+              GRADLE=0
+              echo "GRADLE_BUILD=0" >> "$GITHUB_ENV"
+              sed -i '/^\[preset\.0\.options\]/,/^\[preset\.1\]/ s|^gradle_build/use_gradle_build=.*|gradle_build/use_gradle_build=false|' export_presets.cfg
+              rm -f addons/myrappelz_download/bin/*.aar
+              timeout 600 godot --headless --path . --export-release "Android" "$APK" 2>&1 | tee -a export.log
+            fi
+          else
+            timeout 600 godot --headless --path . --export-release "Android" "$APK" 2>&1 | tee export.log
+          fi
+          ls -la build
           test -s "$APK" || exit 1
+          if [ "$GRADLE" = "1" ]; then
+            if unzip -p "$APK" 'classes*.dex' | grep -aq "com/lemonmen/myrappelz/download/DownloadPlugin"; then
+              echo "APK: плагин фоновой загрузки на месте (Gradle-сборка)"
+            else
+              echo "::warning::в APK нет класса плагина фоновой загрузки — пакет будет качаться внутри игры"
+            fi
+          fi
           # Модели пакета не должны попасть в APK, запасные модели и манифест — должны
           # (проверка по списку файлов APK; если Godot сложил их в один .pck внутри APK — пропускается)
           unzip -l "$APK" > apk_files.txt || true
@@ -181,7 +248,7 @@ jobs:
 
             **Установка:** скачайте `MyRappelz-${{ env.VERSION }}.apk` на телефон, откройте его и разрешите установку из неизвестных источников.
 
-            **Пакет ресурсов:** модели героев профессий и старших стадий питомцев — отдельным файлом (`MyRappelz-assets-….pck`, `assets-manifest.json`). Игра сама загрузит его при первом запуске (покажет размер и спросит) и сохранит в своей памяти; следующие версии скачивают пакет заново, только если модели изменились. Вручную его скачивать не нужно.
+            **Пакет ресурсов:** модели героев профессий и старших стадий питомцев — отдельным файлом (`MyRappelz-assets-….pck`, `assets-manifest.json`). Игра сама загрузит его при первом запуске (покажет размер и спросит) и сохранит в своей памяти; следующие версии скачивают пакет заново, только если модели изменились. Вручную его скачивать не нужно. ${{ env.GRADLE_BUILD == '1' && 'Загрузка идёт в фоне средствами Android: игру можно свернуть, ход загрузки виден в уведомлении (на Android 13+ игра спросит разрешение на уведомления); можно и играть сразу на запасных моделях — пакет подключится при следующем входе в мир.' || '' }}
 
             **Аккаунт и персонажи:** при запуске — вход по логину (аккаунт хранится на телефоне), до 4 персонажей на аккаунт, у каждого свой ник. Создание по шагам: раса (сильные и слабые стороны) → профессии расы → пол (модели Бродяг) → ник. Герой появляется в деревне своей расы. Сменить персонажа — «Настройки» → «Сменить персонажа / выйти из аккаунта». Админ-панель — только у логина Dedok_max.
 

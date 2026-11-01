@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Плагин Godot v2 «MyRappelzDownload»: фоновая загрузка пакета ресурсов через DownloadManager.
+     Разрешение на уведомления (Android 13+) — чтобы система показывала ход загрузки; игра спрашивает его
+     при первом нажатии «Загрузить». -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application>
+        <meta-data
+            android:name="org.godotengine.plugin.v2.MyRappelzDownload"
+            android:value="com.lemonmen.myrappelz.download.DownloadPlugin" />
+    </application>
+
+</manifest>

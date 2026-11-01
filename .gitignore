@@ -6,3 +6,8 @@ export_credentials.cfg
 .claude/worktrees/
 __pycache__/
 assets_pack.json
+android/build/
+android/.build_version
+addons/myrappelz_download/bin/
+android/plugins/*/build/
+android/plugins/*/.gradle/
