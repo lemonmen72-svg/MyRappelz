@@ -151,7 +151,7 @@
   Тёмная эльфийка-Наёмник теперь — `hero_assassin_f`; `dark_elf_wanderer.glb` (скелет Mixamo) больше не выбирается
   ни для кого, пока есть файлы героев, и остаётся запасной (`CharacterModel.MAIN_ASSET`, тест `tests/test_character_model.gd`).
   Оружие в руках модели из файла: меч, кинжал, топор, булава, посох — в правой руке, пары (два кинжала, два меча, два
-  топора) — в обеих, лук — в левой, арбалет — на изготовку (процедурные меши, пока Максим не пришлёт модели оружия),
+  топора) — в обеих, лук — в левой, арбалет — на изготовку (модели из файлов `Handheld`, раздел «Оружие и предметы в руках из файлов»; нет файла — процедурные меши),
   щит — в левой руке.
   Источники и лицензии — `assets/LICENSES.md`.
   Дополнительные анимации героя (Idle, удары и комбо мечом, удары парными клинками, стойка и выстрел из арбалета, рывок, кувырок, урон, смерть, каст, подбор) —
@@ -291,6 +291,31 @@
   `python3 -I tools/prepare_props.py --src <папка Meshy>` (пересобирает всё; `--check`, `--preview <папка>`), затем запись
   в `PropAsset.KINDS` и место в `IslandPois`. Тест `tests/test_props.gd` (в т. ч. лучи в стены построек — без дыр и
   изнанки, свечение эльфов ограничено), кадры 59–68 и 76–82 (постройки вблизи, мост с питомцем) в `tests/shots.gd`.
+- **Оружие и предметы в руках из файлов** (модели Meshy Максима «оружие 1-го ранга» и «предметы к НПС»):
+  `assets/handheld/<id>.glb` (меш без материала) + `<id>.png` (текстура 512, щит и арбалет 1024) + `handheld.json`
+  (вид `kind` — вид `ItemData.WEAPON_KINDS` или "npc", рамка `frame`, длина, min/max, точки `grip` [0,0,0], `grip2` —
+  вторая рука двуручного, `tip`, `butt`). Конвейер `tools/prepare_handheld.py` (функции `prepare_props.py`: упрощение
+  2–6 тыс. треуг., изнанка наружу, xatlas, запекание; `thin` — тонкие части вроде тетивы упрощаются отдельно;
+  `--check`, `--preview` — 4 стороны и сверху, хват красным, grip2 синим). **Контракт осей**: начало — точка хвата
+  (центр кулака на рукояти; у двуручного — ведущая рука у гарды, `grip2` ниже); `blade` — ось +Y, плоскость клинка XY,
+  лезвие топора и боёк к +X (к костяшкам под `_grip_xf`); `bow` — плечи ±Y, тетива +Z; `crossbow` — ложе −Z, верх +Y,
+  кулак на 6 см под ложем (как `_crossbow_mesh`, поворот `crossbow_rot`); `shield` — лицо +Z, ручка за щитом, в левой
+  кисти поворот `Handheld.SHIELD_IN_HAND` (лицо наружу, верх к локтю); `book` — обложка +Z, корешок −X. Оружие
+  (id = id предмета): `weapon_sword_1h_r1` ← Knight's Oath, `weapon_sword_2h_r1` ← Gilded Oathblade,
+  `weapon_dagger_r1` ← Emberfang, `weapon_mace_1h_r1` ← Ironbound Scepter, `weapon_mace_2h_r1` ← Ironbound Warhammer,
+  `weapon_axe_1h_r1` / `weapon_axe_2h_r1` ← два Mooncleaver, `weapon_staff_1h_r1` ← Crystalwood Scepter,
+  `weapon_staff_2h_r1` ← Emberwood Staff, `weapon_spear_r1` ← Emberlance, `weapon_crossbow_r1` ← Ornate Crossbow,
+  `weapon_shield_r1` ← Sunward Aegis; лука среди оружия нет — у героев лук жителя `npc_longbow`. Предметы жителей
+  (id — договорённость с моделями жителей): `npc_grimoire`, `npc_tome`, `npc_cane`, `npc_wand`, `npc_longbow`,
+  `npc_hammer`, `npc_antlerstaff`, `npc_quiver`, `npc_keys`, `npc_scroll`. `handheld.gd` (`Handheld`): `model_for(предмет,
+  вид)` — поле `"model"` предмета `ItemData` (оружие 2-го ранга — свой файл), иначе `KIND_MODELS` вида (1-й ранг);
+  `make(id)` — готовый `MeshInstance3D` (меш, toon-материал, тонкий контур, метка `handheld`), `hold_basis(id)`,
+  `point(id, "grip2")`, `force_missing` — тест отката. `CharacterModel.spec_for(…, weapon_item, offhand_item)` (игрок и
+  окно героя передают `Game.weapon` / `Game.offhand`), `_hold_item` — модель из файла на метке кисти вместо
+  процедурной, пары — один файл в обеих руках, двуручное держит только ведущая рука (IK второй руки нет, `grip2` —
+  на будущее). Лежат в APK (~10 МБ исходников; не в пакете ресурсов — у запасных героев тоже настоящее оружие),
+  `assets/handheld/*.json` — в `include_filter` «Android». Тест `tests/test_handheld.gd`, кадры 150–153 в
+  `tests/shots.gd` (оружие и предметы в ряд, герои профессий с оружием; шаги 1000–1004).
 - Качество и постобработка (задача Максима «мир выглядит плохо: вкладка графики, тени, сглаживание, оптимизация»):
   `quality.gd` (`Quality`: пресеты «Низкое / Среднее (по умолчанию) / Высокое / Максимальное» `LOW…ULTRA`, «Свои» `CUSTOM` —
   если настройку меняли вручную и она не совпала ни с одним пресетом; настройки `Quality.OPTIONS` — номер варианта

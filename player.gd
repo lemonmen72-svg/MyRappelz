@@ -1229,7 +1229,8 @@ func _build_model() -> void:
 		_model.queue_free()
 	_model = CharacterModel.new()
 	_model.name = "Model"
-	_model.setup(CharacterModel.spec_for(Game.race_id, Game.class_id, weapon_kind, Game.gender, has_shield))
+	_model.setup(CharacterModel.spec_for(Game.race_id, Game.class_id, weapon_kind, Game.gender, has_shield,
+		Game.weapon, Game.offhand))
 	_weapon_kind = _model.weapon_kind
 	add_child(_model)
 

@@ -17,7 +17,8 @@ extends Node3D
 ## Оружие (spec "weapon"): у модели из файла — одноручное в правой руке ("sword", "dagger", "axe", "mace", "staff"),
 ## пары в обеих руках ("dual_swords", "daggers", "dual_axes": левое — зеркально), лук в левой руке ("bow"), арбалет
 ## в руках ("crossbow": стойка на изготовку Crossbow_Idle и выстрел Crossbow_Shoot), щит в левой (spec "shield");
-## у модели из примитивов — по классу (ClassData weapon). Модели оружия процедурные (пока нет файлов).
+## у модели из примитивов — по классу (ClassData weapon). Оружие модели из файла — модель из файла Handheld
+## (assets/handheld, по предмету spec "weapon_item" / "offhand_item" или виду "weapon_type"), нет файла — процедурное.
 ## Анимации кодом: дыхание и моргание в покое, ходьба (set_move_speed), play_attack() (по оружию),
 ## play_shoot(), play_cast(), play_buff(), play_bash(), play_spin(), play_hit(), play_wave();
 ## волосы, плащ и шарф покачиваются сами.
@@ -415,8 +416,10 @@ static func model_weapon(weapon: String, asset: bool, shield: bool = false) -> S
 
 
 ## Внешность героя по расе, профессии и полу (ClassData). weapon — вид надетого оружия ItemData или модели
-## ("" — по профессии), shield — щит во второй руке.
-static func spec_for(race_id: String, class_id: String, weapon: String = "", gender: String = "f", shield: bool = false) -> Dictionary:
+## ("" — по профессии), shield — щит во второй руке; weapon_item / offhand_item — надетые предметы (модель оружия
+## из файла по предмету — Handheld.model_for; "" — модель вида по умолчанию).
+static func spec_for(race_id: String, class_id: String, weapon: String = "", gender: String = "f", shield: bool = false,
+		weapon_item: String = "", offhand_item: String = "") -> Dictionary:
 	var r := ClassData.race(race_id)
 	var c := ClassData.cls(class_id)
 	var main_c: Color = c.get("color", Color(0.6, 0.3, 0.2))
@@ -434,6 +437,9 @@ static func spec_for(race_id: String, class_id: String, weapon: String = "", gen
 		"main": main_c,
 		"accent": c.get("accent", main_c.lightened(0.4)),
 		"weapon": model_weapon(w, use_file, shield),
+		"weapon_type": w if ItemData.WEAPON_KINDS.has(w) else "",
+		"weapon_item": weapon_item,
+		"offhand_item": offhand_item,
 		"shield": shield,
 		"gender": gender,
 	}
@@ -1843,34 +1849,44 @@ func _setup_asset(path: String) -> bool:
 		var cbv: Array = rig.get("crossbow_rot", [])
 		if cbv.size() == 4:
 			cb = Quaternion(float(cbv[0]), float(cbv[1]), float(cbv[2]), float(cbv[3]))
+		# Модели оружия из файлов (Handheld): по надетому предмету, иначе по виду; "" — процедурный меш
+		var main_item := String(spec.get("weapon_item", ""))
+		var off_item := String(spec.get("offhand_item", ""))
+		var wkind := Handheld.item_kind(String(spec.get("weapon_type", "")), weapon_kind)
+		var wid := Handheld.model_for(main_item, wkind)
+		var oid := ""
+		if with_shield:
+			oid = Handheld.model_for(off_item, "shield")
+		else:
+			oid = Handheld.model_for(off_item if off_item != "" else main_item, wkind)
 		if hand != null and weapon_kind != "" and weapon_kind != "bow":
 			match weapon_kind:
 				"crossbow":
-					_hold(hand, "Crossbow", _crossbow_mesh(), Transform3D(Basis(cb.normalized()), pos_r))
+					_hold_item(hand, "Crossbow", wid, _crossbow_mesh(), Transform3D(Basis(cb.normalized()), pos_r))
 				"daggers", "dagger":
-					_hold(hand, "DaggerR", _dagger_mesh(), _grip_xf(dir_r, pos_r))
+					_hold_item(hand, "DaggerR", wid, _dagger_mesh(), _grip_xf(dir_r, pos_r))
 				"staff":
-					_hold(hand, "Staff", _staff_mesh(), _grip_xf(dir_r, pos_r))
+					_hold_item(hand, "Staff", wid, _staff_mesh(), _grip_xf(dir_r, pos_r))
 				"axe", "dual_axes":
-					_hold(hand, "Axe", _axe_mesh(), _grip_xf(dir_r, pos_r))
+					_hold_item(hand, "Axe", wid, _axe_mesh(), _grip_xf(dir_r, pos_r))
 				"mace":
-					_hold(hand, "Mace", _mace_mesh(), _grip_xf(dir_r, pos_r))
+					_hold_item(hand, "Mace", wid, _mace_mesh(), _grip_xf(dir_r, pos_r))
 				"spear":
-					_hold(hand, "Spear", _spear_mesh(), _grip_xf(dir_r, pos_r))
+					_hold_item(hand, "Spear", wid, _spear_mesh(), _grip_xf(dir_r, pos_r))
 				_:
-					_hold(hand, "Sword", _sword_mesh(), _grip_xf(dir_r, pos_r))
+					_hold_item(hand, "Sword", wid, _sword_mesh(), _grip_xf(dir_r, pos_r))
 		if hand_l != null:
 			if with_shield:
-				_hold(hand_l, "Shield", _shield_mesh(), _grip_xf(dir_l, pos_l))
+				_hold_item(hand_l, "Shield", oid, _shield_mesh(), _grip_xf(dir_l, pos_l))
 			elif weapon_kind == "daggers":
-				_hold(hand_l, "DaggerL", _dagger_mesh(), _grip_xf(dir_l, pos_l))
+				_hold_item(hand_l, "DaggerL", oid, _dagger_mesh(), _grip_xf(dir_l, pos_l))
 			elif weapon_kind == "dual_axes":
-				_hold(hand_l, "AxeL", _axe_mesh(), _grip_xf(dir_l, pos_l))
+				_hold_item(hand_l, "AxeL", oid, _axe_mesh(), _grip_xf(dir_l, pos_l))
 			elif weapon_kind == "bow":
 				# Лук в левой кисти: древко вдоль клинка хвата (вертикально в стойке), тетива к герою
-				_hold(hand_l, "Bow", _bow_mesh(), _grip_xf(dir_l, pos_l))
+				_hold_item(hand_l, "Bow", wid, _bow_mesh(), _grip_xf(dir_l, pos_l))
 			else:
-				_hold(hand_l, "SwordL", _sword_mesh(), _grip_xf(dir_l, pos_l))
+				_hold_item(hand_l, "SwordL", oid, _sword_mesh(), _grip_xf(dir_l, pos_l))
 
 	var aps := _asset.find_children("*", "AnimationPlayer", true, false)
 	if not aps.is_empty():
@@ -1934,6 +1950,18 @@ func _hold(hand: Node3D, node_name: String, mesh: ArrayMesh, xf: Transform3D) ->
 	w.material_override = _sword_mat()
 	w.set_meta("no_toon", true)
 	w.transform = xf
+	hand.add_child(w)
+
+
+## Оружие в руке модели из файла: модель из файла id (Handheld, с поворотом рамки — у щита) или, если id = "",
+## процедурный меш fallback.
+func _hold_item(hand: Node3D, node_name: String, id: String, fallback: ArrayMesh, xf: Transform3D) -> void:
+	var w := Handheld.make(id)
+	if w == null:
+		_hold(hand, node_name, fallback, xf)
+		return
+	w.name = node_name
+	w.transform = xf * Transform3D(Handheld.hold_basis(id), Vector3.ZERO)
 	hand.add_child(w)
 
 
