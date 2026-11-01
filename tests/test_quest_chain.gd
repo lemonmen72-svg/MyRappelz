@@ -199,8 +199,9 @@ func _elder_chain(race: String) -> void:
 			return
 		stand_near(m, 1.5)
 		var pos := m.global_position
+		var before := _drop_ids()
 		m.take_damage(m.hp + 5, player)
-		var drop := _drop_near(pos)
+		var drop := _drop_near(pos, before)
 		check(drop != null and int(drop.items.get("wolf_pelt", 0)) >= 1, "с волка %d упала шкура" % (i + 1))
 		if drop != null:
 			drop.pick_up()
@@ -610,14 +611,26 @@ func _level_to(lvl: int) -> void:
 
 
 ## Мешочек добычи у точки pos ({} — нет).
-func _drop_near(pos: Vector3) -> LootDrop:
+func _drop_near(pos: Vector3, skip: Dictionary = {}) -> LootDrop:
+	# Новый мешочек (не из skip) ближе всех к месту зверя — рядом может лежать мешочек прошлого волка
+	var best: LootDrop = null
+	var best_d := 3.0
 	for n in get_tree().get_nodes_in_group("loot_drops"):
 		var d := n as LootDrop
-		if d == null or d.is_queued_for_deletion():
+		if d == null or d.is_queued_for_deletion() or skip.has(d.get_instance_id()):
 			continue
-		if Vector2(d.global_position.x - pos.x, d.global_position.z - pos.z).length() < 0.5:
-			return d
-	return null
+		var dist := Vector2(d.global_position.x - pos.x, d.global_position.z - pos.z).length()
+		if dist < best_d:
+			best_d = dist
+			best = d
+	return best
+
+
+func _drop_ids() -> Dictionary:
+	var ids: Dictionary = {}
+	for n in get_tree().get_nodes_in_group("loot_drops"):
+		ids[n.get_instance_id()] = true
+	return ids
 
 
 ## Точка на земле острова.
