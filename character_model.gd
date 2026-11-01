@@ -492,8 +492,6 @@ static var _glow_mats: Dictionary = {}
 static var _face_material: StandardMaterial3D
 ## Модели из файлов вместо примитивов (false — всегда примитивы, для тестов).
 static var use_assets := true
-## Пути моделей, у которых анимации уже подготовлены (зацикливание, без смещения по земле).
-static var _prepared: Dictionary = {}
 static var _asset_outline: ShaderMaterial
 ## Роли костей моделей из файлов (asset_rig): путь GLB → словарь из <модель>.json.
 static var _rig_info: Dictionary = {}
@@ -2135,10 +2133,13 @@ func _setup_asset(path: String) -> bool:
 			if k.contains("/"):
 				k = k.get_slice("/", 1)
 			_clips[k] = String(an)
-		if not _prepared.has(path):
-			_prepared[path] = true
-			for an in _anim.get_animation_list():
-				var a := _anim.get_animation(an)
+		# Подготовка клипов — один раз на ресурс анимации (метка на самом Animation): когда все модели файла удалены,
+		# Godot выгружает сцену, и при новой загрузке клипы снова без петли — метка по пути файла их бы пропустила
+		# (бег замирал после первого цикла).
+		for an in _anim.get_animation_list():
+			var a := _anim.get_animation(an)
+			if not a.has_meta("cm_prepared"):
+				a.set_meta("cm_prepared", true)
 				var k := String(an).to_lower()
 				if k.contains("walk") or k.ends_with("running") or k == "idle" or k == "crossbow_idle" or k.ends_with("_loop") or k.ends_with("_hold") or MQ_LOCO_CLIPS.has(k):
 					a.loop_mode = Animation.LOOP_LINEAR

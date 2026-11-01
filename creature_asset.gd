@@ -82,7 +82,6 @@ static var _exists := {}
 static var _json: Dictionary = {}
 static var _json_loaded := false
 static var _infos := {}
-static var _prepared := {}
 static var _outline: ShaderMaterial
 
 var species := ""
@@ -260,9 +259,9 @@ func setup(id: String, s: float, color: Color = Color.WHITE, tint: Color = Color
 	if not aps.is_empty():
 		anim = aps[0] as AnimationPlayer
 		_map_clips()
-		if not _prepared.has(path):
-			_prepared[path] = true
-			_prepare_clips()
+		# Один раз на ресурс анимации (метка на Animation, не по пути: выгруженная и загруженная заново сцена —
+		# новые клипы без петли)
+		_prepare_clips()
 		# За кадром анимация стоит (кости не считаются); рамка с запасом на прыжки и взмахи
 		var vis := VisibleOnScreenNotifier3D.new()
 		vis.name = "OnScreen"
@@ -329,8 +328,9 @@ func _map_clips() -> void:
 func _prepare_clips() -> void:
 	for k in clips:
 		var a := anim.get_animation(clips[k])
-		if a == null:
+		if a == null or a.has_meta("ca_prepared"):
 			continue
+		a.set_meta("ca_prepared", true)
 		if k in LOOPED:
 			a.loop_mode = Animation.LOOP_LINEAR
 			_pin_root(a)
