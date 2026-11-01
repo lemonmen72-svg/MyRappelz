@@ -44,9 +44,22 @@ const MQ_CLIPS := ["mq_sword_a1", "mq_sword_a2", "mq_sword_a3", "mq_combo_b1", "
 	"mq_jump", "mq_bow_shot", "mq_bow_draw", "mq_reload", "mq_cast_a", "mq_cast_b", "mq_cast_c", "mq_cast_wide",
 	"mq_cast_slam", "mq_cast_beam", "mq_cast_up", "mq_cast_pray", "mq_charged_cast", "mq_charged_cast1", "mq_taunt",
 	"mq_hit", "mq_death", "mq_pickup", "mq_walking", "mq_running", "mq_cast_release", "mq_charge_release",
-	"mq_cast_hold", "mq_charge_hold", "mq_bow_aim_hold", "mq_crossbow_aim_hold"]
-## Петли каста умений героя (CharacterModel.MQ_CAST_LOOPS): зацикленные, первый и последний кадр совпадают.
-const MQ_LOOPS := ["mq_cast_hold", "mq_charge_hold", "mq_bow_aim_hold", "mq_crossbow_aim_hold"]
+	"mq_cast_hold", "mq_charge_hold", "mq_bow_aim_hold", "mq_crossbow_aim_hold",
+	"mq_thrust_b", "mq_blade_spin_b", "mq_bow_draw_b", "mq_bow_draw_c", "mq_bow_draw_d", "mq_pickup_b", "mq_guard",
+	"mq_rise", "mq_bow_scan_hold", "mq_crouch_charge_hold", "mq_turn_l90", "mq_turn_r90", "mq_turn_l180",
+	"mq_running_b", "mq_sprint"]
+## Петли каста умений героя (CharacterModel.MQ_CAST_LOOPS, MQ_CAST_ALT): зацикленные, первый и последний кадр совпадают.
+const MQ_LOOPS := ["mq_cast_hold", "mq_charge_hold", "mq_bow_aim_hold", "mq_crossbow_aim_hold", "mq_bow_scan_hold",
+	"mq_crouch_charge_hold"]
+## Шаг и бег манекенов (CharacterModel.MQ_LOCO): [клип, ход таза по высоте за цикл до, м; длина шага от, до, м].
+## Своя скорость — clips.<имя>.speed в .json.
+const MQ_LOCO := [["mq_walking", 0.09, 0.5, 1.1], ["mq_running_b", 0.12, 0.9, 1.5],
+	["mq_running", 0.08, 1.2, 2.1], ["mq_sprint", 0.08, 1.4, 2.6]]
+## Опорная стопа (носок у земли) едет назад со скоростью клипа: отклонение не больше, м.
+const MQ_LOCO_SLIDE := 0.04
+## Повороты на месте: угол корпуса за клип (clips.<имя>.turn, °) по модулю не меньше.
+const MQ_TURNS := ["mq_turn_l90", "mq_turn_r90", "mq_turn_l180"]
+const MQ_TURN_MIN_DEG := 60.0
 ## Длина клипа обычной атаки при темпе 1 (игра ускоряет до MQ_SPEED_MAX под интервал атаки), умений и прочих, с.
 const MQ_ATTACK_MAX := 1.25
 const MQ_ACT_MAX := 2.8
@@ -56,6 +69,8 @@ const MQ_GROUND_SLIDE := 0.08
 
 var models: Array[CharacterModel] = []
 var heroine: CharacterModel = null
+## Родитель модели для проверки поворота на месте (поворачивается, как герой).
+var _pivot: Node3D = null
 
 
 func _spawn(path: String, weapon: String, x: float) -> CharacterModel:
@@ -99,19 +114,49 @@ func run_step() -> void:
 			wait = 30
 			step = 1
 		1:
+			# Шаг — движение манекена
 			for i in models.size():
 				var m := models[i]
-				check(m._anim.current_animation == m._clip("walking"), "%s: на 1.4 м/с — шаг (%s)" % [
+				check(m._anim.current_animation.to_lower() == "mq_walking" and m.loco_clip() != "", "%s: на 1.4 м/с — шаг Mq_Walking (%s)" % [
 					HEROES[i], m._anim.current_animation])
 				m.set_move_speed(6.5)
 			wait = 30
 			step = 2
 		2:
+			# Бег — Mq_Running, темп = скорость / своя скорость клипа (стопа не скользит)
 			for i in models.size():
 				var m := models[i]
-				check(m._anim.current_animation == m._clip("running"), "%s: на 6.5 м/с — бег (%s)" % [
+				check(m._anim.current_animation.to_lower() == "mq_running", "%s: на 6.5 м/с — бег Mq_Running (%s)" % [
 					HEROES[i], m._anim.current_animation])
-				check(m._anim.speed_scale > 1.0, "%s: темп бега по скорости (%.2f)" % [HEROES[i], m._anim.speed_scale])
+				var v := float(CharacterModel.asset_rig(HEROES[i]).get("clips", {}).get(m._anim.current_animation, {}).get("speed", 0.0))
+				check(v > 0.0 and absf(m._anim.speed_scale - m._asset_speed / v) < 0.02,
+					"%s: темп бега %.2f = скорость / %.2f м/с" % [HEROES[i], m._anim.speed_scale, v])
+				m.set_move_speed(3.6)
+			wait = 20
+			step = 20
+		20:
+			# Трусца между шагом и бегом (порог с запасом: с бега вниз — ниже 4.6 × 0.92)
+			for i in models.size():
+				var m := models[i]
+				check(m._anim.current_animation.to_lower() == "mq_running_b", "%s: на 3.6 м/с — трусца (%s)" % [
+					HEROES[i], m._anim.current_animation])
+				# Чуть выше порога бега, но в пределах запаса — вид держится
+				m.set_move_speed(4.8)
+			wait = 20
+			step = 21
+		21:
+			for i in models.size():
+				var m := models[i]
+				check(m._anim.current_animation.to_lower() == "mq_running_b", "%s: 4.8 м/с — в запасе порога, трусца держится (%s)" % [
+					HEROES[i], m._anim.current_animation])
+				m.set_move_speed(10.0)
+			wait = 20
+			step = 22
+		22:
+			for i in models.size():
+				var m := models[i]
+				check(m._anim.current_animation.to_lower() == "mq_sprint", "%s: на 10 м/с — быстрый бег (%s)" % [
+					HEROES[i], m._anim.current_animation])
 				m.set_move_speed(0.0)
 			wait = 40
 			step = 3
@@ -201,8 +246,68 @@ func run_step() -> void:
 				var idle := m._pick(CharacterModel.ASSET_IDLE_CROSSBOW if m.weapon_kind == "crossbow" else CharacterModel.ASSET_IDLE)
 				check(not idle.is_empty() and m._anim.current_animation == String(idle[0]), "%s: после выпуска — покой (%s)" % [
 					HEROES[i], m._anim.current_animation])
+			# Поворот на месте: герой (родитель) развернулся на 100° влево — модель сначала смотрит по-старому и
+			# переступает клипом поворота
+			_pivot = Node3D.new()
+			main.add_child(_pivot)
+			_pivot.global_position = models[0].global_position
+			models[0].reparent(_pivot)
+			models[0].turn_in_place = true
+			wait = 3
+			step = 11
+		11:
+			_pivot.rotation.y = deg_to_rad(100.0)
+			wait = 4
+			step = 12
+		12:
+			var m := models[0]
+			var cur := m._anim.current_animation.to_lower()
+			check(CharacterModel.MQ_TURNS.has(cur), "%s: развернули стоя — клип поворота (%s)" % [HEROES[0], cur])
+			check(absf(m.rotation.y + deg_to_rad(100.0)) < 0.35, "%s: модель сначала смотрит по-старому (%.0f°)" % [
+				HEROES[0], rad_to_deg(m.rotation.y)])
+			wait = 120
+			step = 13
+		13:
+			var m := models[0]
+			check(m._turn_clip == "" and absf(m.rotation.y) < 0.1, "%s: поворот доигран — модель смотрит, куда герой (%.0f°)" % [
+				HEROES[0], rad_to_deg(m.rotation.y)])
+			check(m.loco_clip() == "" and m._anim.current_animation.to_lower() == "idle", "%s: после поворота — покой (%s)" % [
+				HEROES[0], m._anim.current_animation])
+			# Эмоции, уклонение, подъём при возрождении
+			for i in models.size():
+				models[i].play_emote("level")
+			wait = 3
+			step = 14
+		14:
+			for i in models.size():
+				var cur := models[i]._anim.current_animation.to_lower()
+				check(CharacterModel.MQ_EMOTES["level"].has(cur), "%s: новый уровень — эмоция (%s)" % [HEROES[i], cur])
+			wait = 150
+			step = 15
+		15:
+			for i in models.size():
+				models[i].play_dodge()
+			wait = 3
+			step = 16
+		16:
+			for i in models.size():
+				var cur := models[i]._anim.current_animation.to_lower()
+				check(cur == "dodge", "%s: уклонение — отскок Dodge (%s)" % [HEROES[i], cur])
+			wait = 120
+			step = 17
+		17:
+			for i in models.size():
+				models[i].play_rise()
+			wait = 3
+			step = 18
+		18:
+			for i in models.size():
+				var m := models[i]
+				check(m._anim.current_animation.to_lower() == "mq_rise", "%s: возрождение — подъём (%s)" % [
+					HEROES[i], m._anim.current_animation])
 				m.queue_free()
 			heroine.queue_free()
+			_pivot.queue_free()
 			ok_done()
 
 
@@ -293,6 +398,7 @@ func _check_model(m: CharacterModel, who: String) -> void:
 	print("  %s: рост %.2f м, треугольников %d, клипов %d, костей %d" % [who, h, tris, m._clips.size(),
 		skel.get_bone_count()])
 	_check_mq(m, who, skel, rig)
+	_check_loco(m, who, skel, rig)
 
 
 ## Имя клипа k-й обычной атаки по хвату модели (MQ_ATTACKS) или "".
@@ -320,7 +426,7 @@ func _check_mq(m: CharacterModel, who: String, skel: Skeleton3D, rig: Dictionary
 		var ci: Dictionary = info.get(cn, {})
 		check(not ci.is_empty() and absf(float(ci.get("length", 0.0)) - a.length) < 0.05,
 			"%s: %s — длина в .json (%.2f / %.2f с)" % [who, cn, float(ci.get("length", 0.0)), a.length])
-		var loop: bool = c == "mq_walking" or c == "mq_running" or MQ_LOOPS.has(c)
+		var loop: bool = CharacterModel.MQ_LOCO_CLIPS.has(c) or MQ_LOOPS.has(c)
 		if MQ_LOOPS.has(c):
 			check(bool(ci.get("loop", false)) and a.loop_mode == Animation.LOOP_LINEAR, "%s: %s — петля" % [who, cn])
 			check(_loop_seam(a) < 0.01, "%s: %s — шов петли %.4f" % [who, cn, _loop_seam(a)])
@@ -330,12 +436,101 @@ func _check_mq(m: CharacterModel, who: String, skel: Skeleton3D, rig: Dictionary
 			var lim := MQ_ATTACK_MAX if attacks.has(c) else MQ_ACT_MAX
 			check(a.length <= lim, "%s: %s — длина %.2f с (до %.2f)" % [who, cn, a.length, lim])
 		check(_root_still(a, String(bones.get("root", ""))), "%s: %s на месте (корень по X/Z не уходит)" % [who, cn])
-		if attacks.has(c) or c == "mq_charged_slash" or c == "mq_axe_chop" or MQ_LOOPS.has(c):
+		if MQ_TURNS.has(c):
+			check(absf(float(ci.get("turn", 0.0))) >= MQ_TURN_MIN_DEG, "%s: %s — поворот корпуса %.0f°" % [who, cn,
+				float(ci.get("turn", 0.0))])
+		if attacks.has(c) or c == "mq_charged_slash" or c == "mq_axe_chop" or MQ_LOOPS.has(c) or MQ_TURNS.has(c):
 			for side in ["L", "R"]:
 				var leg: Array = bones.get("legs", {}).get(side, [])
 				var toe := String(leg[mini(3, leg.size() - 1)]) if not leg.is_empty() else ""
 				var s := _ground_slide(skel, a, skel.find_bone(toe))
 				check(s <= MQ_GROUND_SLIDE, "%s: %s — стопа %s не едет по земле (%.3f м)" % [who, cn, side, s])
+
+
+## Шаг и бег манекенов: у клипа своя скорость в .json; пока носок у земли (не выше покоя + 4 см), он едет назад ровно
+## с этой скоростью (иначе в игре стопа скользит); таз по высоте ходит в меру (без «прыжков»); длина шага (скорость ×
+## полцикла) — человеческая. 91 точка цикла, треки клипа (импорт 90 к/с).
+func _check_loco(m: CharacterModel, who: String, skel: Skeleton3D, rig: Dictionary) -> void:
+	var info: Dictionary = rig.get("clips", {})
+	var bones: Dictionary = rig.get("bones", {})
+	for e in MQ_LOCO:
+		var row: Array = e
+		var cn := String(m._clips.get(String(row[0]), ""))
+		if cn == "":
+			continue
+		var a := m._anim.get_animation(cn)
+		var v := float((info.get(cn, {}) as Dictionary).get("speed", 0.0))
+		check(v > 0.5, "%s: %s — своя скорость в .json (%.2f м/с)" % [who, cn, v])
+		if v <= 0.5:
+			continue
+		var worst := 0.0
+		for side in ["L", "R"]:
+			var leg: Array = bones.get("legs", {}).get(side, [])
+			var toe := skel.find_bone(String(leg[mini(3, leg.size() - 1)])) if not leg.is_empty() else -1
+			if toe < 0:
+				continue
+			var pts := _bone_points(skel, a, toe, 90)
+			var near := skel.get_bone_global_rest(toe).origin.y + 0.04
+			var start := -1
+			for k in pts.size():
+				if pts[k].y >= near:
+					start = -1
+				elif start < 0:
+					start = k
+				else:
+					var dt := a.length * float(k - start) / 90.0
+					worst = maxf(worst, Vector2(pts[k].x - pts[start].x, pts[k].z - pts[start].z + v * dt).length())
+		check(worst <= MQ_LOCO_SLIDE, "%s: %s — опорная стопа не скользит при %.2f м/с (%.3f м)" % [who, cn, v, worst])
+		var hips := skel.find_bone(String(bones.get("hips", "")))
+		var hp := _bone_points(skel, a, hips, 90)
+		var lo := INF
+		var hi := -INF
+		for p in hp:
+			lo = minf(lo, p.y)
+			hi = maxf(hi, p.y)
+		check(hi - lo <= float(row[1]), "%s: %s — таз по высоте ходит на %.3f м (до %.2f)" % [who, cn, hi - lo, float(row[1])])
+		var step_len := v * a.length * 0.5
+		if float(row[3]) > 0.0:
+			check(step_len >= float(row[2]) and step_len <= float(row[3]), "%s: %s — шаг %.2f м (%.1f…%.1f)" % [who, cn,
+				step_len, float(row[2]), float(row[3])])
+		if cn.to_lower() == "mq_running":
+			print("  %s: бег %.2f м/с, шаг %.2f м, %.2f шаг/с (при 7 м/с — %.2f), таз %.3f м, скольжение %.3f м" % [
+				who, v, step_len, 2.0 / a.length, 2.0 / a.length * 7.0 / v, hi - lo, worst])
+
+
+## Позиции кости (в пространстве скелета) в n + 1 точках клипа: позы костей от корня — треки клипа, иначе поза покоя.
+func _bone_points(skel: Skeleton3D, a: Animation, bone: int, n: int) -> Array[Vector3]:
+	var pts: Array[Vector3] = []
+	if bone < 0:
+		return pts
+	var chain: Array[int] = []
+	var b := bone
+	while b >= 0:
+		chain.push_front(b)
+		b = skel.get_bone_parent(b)
+	var rot := {}
+	var pos := {}
+	for t in a.get_track_count():
+		var nm := String(a.track_get_path(t).get_concatenated_subnames())
+		if a.track_get_type(t) == Animation.TYPE_ROTATION_3D:
+			rot[nm] = t
+		elif a.track_get_type(t) == Animation.TYPE_POSITION_3D:
+			pos[nm] = t
+	for k in n + 1:
+		var tm := a.length * float(k) / float(n)
+		var xf := Transform3D.IDENTITY
+		for c in chain:
+			var bn := skel.get_bone_name(c)
+			var rest := skel.get_bone_rest(c)
+			var q := rest.basis.get_rotation_quaternion()
+			var o := rest.origin
+			if rot.has(bn):
+				q = a.rotation_track_interpolate(int(rot[bn]), tm)
+			if pos.has(bn):
+				o = a.position_track_interpolate(int(pos[bn]), tm)
+			xf = xf * Transform3D(Basis(q), o)
+		pts.append(xf.origin)
+	return pts
 
 
 ## Шов петли: наибольший угол (рад) между первым и последним ключом поворота у всех костей.
@@ -490,6 +685,7 @@ func _check_gait() -> void:
 	var male_walk := 0.0
 	var male_roll := 0.0
 	var male_run := 0.0
+	var male_mq := 0.0
 	var n := 0
 	for i in models.size():
 		if not _female(String(HEROES[i])):
@@ -497,6 +693,7 @@ func _check_gait() -> void:
 			male_walk += w.x
 			male_roll += w.y
 			male_run += _hips_swing(models[i], String(HEROES[i]), "running").x
+			male_mq += _hips_swing(models[i], String(HEROES[i]), "mq_walking").x
 			n += 1
 	check(n > 0, "есть мужские герои для сравнения пластики")
 	if n == 0:
@@ -504,6 +701,7 @@ func _check_gait() -> void:
 	male_walk /= float(n)
 	male_roll /= float(n)
 	male_run /= float(n)
+	male_mq /= float(n)
 	print("  пластика героев: таз в шаге %.1f° вокруг вертикали, %.1f° в сторону, в беге %.1f°" % [
 		male_walk, male_roll, male_run])
 	for i in models.size():
@@ -515,3 +713,7 @@ func _check_gait() -> void:
 		check(w.x > male_walk * 1.6, "%s: шаг — таз вокруг вертикали %.1f° (у героев %.1f°)" % [who, w.x, male_walk])
 		check(w.y > male_roll * 1.4, "%s: шаг — таз в сторону %.1f° (у героев %.1f°)" % [who, w.y, male_roll])
 		check(r.x > male_run + 3.0, "%s: бег — таз вокруг вертикали %.1f° (у героев %.1f°)" % [who, r.x, male_run])
+		# Шаг манекена (в игре — он): женская пластика тоже (у бега манекена таз и так вращается на 15°, у героинь —
+		# колея уже, мах рук и наклон меньше: tools/retarget_mannequin.py --check)
+		var mw := _hips_swing(models[i], who, "mq_walking")
+		check(mw.x > male_mq * 1.5, "%s: шаг манекена — таз вокруг вертикали %.1f° (у героев %.1f°)" % [who, mw.x, male_mq])

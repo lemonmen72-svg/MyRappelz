@@ -347,6 +347,9 @@ func _on_mob_gone(mob: Mob, killed: bool) -> void:
 		quests.on_mob_killed(mob)
 		# Тело зверя для умений Неофита («Последний вздох», «Остаток силы»)
 		JobFxNeophyte.on_mob_killed(mob)
+		# Победа над боссом — эмоция героя
+		if mob.is_boss:
+			player.play_emote("boss")
 	# Звери, поставленные админ-панелью (slot -1), не возрождаются
 	if mob.slot >= 0:
 		get_tree().create_timer(MobData.respawn_time(mob.type_id)).timeout.connect(_spawn_slot.bind(mob.slot))
