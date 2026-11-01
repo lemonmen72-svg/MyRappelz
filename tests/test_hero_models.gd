@@ -293,7 +293,7 @@ func _check_mq(m: CharacterModel, who: String, skel: Skeleton3D, rig: Dictionary
 		var ci: Dictionary = info.get(cn, {})
 		check(not ci.is_empty() and absf(float(ci.get("length", 0.0)) - a.length) < 0.05,
 			"%s: %s — длина в .json (%.2f / %.2f с)" % [who, cn, float(ci.get("length", 0.0)), a.length])
-		var loop := c == "mq_walking" or c == "mq_running"
+		var loop: bool = c == "mq_walking" or c == "mq_running"
 		if not loop:
 			var hit := float(ci.get("hit", -1.0))
 			check(hit > 0.0 and hit < a.length, "%s: %s — момент удара %.2f с в клипе %.2f с" % [who, cn, hit, a.length])
@@ -428,8 +428,8 @@ func _hips_swing(m: CharacterModel, who: String, clip: String) -> Vector2:
 		var q := Quaternion.IDENTITY
 		for c in chain:
 			var bn := skel.get_bone_name(c)
-			if tracks.has(nm):
-				q = q * a.rotation_track_interpolate(int(tracks[nm]), tm)
+			if tracks.has(bn):
+				q = q * a.rotation_track_interpolate(int(tracks[bn]), tm)
 			else:
 				q = q * skel.get_bone_rest(c).basis.get_rotation_quaternion()
 		var rel := q * rest.inverse()
