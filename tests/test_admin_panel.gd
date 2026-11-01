@@ -456,9 +456,20 @@ func _kill_xp(mult: int) -> Array:
 	var x0: int = game.xp
 	var l0: int = game.level
 	var p0 := pet.xp if pet != null else 0
+	var pl0 := pet.level if pet != null else 0
 	_press("kill_target")
 	check(m.is_dead and game.level == l0, "волк убит (×%d), уровень героя тот же" % mult)
-	var res := [game.xp - x0, (pet.xp - p0) if pet != null else 0]
+	# Опыт питомца с учётом новых уровней (опыт за зверя ×XP_GAIN — питомец может вырасти)
+	var pet_gain := 0
+	if pet != null:
+		pet_gain = pet.xp - p0
+		for l in range(pl0, pet.level):
+			pet_gain += PetData.xp_to_next(l)
+	var res := [game.xp - x0, pet_gain]
+	# Питомец — на прежний уровень: следующий замер с той же разницей уровней
+	if pet != null:
+		pet.level = pl0
+		pet.xp = p0
 	game.level = keep_l
 	game.xp = 0
 	return res

@@ -10,6 +10,6 @@ source_file="res://assets/handheld/weapon_staff_1h_r1.png"
 [params]
 
 compress/mode=2
-compress/high_quality=false
+compress/high_quality=true
 mipmaps/generate=true
 detect_3d/compress_to=0

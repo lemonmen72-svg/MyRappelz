@@ -76,10 +76,35 @@ const PACKS := {
 		"assets/creatures/*_3.glb",
 		"assets/creatures/*_3.png",
 	],
-	# Мир: постройки и атласы (props.json — в APK), деревья, кусты, камни, текстуры окружения, овцы в загоне.
+	# Мир: город, деревня людей, мелочи, природа (атласы страниц town / village / small / nature и их постройки;
+	# props.json — в APK), текстуры окружения, овцы в загоне. Постройки эльфов, порта, лагерей и пещеры — world_b.
+	# Новая постройка — шаблон в часть своей страницы атласа (модель и её атлас — в одной части).
 	"world": [
-		"assets/props/*.glb",
-		"assets/props/*.png",
+		"assets/props/props_town.png",
+		"assets/props/props_village.png",
+		"assets/props/props_small.png",
+		"assets/props/props_nature.png",
+		"assets/props/town_*.glb",
+		"assets/props/well.glb",
+		"assets/props/notice_board.glb",
+		"assets/props/merchant_stall.glb",
+		"assets/props/human_house_*.glb",
+		"assets/props/windmill_*.glb",
+		"assets/props/scarecrow.glb",
+		"assets/props/hay_bale.glb",
+		"assets/props/trough.glb",
+		"assets/props/lantern_*.glb",
+		"assets/props/weapon_rack.glb",
+		"assets/props/training_dummy.glb",
+		"assets/props/bollard.glb",
+		"assets/props/crate.glb",
+		"assets/props/barrel.glb",
+		"assets/props/brazier_dark.glb",
+		"assets/props/dark_spire.glb",
+		"assets/props/crystal_*.glb",
+		"assets/props/tree_*.glb",
+		"assets/props/bush.glb",
+		"assets/props/rock*.glb",
 		"assets/textures/*.png",
 		"assets/creatures/sheep.glb",
 		"assets/creatures/sheep.png",
@@ -101,10 +126,12 @@ const PACKS := {
 		"assets/creatures/anathema*.glb",
 		"assets/creatures/anathema*.png",
 	],
-	# Оружие и предметы в руках (handheld.json — в APK).
+	# Оружие 1-го ранга и предметы жителей (handheld.json — в APK). Оружие 2-го ранга — handheld_r2.
 	"handheld": [
-		"assets/handheld/*.glb",
-		"assets/handheld/*.png",
+		"assets/handheld/*_r1.glb",
+		"assets/handheld/*_r1.png",
+		"assets/handheld/npc_*.glb",
+		"assets/handheld/npc_*.png",
 	],
 	# Значки: предметы, умения героя и питомцев, интерфейс.
 	"icons": [
@@ -116,11 +143,30 @@ const PACKS := {
 		"assets/art/pack/*.jpg",
 		"assets/art/pack/*.png",
 	],
+	# Мир, вторая часть (0.26: атласы 4096 — мир целиком ≈ 134 МБ после импорта): деревни эльфов, порт, лагеря, пещера
+	# (атласы страниц elves / port и их постройки).
+	"world_b": [
+		"assets/props/props_elves.png",
+		"assets/props/props_port.png",
+		"assets/props/light_elf_*.glb",
+		"assets/props/dark_elf_*.glb",
+		"assets/props/lighthouse.glb",
+		"assets/props/ship.glb",
+		"assets/props/cave_entrance.glb",
+		"assets/props/tent_*.glb",
+		"assets/props/campfire.glb",
+		"assets/props/dock_crates.glb",
+	],
+	# Оружие 2-го ранга (на острове не продаётся; текстуры 2048 у двуручного — часть handheld была ≈ 131 МБ).
+	"handheld_r2": [
+		"assets/handheld/*_r2.glb",
+		"assets/handheld/*_r2.png",
+	],
 }
 ## Порядок загрузки частей: сначала мир (с ним игра выглядит нормально), затем значки, оружие, звери; части не из
 ## списка (герои, жители, стадии, новые) — после, в порядке манифеста. По нему идут HTTPRequest (по очереди) и
 ## DownloadManager (все сразу, но в этом порядке).
-const LOAD_ORDER := ["world", "icons", "handheld", "creatures_base"]
+const LOAD_ORDER := ["world", "world_b", "icons", "handheld", "creatures_base"]
 ## Часть старого манифеста (один пакет на все файлы, до разбиения на части): подключена — готовы все части.
 const ALL := "all"
 ## Файл пакета, по которому видно, что ресурсы уже лежат в res:// (редактор, автотесты, полная сборка).

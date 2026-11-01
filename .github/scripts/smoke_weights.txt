@@ -52,6 +52,7 @@ test_skills_warrior_shaman 6
 test_status_icons 4
 test_taming_cards 3
 test_textures 3
+test_texture_quality 3
 test_two_hand 5
 test_ui_icons 3
 test_ui_scale 7

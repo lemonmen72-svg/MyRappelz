@@ -35,11 +35,11 @@
 				-0.1595,
 				0.0002
 			],
-			"tris": 2991,
-			"verts": 4482,
+			"tris": 8493,
+			"verts": 10755,
 			"src_tris": 9748,
-			"tex": 512,
-			"flipped": 7,
+			"tex": 1024,
+			"flipped": 8,
 			"src": "Knight_s_Oath"
 		},
 		"weapon_sword_2h_r1": {
@@ -81,11 +81,11 @@
 				-0.3895,
 				0.0
 			],
-			"tris": 3188,
-			"verts": 5110,
+			"tris": 8500,
+			"verts": 11534,
 			"src_tris": 9880,
-			"tex": 512,
-			"flipped": 4,
+			"tex": 2048,
+			"flipped": 6,
 			"src": "Gilded_Oathblade"
 		},
 		"weapon_dagger_r1": {
@@ -94,7 +94,7 @@
 			"length": 0.38,
 			"size": [
 				0.0809,
-				0.3788,
+				0.38,
 				0.0345
 			],
 			"min": [
@@ -104,7 +104,7 @@
 			],
 			"max": [
 				0.0403,
-				0.2914,
+				0.2926,
 				0.0174
 			],
 			"grip": [
@@ -123,11 +123,11 @@
 				-0.0854,
 				-0.0001
 			],
-			"tris": 2596,
-			"verts": 3799,
+			"tris": 8500,
+			"verts": 9616,
 			"src_tris": 9968,
-			"tex": 512,
-			"flipped": 2,
+			"tex": 1024,
+			"flipped": 4,
 			"src": "Emberfang"
 		},
 		"weapon_mace_1h_r1": {
@@ -135,18 +135,18 @@
 			"frame": "blade",
 			"length": 0.75,
 			"size": [
-				0.1488,
-				0.7496,
+				0.1492,
+				0.75,
 				0.1434
 			],
 			"min": [
-				-0.0711,
+				-0.0715,
 				-0.1425,
 				-0.0715
 			],
 			"max": [
 				0.0777,
-				0.6071,
+				0.6075,
 				0.0719
 			],
 			"grip": [
@@ -165,11 +165,11 @@
 				-0.1405,
 				-0.0002
 			],
-			"tris": 3500,
-			"verts": 5519,
+			"tris": 8498,
+			"verts": 10743,
 			"src_tris": 9774,
-			"tex": 512,
-			"flipped": 2,
+			"tex": 1024,
+			"flipped": 11,
 			"src": "Ironbound_Scepter"
 		},
 		"weapon_mace_2h_r1": {
@@ -211,11 +211,11 @@
 				-0.768,
 				0.0
 			],
-			"tris": 3997,
-			"verts": 6405,
+			"tris": 8499,
+			"verts": 10692,
 			"src_tris": 9755,
-			"tex": 512,
-			"flipped": 0,
+			"tex": 2048,
+			"flipped": 1,
 			"src": "Ironbound_Warhammer"
 		},
 		"weapon_axe_1h_r1": {
@@ -224,12 +224,12 @@
 			"length": 0.7,
 			"size": [
 				0.2414,
-				0.6996,
+				0.7,
 				0.0662
 			],
 			"min": [
 				-0.0529,
-				-0.1396,
+				-0.14,
 				-0.0333
 			],
 			"max": [
@@ -253,11 +253,11 @@
 				-0.138,
 				0.0
 			],
-			"tris": 3497,
-			"verts": 5821,
+			"tris": 8499,
+			"verts": 10704,
 			"src_tris": 9802,
-			"tex": 512,
-			"flipped": 11,
+			"tex": 1024,
+			"flipped": 15,
 			"src": "Mooncleaver_20261101_texture_c2e20c45"
 		},
 		"weapon_axe_2h_r1": {
@@ -299,11 +299,11 @@
 				-0.768,
 				0.0025
 			],
-			"tris": 3499,
-			"verts": 5916,
+			"tris": 8500,
+			"verts": 11219,
 			"src_tris": 9787,
-			"tex": 512,
-			"flipped": 28,
+			"tex": 2048,
+			"flipped": 25,
 			"src": "Mooncleaver_20261101_texture_e850e3a2"
 		},
 		"weapon_staff_1h_r1": {
@@ -341,10 +341,10 @@
 				-0.134,
 				-0.0002
 			],
-			"tris": 3499,
-			"verts": 5894,
+			"tris": 8499,
+			"verts": 11222,
 			"src_tris": 10190,
-			"tex": 512,
+			"tex": 1024,
 			"flipped": 3,
 			"src": "Crystalwood_Scepter"
 		},
@@ -355,7 +355,7 @@
 			"size": [
 				0.2925,
 				1.7,
-				0.1004
+				0.1013
 			],
 			"min": [
 				-0.1567,
@@ -365,7 +365,7 @@
 			"max": [
 				0.1358,
 				1.105,
-				0.0489
+				0.0498
 			],
 			"grip": [
 				0.0,
@@ -387,11 +387,11 @@
 				-0.593,
 				-0.0017
 			],
-			"tris": 3499,
-			"verts": 5394,
+			"tris": 8497,
+			"verts": 10664,
 			"src_tris": 9641,
-			"tex": 512,
-			"flipped": 3,
+			"tex": 2048,
+			"flipped": 4,
 			"src": "Emberwood_Staff"
 		},
 		"weapon_spear_r1": {
@@ -433,11 +433,11 @@
 				-0.658,
 				0.0015
 			],
-			"tris": 2988,
-			"verts": 5593,
+			"tris": 8498,
+			"verts": 12757,
 			"src_tris": 9021,
-			"tex": 512,
-			"flipped": 20,
+			"tex": 2048,
+			"flipped": 27,
 			"src": "Emberlance"
 		},
 		"weapon_crossbow_r1": {
@@ -475,11 +475,11 @@
 				0.0587,
 				0.253
 			],
-			"tris": 5999,
-			"verts": 9535,
+			"tris": 8497,
+			"verts": 12123,
 			"src_tris": 10075,
-			"tex": 1024,
-			"flipped": 14,
+			"tex": 2048,
+			"flipped": 21,
 			"src": "Ornate_Crossbow"
 		},
 		"weapon_shield_r1": {
@@ -517,11 +517,11 @@
 				-0.433,
 				0.0812
 			],
-			"tris": 3999,
-			"verts": 5455,
+			"tris": 8500,
+			"verts": 8959,
 			"src_tris": 8952,
-			"tex": 1024,
-			"flipped": 3,
+			"tex": 2048,
+			"flipped": 5,
 			"src": "Sunward_Aegis"
 		},
 		"weapon_sword_1h_r2": {
@@ -529,17 +529,17 @@
 			"frame": "blade",
 			"length": 0.95,
 			"size": [
-				0.2178,
-				0.9499,
-				0.0317
+				0.2181,
+				0.95,
+				0.0319
 			],
 			"min": [
 				-0.1077,
-				-0.1614,
-				-0.016
+				-0.1615,
+				-0.0162
 			],
 			"max": [
-				0.1101,
+				0.1104,
 				0.7885,
 				0.0157
 			],
@@ -559,11 +559,11 @@
 				-0.1595,
 				-0.0007
 			],
-			"tris": 2985,
-			"verts": 5900,
+			"tris": 11996,
+			"verts": 16193,
 			"src_tris": 13739,
-			"tex": 512,
-			"flipped": 9,
+			"tex": 1024,
+			"flipped": 18,
 			"src": "Azure_Oathblade"
 		},
 		"weapon_sword_2h_r2": {
@@ -571,17 +571,17 @@
 			"frame": "blade",
 			"length": 1.5,
 			"size": [
-				0.3361,
+				0.3387,
 				1.5,
 				0.0535
 			],
 			"min": [
-				-0.1669,
+				-0.1681,
 				-0.405,
 				-0.0269
 			],
 			"max": [
-				0.1692,
+				0.1706,
 				1.095,
 				0.0266
 			],
@@ -605,11 +605,11 @@
 				-0.403,
 				0.0012
 			],
-			"tris": 3186,
-			"verts": 5736,
+			"tris": 11999,
+			"verts": 13582,
 			"src_tris": 14659,
-			"tex": 512,
-			"flipped": 4,
+			"tex": 2048,
+			"flipped": 7,
 			"src": "texture_0cecb119"
 		},
 		"weapon_dagger_r2": {
@@ -624,7 +624,7 @@
 			"min": [
 				-0.0466,
 				-0.0988,
-				-0.013
+				-0.0131
 			],
 			"max": [
 				0.0503,
@@ -647,11 +647,11 @@
 				-0.0968,
 				-0.0012
 			],
-			"tris": 2599,
-			"verts": 4450,
+			"tris": 12000,
+			"verts": 11715,
 			"src_tris": 14107,
-			"tex": 512,
-			"flipped": 10,
+			"tex": 1024,
+			"flipped": 17,
 			"src": "Emerald_Dawnblade"
 		},
 		"weapon_mace_1h_r2": {
@@ -689,10 +689,10 @@
 				-0.148,
 				0.0003
 			],
-			"tris": 3499,
-			"verts": 5792,
+			"tris": 11999,
+			"verts": 12404,
 			"src_tris": 14707,
-			"tex": 512,
+			"tex": 1024,
 			"flipped": 6,
 			"src": "Embercrest_Scepter"
 		},
@@ -735,11 +735,11 @@
 				-0.7955,
 				-0.004
 			],
-			"tris": 3998,
-			"verts": 6563,
+			"tris": 12000,
+			"verts": 12869,
 			"src_tris": 13635,
-			"tex": 512,
-			"flipped": 15,
+			"tex": 2048,
+			"flipped": 11,
 			"src": "Sunforged_War_Scepter"
 		},
 		"weapon_axe_1h_r2": {
@@ -777,10 +777,10 @@
 				-0.152,
 				-0.001
 			],
-			"tris": 3499,
-			"verts": 6016,
+			"tris": 12000,
+			"verts": 13035,
 			"src_tris": 15179,
-			"tex": 512,
+			"tex": 1024,
 			"flipped": 2,
 			"src": "Ruby_Sovereign_Axe"
 		},
@@ -823,11 +823,11 @@
 				-0.723,
 				-0.0011
 			],
-			"tris": 3489,
-			"verts": 5758,
+			"tris": 11999,
+			"verts": 12054,
 			"src_tris": 14114,
-			"tex": 512,
-			"flipped": 12,
+			"tex": 2048,
+			"flipped": 19,
 			"src": "Crimson_Crescent_Halberd"
 		},
 		"weapon_staff_1h_r2": {
@@ -835,12 +835,12 @@
 			"frame": "blade",
 			"length": 0.8,
 			"size": [
-				0.1509,
+				0.1523,
 				0.8,
 				0.055
 			],
 			"min": [
-				-0.0754,
+				-0.0768,
 				-0.16,
 				-0.0269
 			],
@@ -865,10 +865,10 @@
 				-0.158,
 				0.0001
 			],
-			"tris": 3493,
-			"verts": 6477,
+			"tris": 11997,
+			"verts": 15582,
 			"src_tris": 14314,
-			"tex": 512,
+			"tex": 1024,
 			"flipped": 4,
 			"src": "Amethyst_Sovereign_Staff"
 		},
@@ -877,12 +877,12 @@
 			"frame": "blade",
 			"length": 1.7,
 			"size": [
-				0.3752,
+				0.3753,
 				1.7,
 				0.1333
 			],
 			"min": [
-				-0.1834,
+				-0.1835,
 				-0.782,
 				-0.0674
 			],
@@ -911,11 +911,11 @@
 				-0.78,
 				-0.0016
 			],
-			"tris": 3492,
-			"verts": 6273,
+			"tris": 11999,
+			"verts": 14133,
 			"src_tris": 15344,
-			"tex": 512,
-			"flipped": 2,
+			"tex": 2048,
+			"flipped": 1,
 			"src": "Celestial_Sapphire_Scepter"
 		},
 		"weapon_spear_r2": {
@@ -957,11 +957,11 @@
 				-0.658,
 				0.0015
 			],
-			"tris": 2995,
-			"verts": 5552,
+			"tris": 11999,
+			"verts": 13791,
 			"src_tris": 13666,
-			"tex": 512,
-			"flipped": 5,
+			"tex": 2048,
+			"flipped": 6,
 			"src": "Azureleaf_Lance"
 		},
 		"weapon_bow_r2": {
@@ -971,17 +971,17 @@
 			"size": [
 				0.0493,
 				1.4,
-				0.2338
+				0.2367
 			],
 			"min": [
 				-0.0253,
 				-0.7,
-				-0.0585
+				-0.0609
 			],
 			"max": [
 				0.024,
 				0.7,
-				0.1753
+				0.1758
 			],
 			"grip": [
 				0.0,
@@ -999,11 +999,11 @@
 				-0.698,
 				0.1285
 			],
-			"tris": 3989,
-			"verts": 6068,
+			"tris": 11999,
+			"verts": 13807,
 			"src_tris": 14780,
-			"tex": 512,
-			"flipped": 4,
+			"tex": 2048,
+			"flipped": 11,
 			"src": "Emeraldleaf_Bow"
 		},
 		"weapon_crossbow_r2": {
@@ -1041,10 +1041,10 @@
 				0.0559,
 				0.253
 			],
-			"tris": 6000,
-			"verts": 7838,
+			"tris": 10500,
+			"verts": 10573,
 			"src_tris": 11792,
-			"tex": 1024,
+			"tex": 2048,
 			"flipped": 0,
 			"src": "Gilded_Arbalest"
 		},
@@ -1083,11 +1083,11 @@
 				-0.462,
 				0.0607
 			],
-			"tris": 3999,
-			"verts": 5839,
+			"tris": 11999,
+			"verts": 11539,
 			"src_tris": 13934,
-			"tex": 1024,
-			"flipped": 8,
+			"tex": 2048,
+			"flipped": 22,
 			"src": "Sapphire_Sunshield"
 		},
 		"npc_longbow": {
@@ -1125,11 +1125,11 @@
 				-0.698,
 				0.1391
 			],
-			"tris": 3995,
-			"verts": 6918,
+			"tris": 8495,
+			"verts": 12038,
 			"src_tris": 10461,
-			"tex": 512,
-			"flipped": 17,
+			"tex": 2048,
+			"flipped": 25,
 			"src": "Emberwood_Longbow"
 		},
 		"npc_grimoire": {
@@ -1137,7 +1137,7 @@
 			"frame": "book",
 			"length": 0.3,
 			"size": [
-				0.2317,
+				0.2322,
 				0.3,
 				0.1152
 			],
@@ -1147,7 +1147,7 @@
 				-0.0572
 			],
 			"max": [
-				0.2317,
+				0.2322,
 				0.15,
 				0.058
 			],
@@ -1167,11 +1167,11 @@
 				-0.148,
 				-0.0032
 			],
-			"tris": 2997,
-			"verts": 5503,
+			"tris": 8500,
+			"verts": 11238,
 			"src_tris": 8927,
-			"tex": 512,
-			"flipped": 37,
+			"tex": 1024,
+			"flipped": 46,
 			"src": "Astral_Grimoire"
 		},
 		"npc_tome": {
@@ -1179,19 +1179,19 @@
 			"frame": "book",
 			"length": 0.3,
 			"size": [
-				0.2081,
+				0.2088,
 				0.3,
-				0.0938
+				0.0946
 			],
 			"min": [
-				0.0006,
+				0.0,
 				-0.15,
-				-0.0482
+				-0.0484
 			],
 			"max": [
-				0.2087,
+				0.2088,
 				0.15,
-				0.0456
+				0.0462
 			],
 			"grip": [
 				0.0,
@@ -1209,11 +1209,11 @@
 				-0.148,
 				-0.0044
 			],
-			"tris": 2998,
-			"verts": 5421,
+			"tris": 8498,
+			"verts": 13810,
 			"src_tris": 10549,
-			"tex": 512,
-			"flipped": 37,
+			"tex": 1024,
+			"flipped": 38,
 			"src": "Leatherbound_Tome"
 		},
 		"npc_cane": {
@@ -1221,18 +1221,18 @@
 			"frame": "blade",
 			"length": 0.95,
 			"size": [
-				0.1313,
-				0.949,
+				0.1333,
+				0.95,
 				0.1284
 			],
 			"min": [
-				-0.0659,
-				-0.8355,
+				-0.0669,
+				-0.836,
 				-0.0642
 			],
 			"max": [
-				0.0654,
-				0.1135,
+				0.0664,
+				0.114,
 				0.0642
 			],
 			"grip": [
@@ -1251,11 +1251,11 @@
 				-0.834,
 				-0.0007
 			],
-			"tris": 1995,
-			"verts": 3211,
+			"tris": 8491,
+			"verts": 9348,
 			"src_tris": 8491,
-			"tex": 512,
-			"flipped": 2,
+			"tex": 1024,
+			"flipped": 7,
 			"src": "Carved_Wooden_Cane"
 		},
 		"npc_wand": {
@@ -1293,11 +1293,11 @@
 				-0.1105,
 				-0.0003
 			],
-			"tris": 2497,
-			"verts": 4079,
+			"tris": 8498,
+			"verts": 10458,
 			"src_tris": 10129,
-			"tex": 512,
-			"flipped": 7,
+			"tex": 1024,
+			"flipped": 15,
 			"src": "Crystalvine_Wand"
 		},
 		"npc_hammer": {
@@ -1335,10 +1335,10 @@
 				-0.178,
 				0.0005
 			],
-			"tris": 2499,
-			"verts": 3231,
+			"tris": 8499,
+			"verts": 7708,
 			"src_tris": 10128,
-			"tex": 512,
+			"tex": 1024,
 			"flipped": 1,
 			"src": "Ironbound_Hammer"
 		},
@@ -1347,17 +1347,17 @@
 			"frame": "blade",
 			"length": 1.7,
 			"size": [
-				0.3571,
+				0.3589,
 				1.7,
-				0.1903
+				0.193
 			],
 			"min": [
 				-0.1912,
 				-0.85,
-				-0.0598
+				-0.0624
 			],
 			"max": [
-				0.1659,
+				0.1676,
 				0.85,
 				0.1305
 			],
@@ -1381,11 +1381,11 @@
 				-0.848,
 				0.0127
 			],
-			"tris": 4498,
-			"verts": 7498,
+			"tris": 8494,
+			"verts": 12800,
 			"src_tris": 8702,
-			"tex": 512,
-			"flipped": 116,
+			"tex": 2048,
+			"flipped": 508,
 			"src": "Verdant_Antlerstaff"
 		},
 		"npc_quiver": {
@@ -1423,11 +1423,11 @@
 				-0.313,
 				-0.0088
 			],
-			"tris": 4499,
-			"verts": 6429,
+			"tris": 8500,
+			"verts": 9893,
 			"src_tris": 9979,
-			"tex": 512,
-			"flipped": 29,
+			"tex": 1024,
+			"flipped": 31,
 			"src": "Quiver_of_Arrows"
 		},
 		"npc_keys": {
@@ -1435,13 +1435,13 @@
 			"frame": "blade",
 			"length": 0.2,
 			"size": [
-				0.1368,
-				0.1997,
+				0.1369,
+				0.2,
 				0.0184
 			],
 			"min": [
-				-0.0624,
-				-0.1797,
+				-0.0625,
+				-0.18,
 				-0.0093
 			],
 			"max": [
@@ -1465,11 +1465,11 @@
 				-0.178,
 				0.0004
 			],
-			"tris": 4000,
-			"verts": 5783,
+			"tris": 8500,
+			"verts": 9651,
 			"src_tris": 10522,
-			"tex": 512,
-			"flipped": 3,
+			"tex": 1024,
+			"flipped": 2,
 			"src": "Ring_of_Forgotten_Keys"
 		},
 		"npc_scroll": {
@@ -1477,17 +1477,17 @@
 			"frame": "blade",
 			"length": 0.3,
 			"size": [
-				0.0703,
-				0.2998,
+				0.0706,
+				0.3,
 				0.0758
 			],
 			"min": [
 				-0.035,
-				-0.1498,
+				-0.15,
 				-0.0375
 			],
 			"max": [
-				0.0353,
+				0.0356,
 				0.15,
 				0.0384
 			],
@@ -1507,10 +1507,10 @@
 				-0.148,
 				-0.0032
 			],
-			"tris": 2499,
-			"verts": 3701,
+			"tris": 8499,
+			"verts": 8568,
 			"src_tris": 10350,
-			"tex": 512,
+			"tex": 1024,
 			"flipped": 0,
 			"src": "Sealed_Shadow_Scroll"
 		}

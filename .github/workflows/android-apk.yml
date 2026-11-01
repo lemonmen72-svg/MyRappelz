@@ -90,7 +90,7 @@ jobs:
         run: .github/scripts/import.sh
 
       - name: Сохранение кэша импорта
-        if: steps.import-cache.outputs.cache-hit != 'true'
+        if: steps.import-cache.outputs.cache-hit != 'true' && env.GODOT_IMPORT_OK == '1'
         continue-on-error: true
         uses: actions/cache/save@v4
         with:
