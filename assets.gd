@@ -1,42 +1,79 @@
 class_name Assets
 extends RefCounted
-## Пакет ресурсов: тяжёлые модели (герои профессий, стадии эволюции зверей) не лежат в APK, а загружаются
-## отдельным файлом .pck при первом запуске и хранятся в кэше игры (user://packs/assets-<хэш>.pck).
+## Пакет ресурсов: тяжёлые модели (герои профессий, жители, стадии эволюции зверей) не лежат в APK, а загружаются
+## отдельными файлами .pck при первом запуске и хранятся в кэше игры. Пакет разбит на части (PACKS: герои по расам,
+## жители, звери) — у каждой свой хэш содержимого и свой файл в кэше user://packs/assets-<часть>-<хэш>.pck:
+## изменилась одна модель — игрок скачивает только её часть.
 ##
-## Что в пакете — PACK_FILTERS (те же шаблоны, что include_filter пресета экспорта «Assets» и часть
-## exclude_filter пресета «Android» в export_presets.cfg; тест tests/test_asset_pack.gd следит, чтобы совпадали).
-## Сборка пакета — только при сборке APK (.github/workflows/android-apk.yml, tools/asset_pack.py): хэш содержимого
-## (исходники пакета + их .import + версия Godot) — версия пакета; манифест (hash, sha256 и размер .pck, url)
-## кладётся в APK как res://assets_pack.json и в релиз как assets-manifest.json.
+## Части и их шаблоны — PACKS (те же шаблоны, что include_filter пресетов экспорта «Assets <часть>», их объединение —
+## часть exclude_filter пресета «Android» в export_presets.cfg; tools/asset_pack.py check и тест
+## tests/test_asset_pack.gd следят, чтобы совпадали). Сборка частей — только при сборке APK
+## (.github/workflows/android-apk.yml, tools/asset_pack.py): хэш содержимого части (исходники + их .import + версия
+## Godot) — версия части; манифест {format 2, version, parts: [{name, hash, sha256, size, url, file}]} кладётся в APK
+## как res://assets_pack.json и в релиз как assets-manifest.json. Старый манифест (один пакет: hash, sha256, size,
+## url) читается как одна часть ALL, которая заменяет все части (её файл в кэше — прежнее имя assets-<хэш>.pck).
 ##
 ## В редакторе и автотестах файлы пакета лежат прямо в res:// (embedded) — загрузка не нужна.
-## Код моделей проверяет файлы через Assets.exists(path): без пакета модель из пакета «не существует», и
+## Код моделей проверяет файлы через Assets.exists(path): без своей части модель «не существует», и
 ## CharacterModel / CreatureAsset берут запасную (стартовые модели людей в APK, модель 1-й стадии, примитивы).
+## Части подключаются по отдельности: «Играть без загрузки» подключает те, что есть в кэше, — их модели настоящие.
 ## Экран загрузки — AssetLoader (main.gd показывает его до создания персонажа и входа в мир).
 ##
 ## Фоновая загрузка на Android — системный DownloadManager через плагин Godot v2 «MyRappelzDownload»
 ## (download_plugin(); исходники android/plugins/myrappelz_download, AAR собирается при сборке APK с Gradle):
-## качает сам Android — игру можно свернуть, ход загрузки в уведомлении. Файл ложится во внешнюю папку приложения,
-## запись о загрузке (хэш, id, путь) — packs_dir + JOB_FILE (переживает перезапуск игры); после загрузки файл
-## проверяется (sha256) с копированием в assets-<хэш>.pck.part и ставится в кэш как обычно. Нет плагина (ПК,
-## редактор, тесты, APK без Gradle) — прежняя загрузка HTTPRequest.
+## качает сам Android — игру можно свернуть, ход загрузки в уведомлении. Недостающие части отдаются DownloadManager
+## все сразу, файлы ложатся во внешнюю папку приложения; записи о загрузках (часть, хэш, id, путь) — packs_dir +
+## JOB_FILE (переживают перезапуск игры); готовый файл проверяется (sha256) с копированием в
+## assets-<часть>-<хэш>.pck.part и ставится в кэш как обычно. Нет плагина (ПК, редактор, тесты, APK без Gradle) —
+## загрузка HTTPRequest, части по очереди.
 
-## Файлы пакета (пути от res://, шаблоны String.matchn: * — любые символы, ? — один).
+## Части пакета: имя → файлы (пути от res://, шаблоны String.matchn: * — любые символы, ? — один).
 ## Остаются в APK: hero_human_m_starter и hero_human_f_starter (запасные герои), звери 1-й стадии, постройки.
-const PACK_FILTERS := [
-	"assets/characters/dark_elf_wanderer.glb",
-	"assets/characters/dark_elf_wanderer.png",
-	"assets/characters/hero_*_?.glb",
-	"assets/characters/hero_*_?.png",
-	"assets/characters/hero_*elf_?_starter.glb",
-	"assets/characters/hero_*elf_?_starter.png",
-	"assets/characters/npc_*.glb",
-	"assets/characters/npc_*.png",
-	"assets/creatures/*_2.glb",
-	"assets/creatures/*_2.png",
-	"assets/creatures/*_3.glb",
-	"assets/creatures/*_3.png",
-]
+## Новая модель героя профессии — шаблон в часть её расы (и в пресет «Assets <часть>», и в exclude_filter «Android»).
+const PACKS := {
+	"heroes_dark": [
+		"assets/characters/dark_elf_wanderer.glb",
+		"assets/characters/dark_elf_wanderer.png",
+		"assets/characters/hero_assassin_?.glb",
+		"assets/characters/hero_assassin_?.png",
+		"assets/characters/hero_adept_?.glb",
+		"assets/characters/hero_adept_?.png",
+		"assets/characters/hero_neophyte_?.glb",
+		"assets/characters/hero_neophyte_?.png",
+		"assets/characters/hero_dark_elf_?_starter.glb",
+		"assets/characters/hero_dark_elf_?_starter.png",
+	],
+	"heroes_light": [
+		"assets/characters/hero_swordsman_?.glb",
+		"assets/characters/hero_swordsman_?.png",
+		"assets/characters/hero_wizard_?.glb",
+		"assets/characters/hero_wizard_?.png",
+		"assets/characters/hero_beastmaster_?.glb",
+		"assets/characters/hero_beastmaster_?.png",
+		"assets/characters/hero_light_elf_?_starter.glb",
+		"assets/characters/hero_light_elf_?_starter.png",
+	],
+	"heroes_human": [
+		"assets/characters/hero_warrior_?.glb",
+		"assets/characters/hero_warrior_?.png",
+		"assets/characters/hero_shaman_?.glb",
+		"assets/characters/hero_shaman_?.png",
+		"assets/characters/hero_conjurer_?.glb",
+		"assets/characters/hero_conjurer_?.png",
+	],
+	"npcs": [
+		"assets/characters/npc_*.glb",
+		"assets/characters/npc_*.png",
+	],
+	"creatures": [
+		"assets/creatures/*_2.glb",
+		"assets/creatures/*_2.png",
+		"assets/creatures/*_3.glb",
+		"assets/creatures/*_3.png",
+	],
+}
+## Часть старого манифеста (один пакет на все файлы, до разбиения на части): подключена — готовы все части.
+const ALL := "all"
 ## Файл пакета, по которому видно, что ресурсы уже лежат в res:// (редактор, автотесты, полная сборка).
 const PROBE := "res://assets/characters/hero_wizard_f.glb"
 ## Манифест пакета внутри APK (пишет сборка APK; в репозитории его нет).
@@ -47,36 +84,73 @@ const PACK_PREFIX := "assets-"
 const PART_SUFFIX := ".part"
 ## Singleton плагина фоновой загрузки (Engine.get_singleton на Android).
 const DOWNLOAD_PLUGIN := "MyRappelzDownload"
-## Запись о фоновой загрузке DownloadManager в папке кэша (не начинается с PACK_PREFIX — remove_old её не трогает).
+## Записи о фоновых загрузках DownloadManager в папке кэша (не начинается с PACK_PREFIX — remove_old её не трогает).
 const JOB_FILE := "download.cfg"
 ## Папка загрузки DownloadManager во внешней папке приложения (getExternalFilesDir).
 const DOWNLOAD_DIR := "packs/"
 
 ## Папка кэша пакетов (тест подменяет на свою).
 static var packs_dir := "user://packs/"
-## Пакет загружен в res:// (путь файла).
-static var loaded_path := ""
+## Подключённые части: имя → путь файла (ALL — старый пакет целиком).
+static var loaded: Dictionary = {}
+## Все подключённые файлы (и прежние версии частей): их нельзя удалять, пока игра идёт.
+static var loaded_files: Array = []
 ## Игрок выбрал «Играть без загрузки» в этом запуске.
 static var skipped := false
-## Тест: вести себя так, будто пакета нет (embedded и загруженный пакет не в счёт).
+## Тест: вести себя так, будто пакета нет (embedded и подключённые части не в счёт).
 static var force_missing := false
 ## Тест: подставной плагин фоновой загрузки (те же методы, что у MyRappelzDownload); null — настоящий или нет.
 static var plugin_override: Object = null
 static var _embedded := -1
 
 
-## Ресурсы пакета лежат прямо в res:// (не нужно ничего грузить). Проверяется один раз, до загрузки пакета.
+## Ресурсы пакета лежат прямо в res:// (не нужно ничего грузить). Проверяется один раз, до подключения частей.
 static func embedded() -> bool:
 	if _embedded < 0:
-		_embedded = 1 if loaded_path == "" and ResourceLoader.exists(PROBE) else 0
+		_embedded = 1 if loaded.is_empty() and ResourceLoader.exists(PROBE) else 0
 	return _embedded == 1
 
 
-## Модели пакета доступны: встроены или пакет загружен.
+## Имена частей по порядку.
+static func part_names() -> Array:
+	return PACKS.keys()
+
+
+## Шаблоны всех частей (объединение).
+static func all_filters() -> Array:
+	var out: Array = []
+	for n in PACKS:
+		for f in PACKS[n]:
+			out.append(String(f))
+	return out
+
+
+## Модели части доступны: встроены, часть подключена или подключён старый пакет целиком.
+static func part_ready(part: String) -> bool:
+	if force_missing:
+		return false
+	return embedded() or loaded.has(part) or loaded.has(ALL)
+
+
+## Модели всех частей доступны.
 static func available() -> bool:
 	if force_missing:
 		return false
-	return embedded() or loaded_path != ""
+	if embedded() or loaded.has(ALL):
+		return true
+	for n in PACKS:
+		if not loaded.has(n):
+			return false
+	return true
+
+
+## Сколько частей доступно (настройки: «загружен частично»).
+static func ready_count() -> int:
+	var n := 0
+	for p in PACKS:
+		if part_ready(String(p)):
+			n += 1
+	return n
 
 
 ## Тест: «пакета нет» (on) или как обычно; сбрасывает кэш наличия моделей зверей.
@@ -85,18 +159,25 @@ static func simulate_missing(on: bool) -> void:
 	CreatureAsset.reset_cache()
 
 
-## Файл из пакета (путь res://… или от корня проекта).
-static func is_packed(path: String) -> bool:
+## Часть, в которой лежит файл (путь res://… или от корня проекта); "" — файл в APK.
+static func part_of(path: String) -> String:
 	var p := path.trim_prefix("res://")
-	for f in PACK_FILTERS:
-		if p.matchn(String(f)):
-			return true
-	return false
+	for n in PACKS:
+		for f in PACKS[n]:
+			if p.matchn(String(f)):
+				return String(n)
+	return ""
 
 
-## Есть ли ресурс: как ResourceLoader.exists, но файл пакета без пакета «не существует» (запасная модель).
+## Файл из пакета (любой части).
+static func is_packed(path: String) -> bool:
+	return part_of(path) != ""
+
+
+## Есть ли ресурс: как ResourceLoader.exists, но файл части без этой части «не существует» (запасная модель).
 static func exists(path: String) -> bool:
-	if is_packed(path) and not available():
+	var part := part_of(path)
+	if part != "" and not part_ready(part):
 		return false
 	return ResourceLoader.exists(path)
 
@@ -112,19 +193,59 @@ static func manifest_url(version: String = "") -> String:
 	return RELEASES_URL % v if v != "" else ""
 
 
-## Манифест из текста JSON: {hash, sha256, size, url, version?}; {} — неполный или битый.
+## Манифест из текста JSON → {version, parts: [{name, hash, sha256, size, url, file}]}; {} — неполный или битый.
 static func parse_manifest(text: String) -> Dictionary:
 	var d: Variant = JSON.parse_string(text)
 	if not d is Dictionary:
 		return {}
-	var m: Dictionary = d
-	var h := String(m.get("hash", "")).to_lower()
-	var sha := String(m.get("sha256", "")).to_lower()
-	var url := String(m.get("url", ""))
-	var size := int(m.get("size", 0))
-	if not _is_hex(h, 16, 64) or not _is_hex(sha, 64, 64) or size <= 0 or not url.begins_with("http"):
+	return manifest_from(d as Dictionary)
+
+
+## Манифест из словаря: новый формат (parts) или старый (один пакет — часть ALL). {} — неполный, битый, части
+## повторяются.
+static func manifest_from(m: Dictionary) -> Dictionary:
+	var raw: Array = []
+	if m.has("parts"):
+		var list: Variant = m["parts"]
+		if not list is Array:
+			return {}
+		raw = list
+	else:
+		var one := m.duplicate()
+		one["name"] = ALL
+		raw = [one]
+	if raw.is_empty():
 		return {}
-	return {"hash": h, "sha256": sha, "size": size, "url": url, "version": String(m.get("version", ""))}
+	var parts: Array = []
+	var names := {}
+	for item in raw:
+		if not item is Dictionary:
+			return {}
+		var part := _parse_part(item as Dictionary)
+		if part.is_empty() or names.has(part["name"]):
+			return {}
+		names[part["name"]] = true
+		parts.append(part)
+	return {"version": str(m.get("version", "")), "parts": parts}
+
+
+static func _parse_part(m: Dictionary) -> Dictionary:
+	var name := str(m.get("name", "")).to_lower()
+	var h := str(m.get("hash", "")).to_lower()
+	var sha := str(m.get("sha256", "")).to_lower()
+	var url := str(m.get("url", ""))
+	var sz: Variant = m.get("size", 0)
+	var size := int(sz) if (sz is int or sz is float) else 0
+	if not _is_name(name) or not _is_hex(h, 16, 64) or not _is_hex(sha, 64, 64) or size <= 0 \
+			or not url.begins_with("http"):
+		return {}
+	return {"name": name, "hash": h, "sha256": sha, "size": size, "url": url, "file": str(m.get("file", ""))}
+
+
+## Части манифеста (массив словарей).
+static func manifest_parts(m: Dictionary) -> Array:
+	var p: Variant = m.get("parts", [])
+	return p if p is Array else []
 
 
 ## Манифест из APK (res://assets_pack.json), {} — нет.
@@ -143,6 +264,16 @@ static func _is_hex(s: String, min_len: int, max_len: int) -> bool:
 	return true
 
 
+## Имя части: 1–32 знака a–z, 0–9, _.
+static func _is_name(s: String) -> bool:
+	if s.length() < 1 or s.length() > 32:
+		return false
+	for c in s:
+		if not "abcdefghijklmnopqrstuvwxyz0123456789_".contains(c):
+			return false
+	return true
+
+
 ## Плагин фоновой загрузки (Android DownloadManager) или null — нет (не Android, APK без плагина): тогда
 ## загрузка через HTTPRequest. Методы (строки, bool, Dictionary): externalPath(rel), start(url, rel, title, text) → id
 ## или "", query(id) → {found, status, reason, bytes, total, uri, error?}, remove(id), requestNotifications(),
@@ -155,44 +286,89 @@ static func download_plugin() -> Object:
 	return null
 
 
-## Файл загрузки DownloadManager относительно внешней папки приложения.
-static func download_rel_path(content_hash: String) -> String:
-	return DOWNLOAD_DIR + PACK_PREFIX + content_hash + ".pck.download"
+## Файл загрузки DownloadManager части относительно внешней папки приложения.
+static func download_rel_path(part: String, content_hash: String) -> String:
+	return DOWNLOAD_DIR + PACK_PREFIX + part + "-" + content_hash + ".pck.download"
 
 
-## Запись о фоновой загрузке: {hash, id, path}; {} — нет.
-static func read_job() -> Dictionary:
+## Записи о фоновых загрузках: часть → {hash, id, path}; {} — нет. Запись старой версии игры (одна загрузка,
+## секция [job]) — под пустым именем части (не совпадёт ни с одной частью — её загрузка убирается).
+static func read_jobs() -> Dictionary:
 	var cfg := ConfigFile.new()
 	if cfg.load(packs_dir + JOB_FILE) != OK:
 		return {}
-	var h := String(cfg.get_value("job", "hash", ""))
-	var id := String(cfg.get_value("job", "id", ""))
-	if h == "" or id == "":
-		return {}
-	return {"hash": h, "id": id, "path": String(cfg.get_value("job", "path", ""))}
+	var out := {}
+	for sec in cfg.get_sections():
+		var part := ""
+		if sec.begins_with("part."):
+			part = sec.trim_prefix("part.")
+		elif sec != "job":
+			continue
+		var h := str(cfg.get_value(sec, "hash", ""))
+		var id := str(cfg.get_value(sec, "id", ""))
+		if h == "" or id == "":
+			continue
+		out[part] = {"hash": h, "id": id, "path": str(cfg.get_value(sec, "path", ""))}
+	return out
 
 
-static func save_job(content_hash: String, id: String, path: String) -> void:
+## Записать загрузки: часть → {hash, id, path}; пусто — файл удаляется.
+static func save_jobs(jobs: Dictionary) -> void:
+	if jobs.is_empty():
+		clear_jobs()
+		return
 	ensure_dir()
 	var cfg := ConfigFile.new()
-	cfg.set_value("job", "hash", content_hash)
-	cfg.set_value("job", "id", id)
-	cfg.set_value("job", "path", path)
+	for part in jobs:
+		var j: Dictionary = jobs[part]
+		var sec := "part." + String(part)
+		cfg.set_value(sec, "hash", str(j.get("hash", "")))
+		cfg.set_value(sec, "id", str(j.get("id", "")))
+		cfg.set_value(sec, "path", str(j.get("path", "")))
 	cfg.save(packs_dir + JOB_FILE)
 
 
-static func clear_job() -> void:
+static func clear_jobs() -> void:
 	remove_file(packs_dir + JOB_FILE)
 
 
-## Путь пакета в кэше по хэшу содержимого.
-static func pack_path(content_hash: String) -> String:
-	return packs_dir + PACK_PREFIX + content_hash + ".pck"
+## Путь части в кэше по хэшу содержимого (ALL — прежнее имя пакета целиком assets-<хэш>.pck).
+static func pack_path(part: String, content_hash: String) -> String:
+	if part == ALL:
+		return packs_dir + PACK_PREFIX + content_hash + ".pck"
+	return packs_dir + PACK_PREFIX + part + "-" + content_hash + ".pck"
 
 
-## Временный файл загрузки (после проверки переименовывается в pack_path).
-static func part_path(content_hash: String) -> String:
-	return pack_path(content_hash) + PART_SUFFIX
+## Временный файл загрузки части (после проверки переименовывается в pack_path).
+static func part_path(part: String, content_hash: String) -> String:
+	return pack_path(part, content_hash) + PART_SUFFIX
+
+
+## Файл кэша части манифеста ({name, hash}).
+static func pack_path_of(p: Dictionary) -> String:
+	return pack_path(String(p["name"]), String(p["hash"]))
+
+
+## Временный файл загрузки части манифеста.
+static func part_path_of(p: Dictionary) -> String:
+	return part_path(String(p["name"]), String(p["hash"]))
+
+
+## Имя файла кэша → {part, hash, temp (недокачанный .part)}; {} — не файл пакета. assets-<хэш>.pck — часть ALL.
+static func parse_cache_name(file: String) -> Dictionary:
+	if not file.begins_with(PACK_PREFIX):
+		return {}
+	var s := file.trim_prefix(PACK_PREFIX)
+	var temp := s.ends_with(".pck" + PART_SUFFIX)
+	if temp:
+		s = s.trim_suffix(PART_SUFFIX)
+	if not s.ends_with(".pck"):
+		return {}
+	s = s.trim_suffix(".pck")
+	var i := s.rfind("-")
+	if i < 0:
+		return {"part": ALL, "hash": s, "temp": temp}
+	return {"part": s.substr(0, i), "hash": s.substr(i + 1), "temp": temp}
 
 
 static func ensure_dir() -> void:
@@ -207,15 +383,32 @@ static func file_size(path: String) -> int:
 	return int(f.get_length()) if f != null else -1
 
 
-## Готовый пакет этого хэша в кэше (размер совпадает с манифестом), "" — нет.
-static func cached_pack(m: Dictionary) -> String:
-	var p := pack_path(String(m.get("hash", "")))
-	var sz := file_size(p)
+## Готовый файл части манифеста в кэше (размер совпадает), "" — нет.
+static func cached_pack(p: Dictionary) -> String:
+	var path := pack_path_of(p)
+	var sz := file_size(path)
 	if sz < 0:
 		return ""
-	if int(m.get("size", 0)) > 0 and sz != int(m["size"]):
+	if int(p.get("size", 0)) > 0 and sz != int(p["size"]):
 		return ""
-	return p
+	return path
+
+
+## Части манифеста, которых нет в кэше (по порядку манифеста).
+static func missing_parts(m: Dictionary) -> Array:
+	var out: Array = []
+	for p in manifest_parts(m):
+		if cached_pack(p) == "":
+			out.append(p)
+	return out
+
+
+## Сколько байт у частей.
+static func parts_size(parts: Array) -> int:
+	var n := 0
+	for p in parts:
+		n += int((p as Dictionary).get("size", 0))
+	return n
 
 
 ## Файлы папки кэша (имена).
@@ -226,58 +419,128 @@ static func _cache_files() -> PackedStringArray:
 	return d.get_files()
 
 
-## Какой-нибудь прежний пакет в кэше (другой версии) — на случай «Играть без загрузки»; "" — нет.
-static func any_cached_pack() -> String:
+## Какая-нибудь версия части в кэше (готовый файл, не недокачанный) — для «Играть без загрузки»; "" — нет.
+static func any_cached(part: String) -> String:
 	for f in _cache_files():
-		if f.begins_with(PACK_PREFIX) and f.ends_with(".pck"):
+		var info := parse_cache_name(f)
+		if not info.is_empty() and String(info["part"]) == part and not bool(info["temp"]):
 			return packs_dir + f
 	return ""
 
 
-## Удалить из кэша всё, кроме пакета keep_hash (прежние версии, недокачанные файлы). Сколько удалено.
-static func remove_old(keep_hash: String) -> int:
-	var keep := (PACK_PREFIX + keep_hash + ".pck") if keep_hash != "" else ""
+## Удалить из кэша прежние версии части и её недокачанные файлы (кроме файла keep_hash и подключённых).
+## Сколько удалено.
+static func remove_old(part: String, keep_hash: String) -> int:
 	var n := 0
 	for f in _cache_files():
-		if f == keep or not f.begins_with(PACK_PREFIX):
+		var info := parse_cache_name(f)
+		if info.is_empty() or String(info["part"]) != part:
 			continue
-		if packs_dir + f == loaded_path:
+		if not bool(info["temp"]) and String(info["hash"]) == keep_hash:
+			continue
+		if loaded_files.has(packs_dir + f):
 			continue
 		if DirAccess.remove_absolute(packs_dir + f) == OK:
 			n += 1
 	return n
 
 
+## Все части манифеста в кэше: удалить остальное (прежние версии, части прошлых разбиений, старый пакет целиком,
+## недокачанные файлы), кроме подключённых. Сколько удалено.
+static func remove_stale(m: Dictionary) -> int:
+	var keep := {}
+	for p in manifest_parts(m):
+		keep[pack_path_of(p).get_file()] = true
+	var n := 0
+	for f in _cache_files():
+		if not f.begins_with(PACK_PREFIX) or keep.has(f) or loaded_files.has(packs_dir + f):
+			continue
+		if DirAccess.remove_absolute(packs_dir + f) == OK:
+			n += 1
+	return n
+
+
+## Сколько байт освободит remove_stale (прежние версии, старый пакет целиком; подключённые не в счёт).
+static func stale_size(m: Dictionary) -> int:
+	var keep := {}
+	for p in manifest_parts(m):
+		keep[pack_path_of(p).get_file()] = true
+	var n := 0
+	for f in _cache_files():
+		if f.begins_with(PACK_PREFIX) and not keep.has(f) and not loaded_files.has(packs_dir + f):
+			n += maxi(file_size(packs_dir + f), 0)
+	return n
+
+
 static func remove_file(path: String) -> void:
-	if FileAccess.file_exists(path):
+	if path != "" and FileAccess.file_exists(path):
 		DirAccess.remove_absolute(path)
 
 
-## Проверенный временный файл → пакет кэша (переименование), прежние версии удаляются. Путь пакета или "".
-static func install(content_hash: String) -> String:
-	var part := part_path(content_hash)
-	var dst := pack_path(content_hash)
-	if not FileAccess.file_exists(part):
+## Проверенный временный файл части → файл кэша (переименование), прежние версии части удаляются. Путь или "".
+static func install(part: String, content_hash: String) -> String:
+	var tmp := part_path(part, content_hash)
+	var dst := pack_path(part, content_hash)
+	if not FileAccess.file_exists(tmp):
 		return ""
 	remove_file(dst)
-	if DirAccess.rename_absolute(part, dst) != OK:
+	if DirAccess.rename_absolute(tmp, dst) != OK:
 		return ""
-	remove_old(content_hash)
+	remove_old(part, content_hash)
 	return dst
 
 
-## Подключить пакет: его файлы появляются в res:// по своим путям (файлы APK не заменяются). false — не читается.
-static func load_pack(path: String) -> bool:
+## Подключить часть: её файлы появляются в res:// по своим путям (файлы APK и уже подключённые не заменяются).
+## Подключена прежняя версия части — новая подключается поверх (её новые файлы появятся, прежние останутся до
+## перезапуска). false — файл не читается.
+static func load_part(part: String, path: String) -> bool:
 	embedded()
 	if path == "":
 		return false
-	if loaded_path == path:
+	if loaded_files.has(path):
+		loaded[part] = path
 		return true
 	if not ProjectSettings.load_resource_pack(path, false):
 		return false
-	loaded_path = path
+	loaded[part] = path
+	loaded_files.append(path)
 	CreatureAsset.reset_cache()
 	return true
+
+
+## Подключена другая версия этой части (или старый пакет целиком): новая версия заменит модели только после
+## перезапуска игры.
+static func clashes(p: Dictionary) -> bool:
+	var part := String(p["name"])
+	if part != ALL and loaded.has(ALL):
+		return true
+	return loaded.has(part) and String(loaded[part]) != pack_path_of(p)
+
+
+## «Играть без загрузки»: подключить то, что есть в кэше, — сначала части версии манифеста, затем прежние версии
+## частей, затем старый пакет целиком (файлы, подключённые раньше, не заменяются). true — подключено хоть что-то.
+static func load_cached(m: Dictionary) -> bool:
+	var names: Array = part_names()
+	for p in manifest_parts(m):
+		var path := cached_pack(p)
+		if path != "":
+			load_part(String(p["name"]), path)
+		if not names.has(p["name"]):
+			names.append(p["name"])
+	for n in names:
+		if String(n) != ALL and not loaded.has(n):
+			var old := any_cached(String(n))
+			if old != "":
+				load_part(String(n), old)
+	if not loaded.has(ALL):
+		var covered := true
+		for n in PACKS:
+			if not loaded.has(n):
+				covered = false
+		var whole := any_cached(ALL) if not covered else ""
+		if whole != "":
+			load_part(ALL, whole)
+	return not loaded.is_empty()
 
 
 ## sha256 файла целиком (тесты, небольшие файлы); "" — нет файла.
