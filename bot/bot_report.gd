@@ -75,7 +75,8 @@ static func plugin_call(method: String, args: Array) -> Variant:
 	return p.callv(method, args)
 
 
-## Устройство: model, os, cpu, cores, gpu, vendor, api, driver, renderer, screen, window, memory, pack, plugin.
+## Устройство: model, os, soc, vulkan, cpu, gpu, api, driver, renderer, renderer_diag (RendererGuard.diagnostics()),
+## last_exit, screen, memory, pack, plugin.
 static func device_info() -> Dictionary:
 	var d := {}
 	var pinfo: Variant = plugin_call("deviceInfo", [])
@@ -91,7 +92,20 @@ static func device_info() -> Dictionary:
 			d["vulkan"] = String(info["vulkan"])
 	d["model"] = model
 	d["os"] = os_text
-	d["cpu"] = "%s, ядер %d" % [OS.get_processor_name(), OS.get_processor_count()]
+	# Имя процессора: на Android Godot 4.3 читает «model name» из /proc/cpuinfo, у ARM её нет — пусто; тогда чип
+	# из плагина (Build.SOC_MODEL, Build.HARDWARE / BOARD)
+	var cpu := OS.get_processor_name().strip_edges()
+	var info_d: Dictionary = {}
+	if pinfo is Dictionary:
+		info_d = pinfo
+	if cpu == "":
+		for k in ["hardware", "board"]:
+			if String(info_d.get(k, "")) != "" and cpu == "":
+				cpu = String(info_d[k])
+	if cpu == "" and not d.has("soc"):
+		cpu = "неизвестно"
+	var abi := String(info_d.get("abi", ""))
+	d["cpu"] = ("%s, " % cpu if cpu != "" else "") + "ядер %d" % OS.get_processor_count() + (" · %s" % abi if abi != "" else "")
 	d["gpu"] = "%s · %s" % [RenderingServer.get_video_adapter_name(), RenderingServer.get_video_adapter_vendor()]
 	d["api"] = RenderingServer.get_video_adapter_api_version()
 	var drv := OS.get_video_adapter_driver_info()
@@ -105,14 +119,10 @@ static func device_info() -> Dictionary:
 		scale3d = tree.root.scaling_3d_scale
 	var scr := DisplayServer.screen_get_size()
 	d["screen"] = "экран %d×%d, окно %d×%d, 3D ×%.2f" % [scr.x, scr.y, win.x, win.y, scale3d]
-	var mem := "статическая %.0f МБ" % (float(OS.get_static_memory_usage()) / 1048576.0)
-	if OS.has_method("get_memory_info"):
-		var mi: Variant = OS.call("get_memory_info")
-		if mi is Dictionary:
-			var m: Dictionary = mi
-			mem += ", всего %.1f ГБ, доступно %.1f ГБ" % [float(m.get("physical", 0)) / 1073741824.0,
-				float(m.get("available", 0)) / 1073741824.0]
-	d["memory"] = mem
+	d["memory"] = memory_text(info_d)
+	d["renderer_diag"] = Array(RendererGuard.diagnostics())
+	if String(info_d.get("last_exit", "")) != "":
+		d["last_exit"] = String(info_d["last_exit"])
 	if Assets.embedded():
 		d["pack"] = "встроен (редактор, автотесты)"
 	elif Assets.available():
@@ -121,6 +131,29 @@ static func device_info() -> Dictionary:
 		d["pack"] = "частей %d из %d — у остальных моделей запасные" % [Assets.ready_count(), Assets.PACKS.size()]
 	d["plugin"] = "есть" if Assets.download_plugin() != null else "нет (ПК или APK без плагина)"
 	return d
+
+
+## Память: ОЗУ телефона из плагина (ActivityManager.MemoryInfo, МБ), иначе OS.get_memory_info() (на Android
+## Godot 4.3 — −1: /proc/meminfo через FileAccess не читается), статическая память Godot (в релизной сборке — 0,
+## тогда не пишется) и видеопамять.
+static func memory_text(info: Dictionary) -> String:
+	var parts := PackedStringArray()
+	if int(info.get("ram_total_mb", 0)) > 0:
+		parts.append("ОЗУ %.1f ГБ, свободно %.1f ГБ%s" % [float(info["ram_total_mb"]) / 1024.0,
+			float(info.get("ram_avail_mb", 0)) / 1024.0, " (мало памяти)" if bool(info.get("ram_low", false)) else ""])
+	else:
+		var mi: Dictionary = OS.get_memory_info()
+		if int(mi.get("physical", -1)) > 0:
+			var avail := int(mi.get("available", -1))
+			parts.append("ОЗУ %.1f ГБ%s" % [float(mi["physical"]) / 1073741824.0,
+				", доступно %.1f ГБ" % (float(avail) / 1073741824.0) if avail > 0 else ""])
+	var stat := OS.get_static_memory_usage()
+	if stat > 0:
+		parts.append("Godot: статическая %.0f МБ" % (float(stat) / 1048576.0))
+	var vid := float(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED))
+	if vid > 0.0:
+		parts.append("видеопамять %.0f МБ" % (vid / 1048576.0))
+	return " · ".join(parts) if not parts.is_empty() else "—"
 
 
 ## Рендерер: метод (gl_compatibility / mobile / forward_plus) и чем рисует (OpenGL или Vulkan).
@@ -270,6 +303,12 @@ static func build_text(bot: TestBot) -> String:
 	L.append("  Драйвер: %s" % String(d.get("driver", "—")))
 	L.append("  Рендерер: %s%s" % [String(d.get("renderer", "?")), " · Vulkan телефона " + String(d["vulkan"])
 		if d.has("vulkan") else ""])
+	if d.has("renderer_diag"):
+		L.append("  Рендерер подробно:")
+		for line in d["renderer_diag"]:
+			L.append("    " + String(line))
+	if d.has("last_exit"):
+		L.append("  Прошлый запуск игры закончился: %s" % String(d["last_exit"]))
 	L.append("  Экран: %s" % String(d.get("screen", "?")))
 	L.append("  Память: %s" % String(d.get("memory", "?")))
 	L.append("  Пакет ресурсов: %s · плагин Android: %s" % [String(d.get("pack", "?")), String(d.get("plugin", "?"))])

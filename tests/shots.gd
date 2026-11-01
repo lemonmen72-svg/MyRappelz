@@ -2089,7 +2089,7 @@ func run_step() -> void:
 			step = 1340
 		1340:
 			# Рендерер (кадры 310–311): вкладка «Графика» на «подставном Android» (RendererGuard, свои файлы) —
-			# хороший видеочип на Compatibility: Vulkan со следующего запуска, кнопка «Сохранить и выйти»
+			# хороший видеочип на Compatibility: Vulkan со следующего запуска, кнопка перезапуска
 			_renderer_launch(RendererGuard.COMPAT, "Adreno (TM) 750", true)
 			SettingsMenu.open(main.hud, "graphics")
 			wait = 6
@@ -2239,6 +2239,7 @@ func _renderer_launch(m: String, gpu: String, fresh: bool) -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(RENDERER_SHOTS_DIR))
 	RendererGuard.override_path = RENDERER_SHOTS_DIR + "override.cfg"
 	RendererGuard.state_path = RENDERER_SHOTS_DIR + "state.cfg"
+	RendererGuard.log_path = RENDERER_SHOTS_DIR + "log.txt"
 	if fresh:
 		_renderer_clear()
 	RendererGuard.reset_session()
@@ -2249,7 +2250,7 @@ func _renderer_launch(m: String, gpu: String, fresh: bool) -> void:
 
 
 func _renderer_clear() -> void:
-	for f in [RendererGuard.override_path, RendererGuard.state_path]:
+	for f in [RendererGuard.override_path, RendererGuard.state_path, RendererGuard.log_path]:
 		if FileAccess.file_exists(String(f)):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(String(f)))
 
@@ -2258,6 +2259,7 @@ func _renderer_restore() -> void:
 	_renderer_clear()
 	RendererGuard.override_path = RendererGuard.OVERRIDE_PATH
 	RendererGuard.state_path = RendererGuard.STATE_PATH
+	RendererGuard.log_path = RendererGuard.LOG_PATH
 	RendererGuard.platform_override = -1
 	RendererGuard.method_override = ""
 	RendererGuard.gpu_override = ""

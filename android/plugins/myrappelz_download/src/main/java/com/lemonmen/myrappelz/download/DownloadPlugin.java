@@ -63,17 +63,41 @@ public class DownloadPlugin extends GodotPlugin {
 		}
 	}
 
-	/** Вид отрисовки создан, драйвер Vulkan ещё не поднят: неподтверждённый Vulkan — страховка заранее. */
+	/**
+	 * Вид отрисовки создан, настройки этого запуска прочитаны, драйвер Vulkan ещё не поднят: что движок взял на самом
+	 * деле — в журнал; неподтверждённый Vulkan — страховка заранее.
+	 */
 	@Override
 	public View onMainCreate(Activity activity) {
 		try {
 			if (activity != null) {
-				RendererPreflight.armBeforeVulkan(activity.getApplicationContext());
+				RendererPreflight.afterSetup(activity.getApplicationContext());
 			}
 		} catch (Throwable t) {
 			Log.w(TAG, "renderer arm failed", t);
 		}
 		return null;
+	}
+
+	/**
+	 * Перезапустить игру (новый процесс — новый рендерер): тот же путь, что у самого Godot 4.3 при потере контекста
+	 * отрисовки (GodotActivity.onGodotRestartRequested → ProcessPhoenix.triggerRebirth: процесс :phoenix открывает
+	 * игру заново и завершает прежний). false — не вышло (игра выходит сама, игрок открывает её снова).
+	 */
+	@UsedByGodot
+	public boolean restartApp() {
+		final Activity a = getActivity();
+		if (a == null) {
+			return false;
+		}
+		a.runOnUiThread(() -> {
+			try {
+				org.godotengine.godot.utils.ProcessPhoenix.triggerRebirth(a);
+			} catch (Throwable t) {
+				Log.w(TAG, "restart failed", t);
+			}
+		});
+		return true;
 	}
 
 	/** Есть ли Vulkan, с которым Godot 4.3 запустится (RendererGuard.plugin_vulkan). */
@@ -326,7 +350,8 @@ public class DownloadPlugin extends GodotPlugin {
 
 	/**
 	 * Устройство для отчёта тест-бота: manufacturer, model, device, release (версия Android), sdk (int), soc (Android
-	 * 12+: производитель и модель чипа), hardware.
+	 * 12+: производитель и модель чипа), hardware, board, abi, vulkan (версия и уровень), vulkan_ok (Vulkan 1.0.3, как
+	 * требует Godot 4.3), ram_total_mb / ram_avail_mb (int), ram_low, last_exit (как закончился прошлый запуск).
 	 */
 	@UsedByGodot
 	public Dictionary deviceInfo() {
@@ -342,7 +367,28 @@ public class DownloadPlugin extends GodotPlugin {
 			soc = (Build.SOC_MANUFACTURER + " " + Build.SOC_MODEL).trim();
 		}
 		d.put("soc", soc);
+		d.put("board", Build.BOARD != null ? Build.BOARD : "");
+		d.put("abi", Build.SUPPORTED_ABIS != null && Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "");
 		d.put("vulkan", vulkanText(c()));
+		d.put("vulkan_ok", c() != null && RendererPreflight.meetsVulkanRequirements(c().getPackageManager()));
+		// Память телефона (МБ — int: JNI 4.3 не передаёт long): в релизе Godot OS.get_static_memory_usage() = 0,
+		// а OS.get_memory_info() на Android — −1
+		try {
+			android.app.ActivityManager am = (android.app.ActivityManager)c().getSystemService(Context.ACTIVITY_SERVICE);
+			android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+			am.getMemoryInfo(mi);
+			d.put("ram_total_mb", (int)(mi.totalMem / 1048576L));
+			d.put("ram_avail_mb", (int)(mi.availMem / 1048576L));
+			d.put("ram_low", mi.lowMemory);
+		} catch (Throwable t) {
+			Log.w(TAG, "memory info failed", t);
+		}
+		// Как закончился прошлый запуск игры (Android 11+)
+		try {
+			d.put("last_exit", RendererPreflight.exitText(RendererPreflight.lastExit(c())));
+		} catch (Throwable t) {
+			d.put("last_exit", "");
+		}
 		return d;
 	}
 

@@ -62,7 +62,9 @@ class FakePlugin extends RefCounted:
 		return true
 
 	func deviceInfo() -> Dictionary:
-		return {"manufacturer": "Test", "model": "Phone X", "release": "14", "sdk": 34, "soc": "Fake SoC 9"}
+		return {"manufacturer": "Test", "model": "Phone X", "release": "14", "sdk": 34, "soc": "Fake SoC 9",
+			"hardware": "fakehw", "abi": "arm64-v8a", "ram_total_mb": 11878, "ram_avail_mb": 4198, "ram_low": false,
+			"last_exit": "user_requested, статус 0, 2026-11-01 18:40:12"}
 
 	func batteryTemp() -> int:
 		return 312
@@ -276,12 +278,17 @@ func _check_report_done() -> void:
 	var text := FileAccess.get_file_as_string(txt)
 	for part in ["Dark Pact — отчёт тест-бота", "Режим: test", "Итог: готово", "Замеров: 3 из 3", "Версия игры:",
 			"Длительность:", "Пауз на остывание: 1", "Устройство", "Test Phone X", "Android 14 (API 34)", "Fake SoC 9",
-			"Видеочип:", "Рендерер:", "батарея 31.2 °C", "Пресеты (среднее по сценам)", "Замеры (прогрев",
+			"Видеочип:", "Рендерер:", "Рендерер подробно:", "в настройках проекта rendering_method «gl_compatibility»",
+			"Файл рендерера user://", "Состояние user://", "Плагин vulkanSupported:", "Журнал рендерера",
+			"Процессор: ", "arm64-v8a · чип Fake SoC 9", "Память: ОЗУ 11.6 ГБ, свободно 4.1 ГБ",
+			"Прошлый запуск игры закончился: user_requested", "батарея 31.2 °C", "Пресеты (среднее по сценам)", "Замеры (прогрев",
 			"Настройки по одной на «Среднем»", "Тени: Выкл", "Рекомендации", "Раздел сценария: проверка каркаса",
 			"Журнал", "Пауза на остывание: статус температуры 2", "Остыл за", "Проверки: ", "[OK] зверь поставлен",
 			"Лог Godot", "Герой игрока «Тест» сохранён"]:
 		check(text.contains(part), "отчёт содержит «%s»" % part)
 	check(not text.contains("ОШИБКА"), "в отчёте нет ошибок проверок")
+	check(not text.contains("Процессор: ,") and not text.contains("всего -0.0") and not text.contains("статическая 0 МБ"),
+		"нет пустого имени процессора и нулевой памяти")
 	check(int(_result["rows"]) == 3 and _bot.rows.size() == 3, "три строки замеров")
 	var row: Dictionary = _bot.rows[0]
 	var m: Dictionary = row["m"]
