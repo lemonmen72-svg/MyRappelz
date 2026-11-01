@@ -485,22 +485,22 @@
 			"source": "mannequin m1:Charged_Spell_Cast [1.50–2.67]",
 			"hit": 0.22
 		},
-		"Mq_Cast_Loop": {
+		"Mq_Cast_Hold": {
 			"length": 1.6,
 			"loop": true,
 			"source": "mannequin m1:mage_soell_cast_5 [5.77–7.43]"
 		},
-		"Mq_Charge_Loop": {
+		"Mq_Charge_Hold": {
 			"length": 0.6,
 			"loop": true,
 			"source": "mannequin m1:Charged_Spell_Cast [0.90–1.50]"
 		},
-		"Mq_Bow_Aim_Loop": {
+		"Mq_Bow_Aim_Hold": {
 			"length": 2.233,
 			"loop": true,
 			"source": "mannequin m3:Archery_Shot_2 [1.43–3.67]"
 		},
-		"Mq_Crossbow_Aim_Loop": {
+		"Mq_Crossbow_Aim_Hold": {
 			"length": 0.633,
 			"loop": true,
 			"source": "mannequin m3:Gun_Hold_Left_Turn [0.13–0.77]"

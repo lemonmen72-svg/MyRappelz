@@ -129,8 +129,8 @@ const MQ_BUFFS := ["mq_charged_cast1", "mq_cast_wide", "mq_charge_release"]
 ## "magic" — накопление силы (посох вверх), "charge" — заряд в ладонях (усиления, удары с замахом), "bow" —
 ## прицеливание из лука, "crossbow" — из арбалета (нет своей петли — стойка Crossbow_Idle). Первый клип, что есть в модели.
 const MQ_CAST_LOOPS := {
-	"magic": ["mq_cast_loop", "mq_charge_loop"], "charge": ["mq_charge_loop", "mq_cast_loop"],
-	"bow": ["mq_bow_aim_loop"], "crossbow": ["mq_crossbow_aim_loop", "crossbow_idle"],
+	"magic": ["mq_cast_hold", "mq_charge_hold"], "charge": ["mq_charge_hold", "mq_cast_hold"],
+	"bow": ["mq_bow_aim_hold"], "crossbow": ["mq_crossbow_aim_hold", "crossbow_idle"],
 }
 ## Выпуск после каста: клип умения начинается за столько секунд до своего удара (замах уже был в петле), с.
 const MQ_RELEASE_LEAD := 0.2
@@ -2017,7 +2017,7 @@ func _setup_asset(path: String) -> bool:
 			for an in _anim.get_animation_list():
 				var a := _anim.get_animation(an)
 				var k := String(an).to_lower()
-				if k.contains("walk") or k.ends_with("running") or k == "idle" or k == "crossbow_idle" or k.ends_with("_loop"):
+				if k.contains("walk") or k.ends_with("running") or k == "idle" or k == "crossbow_idle" or k.ends_with("_loop") or k.ends_with("_hold"):
 					a.loop_mode = Animation.LOOP_LINEAR
 				_pin_root(a, skel)
 	return true

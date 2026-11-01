@@ -3,9 +3,9 @@ extends "res://tests/test_base.gd"
 ## данные (правило вики → наше время, строки карточки), каст «Громового удара» Неофита идёт заданное время с учётом
 ## скорости каста (посох), эффект — только в конце, MP — тоже в конце, перезарядка — после каста; во время каста
 ## другое умение и обычная атака не идут, повторное нажатие ничего не меняет; полоса каста HUD видна (название,
-## время) и исчезает; петля каста модели (Mq_Cast_Loop) играет и снимается; ходьба джойстиком прерывает каст (MP цел,
+## время) и исчезает; петля каста модели (Mq_Cast_Hold) играет и снимается; ходьба джойстиком прерывает каст (MP цел,
 ## перезарядки нет); цель ушла дальше дальности — прерывание; урон каст не сбивает; без MP каст не начинается;
-## мгновенное умение («Танец теней») — как раньше; лучник (Воин) — петля прицеливания Mq_Bow_Aim_Loop, стрела
+## мгновенное умение («Танец теней») — как раньше; лучник (Воин) — петля прицеливания Mq_Bow_Aim_Hold, стрела
 ## вылетает в конце каста.
 
 var mob: Mob = null
@@ -65,7 +65,7 @@ func run_step() -> void:
 			check(p.mp == mp0, "MP в начале каста не списан")
 			check(mob.hp == hp0, "урона в начале каста нет")
 			check(float(p.skill_cd.get("thunderclap", 0.0)) == 0.0, "перезарядки во время каста нет")
-			check(p._model.cast_loop_clip().to_lower() == "mq_cast_loop", "петля каста модели: %s" % p._model.cast_loop_clip())
+			check(p._model.cast_loop_clip().to_lower() == "mq_cast_hold", "петля каста модели: %s" % p._model.cast_loop_clip())
 			# Во время каста: другое умение — нельзя, то же — ничего, обычная атака не идёт
 			check(not p.use_skill("skill2") and p.casting == "thunderclap" and hud._msg_label.text.contains("Идёт каст"),
 				"другое умение во время каста не применяется: %s" % hud._msg_label.text)
@@ -184,7 +184,7 @@ func run_step() -> void:
 		8:
 			var shots0 := get_tree().get_nodes_in_group("projectiles").size()
 			check(p.use_skill("skill1") and p.casting == "sticky_arrow", "«Вязкая стрела»: прицеливание (каст %.2f с)" % p.cast_total)
-			check(p._model.cast_loop_clip().to_lower() == "mq_bow_aim_loop", "петля прицеливания из лука: %s"
+			check(p._model.cast_loop_clip().to_lower() == "mq_bow_aim_hold", "петля прицеливания из лука: %s"
 				% p._model.cast_loop_clip())
 			check(get_tree().get_nodes_in_group("projectiles").size() == shots0, "стрела не вылетела в начале каста")
 			t0 = frame

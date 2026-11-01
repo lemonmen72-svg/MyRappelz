@@ -44,9 +44,9 @@ const MQ_CLIPS := ["mq_sword_a1", "mq_sword_a2", "mq_sword_a3", "mq_combo_b1", "
 	"mq_jump", "mq_bow_shot", "mq_bow_draw", "mq_reload", "mq_cast_a", "mq_cast_b", "mq_cast_c", "mq_cast_wide",
 	"mq_cast_slam", "mq_cast_beam", "mq_cast_up", "mq_cast_pray", "mq_charged_cast", "mq_charged_cast1", "mq_taunt",
 	"mq_hit", "mq_death", "mq_pickup", "mq_walking", "mq_running", "mq_cast_release", "mq_charge_release",
-	"mq_cast_loop", "mq_charge_loop", "mq_bow_aim_loop", "mq_crossbow_aim_loop"]
+	"mq_cast_hold", "mq_charge_hold", "mq_bow_aim_hold", "mq_crossbow_aim_hold"]
 ## Петли каста умений героя (CharacterModel.MQ_CAST_LOOPS): зацикленные, первый и последний кадр совпадают.
-const MQ_LOOPS := ["mq_cast_loop", "mq_charge_loop", "mq_bow_aim_loop", "mq_crossbow_aim_loop"]
+const MQ_LOOPS := ["mq_cast_hold", "mq_charge_hold", "mq_bow_aim_hold", "mq_crossbow_aim_hold"]
 ## Длина клипа обычной атаки при темпе 1 (игра ускоряет до MQ_SPEED_MAX под интервал атаки), умений и прочих, с.
 const MQ_ATTACK_MAX := 1.25
 const MQ_ACT_MAX := 2.8
@@ -185,7 +185,7 @@ func run_step() -> void:
 			for i in models.size():
 				var m := models[i]
 				var cur := m._anim.current_animation.to_lower()
-				check(cur == "mq_cast_loop" and m._anim.is_playing(), "%s: через 2 с петля каста ещё играет (%s)" % [HEROES[i], cur])
+				check(cur == "mq_cast_hold" and m._anim.is_playing(), "%s: через 2 с петля каста ещё играет (%s)" % [HEROES[i], cur])
 				m.stop_cast_loop()
 				# Выпуск после каста: клип умения с момента незадолго до удара
 				m.play_skill("cast", "fire_spark", "magic", true)

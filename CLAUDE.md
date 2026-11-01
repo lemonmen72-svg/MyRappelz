@@ -226,8 +226,8 @@
   подключены. Тест — `_check_mq` в `tests/test_hero_models.gd`, кадры 140–141 в `tests/shots.gd` (шаги 980–981).
   **Петли каста** (слова Максима: «у некоторых умений, особенно магических, есть время каста»): вид `loop` в `MQ_CLIPS`
   (без сжатия, конец сведён к первому кадру — шов `LOOP_SEAM`, в `.json` `loop: true`, имя на `_Loop` — игра
-  зацикливает): `Mq_Cast_Loop` (накопление силы, mage_soell_cast_5 5.77–7.43 с), `Mq_Charge_Loop` (заряд,
-  Charged_Spell_Cast), `Mq_Bow_Aim_Loop` (Archery_Shot_2), `Mq_Crossbow_Aim_Loop` (Gun_Hold_Left_Turn до поворота;
+  зацикливает): `Mq_Cast_Hold` (накопление силы, mage_soell_cast_5 5.77–7.43 с), `Mq_Charge_Hold` (заряд,
+  Charged_Spell_Cast), `Mq_Bow_Aim_Hold` (Archery_Shot_2), `Mq_Crossbow_Aim_Hold` (Gun_Hold_Left_Turn до поворота;
   прицеливание — с хватом второй рукой: `TwoHandIK.DRAW_CLIPS` / `SUPPORT_CLIPS`);
   выпуски `Mq_Cast_Release` (финал mage_soell_cast_5, в `MQ_CASTS`), `Mq_Charge_Release` (в `MQ_BUFFS`).
   `CharacterModel.play_cast_loop(вид)` — `MQ_CAST_LOOPS` ("magic" / "charge" / "bow" / "crossbow"), `stop_cast_loop`,

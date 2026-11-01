@@ -27,9 +27,9 @@ const TWO_HAND_CLIPS := ["mq_heavy_swing", "mq_leap_slam"]
 ## Покой и передвижение: двуручное наперевес.
 const CARRY_CLIPS := ["idle", "walking", "walking_woman", "running"]
 ## Арбалет: стойка на изготовку, выстрел и прицеливание (петля каста умения) — левая под ложем.
-const SUPPORT_CLIPS := ["crossbow_idle", "crossbow_shoot", "mq_crossbow_aim_loop"]
+const SUPPORT_CLIPS := ["crossbow_idle", "crossbow_shoot", "mq_crossbow_aim_hold"]
 ## Лук: выстрел, выстрел умением и прицеливание (петля каста умения) — правая на тетиве.
-const DRAW_CLIPS := ["mq_bow_shot", "mq_bow_draw", "mq_bow_aim_loop"]
+const DRAW_CLIPS := ["mq_bow_shot", "mq_bow_draw", "mq_bow_aim_hold"]
 ## Скорость смены веса, 1/с (за 0.1 с — 70 %).
 const WEIGHT_RATE := 12.0
 ## Доля длины руки (плечо + предплечье), до которой рука тянется к цели; дальше — вес убывает на REACH_FADE м.

@@ -21,7 +21,7 @@
     Ключи — все кадры исходника (30 к/с) в новом времени, прореживание только без видимой потери: ключ убирается,
     если он восстанавливается из соседних с ошибкой < ROT_TOL / POS_TOL.
   * Момент удара: hit в спецификации (с исходника) или самая быстрая кисть внутри отрезка.
-  * Петли каста умений героя (вид loop, имя кончается на «_Loop»: накопление силы, заряд, прицеливание из лука и
+  * Петли каста умений героя (вид loop, имя кончается на «_Hold» (не «_Loop»: импорт glTF в Godot сам зацикливает «_Loop» и срезает суффикс): накопление силы, заряд, прицеливание из лука и
     арбалета): отрезок без сжатия времени и без удара, последние LOOP_BLEND с сводятся к первому кадру (шов —
     проверка LOOP_SEAM); в .json — loop: true. Игра крутит петлю, пока идёт каст (CharacterModel.MQ_CAST_LOOPS).
 
@@ -103,7 +103,7 @@ LOOP_SEAM = 0.002
 ## Клипы: имя в GLB → (манекен, клип Meshy («A+B» — подряд), t0, t1, вид, pre, post, hit).
 ##   t0/t1 — отрезок исходника (с); вид: act — действие, death — смерть (лёжа на земле), loop — петля каста
 ##   (без сжатия времени и без удара: последние LOOP_BLEND с плавно сводятся к первому кадру — шва нет;
-##   швы t0/t1 подобраны по наименьшей разнице поз; имя кончается на «_Loop» — игра зацикливает);
+##   швы t0/t1 подобраны по наименьшей разнице поз; имя кончается на «_Hold» — игра зацикливает (суффикс «_Loop» импорт Godot срезает));
 ##   pre/post — длительность до удара и после него в игре (с; None — без сжатия этой части);
 ##   hit — момент удара в исходнике (с; None — самая быстрая кисть в отрезке).
 ## Комбо Meshy разрезаны по ударам: части идут подряд (конец одной — начало следующей), обычные атаки чередуют их
@@ -150,10 +150,10 @@ MQ_CLIPS = {
 	"Mq_Cast_Release": ("m1", "mage_soell_cast_5", 8.73, 11.37, "act", 0.45, 0.65, None),  # финал долгого каста
 	"Mq_Charge_Release": ("m1", "Charged_Spell_Cast", 1.5, 2.67, "act", 0.25, 0.6, 1.72),  # выброс заряда вверх
 	# --- Петли каста (время каста умения героя: Player.cast_*; CharacterModel.MQ_CAST_LOOPS) ---
-	"Mq_Cast_Loop": ("m1", "mage_soell_cast_5", 5.77, 7.43, "loop", None, None, None),  # накопление силы, посох вверх
-	"Mq_Charge_Loop": ("m1", "Charged_Spell_Cast", 0.9, 1.5, "loop", None, None, None),  # заряд в ладонях, присед
-	"Mq_Bow_Aim_Loop": ("m3", "Archery_Shot_2", 1.43, 3.67, "loop", None, None, None),  # лук: неподвижное прицеливание
-	"Mq_Crossbow_Aim_Loop": ("m3", "Gun_Hold_Left_Turn", 0.13, 0.77, "loop", None, None, None),  # арбалет у плеча
+	"Mq_Cast_Hold": ("m1", "mage_soell_cast_5", 5.77, 7.43, "loop", None, None, None),  # накопление силы, посох вверх
+	"Mq_Charge_Hold": ("m1", "Charged_Spell_Cast", 0.9, 1.5, "loop", None, None, None),  # заряд в ладонях, присед
+	"Mq_Bow_Aim_Hold": ("m3", "Archery_Shot_2", 1.43, 3.67, "loop", None, None, None),  # лук: неподвижное прицеливание
+	"Mq_Crossbow_Aim_Hold": ("m3", "Gun_Hold_Left_Turn", 0.13, 0.77, "loop", None, None, None),  # арбалет у плеча
 	# --- Прочее ---
 	"Mq_Taunt": ("m1", "Chest_Pound_Taunt", 0.5, 3.2, "act", 0.7, 0.6, 2.1),  # «Вызов»: удар в грудь
 	"Mq_Hit": ("m1", "Hit_Reaction_1", 0.0, 1.1, "act", None, 0.55, 0.2),  # урон
@@ -165,7 +165,7 @@ MQ_CLIPS = {
 MQ_LOCO = {"Mq_Walking": ("walk", "Walking"), "Mq_Running": ("run", "Running")}
 ## Не перенесены: Archery_Shot (= Draw_and_Shoot_from_Back_2), Draw_and_Shoot_from_Back и _1 (то же движение, что
 ## Mq_Bow_Draw, только 7.8 с), Archery_Aim_with_Lateral_Scan (прицел с поворотом в сторону — при касте по цели не к
-## месту; неподвижный прицел — Archery_Shot_2 в Mq_Bow_Aim_Loop), конец Gun_Hold_Left_Turn (поворот кругом), Quick_Walk, RunFast, run_fast_3_inplace, Run_Turn_*, Walk_Turn_* (повороты и
+## месту; неподвижный прицел — Archery_Shot_2 в Mq_Bow_Aim_Hold), конец Gun_Hold_Left_Turn (поворот кругом), Quick_Walk, RunFast, run_fast_3_inplace, Run_Turn_*, Walk_Turn_* (повороты и
 ## разновидности бега — в игре шаг и бег одни, повороты делает код), дубли Walking/Running в m2 и m3.
 
 ## Кости UAL (как их ищут HeroRetarget/BipedRetarget) → кости Mixamo манекена.
