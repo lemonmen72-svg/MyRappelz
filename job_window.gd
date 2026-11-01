@@ -1,19 +1,20 @@
 class_name JobWindow
 extends Node
 ## Окно выбора первой профессии (сдача задания «Доклад мудрецу» мудрецу, QuestData "sage_first_job"):
-## три карточки профессий расы героя — арт профессии с названием внизу (MenuKit.job_art_head; часть пакета «art» не
-## загружена — название строкой), роль, оружие, описание, 3–4 ключевых умения (значки и названия),
-## кнопка «Выбрать»; затем подтверждение («Сменить профессию позже нельзя», бонус сверх-эволюции
+## три карточки профессий расы героя (MenuKit.job_card) — арт профессии целиком (весь рост, 3:4, карточка по высоте
+## окна), поверх низа на затемнении имя, роль и оружие одной строкой, кнопки «Подробнее» и «Выбрать»; часть пакета
+## «art» не загружена — те же строки текстом и описание. «Подробнее» (или касание карточки) — вместо трёх карточек
+## подробности (MenuKit.job_details: арт слева, справа описание, сильные стороны, особенности, ключевые умения со
+## значками и уровнем, с прокруткой; «Назад», «Выбрать»). Окно не прокручивается — помещается при любом размере
+## интерфейса. «Выбрать» — подтверждение под карточками («Сменить профессию позже нельзя», бонус сверх-эволюции
 ## ClassData.over_jp). «Да» — задание сдаётся (Quests.complete: награды), профессия меняется (Game.change_job:
 ## древо, стартовое оружие профессии в сумку и в руки), игрок пересчитывается, сообщение на экране.
 ## Закрыть окно без выбора можно — задание остаётся выполненным, вернуться к мудрецу можно в любой момент.
-## Живёт в main (main.job_window). Кнопки открытого окна для тестов (buttons): "pick_<профессия>", "confirm", "cancel".
+## Живёт в main (main.job_window). Кнопки открытого окна для тестов (buttons): "pick_<профессия>",
+## "info_<профессия>" (на карточках), "back" (в подробностях), "confirm", "cancel"; detail — открытые подробности.
 
 ## Размер окна для «Среднего» размера интерфейса.
 const WINDOW_SIZE := Vector2(1060, 600)
-const CARD_W := 330.0
-## Арт профессии в карточке («Средний»): во всю ширину карточки, окно сверху.
-const ART_H := 190.0
 const GOLD := Color(1.0, 0.85, 0.45)
 const MUTED := Color(0.78, 0.8, 0.9)
 const GOOD := Color(0.55, 1.0, 0.6)
@@ -23,6 +24,8 @@ var main: Node
 var quest_id := ""
 ## Профессия, выбранная карточкой (ждёт подтверждения; "" — ещё не выбрана).
 var picked := ""
+## Профессия, чьи подробности открыты ("" — три карточки).
+var detail := ""
 var buttons: Dictionary = {}
 var _body: VBoxContainer = null
 
@@ -35,6 +38,7 @@ func setup(m: Node) -> void:
 func open(qid: String = "") -> void:
 	quest_id = qid
 	picked = ""
+	detail = ""
 	_build()
 
 
@@ -52,6 +56,8 @@ func is_open() -> bool:
 func _build() -> void:
 	buttons.clear()
 	_body = main.hud.create_window("Выбор профессии", WINDOW_SIZE)
+	# Во всю высоту окна: карточки занимают свободное место, прокрутки нет
+	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var over := ClassData.over_jp(Game.level)
 	var head := "%s · ур. %d · Бродяга. Выберите одну из трёх профессий своей расы." % [
 		String(ClassData.race(Game.race_id)["name"]), Game.level]
@@ -59,62 +65,51 @@ func _build() -> void:
 	if over > 0:
 		_body.add_child(_label("Сверх-эволюция: +%d очков умений (за уровни выше %d)" % [over, ClassData.JOB_LEVEL],
 			UiScale.FONT_HEAD, GOOD))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", int(UiScale.px(10)))
-	_body.add_child(row)
-	for jid in ClassData.jobs_of(Game.race_id):
-		row.add_child(_card(String(jid)))
+	if detail != "" and ClassData.jobs_of(Game.race_id).has(detail):
+		_details(detail)
+	else:
+		detail = ""
+		var row := HBoxContainer.new()
+		row.name = "JobRow"
+		row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		row.add_theme_constant_override("separation", int(UiScale.px(10)))
+		_body.add_child(row)
+		for jid in ClassData.jobs_of(Game.race_id):
+			row.add_child(_card(String(jid)))
 	if picked != "":
 		_confirm_ui(over)
 
 
-## Карточка профессии: название, роль, оружие, описание, ключевые умения, «Выбрать».
+## Карточка профессии: арт во весь рост, имя, роль, оружие, «Подробнее» и «Выбрать».
 func _card(job: String) -> Control:
-	var c := ClassData.cls(job)
-	var col: Color = c["color"]
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(UiScale.px(CARD_W), 0)
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.12, 0.14, 0.26, 0.95)
-	sb.border_color = GOLD if picked == job else col.lightened(0.2)
-	sb.set_border_width_all(3 if picked == job else 2)
-	sb.set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
-	sb.set_content_margin_all(UiScale.px(10))
-	panel.add_theme_stylebox_override("panel", sb)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", int(UiScale.px(3)))
-	panel.add_child(box)
-	var w := UiScale.px(CARD_W - 24.0)
-	var head := MenuKit.job_art_head(job, Vector2(CARD_W - 24.0, ART_H), String(c["name"]), col.lightened(0.5),
-		(CARD_W - 24.0) / ART_H)
-	if head != null:
-		box.add_child(head)
-	else:
-		box.add_child(_label(String(c["name"]), UiScale.FONT_NAME, col.lightened(0.4), w))
-	box.add_child(_label("Роль: " + String(c["role"]), UiScale.FONT_BODY, MUTED, w))
-	box.add_child(_label("Оружие: " + String(c["weapon_text"]), UiScale.FONT_BODY, MUTED, w))
-	box.add_child(_label(String(c["desc"]), UiScale.FONT_SMALL, Color.WHITE, w))
-	box.add_child(_label("Ключевые умения", UiScale.FONT_TEXT, GOLD, w))
-	for sid in c.get("key_skills", []):
-		var id := String(sid)
-		var sk := HeroSkills.get_skill(id, job)
-		var r := HBoxContainer.new()
-		r.add_theme_constant_override("separation", int(UiScale.px(6)))
-		var ic := IconView.new()
-		ic.custom_minimum_size = UiScale.v2(28, 28)
-		ic.set_spec(IconView.hero_skill(id))
-		r.add_child(ic)
-		r.add_child(_label("%s (ур. %d)" % [String(sk.get("name", id)), HeroSkills.level_needed(id, 1, job)],
-			UiScale.FONT_SMALL, Color(0.9, 0.9, 0.95)))
-		box.add_child(r)
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_child(spacer)
+	var col: Color = ClassData.cls(job)["color"]
+	var cd := MenuKit.job_card(job, col.lightened(0.2), picked == job, col.lightened(0.5))
+	var card := cd["card"] as PanelContainer
+	card.gui_input.connect(_on_card_input.bind(job))
+	var actions := cd["actions"] as HBoxContainer
+	var info := MenuKit.card_button("Подробнее")
+	info.pressed.connect(_on_info.bind(job))
+	buttons["info_" + job] = info
+	actions.add_child(info)
+	var b := MenuKit.card_button("Выбрать")
+	b.pressed.connect(_on_pick.bind(job))
+	b.disabled = Game.job_change_block(job) != ""
+	buttons["pick_" + job] = b
+	actions.add_child(b)
+	return cd["slot"] as Control
+
+
+## Подробности профессии вместо трёх карточек: арт, полный текст с прокруткой, «Назад» и «Выбрать».
+func _details(job: String) -> void:
+	var col: Color = ClassData.cls(job)["color"]
+	var d := MenuKit.job_details(job, col.lightened(0.2), col.lightened(0.5))
+	_body.add_child(d["view"] as Control)
+	var back := d["back"] as Button
+	back.pressed.connect(_on_back)
+	buttons["back"] = back
 	var b := _button("Выбрать", "pick_" + job, _on_pick.bind(job))
 	b.disabled = Game.job_change_block(job) != ""
-	box.add_child(b)
-	return panel
+	(d["actions"] as HBoxContainer).add_child(b)
 
 
 func _confirm_ui(over: int) -> void:
@@ -132,6 +127,25 @@ func _confirm_ui(over: int) -> void:
 func _on_pick(job: String) -> void:
 	picked = job
 	_build()
+
+
+## «Подробнее» на карточке — подробности профессии вместо трёх карточек.
+func _on_info(job: String) -> void:
+	detail = job
+	_build()
+
+
+## «Назад» в подробностях — снова три карточки.
+func _on_back() -> void:
+	detail = ""
+	_build()
+
+
+## Касание карточки (не по кнопкам) — подробности.
+func _on_card_input(e: InputEvent, job: String) -> void:
+	var mb := e as InputEventMouseButton
+	if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+		_on_info.call_deferred(job)
 
 
 func _on_cancel() -> void:

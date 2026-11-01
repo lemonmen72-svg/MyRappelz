@@ -5,8 +5,9 @@ extends "res://tests/test_base.gd"
 ## существо, питомцы, сумка, лавка, журнал, диалог, настройки — каждая вкладка, выбор профессии, админ-панель, склад,
 ## сумка с надетой бронёй и украшениями — карточка доспеха со сравнением и надетого кольца, сумка с панелью «Крафт»
 ## в подтверждении, кузница с вещью на наковальне)
-## и экраны до мира (вход в аккаунт, выбор персонажа с 4 занятыми слотами и подтверждением удаления, 4 шага создания)
-## помещаются в экран,
+## и экраны до мира (вход в аккаунт, выбор персонажа с 4 занятыми слотами и подтверждением удаления, 4 шага создания
+## и подробности профессии) помещаются в экран; карточки профессий (шаг «Профессии», окно мудреца) — 3:4, арт
+## целиком, над кнопками, без прокрутки,
 ## заголовки и обрезаемые подписи не обрезаны. Кнопки «Размер интерфейса» в настройках применяют размер сразу
 ## и сохраняют его; надписи над головами — компактнее прежних.
 
@@ -19,14 +20,16 @@ const WINDOWS := [
 	["сумка с картой", "_w_bag"], ["лавка Кирка", "_w_shop"], ["журнал заданий", "_w_journal"],
 	["диалог", "_w_dialog"], ["задание в диалоге", "_w_dialog_quest"], ["настройки: графика", "_w_settings"],
 	["настройки: интерфейс", "_w_settings_ui"], ["настройки: прочее", "_w_settings_other"],
-	["выбор профессии", "_w_job"], ["админ-панель", "_w_admin"], ["склад", "_w_storage"],
+	["выбор профессии", "_w_job"], ["выбор профессии: подробнее", "_w_job_info"], ["админ-панель", "_w_admin"],
+	["склад", "_w_storage"],
 	["сумка: доспех со сравнением", "_w_bag_armor"], ["сумка: надетое кольцо", "_w_bag_ring"],
 	["сумка: крафт", "_w_bag_craft"], ["кузница", "_w_forge"],
 ]
-## Экраны до мира: [что, ключ] — "login", "select", "create_<шаг 0..3>".
+## Экраны до мира: [что, ключ] — "login", "select", "create_<шаг 0..3>" ("create_1_info" — подробности профессии).
 const SCREENS := [
 	["вход в аккаунт", "login"], ["выбор персонажа", "select"], ["создание: раса", "create_0"],
-	["создание: профессии", "create_1"], ["создание: пол", "create_2"], ["создание: ник", "create_3"],
+	["создание: профессии", "create_1"], ["создание: профессия подробно", "create_1_info"], ["создание: пол", "create_2"],
+	["создание: ник", "create_3"],
 ]
 ## Длинный ник (16 символов) для занятых слотов на экране выбора.
 const LONG_NICK := "Шшшшшшшшшшшшшш_%d"
@@ -105,6 +108,8 @@ func run_step() -> void:
 			step = 3
 		3:
 			_check_window(String(WINDOWS[_wi][0]))
+			if String(WINDOWS[_wi][1]).begins_with("_w_job"):
+				_check_job_window(String(WINDOWS[_wi][0]))
 			hud.close_window()
 			_wi += 1
 			if _wi < WINDOWS.size():
@@ -207,6 +212,13 @@ func _w_settings_other() -> void:
 func _w_job() -> void:
 	main.job_window.open("")
 	main.job_window._on_pick("assassin")
+
+
+## Окно мудреца: подробности профессии вместо карточек (и подтверждение выбора).
+func _w_job_info() -> void:
+	main.job_window.open("")
+	main.job_window._on_info("adept")
+	main.job_window._on_pick("adept")
 
 
 func _w_admin() -> void:
@@ -467,7 +479,10 @@ func _open_screen() -> void:
 	elif _screen is CharacterCreate:
 		var cc := _screen as CharacterCreate
 		cc._select_race("light_elf")
-		cc.set_step(k.substr(7).to_int())
+		var parts := k.substr(7).split("_")
+		cc.set_step(parts[0].to_int())
+		if parts.size() > 1:
+			cc.show_job(String(ClassData.jobs_of("light_elf")[0]))
 	wait = 4
 
 
@@ -494,11 +509,87 @@ func _check_screen(what: String) -> void:
 			if c.visible and c.get_combined_minimum_size().y >= 60.0:
 				print("  %s %s: %s" % [c.get_path(), c.get_class(), c.get_combined_minimum_size()])
 	check(need.x <= view.x + 0.5 and need.y <= view.y + 0.5, "%s помещается в %s: нужно %s" % [what, view, need])
+	if _screen is CharacterCreate and (_screen as CharacterCreate).step == 1:
+		_check_job_cards(_screen as CharacterCreate, what)
 	if _screen is CharacterSelect:
 		var cs := _screen as CharacterSelect
 		check(cs.cards.size() == Accounts.SLOTS and not cs.buttons.has("create_1"), "%s: 4 занятых слота" % what)
 		var last := cs.cards[cs.cards.size() - 1].get_global_rect()
 		check(last.end.x <= view.x + 0.5, "%s: карточки на экране (%s)" % [what, last])
+
+
+# ---------- Карточки профессий ----------
+
+## Шаг «Профессии» создания: три карточки целиком над кнопками «Назад» / «Далее», в ряд, арт 3:4 во весь рост
+## (заполняет карточку, без обрезки), имя, роль и оружие — на карточке; подробности — над кнопками, текст с прокруткой.
+func _check_job_cards(cc: CharacterCreate, what: String) -> void:
+	var nav_top := cc._next_btn.get_global_rect().position.y
+	var view := cc.get_viewport().get_visible_rect().size
+	if cc.job_detail != "":
+		var d := cc.find_child("JobDetails", true, false) as Control
+		check(d != null and d.get_global_rect().end.y <= nav_top + 0.5 and d.find_child("JobText", true, false) != null
+			and cc.job_buttons.has("back"), "%s: подробности над кнопками, текст и «К профессиям»" % what)
+		if d != null:
+			var dc := d.find_child("JobCard", true, false) as Control
+			if dc != null:
+				_check_card_art(dc, what)
+		return
+	check(cc._job_cards.size() == 3 and cc.job_buttons.size() == 3, "%s: три карточки с «Подробнее»" % what)
+	var prev_end := -1.0
+	for card in cc._job_cards:
+		var r := card.get_global_rect()
+		check(r.end.y <= nav_top + 0.5 and r.position.y >= 0.0 and r.position.x >= prev_end - 0.5
+			and r.end.x <= view.x + 0.5, "%s: карточка целиком на экране, над кнопками: %s (кнопки с %.0f)"
+			% [what, r, nav_top])
+		prev_end = r.end.x
+		_check_card_art(card, what)
+	print("  карточки профессий: %s" % [cc._job_cards[0].get_global_rect()])
+
+
+## Карточка с артом: 3:4, арт виден целиком и заполняет карточку (почти без полос), строки и кнопки на карточке.
+func _check_card_art(card: Control, what: String) -> void:
+	var head := card.find_child("JobArt", true, false) as Control
+	if head == null:
+		return
+	var r := card.get_global_rect()
+	var aspect := r.size.x / maxf(r.size.y, 1.0)
+	check(absf(aspect - MenuKit.JOB_ART_RATIO) < 0.04 and r.size.y >= 220.0,
+		"%s: карточка 3:4 (%.2f), высота %.0f" % [what, aspect, r.size.y])
+	var pic := head.find_child("Art", true, false) as TextureRect
+	check(pic != null and pic.texture != null and pic.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED,
+		"%s: арт без обрезки" % what)
+	if pic != null and pic.texture != null:
+		var ts := pic.texture.get_size()
+		var ta := ts.x / maxf(ts.y, 1.0)
+		var a := pic.size
+		var drawn := Vector2(a.y * ta, a.y) if a.x / maxf(a.y, 1.0) > ta else Vector2(a.x, a.x / ta)
+		check(drawn.x >= a.x * 0.95 and drawn.y >= a.y * 0.95, "%s: арт заполняет карточку: %s из %s" % [what, drawn, a])
+	var info := head.find_child("ArtInfo", true, false) as Control
+	check(info != null and r.grow(1.0).encloses(info.get_global_rect()), "%s: имя, роль и оружие на арте: %s в %s"
+		% [what, info.get_global_rect() if info != null else Rect2(), r])
+
+
+## Окно мудреца: содержимое не прокручивается (помещается в окно), карточки или подробности — внутри окна.
+func _check_job_window(what: String) -> void:
+	var jw: JobWindow = main.job_window
+	var hud: HUD = main.hud
+	var scroll := jw._body.get_parent() as ScrollContainer
+	var need := jw._body.get_combined_minimum_size().y
+	check(scroll != null and need <= scroll.size.y + 0.5, "%s: без прокрутки — нужно %.0f, есть %.0f"
+		% [what, need, scroll.size.y if scroll != null else 0.0])
+	var wr := hud.window_rect().grow(0.5)
+	var cards: Array = hud._window.find_children("JobCard", "", true, false)
+	check(not cards.is_empty(), "%s: карточки профессий" % what)
+	for n in cards:
+		var c := n as Control
+		check(wr.encloses(c.get_global_rect()), "%s: карточка в окне: %s" % [what, c.get_global_rect()])
+		_check_card_art(c, what)
+	if jw.detail != "":
+		check(jw.buttons.has("back") and jw.buttons.has("pick_" + jw.detail), "%s: «Назад» и «Выбрать»" % what)
+	else:
+		for j in ClassData.jobs_of(game.race_id):
+			check(jw.buttons.has("info_" + String(j)) and jw.buttons.has("pick_" + String(j)),
+				"%s: «Подробнее» и «Выбрать» у «%s»" % [what, ClassData.job_name(String(j))])
 
 
 # ---------- Настройки ----------

@@ -6,7 +6,9 @@ extends "res://tests/test_base.gd"
 ## загрузки. Файлы: логотип (фон прозрачный) и главный арт — в APK, арты рас и профессий и все 24 портрета — в части
 ## пакета «art». Экраны подхватывают арт: загрузка ресурсов и вход — главный арт и логотип (помещаются в 720 px при
 ## любом размере интерфейса), выбор персонажа — портреты по профессии и полу (Бродяга — по расе и полу), у пустого
-## слота нет; создание — арт расы на фоне (меняется с расой), карточки профессий с артом; окно мудреца — тоже.
+## слота нет; создание — арт расы на фоне (меняется с расой), карточки профессий с артом во весь рост (имя на арте,
+## «Подробнее» — подробности с артом и текстом, «Назад» — снова карточки); окно мудреца — тоже («Подробнее»,
+## «Выбрать», «Назад»).
 ## Без пакета (Assets.simulate_missing) — те же экраны без артов пакета, логотип и главный арт остаются.
 
 const SIZES := [0, 1, 2]
@@ -71,11 +73,23 @@ func run_step() -> void:
 					var t := head.find_child("ArtTitle", true, false) as Label
 					check(t != null and t.text == ClassData.job_name(String(jobs[i])), "имя профессии внизу арта")
 					var pic := head.find_child("Art", true, false) as TextureRect
-					var at: AtlasTexture = null
-					if pic != null:
-						at = pic.texture as AtlasTexture
-					check(at != null and at.atlas.resource_path == MenuKit.job_art_path(String(jobs[i])),
-						"арт своей профессии")
+					check(pic != null and pic.texture != null
+						and pic.texture.resource_path == MenuKit.job_art_path(String(jobs[i]))
+						and pic.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED, "арт своей профессии целиком")
+					check(head.find_child("ArtRole", true, false) != null and head.find_child("ArtWeapon", true, false) != null,
+						"роль и оружие на арте")
+			# Подробности: вместо карточек — арт и полный текст; «Назад» — снова карточки
+			check(cc.job_buttons.has("info_" + String(jobs[1])), "«Подробнее» на карточке")
+			(cc.job_buttons["info_" + String(jobs[1])] as Button).pressed.emit()
+			var det := cc.find_child("JobDetails", true, false)
+			check(cc.job_detail == String(jobs[1]) and cc._job_cards.is_empty() and det != null
+				and det.find_child("JobArt", true, false) != null and det.find_child("JobText", true, false) != null,
+				"подробности профессии: арт и текст")
+			cc.go_back()
+			check(cc.step == 1 and cc.job_detail == "" and cc._job_cards.size() == 3, "«Назад» — снова три карточки")
+			cc.show_job(String(jobs[2]))
+			(cc.job_buttons["back"] as Button).pressed.emit()
+			check(cc.step == 1 and cc.job_detail == "" and cc._job_cards.size() == 3, "«К профессиям» — три карточки")
 			_screen.queue_free()
 			_screen = null
 			main.job_window.open("")
@@ -84,6 +98,15 @@ func run_step() -> void:
 		4:
 			var arts: Array = main.hud._window.find_children("JobArt", "", true, false)
 			check(arts.size() == 3, "окно мудреца: арты трёх профессий (%d)" % arts.size())
+			var jw: JobWindow = main.job_window
+			check(jw.buttons.has("info_wizard") and jw.buttons.has("pick_wizard"), "окно мудреца: «Подробнее» и «Выбрать»")
+			(jw.buttons["info_wizard"] as Button).pressed.emit()
+			check(jw.detail == "wizard" and jw.buttons.has("back") and jw.buttons.has("pick_wizard")
+				and main.hud._window.find_children("JobArt", "", true, false).size() == 1
+				and main.hud._window.find_child("JobText", true, false) != null, "окно мудреца: подробности")
+			(jw.buttons["back"] as Button).pressed.emit()
+			check(jw.detail == "" and main.hud._window.find_children("JobArt", "", true, false).size() == 3,
+				"окно мудреца: «Назад» — три карточки")
 			main.hud.close_window()
 			# Без пакета ресурсов: арты пакета пропадают, логотип и главный арт — нет (они в APK)
 			Assets.simulate_missing(true)
@@ -111,6 +134,9 @@ func run_step() -> void:
 			cc.go_next()
 			check(cc._job_cards.size() == 3 and cc._job_cards[0].find_child("JobArt", true, false) == null,
 				"без пакета: карточки профессий без арта")
+			cc.show_job(String(ClassData.jobs_of(cc._race)[0]))
+			check(cc.job_detail != "" and cc.find_child("JobText", true, false) != null
+				and cc.find_child("JobArt", true, false) == null, "без пакета: подробности текстом")
 			_screen.queue_free()
 			_screen = null
 			main.job_window.open("")
