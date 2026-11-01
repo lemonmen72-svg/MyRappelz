@@ -49,7 +49,7 @@ const MQ_ATTACK_MAX := 1.25
 const MQ_ACT_MAX := 2.8
 ## Опора стопы (носок, 4-я кость ноги) у земли (не выше своей высоты в покое + 4 см) едет по земле не дальше, м
 ## (как ground_slide в tools/retarget_mannequin.py; поворот на носке — не скольжение).
-const MQ_GROUND_SLIDE := 0.12
+const MQ_GROUND_SLIDE := 0.08
 
 var models: Array[CharacterModel] = []
 var heroine: CharacterModel = null

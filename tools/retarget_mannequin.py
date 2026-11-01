@@ -62,10 +62,10 @@ ROT_TOL = 0.0015
 POS_TOL = 0.0005
 TAG = "mannequin"
 ## Переступание на месте (plant_inplace): перенос стопы почти без отрыва дальше STEP_MIN / 4 (м) идёт дугой высотой
-## STEP_LIFT × сдвиг (0.03…0.14 м).
+## STEP_LIFT × сдвиг (0.06…0.14 м — выше порога «у земли»).
 STEP_MIN = 0.06
-STEP_LIFT = 0.3
-## Стопа «у земли» — не выше своего минимума в клипе + STEP_LOW, м; шаг из шарканья длится STEP_TIME, с.
+STEP_LIFT = 0.35
+## Стопа «у земли» — не выше своего минимума в клипе (не ниже покоя) + STEP_LOW, м; шаг из шарканья — STEP_TIME, с.
 STEP_LOW = 0.05
 STEP_TIME = 0.3
 ## …и не выше высоты опоры в покое + STEP_GROUND (стопа, что весь клип в воздухе, у земли не бывает), м.
@@ -75,10 +75,10 @@ STANCE_SPEED = 0.3
 STANCE_MIN = 4
 STANCE_GAP = 2
 ## Предел проверки ground_slide (как в tests/test_hero_models.gd), м.
-GROUND_SLIDE = 0.12
+GROUND_SLIDE = 0.08
 GROUND_NEAR = 0.04
-## Клипы, где стопы законно едут или не достают земли: кручение на колене, прыжки с ударом (проверки опор не для них).
-FREE_FEET = {"Mq_Blade_Spin", "Mq_Judgment", "Mq_Leap_Slam", "Mq_Jump"}
+## Клипы, где стопы законно едут или не достают земли: кручение на колене, прыжки, пинок с шагом.
+FREE_FEET = {"Mq_Blade_Spin", "Mq_Judgment", "Mq_Leap_Slam", "Mq_Jump", "Mq_Kick"}
 
 ## Клипы: имя в GLB → (манекен, клип Meshy («A+B» — подряд), t0, t1, вид, pre, post, hit).
 ##   t0/t1 — отрезок исходника (с); вид: act — действие, death — смерть (лёжа на земле);
@@ -369,7 +369,7 @@ def plant_inplace(rt, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, stance:
 
 	for si, (s, b) in enumerate(sorted(rt.contact.items())):
 		ymin = float(Gp[:, b, 1].min())
-		low_y = min(ymin + STEP_LOW, rest_y[s] + STEP_GROUND)
+		low_y = min(max(ymin, rest_y[s]) + STEP_LOW, rest_y[s] + STEP_GROUND)
 		lab = ["S" if stance[s][f] else ("L" if Gp[f, b, 1] < low_y else "A") for f in range(F)]
 		segs = segments(lab)
 		for kind, f, g in segs:
@@ -392,7 +392,7 @@ def plant_inplace(rt, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, stance:
 					u = (k + 1) / float(n + 1)
 					want[f + k, si] = Sx + (Ex - Sx) * (u * u * (3.0 - 2.0 * u))
 				continue
-			h = float(np.clip(STEP_LIFT * D, 0.03, 0.14))
+			h = float(np.clip(STEP_LIFT * D, 0.06, 0.14))
 			m = min(n, max(4, int(round(STEP_TIME * FPS))))
 			v = np.hypot(np.gradient(P[:, 0]), np.gradient(P[:, 2])) if n > 2 else np.ones(n)
 			a = int(np.clip(int(np.argmax(v)) - m // 2, 0, n - m))
