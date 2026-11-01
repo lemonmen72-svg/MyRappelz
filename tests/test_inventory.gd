@@ -2,7 +2,8 @@ extends "res://tests/test_base.gd"
 ## Сумка как в MMORPG (Inventory + InventoryWindow): стопки, вместимость и переполнение, перемещение и сортировка,
 ## сохранение раскладки и загрузка старого формата, окно сумки (ячейки, экипировка, карточка, «Использовать»,
 ## «Надеть», «Переместить», перетаскивание, «Выбросить»), продажа у торговца, окно торговца, «Сумка полна»
-## для покупки и добычи.
+## для покупки и добычи. Заточенные («<id>+N») и сломанные («<id>!broken») вещи в сумке: стопки, порядок, раскладка
+## в сохранении (подробно чарование — tests/test_enchant.gd).
 
 var drop: LootDrop = null
 
@@ -21,6 +22,7 @@ func run_step() -> void:
 			_unit_stacks()
 			_unit_move_sort()
 			_unit_layout()
+			_unit_enchanted()
 			step = 1
 		1:
 			# Новый Наёмник: два надетых кинжала (основная и вторая рука) в ячейках не лежат
@@ -267,7 +269,7 @@ func run_step() -> void:
 				var wid := String(key)
 				if wid.begins_with("weapon_") and wid != game.weapon and wid != game.offhand:
 					inv.remove(wid, inv.count(wid))
-				elif ItemData.is_potion(wid) or ItemData.is_gear(wid):
+				elif ItemData.is_potion(wid) or ItemData.is_gear(wid) or ItemData.is_cube(wid):
 					inv.remove(wid, inv.count(wid))
 			var steel: int = inv.count("dagger_steel")
 			var free_slots: int = inv.room_for("dagger_steel")
@@ -406,6 +408,37 @@ func _unit_layout() -> void:
 	bad.load_layout([{"id": "potion_hp_r1", "n": 5}, {"id": "no_such_item", "n": 1}, {}, "мусор"])
 	check(bad.count("potion_hp_r1") == 2 and int(bad.cell(0).get("n", 0)) == 2 and bad.used_cells() == 1,
 		"лишнее из раскладки отброшено")
+
+
+## Заточенные и сломанные вещи — свои id: оружие +N по одной в ячейке, лом стопкой, сильнее заточенная — раньше
+## в сортировке, раскладка и количества переживают сохранение.
+func _unit_enchanted() -> void:
+	var inv := Inventory.new()
+	var e3 := ItemData.enchanted_id("weapon_sword_1h_r1", 3)
+	var br := ItemData.broken_id("weapon_sword_1h_r1")
+	check(e3 == "weapon_sword_1h_r1+3" and br == "weapon_sword_1h_r1!broken", "id: %s, %s" % [e3, br])
+	inv.add("weapon_sword_1h_r1", 1)
+	inv.add(e3, 2)
+	inv.add(br, 3)
+	inv.add("cube_attack_r1", 5)
+	check(ItemData.stack_size(e3) == 1 and ItemData.stack_size(br) == ItemData.BROKEN_STACK and ItemData.stack_size("cube_attack_r1") == 99,
+		"стопки: заточенное по 1, лом до %d, кубы до 99" % ItemData.BROKEN_STACK)
+	check(inv.used_cells() == 5, "занято ячеек: %d (меч, 2 меча +3, лом, кубы)" % inv.used_cells())
+	inv.sort()
+	check(String(inv.cell(0).get("id", "")) == e3 and String(inv.cell(2).get("id", "")) == "weapon_sword_1h_r1",
+		"сортировка: меч +3 раньше простого (%s, %s, %s)" % [inv.cell(0).get("id"), inv.cell(1).get("id"), inv.cell(2).get("id")])
+	check(String(inv.cell(inv.used_cells() - 1).get("id", "")) == br, "лом — в конце: %s" % inv.cell(inv.used_cells() - 1).get("id"))
+	check(ItemData.type_name(br) == "Лом" and ItemData.type_name("cube_attack_r1") == "Куб чарования", "типы: лом, куб")
+	var arr: Array = JSON.parse_string(JSON.stringify(inv.layout_to_array()))
+	var inv2 := Inventory.new()
+	inv2.from_dict(JSON.parse_string(JSON.stringify(inv.to_dict())))
+	inv2.load_layout(arr)
+	check(inv2.count(e3) == 2 and inv2.count(br) == 3 and String(inv2.cell(0).get("id", "")) == e3,
+		"заточенное и лом — в сохранении раскладки")
+	# replace_one: штука уходит, новая ложится в ту же ячейку
+	var c := inv2.find_cell("weapon_sword_1h_r1")
+	inv2.replace_one("weapon_sword_1h_r1", ItemData.enchanted_id("weapon_sword_1h_r1", 1))
+	check(String(inv2.cell(c).get("id", "")) == "weapon_sword_1h_r1+1", "заточка — в той же ячейке")
 
 
 ## Сохранение раскладки через save.json и загрузка сохранения без раскладки.

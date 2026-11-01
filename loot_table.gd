@@ -20,13 +20,15 @@ extends RefCounted
 ## Броня (armor, 25 — как оружие): обычная броня ранга по уровню зверя (как оружие), вид вещи — случайный поровну
 ## (шлем, доспех, перчатки, ботинки — по 25 %), вариант доспеха — случайный (воин, маг, призыватель — по трети).
 ## Украшения (jewelry, 15) — только с боссов: ранг по уровню босса, вид поровну (кольцо, серьги, кулон, пояс), вариант
-## внутри вида — случайный. Кубы (cube: обычный зверь 10, минибосс 25, босс 35) уже в таблице — пока их предметов нет
-## (пул пуст), категория не выбирается.
+## внутри вида — случайный. Кубы чарования (cube, этап 3: обычный зверь 10, минибосс 25, босс 35 — вес, как у других
+## категорий): куб атаки или защиты поровну, ранг — по уровню зверя (ItemData.cube_rank_for_level: 1–20 ур. — 1-й,
+## 21+ — 2-й). На деле: волк — 4.9 % на предмет, ≈ 9.5 % за убийство (2 предмета); кентавр-минибосс — 11.9 % на
+## предмет, ≈ 32 % за убийство (3); босс-пантера — 14.9 %, ≈ 47 % за убийство (4).
 ##
 ## Награды заданий (quest_reward): 1–2 случайных предмета сверх наград из данных; шансы вдвое ниже, чем в добыче
 ## (зелье 37.5 %, оружие 12.5 % — подходящее профессии, броня 12.5 % — доспех варианта профессии героя (Бродяге —
 ## любой), шлем, перчатки, ботинки — всем; карта существа — половина шанса приручения карты случайного приручаемого
-## вида острова), ранг — по уровню героя. Украшения: правило «только с боссов» к заданию неприменимо (зверя нет) —
+## вида острова; куб чарования — 5 %, вдвое ниже веса обычного зверя), ранг — по уровню героя. Украшения: правило «только с боссов» к заданию неприменимо (зверя нет) —
 ## решено давать их и в наградах, с половиной шанса добычи босса: 7.5 %. Каждая категория бросается отдельно; выпало
 ## больше двух — остаются два случайных, не выпало ничего — один предмет категории, выбранной по тем же шансам.
 
@@ -54,7 +56,7 @@ const MIRROR_WEIGHT := 1.0
 const QUEST_MIN := 1
 const QUEST_MAX := 2
 const QUEST_CHANCE_MULT := 0.5
-const QUEST_CATEGORIES := ["potion", "weapon", "armor", "jewelry", "card"]
+const QUEST_CATEGORIES := ["potion", "weapon", "armor", "jewelry", "card", "cube"]
 
 
 ## Тип зверя для добычи: "boss" | "mini" | "normal".
@@ -126,9 +128,19 @@ static func pool(cat: String, type_id: String, lvl: int) -> Array:
 				res.append([String(id), 1.0])
 		"armor", "jewelry":
 			res = gear_pool(cat, ItemData.equip_rank_for_level(lvl))
-		_:
-			# cube — предметов пока нет
-			pass
+		"cube":
+			res = cube_pool(lvl)
+	return res
+
+
+## Кубы чарования для уровня lvl: атаки и защиты поровну, ранг — ItemData.cube_rank_for_level.
+static func cube_pool(lvl: int) -> Array:
+	var r := ItemData.cube_rank_for_level(lvl)
+	var res: Array = []
+	for k in ItemData.CUBE_KINDS:
+		var id := ItemData.cube_id(String(k), r)
+		if not ItemData.get_item(id).is_empty():
+			res.append([id, 1.0])
 	return res
 
 
@@ -217,6 +229,8 @@ static func category_of(id: String, type_id: String = "") -> String:
 		return "armor"
 	if ItemData.is_jewelry(id):
 		return "jewelry"
+	if ItemData.is_cube(id):
+		return "cube"
 	if type_id != "" and MobData.special_materials(type_id).has(id):
 		return "special"
 	if ItemData.item_type(id) == "trophy":
@@ -287,6 +301,11 @@ static func quest_chances(hero_lvl: int, class_id: String = "", rng: RandomNumbe
 		var sp := String(species[_randi(rng, species.size())])
 		var ch := float(Taming.CHANCE.get(MobData.card_tier(sp), 0.5)) * QUEST_CHANCE_MULT
 		res["card"] = [ch, [[ItemData.card_for(sp), 1.0]]]
+	# Куб чарования — вдвое ниже веса обычного зверя (10 % → 5 %), ранг по уровню героя
+	var cubes := cube_pool(hero_lvl)
+	if not cubes.is_empty():
+		var cw: Dictionary = CATEGORIES["cube"]["chance"]
+		res["cube"] = [float(cw["normal"]) * QUEST_CHANCE_MULT, cubes]
 	return res
 
 

@@ -2,7 +2,7 @@ extends "res://tests/test_base.gd"
 ## Добыча по правилам Максима (LootTable): число предметов по типу зверя (обычный 2, минибосс 3, босс 4, в подземелье
 ## +1), золото всегда и около цены материала, ранг зелья и оружия по уровню зверя (1 / 12 / 25 / 35 ур.), карты —
 ## только приручаемых (и зеркальная), особые материалы — только с боссов, броня — у всех (как оружие), украшения —
-## только у боссов, кубы (будущие) не выбираются без предметов, статистика по 2000 убийствам (доли категорий — как веса), мешочек в мире (золото
+## только у боссов, кубы чарования — у всех (вес 10 / 25 / 35, ранг по уровню зверя), статистика по 2000 убийствам (доли категорий — как веса), мешочек в мире (золото
 ## и предметы, крупный у босса). Случайные награды заданий (1–2 предмета, шансы вдвое ниже, ранг по уровню героя;
 ## броня — подходящая профессии, украшения — 7.5 %). Подробно броня и украшения — tests/test_equipment.gd.
 ## Золото на складе (Game.storage_gold, окно склада, сохранение).
@@ -182,14 +182,20 @@ func _unit_cards_special() -> void:
 		check(cats.has("special") == MobData.is_boss(id), "%s: особые материалы — только у боссов" % id)
 		check(is_equal_approx(float(cats.get("armor", 0.0)), 0.25), "%s: броня — как оружие, 25" % id)
 		check(cats.has("jewelry") == MobData.is_boss(id), "%s: украшения — только у боссов" % id)
-		check(not cats.has("cube"), "%s: кубов пока нет" % id)
+		var cw := 0.35 if MobData.is_boss(id) else (0.25 if MobData.is_mini_boss(id) else 0.10)
+		check(is_equal_approx(float(cats.get("cube", 0.0)), cw), "%s: кубы — вес %.2f" % [id, cw])
+		for e in LootTable.pool("cube", id, 10):
+			check(ItemData.is_cube(String((e as Array)[0])) and ItemData.rank(String((e as Array)[0])) == 1,
+				"%s 10 ур.: куб 1-го ранга (%s)" % [id, (e as Array)[0]])
+		for e in LootTable.pool("cube", id, 25):
+			check(ItemData.rank(String((e as Array)[0])) == 2, "%s 25 ур.: куб 2-го ранга (%s)" % [id, (e as Array)[0]])
 		check(is_equal_approx(float(cats.get("potion", 0.0)), 0.75) and is_equal_approx(float(cats.get("weapon", 0.0)), 0.25)
 			and is_equal_approx(float(cats.get("material", 0.0)), 0.25), "%s: зелья 75, оружие 25, материалы 25" % id)
 	check(is_equal_approx(LootTable.category_chance("special", "boss_wolf"), 0.10), "особый материал босса — 10")
 	check(is_equal_approx(LootTable.category_chance("jewelry", "boss_wolf"), 0.15) and LootTable.category_chance("jewelry", "wolf") == 0.0,
 		"украшения — 15, только боссы")
 	check(is_equal_approx(LootTable.category_chance("cube", "wolf"), 0.10) and is_equal_approx(LootTable.category_chance("cube", "centaur"), 0.25)
-		and is_equal_approx(LootTable.category_chance("cube", "boss_wolf"), 0.35), "кубы (будущие): 10 / 25 / 35")
+		and is_equal_approx(LootTable.category_chance("cube", "boss_wolf"), 0.35), "кубы: 10 / 25 / 35")
 	check(is_equal_approx(LootTable.category_chance("armor", "wolf"), 0.25), "броня — как оружие, 25")
 
 
@@ -230,6 +236,7 @@ func _unit_quest_rewards() -> void:
 		var ch := LootTable.quest_chances(lvl, "swordsman", rng)
 		check(is_equal_approx(float((ch["potion"] as Array)[0]), 0.375) and is_equal_approx(float((ch["weapon"] as Array)[0]), 0.125),
 			"награды: шансы вдвое ниже добычи (зелья 37.5 %, оружие 12.5 %)")
+		check(ch.has("cube") and is_equal_approx(float((ch["cube"] as Array)[0]), 0.05), "награды: куб 5 % (вдвое ниже 10 %)")
 		var card: Array = ch["card"]
 		var card_id := String(((card[1] as Array)[0] as Array)[0])
 		check(is_equal_approx(float(card[0]), float(Taming.CHANCE[ItemData.card_tier(card_id)]) * 0.5),
@@ -244,8 +251,10 @@ func _unit_quest_rewards() -> void:
 				n += int(r[k])
 				var c := LootTable.category_of(it)
 				per_cat[c] = int(per_cat.get(c, 0)) + int(r[k])
-				check(c == "potion" or c == "weapon" or c == "card" or c == "armor" or c == "jewelry",
-					"награда: зелье, оружие, броня, украшение или карта (%s)" % it)
+				check(c == "potion" or c == "weapon" or c == "card" or c == "armor" or c == "jewelry" or c == "cube",
+					"награда: зелье, оружие, броня, украшение, карта или куб (%s)" % it)
+				if ItemData.is_cube(it):
+					check(ItemData.rank(it) == ItemData.cube_rank_for_level(lvl), "%d ур.: куб награды %s" % [lvl, it])
 				if ItemData.is_gear(it):
 					check(ItemData.rank(it) == ItemData.equip_rank_for_level(lvl) and ItemData.armor_fits(it, "swordsman"),
 						"%d ур.: броня или украшение награды по рангу и профессии: %s" % [lvl, it])

@@ -26,6 +26,9 @@ extends RefCounted
 ## Броня (type "armor": шлем, доспех, перчатки, ботинки) и украшения (type "jewelry": кольца, серьги, кулон, пояс) —
 ## раздел «Броня и украшения» ниже: строятся в _static_init из ARMOR_DEFS / JEWELRY_DEFS (ранги 1–2), надетое —
 ## Game.equip {ячейка: id}, бонусы — Player.recalc_stats.
+## Чарование и закалка (этап 3) — раздел «Чарование, закалка, кубы» ниже: заточенная вещь — свой id «<id>+N»
+## (weapon_sword_1h_r1+3), сломанная — «<id>!broken» (тип "broken", лом); get_item строит их записи из базовой.
+## Кубы чарования — cube_<attack|defense>_r<ранг> (type "cube"). Правила чарования и закалки — Enchant.
 
 const BASE_ITEMS := {
 	# ---------- Карты существ: базовые продаёт Учитель Кирк, остальные выпадают из зверей своего вида ----------
@@ -273,6 +276,10 @@ static func _static_init() -> void:
 	for k in JEWELRY_DEFS:
 		for r in range(1, GEAR_RANKS + 1):
 			ITEMS[gear_id(String(k), r)] = _make_gear(String(k), r, JEWELRY_DEFS[k], "jewelry")
+	for k in CUBE_KINDS:
+		for r in range(1, CUBE_RANKS + 1):
+			ITEMS[cube_id(String(k), r)] = _make_cube(String(k), r)
+	_derived.clear()
 
 
 # ---------- Ранги предметов ----------
@@ -508,7 +515,15 @@ const LEGACY_GOLD := {"crystal_rare": 30, "crystal_unique": 100}
 
 
 static func get_item(id: String) -> Dictionary:
-	return ITEMS.get(id, {})
+	if ITEMS.has(id):
+		return ITEMS[id]
+	if _derived.has(id):
+		return _derived[id]
+	# Заточенная («<id>+N») или сломанная («<id>!broken») вещь — запись из базовой (раздел «Чарование»)
+	var it := _make_derived(id)
+	if not it.is_empty():
+		_derived[id] = it
+	return it
 
 
 static func item_name(id: String) -> String:
@@ -1012,8 +1027,10 @@ const TYPES := {
 	"armor": {"name": "Броня", "order": 1, "color": Color(0.7, 0.72, 0.78)},
 	"jewelry": {"name": "Украшение", "order": 2, "color": Color(0.7, 0.72, 0.78)},
 	"consumable": {"name": "Расходник", "order": 3, "color": Color(0.95, 0.45, 0.5)},
-	"card": {"name": "Карта существа", "order": 4, "color": Color(0.78, 0.56, 0.34)},
-	"trophy": {"name": "Трофей", "order": 5, "color": Color(0.85, 0.65, 0.4)},
+	"cube": {"name": "Куб чарования", "order": 4, "color": Color(0.5, 0.82, 1.0)},
+	"card": {"name": "Карта существа", "order": 5, "color": Color(0.78, 0.56, 0.34)},
+	"trophy": {"name": "Трофей", "order": 6, "color": Color(0.85, 0.65, 0.4)},
+	"broken": {"name": "Лом", "order": 7, "color": Color(0.5, 0.5, 0.52)},
 }
 ## Редкость: название, ранг (для сортировки), цвет рамки и названия.
 const RARITIES := {
@@ -1114,6 +1131,11 @@ static func sort_before(a: String, b: String) -> bool:
 		return rank(a) > rank(b)
 	if is_equipment(a) and is_equipment(b) and rank(a) != rank(b):
 		return rank(a) > rank(b)
+	# Одна и та же вещь: сильнее заточенная — раньше; кубы — старший ранг раньше
+	if base_id(a) == base_id(b) and enchant_level(a) != enchant_level(b):
+		return enchant_level(a) > enchant_level(b)
+	if is_cube(a) and is_cube(b) and cube_kind(a) == cube_kind(b) and rank(a) != rank(b):
+		return rank(a) > rank(b)
 	var na := item_name(a)
 	var nb := item_name(b)
 	if na != nb:
@@ -1189,4 +1211,189 @@ static func grade_name(id: String) -> String:
 			return "Оберег"
 		var t := card_tier_label(card_tier(id))
 		return t.substr(0, 1).to_upper() + t.substr(1)
+	if is_broken(id):
+		return "Сломано"
+	if is_cube(id):
+		return "%d-й ранг" % rank(id)
 	return rarity_name(id)
+
+
+# ---------- Чарование, закалка, кубы (этап 3, задачи Максима 26–32) ----------
+## Заточка «+N» — у конкретной вещи. Предметы в сумке — id → количество (стопки), у штук нет своих полей, поэтому
+## заточенная вещь — свой id: «<id>+N» («weapon_sword_1h_r1+3» — Меч новичка +3), стопка по одной, как всё
+## снаряжение; в сумке, на складе, в надетом (Game.weapon / offhand / equip) и в сохранении — обычная строка,
+## старые сохранения (без «+») — заточка 0. get_item строит запись заточенной вещи из базовой (_make_derived, кэш
+## _derived): название «… +N», атака / защита по ENCHANT_PCT, цена продажи выше (ENCHANT_SELL за уровень), значок —
+## базовой вещи с «+N» в углу (ItemIcon). Остальное (вид, ранг, хват, модель в руках, кому подходит) — как у базовой.
+## Сломанная при чаровании вещь — «<id>!broken» (заточка теряется): тип "broken" (лом), значок broken_weapon /
+## broken_armor, надеть нельзя, продаётся торговцу за BROKEN_SELL от цены продажи базовой, стопка до BROKEN_STACK.
+## Точатся оружие (кубом атаки) и броня со щитом (кубом защиты); украшения — нет. Пределы, шансы и закалка — Enchant.
+const ENCHANT_MARK := "+"
+const BROKEN_MARK := "!broken"
+const ENCHANT_MAX := 20
+## Прибавка атаки оружия (atk, matk) или защиты брони и щита (def, mdef) по уровню заточки, % от базовой вещи
+## (индекс — уровень). Шаг: +1…+10 — по 10 % (+10 — вдвое сильнее базовой: у кузнеца это гарантировано за золото),
+## +11…+15 — по 15 % (+15 — +175 %), +16…+20 — по 20 % (+20 — +275 %, почти вчетверо). Оружие — 15–30 % атаки героя
+## (остальное — статы), поэтому +10 даёт ≈ +15–25 % атаки героя, +20 — ≈ +50–75 % (только кубами, шанс — доли
+## процента); броня +10 — вдвое больше защиты (у воина с комплектом 1-го ранга урон зверя своего уровня на 10 ур.
+## ≈ −40 % вместо −25 %). Округление — вверх: даже у шлема с защитой 3 заточка +1 видна (+1).
+const ENCHANT_PCT := [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 115, 130, 145, 160, 175, 195, 215, 235, 255, 275]
+## Цена продажи заточенной вещи: × (1 + ENCHANT_SELL · N) — дороже, но много меньше цены закалки (точить на продажу
+## невыгодно).
+const ENCHANT_SELL := 0.2
+## Сломанная вещь — лом: доля цены продажи базовой вещи (не меньше 1 зол.), стопка в ячейке.
+const BROKEN_SELL := 0.25
+const BROKEN_STACK := 20
+## Кубы чарования (type "cube"): вид → название, что чарует, цвет. Ранги 1–CUBE_RANKS (значки cube_<вид>_r1 / _r2);
+## ранг куба со зверя — по его уровню, как у снаряжения (cube_rank_for_level: 1-й — 1–20 ур., 2-й — 21+).
+## Куб ранга N чарует вещи ранга ≤ N (решено так, а не «ровно N»: младшую вещь можно точить и старшим кубом —
+## кубы не пропадают зря; старшую вещь младшим кубом — нельзя).
+const CUBE_KINDS := {
+	"attack": {"name": "Куб атаки", "what": "оружие", "color": Color(1.0, 0.45, 0.3)},
+	"defense": {"name": "Куб защиты", "what": "броню и щит", "color": Color(0.35, 0.7, 1.0)},
+}
+const CUBE_RANKS := 2
+const CUBE_SELL := [12, 40]
+
+## Записи заточенных и сломанных вещей (строит get_item, сбрасывает _static_init).
+static var _derived: Dictionary = {}
+
+
+## id без заточки и поломки («weapon_sword_1h_r1+3» → «weapon_sword_1h_r1»).
+static func base_id(id: String) -> String:
+	if id.ends_with(BROKEN_MARK):
+		return id.substr(0, id.length() - BROKEN_MARK.length())
+	var i := id.rfind(ENCHANT_MARK)
+	if i > 0 and id.substr(i + 1).is_valid_int():
+		return id.substr(0, i)
+	return id
+
+
+## Уровень заточки вещи (0 — без заточки, у сломанной — 0).
+static func enchant_level(id: String) -> int:
+	if id.ends_with(BROKEN_MARK):
+		return 0
+	var i := id.rfind(ENCHANT_MARK)
+	if i > 0 and id.substr(i + 1).is_valid_int():
+		return clampi(int(id.substr(i + 1)), 0, ENCHANT_MAX)
+	return 0
+
+
+## Та же вещь (любой её id) с заточкой n (0 — без «+»).
+static func enchanted_id(id: String, n: int) -> String:
+	var b := base_id(id)
+	return b if n <= 0 else "%s%s%d" % [b, ENCHANT_MARK, mini(n, ENCHANT_MAX)]
+
+
+## Сломанная вещь (из любого id той же вещи).
+static func broken_id(id: String) -> String:
+	return base_id(id) + BROKEN_MARK
+
+
+static func is_broken(id: String) -> bool:
+	return id.ends_with(BROKEN_MARK) and item_type(id) == "broken"
+
+
+## Чем точится вещь: "attack" — оружие (кроме щита), "defense" — броня и щит, "" — не точится (украшения, прочее,
+## сломанное).
+static func enchant_kind(id: String) -> String:
+	var t := String(get_item(id).get("type", ""))
+	if t == "weapon":
+		return "defense" if is_shield(id) else "attack"
+	if t == "armor":
+		return "defense"
+	return ""
+
+
+static func is_enchantable(id: String) -> bool:
+	return enchant_kind(id) != ""
+
+
+## Прибавка заточки +n, доля (0.1 = +10 %).
+static func enchant_pct(n: int) -> float:
+	return float(ENCHANT_PCT[clampi(n, 0, ENCHANT_MAX)]) / 100.0
+
+
+## Число базовой вещи v (атака, защита) с заточкой n: v + вверх(v · ENCHANT_PCT).
+static func enchant_value(v: int, n: int) -> int:
+	if v <= 0 or n <= 0:
+		return v
+	return v + ceili(float(v) * enchant_pct(n) - 0.0001)
+
+
+## Заточенная или сломанная вещь: запись из базовой ({} — id не такой, базовой вещи нет или она не точится).
+static func _make_derived(id: String) -> Dictionary:
+	var b := base_id(id)
+	if b == id or not ITEMS.has(b) or not is_enchantable(b):
+		return {}
+	var base: Dictionary = ITEMS[b]
+	if id.ends_with(BROKEN_MARK):
+		var blade := String(base.get("type", "")) == "weapon" and not is_shield(b)
+		return {
+			"name": "%s (сломано)" % String(base.get("name", b)), "type": "broken", "base": b,
+			"icon": String(base.get("icon", "")), "icon_file": "broken_weapon" if blade else "broken_armor",
+			"rank": int(base.get("rank", 1)), "buy": 0, "stack": BROKEN_STACK,
+			"sell": maxi(1, roundi(float(base.get("sell", 0)) * BROKEN_SELL)),
+			"color": Color(0.55, 0.53, 0.5),
+			"desc": "Сломано при чаровании. Надеть и чаровать нельзя — торговец купит как лом.",
+		}
+	var n := enchant_level(id)
+	if n <= 0 or enchanted_id(b, n) != id:
+		return {}
+	var it: Dictionary = base.duplicate(true)
+	it["name"] = "%s +%d" % [String(base.get("name", b)), n]
+	it["base"] = b
+	it["enchant"] = n
+	it["buy"] = 0
+	it["sell"] = roundi(float(base.get("sell", 0)) * (1.0 + ENCHANT_SELL * float(n)))
+	if not it.has("icon_file"):
+		it["icon_file"] = b
+	for k in ["atk", "matk", "def", "mdef"]:
+		if it.has(k):
+			it[k] = enchant_value(int(it[k]), n)
+	return it
+
+
+## Что даёт заточка словами: «Заточка +3 (+30 %): физ. атака 4 → 6» ("" — без заточки).
+static func enchant_text(id: String) -> String:
+	var n := enchant_level(id)
+	if n <= 0:
+		return ""
+	var base := get_item(base_id(id))
+	var it := get_item(id)
+	var names := {"atk": "физ. атака", "matk": "маг. атака", "def": "физ. защита", "mdef": "маг. защита"}
+	var parts: PackedStringArray = []
+	for k in names:
+		var v0 := int(base.get(k, 0))
+		if v0 > 0:
+			parts.append("%s %d → %d" % [String(names[k]), v0, int(it.get(k, v0))])
+	return "Заточка +%d (+%d%%): %s" % [n, roundi(enchant_pct(n) * 100.0), ", ".join(parts)]
+
+
+## Куб вида kind ("attack" | "defense") ранга rank_n.
+static func cube_id(kind: String, rank_n: int) -> String:
+	return "cube_%s_r%d" % [kind, rank_n]
+
+
+static func is_cube(id: String) -> bool:
+	return item_type(id) == "cube"
+
+
+## Вид куба: "attack" | "defense" ("" — не куб).
+static func cube_kind(id: String) -> String:
+	return String(get_item(id).get("cube", ""))
+
+
+## Ранг куба со зверя уровня lvl (и в награде герою уровня lvl): как у снаряжения, не выше CUBE_RANKS.
+static func cube_rank_for_level(lvl: int) -> int:
+	return clampi(equip_rank_for_level(lvl), 1, CUBE_RANKS)
+
+
+static func _make_cube(kind: String, r: int) -> Dictionary:
+	var ck: Dictionary = CUBE_KINDS[kind]
+	return {
+		"name": "%s %s" % [String(ck["name"]), roman(r)], "type": "cube", "icon": "cube", "cube": kind, "rank": r,
+		"buy": 0, "sell": int(CUBE_SELL[mini(r, CUBE_SELL.size()) - 1]), "color": ck["color"],
+		"desc": "Чарует %s %d-го ранга и младше: заточка +1 с шансом (чем выше заточка, тем ниже шанс). Неудача — вещь ломается. Куб тратится в любом случае. Крафт — в сумке, кнопка «Крафт»."
+			% [String(ck["what"]), r],
+	}

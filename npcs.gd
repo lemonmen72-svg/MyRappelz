@@ -550,13 +550,17 @@ func _on_quest(id: String) -> void:
 	open_dialog(dialog_npc, "quest", id)
 
 
-## Пункт о делах NPC, который открывает окно (action): "storage" — склад кладовщика.
+## Пункт о делах NPC, который открывает окно (action): "storage" — склад кладовщика, "forge" — закалка у кузнеца.
 func _on_npc_action(action: String) -> void:
 	match action:
 		"storage":
 			close_dialog()
 			if main.get("economy") != null:
 				main.economy.open_storage()
+		"forge":
+			close_dialog()
+			if main.get("economy") != null:
+				main.economy.open_forge()
 
 
 func _on_trade() -> void:

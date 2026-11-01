@@ -9,7 +9,9 @@ extends Control
 ## зеркальная — серебристая с бликами отражения.
 ## Зелья: картинка одна на вид и размер колбы (ItemData.icon_path: potion_<вид>_t<1|2|3>.png — ранги 1–5, 6–10,
 ## 11–15), без картинки — колба цвета вида, крупнее с размером; номер ранга — римской цифрой в правом верхнем углу.
-## Оружие 2-го ранга и выше — номер ранга в углу тоже.
+## Оружие 2-го ранга и выше — номер ранга в углу тоже, кубы чарования — всегда.
+## Заточенная вещь («<id>+N», ItemData «Чарование») — значок базовой вещи и «+N» в левом верхнем углу; сломанная —
+## картинка broken_weapon / broken_armor (поле icon_file), без картинки — силуэт вещи серым с красной трещиной.
 
 ## Цвет контуров силуэтов.
 const INK := Color(0.08, 0.06, 0.12, 0.95)
@@ -65,6 +67,7 @@ func _draw() -> void:
 	if tex != null:
 		draw_texture_rect(tex, Rect2(Vector2.ZERO, size), false)
 		_rank_mark()
+		_enchant_mark()
 		return
 	var base: Color = ItemData.get_item(item_id).get("color", Color.WHITE)
 	# Мягкий фон цвета рамки
@@ -121,14 +124,20 @@ func _draw() -> void:
 			_fin(base)
 		"spike":
 			_spike(base)
+		"cube":
+			_cube(base)
 		_:
 			_letter(base)
+	if ItemData.is_broken(item_id):
+		_crack()
 	_rank_mark()
+	_enchant_mark()
 
 
 ## Номер ранга в правом верхнем углу: у зелий — всегда, у снаряжения — со 2-го ранга.
 func _rank_mark() -> void:
-	var on := ItemData.is_potion(item_id) or (ItemData.is_equipment(item_id) and ItemData.rank(item_id) >= 2)
+	var on := ItemData.is_potion(item_id) or ItemData.is_cube(item_id) \
+		or (ItemData.is_equipment(item_id) and ItemData.rank(item_id) >= 2)
 	if not on:
 		return
 	var font := ThemeDB.fallback_font
@@ -506,6 +515,41 @@ func _fin(c: Color) -> void:
 
 
 ## Неизвестный предмет: первая буква названия.
+## Заточка «+N» в левом верхнем углу (зеленовато-золотая, с +11 — ярче).
+func _enchant_mark() -> void:
+	var n := ItemData.enchant_level(item_id)
+	if n <= 0:
+		return
+	var font := ThemeDB.fallback_font
+	var fs := maxi(8, int(_s(0.3)))
+	var t := "+%d" % n
+	var pos := Vector2(_s(0.05), _s(0.06) + font.get_ascent(fs))
+	var col := Color(0.55, 1.0, 0.6) if n <= 10 else Color(1.0, 0.72, 0.3)
+	draw_string_outline(font, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, maxi(2, int(_s(0.05))), INK)
+	draw_string(font, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
+
+
+## Куб чарования: кубик в изометрии (верх светлее, бока темнее) с руной.
+func _cube(c: Color) -> void:
+	var top := _poly([Vector2(0.5, 0.18), Vector2(0.8, 0.33), Vector2(0.5, 0.48), Vector2(0.2, 0.33)])
+	var left := _poly([Vector2(0.2, 0.33), Vector2(0.5, 0.48), Vector2(0.5, 0.84), Vector2(0.2, 0.68)])
+	var right := _poly([Vector2(0.5, 0.48), Vector2(0.8, 0.33), Vector2(0.8, 0.68), Vector2(0.5, 0.84)])
+	draw_colored_polygon(left, c.darkened(0.25))
+	draw_colored_polygon(right, c.darkened(0.45))
+	draw_colored_polygon(top, c.lightened(0.3))
+	_outline(top, INK, _s(0.03))
+	_outline(left, INK, _s(0.03))
+	_outline(right, INK, _s(0.03))
+	draw_circle(_p(0.5, 0.33), _s(0.06), Color(1.0, 1.0, 0.85, 0.9))
+
+
+## Трещина сломанной вещи: красная ломаная поперёк значка.
+func _crack() -> void:
+	var pts := PackedVector2Array([_p(0.22, 0.2), _p(0.42, 0.42), _p(0.34, 0.52), _p(0.6, 0.7), _p(0.52, 0.78), _p(0.8, 0.86)])
+	draw_polyline(pts, INK, _s(0.07))
+	draw_polyline(pts, Color(1.0, 0.3, 0.25), _s(0.035))
+
+
 func _letter(c: Color) -> void:
 	draw_circle(_p(0.5, 0.5), _s(0.3), c.darkened(0.3))
 	var font := ThemeDB.fallback_font

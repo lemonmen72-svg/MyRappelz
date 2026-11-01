@@ -26,12 +26,24 @@ extends Node
 ## и быстрые кнопки +100 / +1000 / всё в обе стороны (Economy.deposit_gold / withdraw_gold).
 ## Зелья (ItemData.POTION_KINDS): «Использовать» — Economy.drink; в карточке ранг и с какого уровня можно пить.
 ## Оружие: в карточке ранг и с какого уровня можно надеть (ниже — «Надеть» выключена).
+## Крафт (этап 3, Enchant): кнопка «Крафт» в сумке меняет столбец экипировки на панель чарования — ячейка вещи
+## (оружие, броня, щит — из сумки или надетая) и ячейка куба, шанс, предел, что будет при неудаче, «Крафт» с
+## подтверждением (вещь может сломаться), итог. Положить — перетащить значок в ячейку панели, или «В крафт» в карточке,
+## или касание пустой ячейки панели при выбранной вещи (телефон); касание занятой — убрать. Ниже — надетое
+## (оружие и броня): касание — карточка с «В крафт». Сумка в режиме крафта — помельче (SHOP_CELL), чтобы всё
+## поместилось.
+## Кузница (окно "forge", Кузнец Гуннар — Economy.open_forge): слева наковальня — ячейка вещи, «+N → +N+1», цена,
+## «Закалить» (нет золота — серая, причина красным), итог и надетое; в центре сумка; справа карточка с
+## «На наковальню». Отошёл от кузнеца — окно закрывается.
 ## Кнопки открытого окна для тестов (buttons): "cell_<i>", "store_<i>", "equip_<слот>", "good_<id>", "sort",
 ## "sort_store", "act_equip", "act_equip_ring2", "act_unequip", "act_use", "act_form", "act_sell", "act_sell_all",
 ## "act_move", "act_move_cancel",
 ## "act_drop", "act_drop_yes", "act_drop_no", "act_drop_minus", "act_drop_plus", "act_drop_all", "act_buy", "act_buy5",
 ## "act_store", "act_store_all", "act_take", "act_take_all", "gold_put", "gold_take", "gold_put_100",
-## "gold_put_1000", "gold_put_all", "gold_take_100", "gold_take_1000", "gold_take_all"; поле суммы — gold_edit.
+## "gold_put_1000", "gold_put_all", "gold_take_100", "gold_take_1000", "gold_take_all"; поле суммы — gold_edit;
+## крафт и кузница: "craft_toggle", "craft_0" (вещь), "craft_1" (куб), "act_craft_put", "act_craft", "act_craft_yes",
+## "act_craft_no", "act_craft_clear", "forge_0", "act_forge_put", "act_forge", "act_forge_clear", надетое на панели —
+## "worn_<слот>".
 
 ## Размеры — для «Среднего» размера интерфейса (умножаются на UiScale.k(); было окно 1240×680, ячейка 88).
 const WINDOW_SIZE := Vector2(1060, 580)
@@ -49,6 +61,12 @@ const SHOP_CARD_W := 290.0
 const BIG_ICON := 72.0
 ## Сколько штук покупается кнопкой «Купить ×N».
 const BUY_MANY := 5
+## Панель крафта и наковальня: ширина столбца, ячейки вещи и куба, ячейки надетого.
+const CRAFT_W := 200.0
+const CRAFT_CELL := 60.0
+const WORN_CELL := 44.0
+## Надетое, что точится: на панели крафта и наковальне.
+const WORN_SLOTS := ["weapon", "offhand", "head", "body", "hands", "feet"]
 ## Окно склада: ячейки склада и сумки (по COLS столбцов) и ширина карточки — поуже, чтобы две сетки поместились.
 const STORE_SIZE := Vector2(1040, 560)
 const STORE_CELL := 42.0
@@ -74,8 +92,22 @@ const EQUIP_COL_A := 6
 
 var main: Node
 var economy: Node
-## Открытое окно: "" (закрыто), "bag", "shop" или "storage" (склад).
+## Открытое окно: "" (закрыто), "bag", "shop", "storage" (склад) или "forge" (кузница).
 var mode := ""
+## Панель «Крафт» в сумке открыта (вместо экипировки); в ячейках — вещь craft_item (где: craft_where — "" сумка или
+## ячейка экипировки) и куб craft_cube; craft_confirm — ждёт подтверждения; итог последней попытки — craft_result
+## (craft_ok — удалось).
+var craft_open := false
+var craft_item := ""
+var craft_where := ""
+var craft_cube := ""
+var craft_confirm := false
+var craft_result := ""
+var craft_ok := false
+## Наковальня кузницы: вещь forge_item (где — forge_where), итог последней закалки.
+var forge_item := ""
+var forge_where := ""
+var forge_result := ""
 ## У кого открыта торговля (id NPC, NpcData).
 var seller := "merchant"
 ## Выбранное: sel_kind "cell" (ячейка сумки sel_index с предметом sel_id), "equip" (слот EQUIP_SLOTS[sel_index]),
@@ -106,6 +138,9 @@ func setup(m: Node, eco: Node) -> void:
 ## Открыть окно kind ("bag", "shop" или "storage") заново, без выделения. who — продавец для "shop" ("" — прежний).
 func open(kind: String, who: String = "") -> void:
 	mode = kind
+	# Сумка открывается с экипировкой; панель «Крафт» — кнопкой «Крафт» или open_craft
+	craft_open = false
+	craft_confirm = false
 	if kind == "shop" and who != "":
 		seller = who
 	clear_selection()
@@ -179,9 +214,12 @@ func _build() -> void:
 	buttons.clear()
 	gold_edit = null
 	_validate_selection()
+	_validate_craft()
 	var title := "Сумка" if mode == "bag" else NpcData.shop_title(seller)
 	if mode == "storage":
 		title = "Склад — %s" % NpcData.npc_name(Economy.STORAGE_NPC)
+	elif mode == "forge":
+		title = "Кузница — %s" % NpcData.npc_name(Enchant.SMITH_NPC)
 	_body = main.hud.create_window(title, STORE_SIZE if mode == "storage" else WINDOW_SIZE)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", int(UiScale.px(10)))
@@ -206,6 +244,12 @@ func _build() -> void:
 	elif mode == "storage":
 		_build_storage(left)
 		_build_bag(center, UiScale.px(STORE_CELL))
+	elif mode == "forge":
+		_build_forge(left)
+		_build_bag(center, UiScale.px(SHOP_CELL))
+	elif craft_open:
+		_build_craft(left)
+		_build_bag(center, UiScale.px(SHOP_CELL))
 	else:
 		_build_equipment(left)
 		_build_bag(center, UiScale.px(CELL))
@@ -365,6 +409,10 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 	used.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(used)
 	head.add_child(_button("Сортировать", "sort", _on_sort))
+	if mode == "bag":
+		var cb := _button("Экипировка" if craft_open else "Крафт", "craft_toggle", _on_craft_toggle)
+		UiIcons.add_icon(cb, "menu_bag" if craft_open else "btn_craft")
+		head.add_child(cb)
 	var grid := GridContainer.new()
 	grid.columns = COLS
 	grid.add_theme_constant_override("h_separation", int(UiScale.px(GAP)))
@@ -379,6 +427,326 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 		var b := _make_cell("bag", i, id, str(n) if n > 1 else "", cell_sz, sel_kind == "cell" and sel_index == i)
 		grid.add_child(b)
 		buttons["cell_%d" % i] = b
+
+
+# ---------- Крафт и кузница ----------
+
+## Вещи на панели крафта и наковальне ещё есть (продали, выбросили, сломалась — ячейка пустеет); куб — в сумке.
+func _validate_craft() -> void:
+	if craft_item != "" and not Enchant.has_item(craft_item, craft_where):
+		craft_item = ""
+		craft_where = ""
+		craft_confirm = false
+	elif craft_item != "":
+		craft_where = Enchant.locate(craft_item, craft_where)
+	if craft_cube != "" and not Game.inventory.has(craft_cube):
+		craft_cube = ""
+		craft_confirm = false
+	if forge_item != "" and not Enchant.has_item(forge_item, forge_where):
+		forge_item = ""
+		forge_where = ""
+	elif forge_item != "":
+		forge_where = Enchant.locate(forge_item, forge_where)
+
+
+## Открыть сумку с панелью крафта.
+func open_craft() -> void:
+	open("bag")
+	craft_open = true
+	refresh()
+
+
+## Положить вещь id на панель крафта (where — "" из сумки или ячейка экипировки). "" — положено, иначе причина.
+func put_craft(id: String, where: String = "") -> String:
+	if ItemData.is_cube(id):
+		return put_cube(id)
+	if not ItemData.is_enchantable(id):
+		var why := "Сломанную вещь не чаруют" if ItemData.is_broken(id) else "Чаруются только оружие, броня и щит"
+		_msg(why)
+		return why
+	if not Enchant.has_item(id, where):
+		return "Этой вещи нет"
+	craft_open = true
+	craft_item = id
+	craft_where = Enchant.locate(id, where)
+	craft_confirm = false
+	craft_result = ""
+	# Подходящий куб из сумки — сразу во вторую ячейку, если там пусто или не тот
+	if craft_cube == "" or Enchant.cube_block(id, craft_cube) != "":
+		var best := _best_cube(id)
+		if best != "":
+			craft_cube = best
+	refresh()
+	return ""
+
+
+## Положить куб id на панель крафта.
+func put_cube(id: String) -> String:
+	if not ItemData.is_cube(id) or not Game.inventory.has(id):
+		return "Это не куб"
+	craft_open = true
+	craft_cube = id
+	craft_confirm = false
+	craft_result = ""
+	refresh()
+	return ""
+
+
+## Положить вещь на наковальню кузницы.
+func put_forge(id: String, where: String = "") -> String:
+	if not ItemData.is_enchantable(id):
+		var why := "Сломанную вещь не закалить" if ItemData.is_broken(id) else "Закаляют только оружие, броню и щит"
+		_msg(why)
+		return why
+	if not Enchant.has_item(id, where):
+		return "Этой вещи нет"
+	forge_item = id
+	forge_where = Enchant.locate(id, where)
+	forge_result = ""
+	refresh()
+	return ""
+
+
+## Подходящий вещи куб из сумки (младший из подходящих по рангу; "" — нет).
+func _best_cube(item: String) -> String:
+	var best := ""
+	for k in Game.inventory.ids():
+		var cid := String(k)
+		if ItemData.is_cube(cid) and Enchant.cube_block(item, cid) == "":
+			if best == "" or ItemData.rank(cid) < ItemData.rank(best):
+				best = cid
+	return best
+
+
+## Панель «Крафт»: ячейки вещи и куба, шанс и предел, «Крафт» (с подтверждением), итог, надетое.
+func _build_craft(parent: VBoxContainer) -> void:
+	var box := VBoxContainer.new()
+	box.custom_minimum_size = Vector2(UiScale.px(CRAFT_W), 0)
+	box.add_theme_constant_override("separation", int(UiScale.px(GAP)))
+	parent.add_child(box)
+	box.add_child(_label("Крафт", UiScale.FONT_HEAD, GOLD))
+	var cells := HBoxContainer.new()
+	cells.add_theme_constant_override("separation", int(UiScale.px(8)))
+	box.add_child(cells)
+	var c0 := _make_cell("craft", 0, craft_item, "", UiScale.px(CRAFT_CELL), false, "Вещь")
+	cells.add_child(c0)
+	buttons["craft_0"] = c0
+	cells.add_child(_label("+", UiScale.FONT_TITLE, MUTED))
+	var c1 := _make_cell("craft", 1, craft_cube, str(Game.inventory.count(craft_cube)) if craft_cube != "" else "",
+		UiScale.px(CRAFT_CELL), false, "Куб")
+	cells.add_child(c1)
+	buttons["craft_1"] = c1
+	if craft_item == "":
+		box.add_child(_text("Положите оружие, броню или щит (перетащите значок или «В крафт» в карточке) и куб: атаки — для оружия, защиты — для брони и щита.",
+			UiScale.FONT_BODY, MUTED))
+	else:
+		var n := ItemData.enchant_level(craft_item)
+		var cap := Enchant.cube_cap(craft_item)
+		var block := Enchant.cube_block(craft_item, craft_cube)
+		if craft_cube == "" and block == "":
+			block = "Нужен %s %d-го ранга или старше" % ["куб атаки" if ItemData.enchant_kind(craft_item) == "attack"
+				else "куб защиты", ItemData.rank(craft_item)]
+		if n < cap:
+			box.add_child(_text("+%d → +%d · шанс %s" % [n, n + 1, _pct(Enchant.chance(craft_item))], UiScale.FONT_TEXT,
+				Color.WHITE))
+		box.add_child(_text("Предел кубами: +%d" % cap, UiScale.FONT_BODY, MUTED))
+		if block != "":
+			box.add_child(_text(block, UiScale.FONT_BODY, BAD))
+		else:
+			box.add_child(_text("Неудача — вещь сломается. Куб тратится в любом случае.", UiScale.FONT_BODY, BAD.lerp(MUTED, 0.4)))
+		if craft_confirm and block == "":
+			box.add_child(_text("Чаровать «%s»? Шанс %s, иначе вещь сломается." % [ItemData.item_name(craft_item),
+				_pct(Enchant.chance(craft_item))], UiScale.FONT_BODY, BAD))
+			box.add_child(_action_grid([["Да, крафт", "act_craft_yes", _on_craft_yes], ["Отмена", "act_craft_no", _on_craft_no]]))
+		else:
+			var g := _action_grid([["Крафт", "act_craft", _on_craft_ask, block != ""],
+				["Очистить", "act_craft_clear", _on_craft_clear]])
+			UiIcons.add_icon(buttons["act_craft"] as Button, "btn_craft")
+			box.add_child(g)
+	if craft_result != "":
+		var rl := _text(craft_result, UiScale.FONT_BODY, GOOD if craft_ok else BAD)
+		rl.name = "craft_result"
+		box.add_child(rl)
+	_build_worn_row(box)
+
+
+## Наковальня кузницы: ячейка вещи, «+N → +N+1», цена, «Закалить», итог, надетое.
+func _build_forge(parent: VBoxContainer) -> void:
+	var box := VBoxContainer.new()
+	box.custom_minimum_size = Vector2(UiScale.px(CRAFT_W), 0)
+	box.add_theme_constant_override("separation", int(UiScale.px(GAP)))
+	parent.add_child(box)
+	var head := _label("Закалка", UiScale.FONT_HEAD, GOLD)
+	box.add_child(head)
+	var c0 := _make_cell("forge", 0, forge_item, "", UiScale.px(CRAFT_CELL), false, "Вещь")
+	box.add_child(c0)
+	buttons["forge_0"] = c0
+	if forge_item == "":
+		box.add_child(_text("Положите оружие, броню или щит на наковальню: перетащите значок или «На наковальню» в карточке.",
+			UiScale.FONT_BODY, MUTED))
+	else:
+		var n := ItemData.enchant_level(forge_item)
+		var block := Enchant.temper_block(forge_item)
+		var gold_err := ""
+		if block == "":
+			var price := Enchant.temper_price(forge_item)
+			gold_err = Enchant.temper_gold_block(forge_item)
+			box.add_child(_text("+%d → +%d · успех 100%%" % [n, n + 1], UiScale.FONT_TEXT, Color.WHITE))
+			var pl := _text("Цена: %d зол." % price, UiScale.FONT_TEXT, GOLD if gold_err == "" else BAD)
+			pl.name = "forge_price"
+			box.add_child(pl)
+		if block != "":
+			box.add_child(_text(block, UiScale.FONT_BODY, BAD))
+		elif gold_err != "":
+			box.add_child(_text(gold_err, UiScale.FONT_BODY, BAD))
+		box.add_child(_action_grid([["Закалить", "act_forge", _on_forge, block != "" or gold_err != ""],
+			["Убрать", "act_forge_clear", _on_forge_clear]]))
+		UiIcons.add_icon(buttons["act_forge"] as Button, "btn_forge")
+	if forge_result != "":
+		var rl := _text(forge_result, UiScale.FONT_BODY, GOOD)
+		rl.name = "forge_result"
+		box.add_child(rl)
+	box.add_child(_text("Кузнец закаляет до +%d. Дальше — только кубы («Крафт» в сумке): оружие 2-го ранга и выше — до +%d, броня и щит — до +%d."
+		% [Enchant.SMITH_MAX, Enchant.WEAPON_MAX, Enchant.ARMOR_MAX], UiScale.FONT_SMALL, MUTED))
+	_build_worn_row(box)
+
+
+## Надетое, что точится (оружие и броня): маленькие ячейки, касание — карточка с «В крафт» / «На наковальню».
+func _build_worn_row(parent: VBoxContainer) -> void:
+	parent.add_child(_label("Надетое", UiScale.FONT_BODY, MUTED))
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", int(UiScale.px(GAP)))
+	grid.add_theme_constant_override("v_separation", int(UiScale.px(GAP)))
+	parent.add_child(grid)
+	for s in WORN_SLOTS:
+		var slot := String(s)
+		var i := equip_index(slot)
+		var b := _make_cell("equip", i, equipped_in(slot), "", UiScale.px(WORN_CELL), sel_kind == "equip" and sel_index == i)
+		b.tooltip_text = String(EQUIP_SLOTS[i][1])
+		grid.add_child(b)
+		buttons["worn_" + slot] = b
+
+
+## Шанс процентами: «50 %», «12.5 %», «6.25 %».
+static func _pct(v: float) -> String:
+	var p := v * 100.0
+	if is_equal_approx(p, roundf(p)):
+		return "%d%%" % roundi(p)
+	if is_equal_approx(p * 10.0, roundf(p * 10.0)):
+		return "%.1f%%" % p
+	return "%.2f%%" % p
+
+
+func _on_craft_toggle() -> void:
+	craft_open = not craft_open
+	craft_confirm = false
+	moving = false
+	drop_confirm = false
+	refresh()
+
+
+func _on_craft_ask() -> void:
+	if Enchant.cube_block(craft_item, craft_cube) != "":
+		_msg(Enchant.cube_block(craft_item, craft_cube))
+		return
+	craft_confirm = true
+	refresh()
+
+
+func _on_craft_no() -> void:
+	craft_confirm = false
+	refresh()
+
+
+func _on_craft_yes() -> void:
+	craft_confirm = false
+	var cube := craft_cube
+	var r: Dictionary = economy.craft(craft_item, cube, craft_where)
+	if String(r.get("error", "")) != "":
+		refresh()
+		return
+	craft_ok = bool(r.get("ok", false))
+	craft_result = String(r.get("text", ""))
+	if craft_ok:
+		craft_item = String(r.get("item", ""))
+		craft_where = Enchant.locate(craft_item, craft_where)
+	else:
+		craft_item = ""
+		craft_where = ""
+	if not Game.inventory.has(cube):
+		craft_cube = ""
+	clear_selection()
+	refresh()
+
+
+func _on_craft_clear() -> void:
+	craft_item = ""
+	craft_where = ""
+	craft_cube = ""
+	craft_confirm = false
+	craft_result = ""
+	refresh()
+
+
+func _on_forge() -> void:
+	var r: Dictionary = economy.temper(forge_item, forge_where)
+	if bool(r.get("ok", false)):
+		forge_item = String(r.get("item", ""))
+		forge_where = Enchant.locate(forge_item, forge_where)
+		forge_result = String(r.get("text", ""))
+	clear_selection()
+	refresh()
+
+
+func _on_forge_clear() -> void:
+	forge_item = ""
+	forge_where = ""
+	forge_result = ""
+	refresh()
+
+
+## «В крафт» / «На наковальню» в карточке выбранного (ячейка сумки или надетое).
+func _on_put_selected() -> void:
+	var id := sel_id
+	var where := ""
+	if sel_kind == "equip":
+		where = String(EQUIP_SLOTS[sel_index][0])
+		id = equipped_in(where)
+	if mode == "forge":
+		put_forge(id, where)
+	else:
+		put_craft(id, where)
+
+
+## Касание ячейки панели крафта (index 0 — вещь, 1 — куб) или наковальни: занятая — убрать, пустая — положить
+## выбранное в сумке.
+func _on_tool_cell(kind: String, index: int) -> void:
+	var filled := forge_item if kind == "forge" else (craft_item if index == 0 else craft_cube)
+	if filled != "":
+		if kind == "forge":
+			_on_forge_clear()
+		elif index == 0:
+			craft_item = ""
+			craft_where = ""
+			craft_confirm = false
+			refresh()
+		else:
+			craft_cube = ""
+			craft_confirm = false
+			refresh()
+		return
+	if sel_kind == "cell" and sel_id != "":
+		if kind == "forge":
+			put_forge(sel_id)
+		elif index == 1:
+			put_cube(sel_id)
+		else:
+			put_craft(sel_id)
+	elif sel_kind == "equip":
+		_on_put_selected()
+	else:
+		_msg("Выберите вещь в сумке или перетащите её сюда")
 
 
 ## Ячейка: рамка цвета редкости или типа, значок, число в углу (стопка или цена), подпись (слот экипировки).
@@ -513,6 +881,10 @@ func _card_item(card: VBoxContainer) -> void:
 	var sub := "В ячейке: %d" % n if n > 1 else ""
 	_card_head(card, id, sub)
 	_card_body(card, id, _compare_with(id))
+	if mode == "forge":
+		if ItemData.is_enchantable(id):
+			card.add_child(_action_grid([["На наковальню", "act_forge_put", _on_put_selected]]))
+		return
 	if mode == "storage":
 		var sa: Array = [["На склад", "act_store", _on_store.bind(false)]]
 		if n > 1:
@@ -546,6 +918,9 @@ func _card_item(card: VBoxContainer) -> void:
 		acts.append(["Использовать", "act_use", _on_use])
 	elif ItemData.is_soul_card(id):
 		acts.append(["Сформировать", "act_form", _on_form])
+	# Чарование: вещь или куб — на панель «Крафт»
+	if mode == "bag" and (ItemData.is_enchantable(id) or ItemData.is_cube(id)):
+		acts.append(["В крафт", "act_craft_put", _on_put_selected])
 	if sell > 0 and economy.is_near_trader():
 		acts.append(["Продать", "act_sell", _on_sell.bind(false)])
 		if n > 1:
@@ -578,21 +953,35 @@ func _drop_confirm_ui(card: VBoxContainer, id: String, n: int) -> void:
 func _card_equip(card: VBoxContainer) -> void:
 	var slot_id := String(EQUIP_SLOTS[sel_index][0])
 	var slot_name := String(EQUIP_SLOTS[sel_index][1])
+	var on := equipped_in(slot_id)
+	if on != "" and (mode == "forge" or craft_open):
+		# Крафт и кузница: надетое — на панель («В крафт» / «На наковальню»)
+		_card_head(card, on, "Надето · слот «%s»" % slot_name)
+		_card_body(card, on, "")
+		if ItemData.is_enchantable(on):
+			card.add_child(_action_grid([["На наковальню" if mode == "forge" else "В крафт",
+				"act_forge_put" if mode == "forge" else "act_craft_put", _on_put_selected]]))
+		return
 	if slot_id == "weapon" and Game.weapon != "":
 		_card_head(card, Game.weapon, "Надето · слот «%s»" % slot_name)
 		_card_body(card, Game.weapon, "")
 		card.add_child(_text("Сменить: коснитесь другого оружия в сумке и «Надеть» или перетащите его сюда.", UiScale.FONT_BODY, MUTED))
+		card.add_child(_action_grid([["В крафт", "act_craft_put", _on_put_selected]]))
 		return
 	if slot_id == "offhand" and Game.offhand != "":
 		_card_head(card, Game.offhand, "Надето · слот «%s»" % slot_name)
 		_card_body(card, Game.offhand, "")
-		card.add_child(_action_grid([["Снять щит" if Game.has_shield() else "Снять", "act_unshield", _on_unshield]]))
+		card.add_child(_action_grid([["Снять щит" if Game.has_shield() else "Снять", "act_unshield", _on_unshield],
+			["В крафт", "act_craft_put", _on_put_selected]]))
 		return
 	var worn: String = Game.gear_in(slot_id)
 	if worn != "":
 		_card_head(card, worn, "Надето · слот «%s»" % slot_name)
 		_card_body(card, worn, "")
-		card.add_child(_action_grid([["Снять", "act_unequip", _on_unequip.bind(slot_id)]]))
+		var ga: Array = [["Снять", "act_unequip", _on_unequip.bind(slot_id)]]
+		if ItemData.is_enchantable(worn):
+			ga.append(["В крафт", "act_craft_put", _on_put_selected])
+		card.add_child(_action_grid(ga))
 		return
 	_card_head(card, "", "")
 	card.add_child(_label(slot_name, UiScale.FONT_HEAD, GOLD))
@@ -652,6 +1041,15 @@ func _card_body(card: VBoxContainer, id: String, cmp: String) -> void:
 				card.add_child(_text(String(line), UiScale.FONT_BODY, MUTED))
 		"trophy":
 			card.add_child(_text("Продаётся торговцу в городе.", UiScale.FONT_BODY, MUTED))
+		"cube":
+			card.add_child(_text("Шанс: +1…+4 — 50 %, +5…+10 — 25 %, +11…+15 — 12.5 %, +16…+20 — 6.25 %.", UiScale.FONT_BODY, MUTED))
+	# Заточка и чарование (Enchant)
+	if ItemData.enchant_level(id) > 0:
+		card.add_child(_text(ItemData.enchant_text(id), UiScale.FONT_BODY, GOOD))
+	if ItemData.is_enchantable(id):
+		var cube := "куб атаки" if ItemData.enchant_kind(id) == "attack" else "куб защиты"
+		card.add_child(_text("Улучшение: %s %d-го ранга и старше — до +%d («Крафт» в сумке); закалка у кузнеца — до +%d."
+			% [cube, ItemData.rank(id), Enchant.cube_cap(id), Enchant.SMITH_MAX], UiScale.FONT_SMALL, MUTED))
 	if ItemData.is_potion(id) or ItemData.is_equipment(id):
 		var lr := ItemData.rank_level_range(ItemData.rank(id), ItemData.is_potion(id))
 		var need := ItemData.required_level(id)
@@ -792,10 +1190,17 @@ func _name_color(id: String) -> Color:
 
 func _on_cell(kind: String, index: int) -> void:
 	var inv: Inventory = Game.inventory
+	if (kind == "craft" or kind == "forge") and not moving:
+		drop_confirm = false
+		_on_tool_cell(kind, index)
+		return
 	if moving and sel_kind == "cell":
 		moving = false
 		if kind == "bag":
 			_move_to(index)
+		elif kind == "craft" or kind == "forge":
+			_on_tool_cell(kind, index)
+			return
 		elif kind == "equip" and index <= 1:
 			_equip_cell(sel_index)
 		elif kind == "equip":
@@ -860,6 +1265,14 @@ func _on_drop(kind: String, index: int, from: int) -> void:
 	elif kind == "store":
 		economy.deposit(from, -1)
 		clear_selection()
+	elif kind == "craft" or kind == "forge":
+		var id := String(Game.inventory.cell(from).get("id", ""))
+		if kind == "forge":
+			put_forge(id)
+		elif index == 1:
+			put_cube(id)
+		else:
+			put_craft(id)
 	refresh()
 
 
@@ -873,6 +1286,11 @@ func _on_take_drop(_index: int, from: int) -> void:
 
 
 func _can_drop(kind: String, index: int, from: int) -> bool:
+	if kind == "craft" or kind == "forge":
+		var cid := String(Game.inventory.cell(from).get("id", ""))
+		if kind == "craft" and index == 1:
+			return ItemData.is_cube(cid)
+		return ItemData.is_enchantable(cid)
 	if kind == "store":
 		return String(Game.inventory.cell(from).get("id", "")) != ""
 	if kind == "bag":

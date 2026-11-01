@@ -461,6 +461,19 @@ func equip(id: String, second: bool = false) -> String:
 	return ""
 
 
+## Надетая вещь изменилась на месте (чарование, закалка — Enchant; сломанная снята): характеристики заново,
+## weapon = true — и модель (оружие в руках).
+func refresh_equipment(weapon: bool) -> void:
+	if weapon:
+		cancel_cast("")
+	recalc_stats()
+	if weapon:
+		_build_model()
+	hp = mini(hp, max_hp)
+	mp = mini(mp, max_mp)
+	stats_changed.emit()
+
+
 ## Надеть броню или украшение id (ячейка gslot; "" — первая свободная подходящая). "" — получилось, иначе причина.
 func equip_gear(id: String, gslot: String = "") -> String:
 	var err: String = Game.equip_gear(id, gslot)
