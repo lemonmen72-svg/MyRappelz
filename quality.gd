@@ -445,6 +445,7 @@ static func apply(tree: SceneTree) -> void:
 	_set_group_range(tree, "poi_props", props_distance(), 8.0)
 	_set_group_range(tree, "poi_decor", decor_distance(), 8.0)
 	_apply_models()
+	_apply_scene_models(tree.root)
 
 
 ## Разрешение и сглаживание окна. Интерфейс рисуется в родном разрешении (растяжение canvas_items, база
@@ -514,6 +515,7 @@ static func track_model(m: Material, outline: Material = null) -> void:
 		return
 	if m is BaseMaterial3D:
 		(m as BaseMaterial3D).disable_receive_shadows = not model_shadows()
+		m.set_meta("model_mat", true)
 		_model_mats = _alive(_model_mats)
 		_model_mats.append(weakref(m))
 	if outline != null:
@@ -539,6 +541,31 @@ static func _alive(list: Array[WeakRef]) -> Array[WeakRef]:
 		if wr.get_ref() != null:
 			out.append(wr)
 	return out
+
+
+## Обход сцены: материалы моделей (meta "model_mat" — тени на модели) и с контуром (meta "outline") у всех мешей —
+## не зависит от списков WeakRef (в автотесте они оказывались пустыми, и контур героя не выключался).
+static func _apply_scene_models(root: Node) -> void:
+	if root == null:
+		return
+	var recv := not model_shadows()
+	var ol := outlines()
+	for n in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		var mats: Array[Material] = [mi.material_override]
+		for i in mi.get_surface_override_material_count():
+			mats.append(mi.get_surface_override_material(i))
+		for mat in mats:
+			if mat == null:
+				continue
+			if mat.has_meta("model_mat") and mat is BaseMaterial3D:
+				var bm := mat as BaseMaterial3D
+				if bm.disable_receive_shadows != recv:
+					bm.disable_receive_shadows = recv
+			if mat.has_meta("outline"):
+				var want: Material = (mat.get_meta("outline") as Material) if ol else null
+				if mat.next_pass != want:
+					mat.next_pass = want
 
 
 static func _apply_models() -> void:
