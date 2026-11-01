@@ -15,6 +15,7 @@ test_combat 3
 test_combat_magic 3
 test_combat_melee 3
 test_economy 5
+test_equipment 8
 test_flyfish 4
 test_graphics_settings 3
 test_handheld 3

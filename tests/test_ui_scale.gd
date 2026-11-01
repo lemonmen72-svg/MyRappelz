@@ -2,7 +2,8 @@ extends "res://tests/test_base.gd"
 ## Масштаб интерфейса (UiScale, «Размер интерфейса» в настройках): при каждом размере — «Мелкий», «Средний»,
 ## «Крупный» — круглые кнопки HUD не перекрываются, помещаются на экран, не мельче 56 px и не на панелях,
 ## меню и панель цели на месте, трекер не на кнопках, касание по кнопке работает; все окна (герой, древо,
-## существо, питомцы, сумка, лавка, журнал, диалог, настройки — каждая вкладка, выбор профессии, админ-панель, склад)
+## существо, питомцы, сумка, лавка, журнал, диалог, настройки — каждая вкладка, выбор профессии, админ-панель, склад,
+## сумка с надетой бронёй и украшениями — карточка доспеха со сравнением и надетого кольца)
 ## и экраны до мира (вход в аккаунт, выбор персонажа с 4 занятыми слотами и подтверждением удаления, 4 шага создания)
 ## помещаются в экран,
 ## заголовки и обрезаемые подписи не обрезаны. Кнопки «Размер интерфейса» в настройках применяют размер сразу
@@ -18,6 +19,7 @@ const WINDOWS := [
 	["диалог", "_w_dialog"], ["задание в диалоге", "_w_dialog_quest"], ["настройки: графика", "_w_settings"],
 	["настройки: интерфейс", "_w_settings_ui"], ["настройки: прочее", "_w_settings_other"],
 	["выбор профессии", "_w_job"], ["админ-панель", "_w_admin"], ["склад", "_w_storage"],
+	["сумка: доспех со сравнением", "_w_bag_armor"], ["сумка: надетое кольцо", "_w_bag_ring"],
 ]
 ## Экраны до мира: [что, ключ] — "login", "select", "create_<шаг 0..3>".
 const SCREENS := [
@@ -54,6 +56,13 @@ func before_start() -> void:
 	game.inventory.add("card_panther_soul", 1)
 	game.inventory.add("card_wolf", 3)
 	game.inventory.add("boar_tusk", 12)
+	# Экипировка: окно героя и сумка с надетыми бронёй и украшениями, карточка доспеха со сравнением
+	for id in ["armor_body_warrior_r1", "armor_body_warrior_r2", "armor_helmet_r1", "armor_boots_r1", "ring_critdmg_r1",
+			"ring_hp_r1", "pendant_mdef_r1", "belt_speed_r1"]:
+		game.inventory.add(String(id))
+	for id in ["armor_body_warrior_r1", "armor_helmet_r1", "armor_boots_r1", "ring_critdmg_r1", "ring_hp_r1", "pendant_mdef_r1",
+			"belt_speed_r1"]:
+		game.equip_gear(String(id))
 
 
 func run_step() -> void:
@@ -196,6 +205,17 @@ func _w_job() -> void:
 
 func _w_admin() -> void:
 	AdminPanel.open(main)
+
+
+## Сумка: выбран доспех 2-го ранга (сравнение с надетым 1-го, уровень не тот).
+func _w_bag_armor() -> void:
+	main.economy.open_bag()
+	main.economy.window.select_cell(game.inventory.find_cell("armor_body_warrior_r2"))
+
+
+func _w_bag_ring() -> void:
+	main.economy.open_bag()
+	main.economy.window.select_equip("ring1")
 
 
 ## Склад у кладовщика: игрок рядом с ним (иначе окно закроется), на складе стопки, выбрана вещь из сумки.

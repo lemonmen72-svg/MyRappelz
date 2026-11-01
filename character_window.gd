@@ -5,6 +5,8 @@ extends Node
 ## у питомцев) и боевые показатели (HP, MP, физ./маг. атака и защита, точность, уклонение, крит, скорость атаки и каста,
 ## восстановление HP/MP, блок, дальность, бег — с оружием и умениями), выбор оружия из сумки (подходящее профессии,
 ## щит — во вторую руку, «Во 2-ю руку» — второй такой же клинок или топор, «Снять щит» / «Освободить 2-ю руку»);
+## экипировка — 9 ячеек брони и украшений (Game.equip; касание — окно сумки с этой ячейкой: надеть, снять, сравнить)
+## и строка «От экипировки: …» (сумма бонусов надетого, Player.gear_bonus);
 ## древо умений — вкладки профессии (у Наёмника «Общие» / «Мечи и кинжалы» / «Арбалет», у других — JobSkills.TABS);
 ## у Бродяги одна вкладка «Умения» с подсказкой: умения появятся после выбора профессии на 10 уровне.
 ## Древо — SkillTree (ярусы по уровню героя, линии пререквизитов), справа карточка выбранного умения:
@@ -18,6 +20,9 @@ const WINDOW_SIZE := Vector2(1060, 600)
 const TREE_SIZE := Vector2(600, 410)
 const CARD_W := 380.0
 const PREVIEW_SIZE := Vector2(200, 240)
+## Ячейка экипировки (броня и украшения) на вкладке «Герой», сторона.
+const GEAR_CELL := 46.0
+const GEAR_COLS := 3
 const GOLD := Color(1.0, 0.85, 0.45)
 const MUTED := Color(0.78, 0.8, 0.9)
 const GOOD := Color(0.55, 1.0, 0.6)
@@ -29,7 +34,7 @@ var tab := "hero"
 ## Выбранное в древе умение и древо открытой вкладки.
 var selected := ""
 var tree: SkillTree = null
-## Кнопки открытого окна: "tab_<вкладка>", "weapon_<id предмета>", "to_skills", "skill_<id>" (значки),
+## Кнопки открытого окна: "tab_<вкладка>", "weapon_<id предмета>", "gear_<ячейка>", "to_skills", "skill_<id>" (значки),
 ## "learn_<id>", "toggle_<id>", "slot_<1..4>" (карточка выбранного умения).
 var buttons: Dictionary = {}
 
@@ -193,6 +198,9 @@ func _build_hero(body: VBoxContainer) -> void:
 			g1.add_child(_label(String(Stats.STAT_NAMES[key]) + (" ★" if key == main_stat else ""), UiScale.FONT_TEXT, MUTED))
 			g1.add_child(_label(str(int(st[key])), UiScale.FONT_TEXT, Color.WHITE))
 
+	# Экипировка: броня и украшения (касание — окно сумки с этой ячейкой)
+	top.add_child(_build_gear())
+
 	# Боевые показатели (с оружием, умениями и усилениями; по три пары в ряд)
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", int(UiScale.px(12)))
@@ -211,6 +219,12 @@ func _build_hero(body: VBoxContainer) -> void:
 	for r in _combat_rows(p):
 		g.add_child(_label(String(r[0]), UiScale.FONT_TEXT, MUTED))
 		g.add_child(_label(String(r[1]), UiScale.FONT_TEXT, Color.WHITE))
+	# Источник: что дают надетые броня и украшения
+	var gtext := ItemData.gear_bonus_text(p.gear_bonus)
+	var gl := _label("От экипировки: %s" % (gtext if gtext != "" else "ничего не надето (броня и украшения — в сумке)"),
+		UiScale.FONT_BODY, GOOD if gtext != "" else MUTED, UiScale.px(WINDOW_SIZE.x - 60.0))
+	gl.name = "gear_bonus_label"
+	body.add_child(gl)
 
 	# Оружие: основная рука, вторая рука (щит или второе такое же одноручное — пара)
 	var wrow := HFlowContainer.new()
@@ -242,6 +256,58 @@ func _build_hero(body: VBoxContainer) -> void:
 		off.pressed.connect(_on_unshield)
 		wrow.add_child(off)
 		buttons["unequip_shield"] = off
+
+
+## Экипировка: заголовок и сетка GEAR_COLS × 3 ячеек брони и украшений (значок надетого или подпись ячейки).
+func _build_gear() -> Control:
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", int(UiScale.px(2)))
+	col.add_child(_label("Экипировка", UiScale.FONT_HEAD, GOLD))
+	var grid := GridContainer.new()
+	grid.columns = GEAR_COLS
+	grid.add_theme_constant_override("h_separation", int(UiScale.px(4)))
+	grid.add_theme_constant_override("v_separation", int(UiScale.px(4)))
+	col.add_child(grid)
+	var sz := UiScale.px(GEAR_CELL)
+	for e in ItemData.GEAR_SLOTS:
+		var gslot := String(e[0])
+		var id: String = Game.gear_in(gslot)
+		var b := Button.new()
+		b.name = "gear_" + gslot
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(sz, sz)
+		b.tooltip_text = String(e[1]) + (": " + ItemData.item_name(id) if id != "" else "")
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.05, 0.06, 0.13, 0.92)
+		sb.border_color = ItemData.frame_color(id) if id != "" else Color(0.42, 0.44, 0.58, 0.75)
+		sb.set_border_width_all(2)
+		sb.set_corner_radius_all(int(sz * 0.12))
+		for st in ["normal", "hover", "pressed"]:
+			b.add_theme_stylebox_override(st, sb)
+		if id != "":
+			var ic := ItemIcon.make(id, sz - 8.0)
+			ic.position = Vector2(4, 4)
+			b.add_child(ic)
+		else:
+			var cap := _label(String(e[1]), UiScale.FONT_TINY, Color(0.62, 0.64, 0.78))
+			cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			cap.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			cap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			cap.position = Vector2(1, 1)
+			cap.size = Vector2(sz - 2.0, sz - 2.0)
+			b.add_child(cap)
+		b.pressed.connect(_on_gear.bind(gslot))
+		grid.add_child(b)
+		buttons["gear_" + gslot] = b
+	return col
+
+
+## Касание ячейки экипировки: окно сумки с этой ячейкой (надеть из сумки, снять, сравнить).
+func _on_gear(gslot: String) -> void:
+	if main.get("economy") == null:
+		return
+	main.economy.open_bag()
+	main.economy.window.select_equip(gslot)
 
 
 func _weapon_button(_id: String, text: String, on: bool) -> Button:
@@ -307,6 +373,7 @@ func _combat_rows(p: Player) -> Array:
 		rows.append(["Точность", str(p.accuracy)])
 	rows.append(["Уклонение", "%.1f%%" % (p.cur_eva() * 100.0)])
 	rows.append(["Шанс крита", "%.1f%%" % (p.cur_crit() * 100.0)])
+	rows.append(["Сила крита", "×%.2f" % p.crit_mult])
 	if hs.is_empty():
 		rows.append(["Скорость атаки", "%.2f / с" % aps])
 	else:

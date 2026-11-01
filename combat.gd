@@ -153,7 +153,7 @@ static func profile_of(n: Object) -> Dictionary:
 			"level": Game.level, "max_hp": p.max_hp, "atk": p.cur_matk() if p.attack_kind == "magic" else p.cur_atk(),
 			"magic": p.attack_kind == "magic", "def": p.defense + p.aura_def, "mdef": p.mdef + p.aura_def,
 			"acc": p.accuracy, "avoid": p.avoid, "eva": p.cur_eva(), "crit": p.cur_crit(), "interval": p.attack_time,
-			"crit_mult": Player.CRIT_MULT, "block": p.block,
+			"crit_mult": p.crit_mult, "block": p.block,
 		}
 	if n is Mob:
 		var m := n as Mob
