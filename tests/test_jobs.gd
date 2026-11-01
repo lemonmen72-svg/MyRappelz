@@ -272,8 +272,18 @@ func _run_job(race: String, lvl: int, job: String, over: int) -> void:
 	check(jw.is_open() and jw.quest_id == QID, "открыт выбор профессии")
 	for j in ClassData.jobs_of(race):
 		check(jw.buttons.has("pick_" + String(j)), "карточка «%s»" % ClassData.job_name(String(j)))
-	check(jw.buttons.size() == 3, "только три профессии своей расы")
+	var picks := 0
+	for k in jw.buttons:
+		if String(k).begins_with("pick_"):
+			picks += 1
+	check(picks == 3, "только три профессии своей расы")
 	var other := String(ClassData.jobs_of(race)[1]) if String(ClassData.jobs_of(race)[0]) == job else String(ClassData.jobs_of(race)[0])
+	# «Подробнее» — подробности профессии с «Выбрать», «Назад» — снова карточки
+	jw.buttons["info_" + job].pressed.emit()
+	check(jw.detail == job and jw.buttons.has("back") and jw.buttons.has("pick_" + job) and jw.is_open(),
+		"подробности профессии «%s»" % ClassData.job_name(job))
+	jw.buttons["back"].pressed.emit()
+	check(jw.detail == "" and jw.buttons.has("pick_" + other) and jw.is_open(), "«Назад» — снова три карточки")
 	jw.buttons["pick_" + other].pressed.emit()
 	check(jw.picked == other and jw.buttons.has("confirm") and jw.buttons.has("cancel"), "подтверждение выбора")
 	jw.buttons["cancel"].pressed.emit()

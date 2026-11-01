@@ -2,7 +2,8 @@ class_name MenuKit
 extends RefCounted
 ## Общие детали экранов до мира (вход LoginScreen, выбор персонажа CharacterSelect, создание CharacterCreate):
 ## фон с полосой (или арт на весь экран), корневой MarginContainer с темой Util.ui_theme(), подписи, кнопки, рамки
-## карточек, арты Dark Pact (логотип, главный арт, арты рас и профессий, портреты — раздел «Арты»).
+## карточек, арты Dark Pact (логотип, главный арт, арты рас и профессий, портреты — раздел «Арты»), карточки
+## профессий с артом во весь рост и подробности профессии (раздел «Карточки профессий» — создание и окно мудреца).
 ## Размеры — для «Среднего» размера интерфейса, переводятся через UiScale. Экраны — CanvasLayer слоя LAYER
 ## (поверх HUD); test_ui_scale проверяет, что корневой MarginContainer помещается в 1280×720.
 
@@ -142,14 +143,6 @@ static func bullets(items: Array, font_size: int, col: Color) -> Label:
 	return label("\n".join(lines), font_size, col, true)
 
 
-## Названия ключевых умений профессии (ClassData key_skills) через запятую.
-static func key_skill_names(job: String) -> String:
-	var names: PackedStringArray = []
-	for sid in ClassData.cls(job).get("key_skills", []):
-		names.append(String(HeroSkills.get_skill(String(sid), job).get("name", sid)))
-	return ", ".join(names)
-
-
 # ---------- Арты ----------
 
 ## Картинка арта (Texture2D) или null: нет файла или его часть пакета ресурсов не загружена (Assets.exists).
@@ -244,53 +237,86 @@ static func logo(height: float) -> TextureRect:
 	return r
 
 
-## Арт tex в рамке size (база «Среднего», наименьший размер; ширина может вырасти по контейнеру): окно картинки
-## с соотношением сторон aspect (0 — как у size; ожидаемая ширина рамки / высота) — по ширине целиком, по высоте —
-## от доли focus_y (0 — верх: лица на артах профессий вверху). Уменьшенный — с мипмапами.
-static func art_rect(tex: Texture2D, size: Vector2, focus_y: float = 0.0, aspect: float = 0.0) -> TextureRect:
-	var box := UiScale.v2(size.x, size.y)
-	var ts := tex.get_size()
-	var want := aspect if aspect > 0.0 else box.x / maxf(box.y, 1.0)
-	var region := Rect2(Vector2.ZERO, ts)
-	if ts.x / maxf(ts.y, 1.0) > want:
-		var w := ts.y * want
-		region = Rect2((ts.x - w) * 0.5, 0.0, w, ts.y)
-	else:
-		var h := ts.x / want
-		region = Rect2(0.0, (ts.y - h) * clampf(focus_y, 0.0, 1.0), ts.x, h)
-	var at := AtlasTexture.new()
-	at.atlas = tex
-	at.region = region
-	var r := TextureRect.new()
-	r.name = "Art"
-	r.texture = at
-	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	r.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	r.custom_minimum_size = box
-	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return r
+# ---------- Карточки профессий ----------
+
+## Соотношение сторон артов профессий (ширина / высота; файлы 800×1066, персонаж во весь рост).
+const JOB_ART_RATIO := 0.75
+## Наименьший размер арта в карточке («Средний»); обычно карточка больше — по свободному месту.
+const JOB_ART_MIN := Vector2(168, 224)
+## Высота кнопок на карточке профессии («Средний»).
+const JOB_BUTTON_H := 38.0
 
 
-## Шапка вертикальной карточки профессии: арт профессии (окно сверху), внизу на затемнении — название цвета col.
-## size — наименьший размер («Средний»), aspect — ожидаемое соотношение сторон по ширине карточки (0 — как у size).
-## null — арта нет (часть «art» не загружена).
-static func job_art_head(job: String, size: Vector2, title_text: String, col: Color, aspect: float = 0.0) -> Control:
+## Вертикальная карточка профессии (шаг «Профессии» создания персонажа, окно мудреца JobWindow), рамка цвета border
+## (selected — золотая). С артом (часть «art»): арт целиком — весь рост, без обрезки (TextureRect KEEP_ASPECT_CENTERED
+## в AspectRatioContainer 3:4: карточка занимает свободное место по высоте и держит соотношение сторон); поверх
+## нижней части на затемнении — имя крупно (ArtTitle), роль и оружие одной строкой с многоточием (ArtRole,
+## ArtWeapon), ряд кнопок «JobActions» (кнопки добавляет вызывающий — MenuKit.card_button). Без арта — те же строки
+## текстом и описание. Возвращает {"slot": Control (в ряд карточек; растягивается), "card": PanelContainer
+## (касание — gui_input), "actions": HBoxContainer}. Подробности — MenuKit.job_details.
+static func job_card(job: String, border: Color, selected: bool, title_col: Color) -> Dictionary:
+	var c := ClassData.cls(job)
 	var tex := art(job_art_path(job))
+	var card := PanelContainer.new()
+	card.name = "JobCard"
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var sb := card_style(border, selected)
+	var actions := HBoxContainer.new()
+	actions.name = "JobActions"
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", int(UiScale.px(6)))
+	actions.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if tex == null:
-		return null
+		card.add_theme_stylebox_override("panel", sb)
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", int(UiScale.px(5)))
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(v)
+		v.add_child(label(String(c["name"]), UiScale.FONT_NAME, title_col))
+		v.add_child(label(String(c["role"]), UiScale.FONT_BODY, MUTED, true))
+		v.add_child(label("Оружие: " + String(c["weapon_text"]), UiScale.FONT_SMALL, TEXT, true))
+		v.add_child(label(String(c.get("desc", "")), UiScale.FONT_SMALL, TEXT, true))
+		var spacer := Control.new()
+		spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(spacer)
+		v.add_child(actions)
+		return {"slot": card, "card": card, "actions": actions}
+	# Арт почти вплотную к рамке
+	sb.set_content_margin_all(float(sb.border_width_left))
+	sb.set_corner_radius_all(int(UiScale.px(4)))
+	sb.bg_color = Color(0.03, 0.04, 0.07, 1.0)
+	card.add_theme_stylebox_override("panel", sb)
+	var slot := AspectRatioContainer.new()
+	slot.name = "JobSlot"
+	slot.ratio = JOB_ART_RATIO
+	slot.stretch_mode = AspectRatioContainer.STRETCH_FIT
+	slot.alignment_horizontal = AspectRatioContainer.ALIGNMENT_CENTER
+	slot.alignment_vertical = AspectRatioContainer.ALIGNMENT_CENTER
+	slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slot.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.add_child(card)
 	var head := Control.new()
 	head.name = "JobArt"
-	head.custom_minimum_size = UiScale.v2(size.x, size.y)
-	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.custom_minimum_size = UiScale.v2(JOB_ART_MIN.x, JOB_ART_MIN.y)
 	head.clip_contents = true
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var pic := art_rect(tex, size, 0.06, aspect)
+	card.add_child(head)
+	var pic := TextureRect.new()
+	pic.name = "Art"
+	pic.texture = tex
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	pic.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pic.set_anchors_preset(Control.PRESET_FULL_RECT)
 	head.add_child(pic)
+	# Затемнение снизу — под имя, роль и кнопки (низ арта и так темнее)
 	var g := Gradient.new()
-	g.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
-	g.colors = PackedColorArray([Color(0, 0, 0, 0), Color(0, 0, 0, 0.35), Color(0, 0, 0, 0.85)])
+	g.offsets = PackedFloat32Array([0.0, 0.4, 1.0])
+	g.colors = PackedColorArray([Color(0, 0, 0, 0), Color(0, 0, 0, 0.5), Color(0, 0, 0, 0.9)])
 	var gt := GradientTexture2D.new()
 	gt.gradient = g
 	gt.width = 4
@@ -298,30 +324,149 @@ static func job_art_head(job: String, size: Vector2, title_text: String, col: Co
 	gt.fill_from = Vector2(0, 0)
 	gt.fill_to = Vector2(0, 1)
 	var sh := TextureRect.new()
+	sh.name = "ArtShade"
 	sh.texture = gt
 	sh.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	sh.stretch_mode = TextureRect.STRETCH_SCALE
 	sh.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sh.anchor_left = 0.0
 	sh.anchor_right = 1.0
-	sh.anchor_top = 0.6
+	sh.anchor_top = 0.55
 	sh.anchor_bottom = 1.0
 	head.add_child(sh)
-	var t := label(title_text, UiScale.FONT_NAME + 2, col)
+	# Имя, роль, оружие и кнопки — прижаты к низу, растут вверх
+	var info := VBoxContainer.new()
+	info.name = "ArtInfo"
+	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	info.add_theme_constant_override("separation", int(UiScale.px(2)))
+	var pad := UiScale.px(8)
+	info.anchor_left = 0.0
+	info.anchor_right = 1.0
+	info.anchor_top = 1.0
+	info.anchor_bottom = 1.0
+	info.offset_left = pad
+	info.offset_right = -pad
+	info.offset_top = -pad
+	info.offset_bottom = -pad
+	info.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	head.add_child(info)
+	var t := _art_line(String(c["name"]), UiScale.FONT_NAME + 4, title_col)
 	t.name = "ArtTitle"
-	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	t.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	t.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	t.add_theme_constant_override("outline_size", maxi(2, int(UiScale.px(4))))
-	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	t.anchor_left = 0.0
-	t.anchor_right = 1.0
-	t.anchor_top = 0.0
-	t.anchor_bottom = 1.0
-	t.offset_bottom = -UiScale.px(6)
-	head.add_child(t)
-	return head
+	info.add_child(t)
+	var role := _art_line(String(c["role"]), UiScale.FONT_SMALL, Color(0.86, 0.88, 0.95))
+	role.name = "ArtRole"
+	info.add_child(role)
+	var weapon := _art_line("Оружие: " + String(c["weapon_text"]), UiScale.FONT_SMALL, GOLD.lerp(TEXT, 0.4))
+	weapon.name = "ArtWeapon"
+	info.add_child(weapon)
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, UiScale.px(4))
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	info.add_child(gap)
+	info.add_child(actions)
+	return {"slot": slot, "card": card, "actions": actions}
 
+
+## Строка поверх арта: по центру, с обводкой, не влезла — многоточие (без clip_text: ширину карточки не держит).
+static func _art_line(text: String, font_size: int, col: Color) -> Label:
+	var l := label(text, font_size, col)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	l.add_theme_constant_override("outline_size", maxi(2, int(UiScale.px(4))))
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+
+## Кнопка на карточке профессии («Подробнее», «Выбрать»): компактная, делит ряд поровну.
+static func card_button(text: String) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(0, UiScale.px(JOB_BUTTON_H))
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT))
+	return b
+
+
+## Подробности профессии (вместо ряда карточек): слева карточка с артом целиком (если есть), справа на затемнении
+## с прокруткой — имя, роль, оружие, описание, сильные стороны, особенности, ключевые умения (значок, требуемый
+## уровень); снизу ряд кнопок, первая — «Назад» (подключает вызывающий). Возвращает {"view": HBoxContainer,
+## "actions": HBoxContainer, "back": Button, "card": PanelContainer или null — без арта}.
+static func job_details(job: String, border: Color, title_col: Color) -> Dictionary:
+	var c := ClassData.cls(job)
+	var view := HBoxContainer.new()
+	view.name = "JobDetails"
+	view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	view.add_theme_constant_override("separation", int(UiScale.px(12)))
+	var card: PanelContainer = null
+	if art(job_art_path(job)) != null:
+		var cd := job_card(job, border, true, title_col)
+		(cd["actions"] as Control).visible = false
+		var slot := cd["slot"] as Control
+		slot.size_flags_stretch_ratio = 1.0
+		view.add_child(slot)
+		card = cd["card"] as PanelContainer
+	var panel := PanelContainer.new()
+	panel.name = "JobInfo"
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = 2.0
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.04, 0.05, 0.1, 0.88)
+	sb.border_color = border
+	sb.set_border_width_all(int(UiScale.px(2)))
+	sb.set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
+	sb.set_content_margin_all(UiScale.px(12))
+	panel.add_theme_stylebox_override("panel", sb)
+	view.add_child(panel)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", int(UiScale.px(8)))
+	panel.add_child(col)
+	var scroll := ScrollContainer.new()
+	scroll.name = "JobText"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(scroll)
+	var text := VBoxContainer.new()
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.add_theme_constant_override("separation", int(UiScale.px(5)))
+	scroll.add_child(text)
+	text.add_child(label(String(c["name"]), UiScale.FONT_TITLE + 2, title_col))
+	text.add_child(label("Роль: " + String(c["role"]), UiScale.FONT_TEXT, MUTED, true))
+	text.add_child(label("Оружие: " + String(c["weapon_text"]), UiScale.FONT_BODY, TEXT, true))
+	text.add_child(label(String(c.get("desc", "")), UiScale.FONT_BODY, TEXT, true))
+	text.add_child(label("Сильные стороны", UiScale.FONT_TEXT, GOOD))
+	text.add_child(bullets(c.get("strengths", []), UiScale.FONT_BODY, TEXT))
+	text.add_child(label("Особенности", UiScale.FONT_TEXT, Color(1.0, 0.75, 0.45)))
+	text.add_child(bullets(c.get("features", []), UiScale.FONT_BODY, TEXT))
+	text.add_child(label("Ключевые умения", UiScale.FONT_TEXT, GOLD))
+	for sid in c.get("key_skills", []):
+		var id := String(sid)
+		var sk := HeroSkills.get_skill(id, job)
+		var r := HBoxContainer.new()
+		r.add_theme_constant_override("separation", int(UiScale.px(6)))
+		var ic := IconView.new()
+		ic.custom_minimum_size = UiScale.v2(28, 28)
+		ic.set_spec(IconView.hero_skill(id))
+		r.add_child(ic)
+		var sl := label("%s (ур. %d)" % [String(sk.get("name", id)), HeroSkills.level_needed(id, 1, job)],
+			UiScale.FONT_BODY, Color(0.9, 0.9, 0.95), true)
+		sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		r.add_child(sl)
+		text.add_child(r)
+	var actions := HBoxContainer.new()
+	actions.name = "JobActions"
+	actions.add_theme_constant_override("separation", int(UiScale.px(12)))
+	col.add_child(actions)
+	var back := button("Назад")
+	back.name = "JobBack"
+	actions.add_child(back)
+	return {"view": view, "actions": actions, "back": back, "card": card}
+
+
+# ---------- Портреты ----------
 
 ## Портрет персонажа (квадрат side для «Среднего», скруглённые углы — в самой картинке); null — нет файла.
 static func portrait(job: String, race_id: String, gender: String, side: float) -> TextureRect:

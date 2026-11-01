@@ -1952,13 +1952,17 @@ func run_step() -> void:
 			wait = 10
 			step = 1227
 		1227:
+			check((_menu as CharacterCreate)._job_cards.size() == 3, "кадр 266: три карточки профессий")
 			shot("266_create_jobs_human")
 			(_menu as CharacterCreate).go_back()
 			(_menu as CharacterCreate)._select_race("dark_elf")
 			(_menu as CharacterCreate).go_next()
+			# Подробности профессии (как по «Подробнее»): арт слева, справа полный текст
+			(_menu as CharacterCreate).show_job("assassin")
 			wait = 10
 			step = 1228
 		1228:
+			check((_menu as CharacterCreate).job_detail == "assassin", "кадр 267: подробности Наёмника")
 			shot("267_create_jobs_dark")
 			_menu.queue_free()
 			_menu = null

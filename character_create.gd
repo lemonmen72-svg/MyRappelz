@@ -4,18 +4,23 @@ extends CanvasLayer
 ##   1. «Раса» — три карточки-вкладки (Люди, Светлые эльфы, Тёмные эльфы: название и профессии), под ними слева на
 ##      затемнении — описание выбранной расы, сильные и слабые стороны (ClassData RACES strengths / weaknesses); фон
 ##      экрана — арт расы (MenuKit.race_art_path: пара мужчина и женщина справа, левая треть спокойнее — под текст);
-##   2. «Профессии» — три профессии выбранной расы, только знакомство: вертикальные карточки — сверху арт профессии
-##      с названием внизу (MenuKit.job_art_head), под ним роль, оружие, сильные стороны, особенности, ключевые умения
-##      (ClassData strengths / features / key_skills). Все начинают Бродягой, профессию предложит Мудрец Альдерик
+##   2. «Профессии» — три профессии выбранной расы, только знакомство: вертикальные карточки MenuKit.job_card — арт
+##      профессии целиком (весь рост, 3:4, карточка по высоте свободного места), поверх низа на затемнении — имя,
+##      роль и оружие одной строкой, «Подробнее». Касание карточки или «Подробнее» — вместо трёх карточек
+##      подробности (MenuKit.job_details: арт слева, справа описание, сильные стороны, особенности, ключевые умения
+##      с прокруткой), «Назад» (и нижняя «Назад») — снова три карточки. Экран шага не прокручивается — помещается
+##      в 1280×720 при любом размере интерфейса. Все начинают Бродягой, профессию предложит Мудрец Альдерик
 ##      с 10 уровня;
 ##   Арты рас и профессий — в пакете ресурсов (часть «art»); нет части — те же шаги без артов (тёмный фон).
 ##   3. «Пол» — 3D-превью Бродяг-новичков расы обоих полов (CharacterModel, модель hero_<раса>_<пол>_starter
 ##      с откатом на запасные; медленно вращаются, перетаскивание крутит, касание — выбрать и показать атаку);
 ##   4. «Ник» — превью выбранного героя, ник (Accounts.nick_error: 3–16 символов, буквы, цифры, _, уникален на
 ##      устройстве) → «Войти в игру» (сигнал created). «Назад» с первого шага — сигнал cancelled (к выбору персонажа).
-## Рассчитан на 1280×720 и касания пальцем; размеры — UiScale, содержимое шага прокручивается, если не влезло.
+## Рассчитан на 1280×720 и касания пальцем; размеры — UiScale, содержимое шага прокручивается, если не влезло
+## (кроме шага «Профессии»).
 ## Для тестов: step, set_step(i), go_next() / go_back(), _select_race, _select_gender, preview_model(ключ "f" / "m" /
-## "name"), _race_cards, _job_cards, _race_info (описание расы), _name_edit, _error; backdrop() — арт фона.
+## "name"), _race_cards, _job_cards (карточки PanelContainer), job_detail / show_job(id) / close_job(), job_buttons
+## ("info_<профессия>", "back"), _race_info (описание расы), _name_edit, _error; backdrop() — арт фона.
 
 signal created(char_name: String, race_id: String, gender: String)
 signal cancelled
@@ -25,11 +30,6 @@ const STEP_NAMES := ["Раса", "Профессии", "Пол", "Ник"]
 ## Превью на шаге «Пол» и «Ник» для «Среднего» размера интерфейса.
 const PREVIEW_SIZE := Vector2(250, 360)
 const NAME_PREVIEW_SIZE := Vector2(250, 360)
-## Арт профессии на карточке шага «Профессии»: наименьший размер («Средний»; три карточки влезают в 1280 px и на
-## «Крупном»), ширина растёт по карточке — окно арта сверху с соотношением сторон JOB_ART_ASPECT (≈ ширина карточки
-## на экране 1280 / высота).
-const JOB_ART_SIZE := Vector2(300, 270)
-const JOB_ART_ASPECT := 1.45
 ## Затемнение арта расы: везде и дополнительно слева (под описанием); на других шагах — сильнее.
 const RACE_SHADE := 0.15
 const RACE_SHADE_LEFT := 0.5
@@ -49,6 +49,9 @@ var _next_btn: Button
 var _race_cards: Dictionary = {}
 var _race_info: VBoxContainer
 var _job_cards: Array[PanelContainer] = []
+## Шаг «Профессии»: открытые подробности профессии ("" — три карточки) и кнопки шага ("info_<профессия>", "back").
+var job_detail := ""
+var job_buttons: Dictionary = {}
 var _gender_cards: Dictionary = {}
 var _name_edit: LineEdit
 var _nick := ""
@@ -77,6 +80,8 @@ func _ready() -> void:
 	root.add_child(_scroll)
 	_content = VBoxContainer.new()
 	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Во всю высоту прокрутки: карточки профессий занимают свободное место
+	_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_content.add_theme_constant_override("separation", int(UiScale.px(8)))
 	_scroll.add_child(_content)
 
@@ -102,7 +107,10 @@ func _ready() -> void:
 func set_step(i: int) -> void:
 	if _name_edit != null and is_instance_valid(_name_edit):
 		_nick = _name_edit.text
-	step = clampi(i, 0, STEPS.size() - 1)
+	var ni := clampi(i, 0, STEPS.size() - 1)
+	if ni != step:
+		job_detail = ""
+	step = ni
 	for k in _step_labels.size():
 		_step_labels[k].add_theme_color_override("font_color", MenuKit.GOLD if k == step else MenuKit.MUTED)
 	for c in _content.get_children():
@@ -111,11 +119,15 @@ func set_step(i: int) -> void:
 	_previews.clear()
 	_race_cards.clear()
 	_job_cards.clear()
+	job_buttons.clear()
 	_gender_cards.clear()
 	_race_info = null
 	_name_edit = null
 	_error.text = ""
 	_scroll.scroll_vertical = 0
+	# Шаг «Профессии» не прокручивается: карточки и подробности помещаются в экран (у подробностей своя прокрутка)
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED if String(STEPS[step]) == "jobs" \
+		else ScrollContainer.SCROLL_MODE_AUTO
 	match String(STEPS[step]):
 		"race":
 			_build_race()
@@ -144,8 +156,11 @@ func go_next() -> bool:
 	return true
 
 
-## «Назад»: прошлый шаг; с первого — сигнал cancelled.
+## «Назад»: из подробностей профессии — к трём карточкам; иначе прошлый шаг; с первого — сигнал cancelled.
 func go_back() -> void:
+	if job_detail != "":
+		close_job()
+		return
 	if step == 0:
 		cancelled.emit()
 		return
@@ -282,6 +297,10 @@ func _fill_race_info() -> void:
 # ---------- 2. Профессии ----------
 
 func _build_jobs() -> void:
+	if job_detail != "" and ClassData.jobs_of(_race).has(job_detail):
+		_build_job_detail(job_detail)
+		return
+	job_detail = ""
 	var w := ClassData.cls(ClassData.WANDERER)
 	var st := HeroStats.base_stats(ClassData.WANDERER, 1)
 	var parts: PackedStringArray = []
@@ -289,32 +308,52 @@ func _build_jobs() -> void:
 		parts.append("%s %d" % [String(Stats.STAT_NAMES[k]), int(st[k])])
 	_content.add_child(MenuKit.label("Профессии расы «%s». Сейчас — только знакомство: все начинают Бродягой (%s), "
 		% [String(ClassData.race(_race)["name"]), String(w["weapon_text"])]
-		+ "профессию предложит Мудрец Альдерик с %d уровня. Бродяга 1-го уровня: %s." % [ClassData.JOB_LEVEL,
-		" · ".join(parts)], UiScale.FONT_BODY, MenuKit.MUTED, true))
+		+ "профессию предложит Мудрец Альдерик с %d уровня. Бродяга 1-го уровня: %s. Касание карточки — подробнее."
+		% [ClassData.JOB_LEVEL, " · ".join(parts)], UiScale.FONT_BODY, MenuKit.MUTED, true))
+	# Три карточки во всю высоту свободного места: арт целиком, имя, роль и оружие поверх низа арта
 	var row := HBoxContainer.new()
+	row.name = "JobRow"
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	row.add_theme_constant_override("separation", int(UiScale.px(10)))
 	_content.add_child(row)
 	for jid in ClassData.jobs_of(_race):
 		var id := String(jid)
-		var j := ClassData.cls(id)
-		var jc: Color = j["color"]
-		var card := _card(jc.lightened(0.25), false)
-		row.add_child(card)
+		var jc: Color = ClassData.cls(id)["color"]
+		var cd := MenuKit.job_card(id, jc.lightened(0.25), false, jc.lightened(0.5))
+		row.add_child(cd["slot"] as Control)
+		var card := cd["card"] as PanelContainer
+		# Пересборка шага — после обработки касания (карточка уходит из дерева)
+		card.gui_input.connect(_on_card_input.bind(func() -> void: show_job.call_deferred(id)))
 		_job_cards.append(card)
-		var v := card.get_child(0) as VBoxContainer
-		# Вертикальная карточка: арт профессии с названием внизу; без арта — название строкой
-		var head := MenuKit.job_art_head(id, JOB_ART_SIZE, String(j["name"]), jc.lightened(0.5), JOB_ART_ASPECT)
-		if head != null:
-			v.add_child(head)
-		else:
-			v.add_child(MenuKit.label(String(j["name"]), UiScale.FONT_NAME, jc.lightened(0.4)))
-		v.add_child(MenuKit.label(String(j["role"]), UiScale.FONT_BODY, MenuKit.MUTED, true))
-		v.add_child(MenuKit.label("Оружие: " + String(j["weapon_text"]), UiScale.FONT_SMALL, MenuKit.TEXT, true))
-		v.add_child(MenuKit.label("Сильные стороны", UiScale.FONT_TEXT, MenuKit.GOOD))
-		v.add_child(MenuKit.bullets(j.get("strengths", []), UiScale.FONT_SMALL, MenuKit.TEXT))
-		v.add_child(MenuKit.label("Особенности", UiScale.FONT_TEXT, Color(1.0, 0.75, 0.45)))
-		v.add_child(MenuKit.bullets(j.get("features", []), UiScale.FONT_SMALL, MenuKit.TEXT))
-		v.add_child(MenuKit.label("Ключевые умения: " + MenuKit.key_skill_names(id), UiScale.FONT_SMALL, MenuKit.GOLD, true))
+		var b := MenuKit.card_button("Подробнее")
+		b.pressed.connect(func() -> void: show_job(id))
+		(cd["actions"] as HBoxContainer).add_child(b)
+		job_buttons["info_" + id] = b
+
+
+## Подробности профессии вместо трёх карточек: арт слева, справа полный текст с прокруткой, «Назад».
+func _build_job_detail(id: String) -> void:
+	var jc: Color = ClassData.cls(id)["color"]
+	var d := MenuKit.job_details(id, jc.lightened(0.25), jc.lightened(0.5))
+	_content.add_child(d["view"] as Control)
+	var back := d["back"] as Button
+	back.text = "К профессиям"
+	back.pressed.connect(close_job)
+	job_buttons["back"] = back
+
+
+## Открыть подробности профессии id (шаг «Профессии»).
+func show_job(id: String) -> void:
+	if String(STEPS[step]) != "jobs" or not ClassData.jobs_of(_race).has(id):
+		return
+	job_detail = id
+	set_step(step)
+
+
+## Закрыть подробности — снова три карточки.
+func close_job() -> void:
+	job_detail = ""
+	set_step(step)
 
 
 # ---------- 3. Пол ----------
