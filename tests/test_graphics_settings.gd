@@ -294,7 +294,8 @@ func _check_shaders() -> void:
 	check(toon != null and prop != null, "шейдеры загружены")
 	if toon == null or prop == null:
 		return
-	check(toon.code.count("sampler2D") <= 8, "toon.gdshader: сэмплеров %d (предел 8)" % toon.code.count("sampler2D"))
+	var samplers := toon.code.count("uniform sampler2D")
+	check(samplers <= 8, "toon.gdshader: сэмплеров %d (предел 8)" % samplers)
 	for sh in [toon, prop]:
 		var code := (sh as Shader).code
 		check(code.contains("smoothstep(shadow_lo, shadow_hi, ATTENUATION)") and not code.contains("ATTENUATION * 2.0 - 1.0"),
