@@ -252,6 +252,19 @@ func _check_options() -> void:
 		var m: StandardMaterial3D = mats[0]
 		Quality.set_option("outlines", 0, false)
 		Quality.apply(tree)
+		if m.next_pass != null:
+			# Разбор: отслеживается ли материал героя (Quality._model_mats / _outline_mats)
+			var in_model := false
+			for wr in Quality._model_mats:
+				if wr.get_ref() == m:
+					in_model = true
+			var in_ol := false
+			for wr in Quality._outline_mats:
+				if wr.get_ref() == m:
+					in_ol = true
+			print("  контур героя: в _model_mats %s, в _outline_mats %s (%d / %d), meta outline %s, next_pass %s, материалов %d"
+				% [in_model, in_ol, Quality._model_mats.size(), Quality._outline_mats.size(), m.has_meta("outline"),
+				m.next_pass, mats.size()])
 		check(m.next_pass == null, "контуры «Выкл»: у героя контура нет")
 		Quality.set_option("outlines", 1, false)
 		Quality.apply(tree)
