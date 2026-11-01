@@ -117,12 +117,134 @@ const BAG_ITEMS := [
 	["potion_hp_r1", 12],
 ]
 
+## ---------- Части сценария (CI: матрица visual в .github/workflows/check.yml, задачи идут параллельно) ----------
+## Запуск части K из N (K с 1): … res://tests/runner.tscn -- res://tests/shots.gd --shots-part=K --shots-parts=N.
+## Без аргументов — вся цепочка, как раньше. Цепочку делят точки входа PART_ENTRIES: [шаг, с которого начинается
+## блок кадров; кадров в блоке до следующей точки входа — вес для деления поровну], по порядку цепочки. Часть K
+## получает подряд идущие блоки (part_bounds). Шаги до своей точки входа часть проходит «перемоткой»: логика игры
+## идёт кадр за кадром как в полной цепочке (герой, питомцы, окна, качество — то же состояние), но без отрисовки
+## (RenderingServer.render_loop_enabled = false) и без снимков; за PART_WARMUP кадров до точки входа отрисовка
+## включается. На точке входа следующей части — ok_done().
+## Новый блок кадров: дописать в цепочку как раньше и добавить его первый шаг в PART_ENTRIES по порядку цепочки
+## (точка входа — шаг без снимка в начале, где блок ставит свою сцену, или шаг со снимком, перед которым wait ≥ 3);
+## веса пересчитывает python3 -I tools/shots_parts.py (печатает таблицу; --parts N — деление, --check — проверка).
+const PART_ENTRIES := [
+	[0, 373], [9, 189], [18, 256], [29, 181], [41, 185], [46, 74], [52, 83], [520, 225],
+	[540, 103], [560, 143], [600, 195], [605, 205], [610, 117], [700, 246], [800, 336], [806, 61],
+	[807, 82], [808, 176], [814, 152], [816, 59], [818, 120], [960, 45], [963, 64], [925, 141],
+	[940, 33], [943, 63], [946, 95], [980, 40], [1000, 42], [1002, 95], [1025, 102], [1021, 126],
+	[1040, 141], [1060, 66], [1160, 124], [1120, 98], [1080, 60], [1200, 178],
+]
+## Сколько кадров до точки входа часть уже рисует (компиляция шейдеров, тени, окна интерфейса).
+const PART_WARMUP := 10
+## Первый шаг части (−1 — вся цепочка), шаг начала следующей части (−1 — до конца), часть пуста.
+var _part_start := -1
+var _part_end := -1
+var _part_empty := false
+## Идёт перемотка к точке входа (без отрисовки и снимков).
+var _skipping := false
+var _skip_t0 := 0
+var _t0 := 0
+
+
+## Части k (1…n): [индекс первой точки входа PART_ENTRIES, индекс после последней] — подряд, поровну по весам.
+## То же деление — part_bounds в tools/shots_parts.py.
+static func part_bounds(k: int, n: int) -> Array:
+	var cnt := PART_ENTRIES.size()
+	var cum: Array[int] = []
+	var total := 0
+	for e in PART_ENTRIES:
+		cum.append(total)
+		total += int(e[1])
+	var cuts: Array[int] = [0]
+	for j in range(1, n):
+		var target := float(total) * float(j) / float(n)
+		var best := cnt
+		var best_d := INF
+		for i in range(cuts[j - 1] + 1, cnt):
+			var d := absf(float(cum[i]) - target)
+			if d < best_d:
+				best_d = d
+				best = i
+		cuts.append(best)
+	cuts.append(cnt)
+	return [cuts[k - 1], cuts[k]]
+
+
+## Аргументы --shots-part=K --shots-parts=N: границы части и перемотка без отрисовки до её начала.
+func _setup_part() -> void:
+	_t0 = Time.get_ticks_msec()
+	var k := 0
+	var n := 0
+	for a in OS.get_cmdline_user_args():
+		var s := String(a)
+		if s.begins_with("--shots-part="):
+			k = s.get_slice("=", 1).to_int()
+		elif s.begins_with("--shots-parts="):
+			n = s.get_slice("=", 1).to_int()
+	if n <= 1:
+		return
+	if k < 1 or k > n:
+		fail("часть %d из %d: нужно 1 ≤ K ≤ N" % [k, n])
+		return
+	var b := part_bounds(k, n)
+	var i0 := int(b[0])
+	var i1 := int(b[1])
+	if i0 >= i1:
+		_part_empty = true
+		print("Часть %d/%d: блоков нет (частей больше, чем точек входа)" % [k, n])
+		return
+	_part_start = int(PART_ENTRIES[i0][0])
+	_part_end = int(PART_ENTRIES[i1][0]) if i1 < PART_ENTRIES.size() else -1
+	print("Часть %d/%d: шаги с %d до %s" % [k, n, _part_start, str(_part_end) if _part_end >= 0 else "конца"])
+	if _part_start != 0:
+		_skipping = true
+		_skip_t0 = Time.get_ticks_msec()
+		RenderingServer.render_loop_enabled = false
+
+
+func _process(delta: float) -> void:
+	if not done and main != null and main.is_inside_tree():
+		_part_tick()
+	super(delta)
+
+
+func _part_tick() -> void:
+	if _part_empty:
+		ok_done()
+		return
+	if _part_end >= 0 and step == _part_end:
+		print("Часть: дошли до шага %d — дальше следующая часть (%.0f с)" % [_part_end,
+			float(Time.get_ticks_msec() - _t0) / 1000.0])
+		ok_done()
+		return
+	if not _skipping:
+		return
+	# Без отрисовки кадры короткие — без предела кадров/с (Quality.apply_fps ставит его заново)
+	Engine.max_fps = 0
+	if step == _part_start and wait <= PART_WARMUP:
+		_skipping = false
+		RenderingServer.render_loop_enabled = true
+		Quality.apply_fps()
+		# Снимок читает уже нарисованный кадр: хотя бы 3 кадра с отрисовкой до шага входа
+		wait = maxi(wait, 3)
+		print("Часть: перемотка до шага %d — %d кадров за %.1f с, дальше с отрисовкой" % [_part_start, frame,
+			float(Time.get_ticks_msec() - _skip_t0) / 1000.0])
+
+
+func ok_done() -> void:
+	if _skipping and not done:
+		fail("точка входа части (шаг %d) не встретилась в цепочке — PART_ENTRIES в tests/shots.gd" % _part_start)
+		return
+	super()
+
 
 func race_class() -> Array:
 	return ["light_elf", "wizard"]
 
 
 func before_start() -> void:
+	_setup_part()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SHOTS_DIR))
 	Quality.set_level(Quality.HIGH, false)
 	# MSAA на программном рендере CI в разы медленнее — сценарий не укладывался в предел; сглаживание — FXAA
@@ -2406,10 +2528,14 @@ func _handheld_clear() -> void:
 
 
 func shot(shot_name: String) -> void:
+	# Перемотка к точке входа части: кадр снимает другая часть
+	if _skipping:
+		return
 	var img := get_viewport().get_texture().get_image()
 	var path := SHOTS_DIR + shot_name + ".png"
 	var err := img.save_png(path)
-	check(err == OK, "скриншот %s (%dx%d)" % [shot_name, img.get_width(), img.get_height()])
+	check(err == OK, "скриншот %s (%dx%d), %.0f с от запуска" % [shot_name, img.get_width(), img.get_height(),
+		float(Time.get_ticks_msec() - _t0) / 1000.0])
 
 
 ## Туман на высоте 250 м заливает весь кадр — для вида сверху выключаем.
