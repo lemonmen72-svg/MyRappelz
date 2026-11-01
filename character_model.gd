@@ -2220,6 +2220,9 @@ func _asset_act(kind: String) -> void:
 	_anim.seek(float(a[1]), true)
 	_act_end = float(a[2])
 	_act_hit = _act_end
+	# Реакция на удар: пошёл — сразу шаг и бег (раньше герой скользил в позе урона до конца клипа — «завис»)
+	if kind == "hit":
+		_act_hit = float(a[1])
 	_loco = ""
 
 
@@ -2344,9 +2347,9 @@ func _mq_play(c: String, sp: float) -> void:
 	_loco = ""
 
 
-## Отшатывание модели из файла при уроне.
+## Отшатывание модели из файла при уроне (на бегу — нет: от каждого удара зверя модель дёргалась назад).
 func _asset_recoil() -> void:
-	if not is_inside_tree():
+	if not is_inside_tree() or _asset_speed > 0.3:
 		return
 	if _hit != null and _hit.is_valid():
 		_hit.kill()

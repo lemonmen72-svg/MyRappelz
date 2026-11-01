@@ -20,7 +20,7 @@ extends RefCounted
 ## - трава и цветы — MultiMesh участками GRASS_CHUNK×GRASS_CHUNK, плотность и дальность из Quality;
 ##   вдали пучки плавно уходят в землю (шейдер), участки дальше дальности отсекаются visibility_range_end;
 ## - деревья, кусты, камни и кристаллы сливаются в один меш на участок DECOR_CHUNK×DECOR_CHUNK и группу
-##   материала (7 общих материалов на весь остров); коллизия — цилиндры в одном StaticBody3D (слой 1).
+##   материала (7 общих материалов на весь остров); коллизия — капсулы-столбы Util.pillar в одном StaticBody3D (слой 1).
 ## Модели из файлов (PropAsset, страница атласа «nature»: деревья tree_oak / tree_pine / tree_elf / tree_dead,
 ## куст bush, камни rock / rock_dark — модели Meshy от Максима) — свои группы G_PTREE и G_PSMALL (материал —
 ## атлас, prop.gdshader, контур по нормалям); нет файла — процедурные, как раньше. Колючие кусты тёмных земель,
@@ -1116,13 +1116,11 @@ static func _build_colliders(c: Ctx, holder: Node3D) -> void:
 		hh = snappedf(hh, 0.1)
 		var key := "%.2f|%.1f" % [r, hh]
 		if not shapes.has(key):
-			var cs := CylinderShape3D.new()
-			cs.radius = r
-			cs.height = hh
-			shapes[key] = cs
+			# Капсула-столб (Util.pillar_shape), не CylinderShape3D: у цилиндра в физике Godot 4.3 дрожат контакты
+			shapes[key] = Util.pillar_shape(r, hh)
 		var col := CollisionShape3D.new()
 		col.shape = shapes[key]
-		col.position = pos + Vector3(0, hh * 0.5, 0)
+		col.position = pos + Vector3(0, Util.pillar_y(hh), 0)
 		body.add_child(col)
 	holder.add_child(body)
 

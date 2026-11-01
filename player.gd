@@ -168,6 +168,28 @@ var _mp_delay := 0.0
 var _upkeep_acc := 0.0
 var _fx: HeroSkillFx
 
+# ---------- Движение без дрожи (жалобы Максима: «экран трясётся», «персонаж дёргается»; тест
+# tests/test_movement_smooth.gd) ----------
+## Прилипание к земле на кочках, гребнях и спусках, м (было 0.1 по умолчанию — тело отрывалось и падало).
+const FLOOR_SNAP := 0.5
+## Самый крутой пол, градусы: треугольник проходимой клетки (перепад до IslandWorld.MAX_STEP на 1 м по каждой оси)
+## по диагонали бывает круче 45° — там тело «упиралось в стену» и подскакивало.
+const FLOOR_MAX_DEG := 52.0
+## Поворот к цели при атаке и умении: не рывком за кадр, а быстро и плавно (скорость в экспоненте, 1/с) первые
+## FACE_HOLD с; потом — снова по движению.
+const FACE_RATE := 22.0
+const FACE_HOLD := 0.25
+## Сдвиг тела за тик больше этого (перенос) — не сглаживается.
+const TELEPORT_STEP := 1.5
+var _face_yaw := 0.0
+var _face_hold := 0.0
+## Позиция тела до и после последнего тика физики: модель и камера рисуются между ними (visual_position) — тиков
+## 60 в секунду, кадров 30/45/60 и неровно, без этого на 45 к/с тело сдвигалось на 1, 1, 2 тика за кадр (рывки).
+var _phys_prev := Vector3.ZERO
+var _phys_cur := Vector3.ZERO
+## Скорость по земле за последний тик — по настоящему сдвигу (у стены и у края воды ≈ 0): шаг, бег или покой модели.
+var ground_speed := 0.0
+
 
 func _ready() -> void:
 	add_to_group("player")
@@ -186,6 +208,12 @@ func _ready() -> void:
 	col.shape = shape
 	col.position.y = 0.9
 	add_child(col)
+	floor_snap_length = FLOOR_SNAP
+	floor_max_angle = deg_to_rad(FLOOR_MAX_DEG)
+	# Одинаковая скорость вдоль земли на любом треугольнике рельефа (без неё скорость менялась на каждом ребре)
+	floor_constant_speed = true
+	_phys_prev = global_position
+	_phys_cur = global_position
 
 	_build_model()
 
@@ -543,11 +571,40 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	# Остров: в воду и на крутые склоны не заходим, сквозь землю не проваливаемся
 	IslandWorld.constrain(self, prev)
+	_track_motion(prev, delta)
 
-	if dir.length() > 0.1:
+	if _face_hold > 0.0:
+		_face_hold -= delta
+		rotation.y = lerp_angle(rotation.y, _face_yaw, 1.0 - exp(-FACE_RATE * delta))
+	elif dir.length() > 0.1:
 		rotation.y = lerp_angle(rotation.y, atan2(-dir.x, -dir.z), 12.0 * delta)
 	if _has_model():
-		_model.set_move_speed(Vector2(velocity.x, velocity.z).length())
+		_model.set_move_speed(ground_speed)
+
+
+## Сдвиг за тик: позиции для сглаживания между тиками и скорость шага по настоящему сдвигу (не по velocity: у стены
+## и у края воды тело стоит, а velocity — нет; модель бежала на месте и дёргалась между бегом и покоем).
+func _track_motion(prev: Vector3, delta: float) -> void:
+	_phys_prev = prev
+	_phys_cur = global_position
+	var flat := Vector2(global_position.x - prev.x, global_position.z - prev.z).length()
+	ground_speed = 0.0 if delta <= 0.0 or flat > TELEPORT_STEP else flat / delta
+
+
+## Где рисовать героя в этом кадре: между позициями двух последних тиков физики (доля тика — Engine). Камера
+## следит за этой точкой, модель героя сдвигается сюда же (_process). Перенос после тика — сразу на новом месте.
+func visual_position() -> Vector3:
+	var step := _phys_cur - _phys_prev
+	if step.length() > TELEPORT_STEP:
+		return global_position
+	var f := clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
+	return global_position - step * (1.0 - f)
+
+
+func _process(_delta: float) -> void:
+	if _has_model():
+		# Сдвиг модели к visual_position в осях тела (Vector3 * Basis — обратный поворот)
+		_model.position = (visual_position() - global_position) * global_transform.basis
 
 
 func _tick_skills(delta: float) -> void:
@@ -819,10 +876,13 @@ func _engage(t: Mob) -> void:
 	_face(t.global_position)
 
 
+## Повернуться к точке: плавно за FACE_HOLD с (_physics_process), не рывком. Почти над точкой (ближе 5 см) — не
+## поворачиваться: направление на неё скачет.
 func _face(pos: Vector3) -> void:
 	var to := pos - global_position
-	if Vector2(to.x, to.z).length() > 0.01:
-		rotation.y = atan2(-to.x, -to.z)
+	if Vector2(to.x, to.z).length() > 0.05:
+		_face_yaw = atan2(-to.x, -to.z)
+		_face_hold = FACE_HOLD
 
 
 func _forward() -> Vector3:
@@ -869,8 +929,11 @@ func _shoot(t: Mob, dmg: int, size: float, on_hit: Callable, miss: bool = false)
 	p.on_hit = on_hit
 	p.miss = miss
 	get_parent().add_child(p)
-	p.global_position = global_position + Vector3(0, 1.25, 0) + _forward() * 0.6
 	var aim := t.aim_point()
+	# Снаряд вылетает в сторону цели (герой к ней ещё поворачивается — _face)
+	var fwd := Vector3(aim.x - global_position.x, 0.0, aim.z - global_position.z)
+	fwd = fwd.normalized() if fwd.length() > 0.05 else _forward()
+	p.global_position = global_position + Vector3(0, 1.25, 0) + fwd * 0.6
 	if p.is_shaft() and Vector2(aim.x - p.global_position.x, aim.z - p.global_position.z).length() > 0.05:
 		p.look_at(aim, Vector3.UP)
 

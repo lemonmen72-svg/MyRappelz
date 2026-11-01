@@ -26,6 +26,17 @@ const CAM_PITCH_MIN := deg_to_rad(18.0)
 const CAM_PITCH_MAX := deg_to_rad(75.0)
 ## Чувствительность вращения камеры, радиан на пиксель.
 const CAM_SENS := 0.006
+## Точка, за которой следит камера (cam_focus): по горизонтали — где нарисован герой (Player.visual_position, между
+## тиками физики), по высоте — сглажено (скорость в экспоненте, 1/с; растёт с отставанием, при CAM_Y_LAG м — вдвое,
+## дальше 2 × CAM_Y_LAG не отстаёт): кочки рельефа под ногами не трясут экран, на склоне герой не уезжает из кадра.
+## Перенос дальше CAM_SNAP м — сразу.
+const CAM_Y_RATE := 7.0
+const CAM_Y_LAG := 0.35
+const CAM_SNAP := 4.0
+## Камера не ниже земли + CAM_GROUND м: высота земли — наибольшая из точек в CAM_GROUND_R м вокруг (огибающая,
+## а не каждая кочка под камерой).
+const CAM_GROUND := 1.0
+const CAM_GROUND_R := 1.5
 ## Круглые кнопки HUD: центр от правого нижнего угла и радиус — для «Среднего» размера интерфейса
 ## (HUD умножает на UiScale.k()). Атака в углу, умения дугой вокруг неё (зазоры ≥ 10 px), выше — «Приручить»,
 ## левее — «Зелье», «Торговец», «Говорить». Было: атака r 85, умения r 50–55, остальные r 45–50.
@@ -91,6 +102,8 @@ var job_window: JobWindow
 var cam_yaw := 0.0
 var cam_pitch := atan2(9.0, 8.5)
 var cam_dist := CAM_DIST
+## Сглаженная точка слежения камеры (см. CAM_Y_RATE); Vector3.INF — ещё не задана.
+var cam_focus := Vector3.INF
 
 ## Экран до мира (вход, выбор или создание персонажа; null — мир).
 var screen: Node = null
@@ -410,13 +423,14 @@ func _process(delta: float) -> void:
 	else:
 		hud.update_cast("", 0.0, 0.0)
 
-	var want := player.global_position + _cam_offset()
+	_update_cam_focus(delta)
+	var want := cam_focus + _cam_offset()
 	# Не прятать камеру в холм
-	var ground := world.height_at(want.x, want.z) + 1.0
+	var ground := _cam_ground(want) + CAM_GROUND
 	if want.y < ground:
 		want.y = ground
 	cam.global_position = cam.global_position.lerp(want, 1.0 - exp(-8.0 * delta))
-	cam.look_at(player.global_position + Vector3(0, _cam_look_y(), 0), Vector3.UP)
+	cam.look_at(cam_focus + Vector3(0, _cam_look_y(), 0), Vector3.UP)
 
 	_check_transitions(delta)
 
@@ -468,6 +482,29 @@ func refresh_tame_icon(t: Node3D) -> void:
 		hud.set_button_icon("tame", {"path": UiIcons.path("btn_tame")})
 		return
 	hud.set_button_icon("tame", IconView.item(card))
+
+
+## Точка слежения камеры: x, z — где нарисован герой, высота — сглажена (CAM_Y_RATE, CAM_Y_LAG).
+func _update_cam_focus(delta: float) -> void:
+	var v := player.visual_position()
+	if not cam_focus.is_finite() or cam_focus.distance_to(v) > CAM_SNAP:
+		cam_focus = v
+		return
+	# Чем больше отставание, тем быстрее догоняет (плавно, без упора в предел): на долгом склоне отставание
+	# ≈ CAM_Y_LAG, кочки гасятся
+	var lag := (cam_focus.y - v.y) / CAM_Y_LAG
+	var rate := CAM_Y_RATE * (1.0 + lag * lag)
+	var y := lerpf(cam_focus.y, v.y, 1.0 - exp(-rate * delta))
+	cam_focus = Vector3(v.x, clampf(y, v.y - 2.0 * CAM_Y_LAG, v.y + 2.0 * CAM_Y_LAG), v.z)
+
+
+## Высота земли под камерой: наибольшая в центре и в 4 точках на CAM_GROUND_R м вокруг.
+func _cam_ground(p: Vector3) -> float:
+	var h := world.height_at(p.x, p.z)
+	for k in 4:
+		var a := float(k) * PI * 0.5
+		h = maxf(h, world.height_at(p.x + cos(a) * CAM_GROUND_R, p.z + sin(a) * CAM_GROUND_R))
+	return h
 
 
 func _cam_offset() -> Vector3:

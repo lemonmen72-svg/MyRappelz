@@ -53,13 +53,9 @@ func _ready() -> void:
 	collision_layer = 1
 	collision_mask = 0
 
-	var col := CollisionShape3D.new()
-	var cs := CylinderShape3D.new()
-	cs.radius = 0.45
-	cs.height = 1.9
-	col.shape = cs
-	col.position.y = 0.95
-	add_child(col)
+	# Капсула-столб (Util.pillar), не цилиндр: у CylinderShape3D в физике Godot 4.3 дрожат контакты — герой
+	# дёргался, подойдя к жителю вплотную
+	add_child(Util.pillar(0.45, 1.9))
 
 	_model = CharacterModel.new()
 	_model.name = "Model"

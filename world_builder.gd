@@ -375,13 +375,7 @@ static func _try_tree(parent: Node3D, kits: Array, kind: int, p: Vector3, rng: R
 	var s := rng.randf_range(0.85, 1.2)
 	if in_play:
 		var body := StaticBody3D.new()
-		var col := CollisionShape3D.new()
-		var cs := CylinderShape3D.new()
-		cs.radius = 0.35 * s
-		cs.height = 2.4
-		col.shape = cs
-		col.position.y = 1.2
-		body.add_child(col)
+		body.add_child(Util.pillar(0.35 * s, 2.4))
 		holder = body
 	else:
 		holder = Node3D.new()  # опушка за краем карты: туда никто не заходит, коллизия не нужна
@@ -751,13 +745,7 @@ static func _build_flowers(root: Node3D, rng: RandomNumberGenerator) -> void:
 static func _small_body(parent: Node3D, pos: Vector3, radius: float, height: float) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = pos
-	var col := CollisionShape3D.new()
-	var cs := CylinderShape3D.new()
-	cs.radius = radius
-	cs.height = height
-	col.shape = cs
-	col.position.y = height * 0.5
-	body.add_child(col)
+	body.add_child(Util.pillar(radius, height))
 	parent.add_child(body)
 	return body
 
