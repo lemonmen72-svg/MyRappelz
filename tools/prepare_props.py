@@ -14,10 +14,11 @@
                     Без картинок (материал задаёт игра: PropAsset, prop.gdshader).
   <id>.glb.import — встроенные картинки отбрасываются, LOD не генерируются (меши склеиваются по зонам).
 Для каждой страницы атласа — props_<страница>.png (+ .png.import: VRAM-сжатие, мипмапы): текстуры объектов
-страницы в клетках 1024/512 по сетке степеней двойки (мип-уровни не смешивают соседей). Текстура клетки
-запекается: каждый тексель новой развёртки берёт цвет ближайших точек поверхности исходной модели (с нормалью в ту же
-сторону — тонкие доски и листья не берут цвет обратной стороны); пустое вокруг развёрток залито цветом ближайшей
-развёртки (без тёмных швов на мипах).
+страницы в клетках CELL_BIG 2048 / CELL_SMALL 1024 по сетке степеней двойки (мип-уровни не смешивают соседей),
+страницы 4096×4096 (мелочи 4096×3072, природа 4096×2048), сжатие высокого качества (ASTC 4×4 на телефоне). Текстура
+клетки запекается: каждый тексель новой развёртки берёт цвет текстуры исходника в ближайшей точке исходной поверхности
+(точно, билинейно; с нормалью в ту же сторону — тонкие доски и листья не берут цвет обратной стороны); пустое вокруг
+развёрток залито цветом ближайшей развёртки (без тёмных швов на мипах).
 props.json — размеры (м), страница, клетка, треугольники (panel_tris — из них сохранённые панели, flipped —
 развёрнутые наружу грани, glow_max — наибольшее свечение), точки (glow — центр светящихся вершин; lamp — фонарь;
 front — самая передняя точка, у башни мельницы — ступица крыльев), для игры и тестов.
@@ -27,8 +28,8 @@ front — самая передняя точка, у башни мельницы
 почти не прибавляется. Страницы — по местам (город, деревня людей, эльфы, порт и лагеря, мелочи, природа).
 
 Как добавить объект: положить GLB из Meshy в папку исходников, добавить строку в PROPS (src — часть имени файла,
-fit — рамка, tris, tex 1024/512, rot — поворот, чтобы дверь смотрела на +Z, page — страница, где есть место:
-клеток 1024 на странице 2048×2048 — 4, клеток 512 — 16), запустить скрипт (пересобирает всё) и посмотреть
+fit — рамка, tris, tex CELL_BIG/CELL_SMALL, rot — поворот, чтобы дверь смотрела на +Z, page — страница, где есть
+место: клеток 2048 на странице 4096×4096 — 4, клеток 1024 — 16), запустить скрипт (пересобирает всё) и посмотреть
 картинки --preview. В игре — запись в PropAsset.KINDS (какую процедурную модель заменяет).
 
 Зависимости: numpy, Pillow, scipy, meshoptimizer (как у tools/prepare_creatures.py) и xatlas (pip install xatlas). Запуск из корня
@@ -69,14 +70,21 @@ GLOW_WARM = [(0.08, 0.17, 0.3, 0.86)]
 GLOW_BLUE_HOUSE = [(0.47, 0.6, 0.4, 0.6)]
 GLOW_PURPLE_HOUSE = [(0.7, 0.88, 0.34, 0.46)]
 
-# Страницы атласа: имя → (ширина, высота).
+# Клетки атласа (решение Максима «текстуры на максимум от исходного»): дома, башни, корабль, пещера — 2048 (как
+# текстура исходника Meshy: плотность деталей не ниже исходной), мелочи и природа — 1024. Прежде было 1024 / 512.
+CELL_BIG = 2048
+CELL_SMALL = 1024
+# Отступ между островами развёртки, px (unwrap): прежде size // 128 (16 px в клетке 2048)
+UNWRAP_PADDING = 4
+# Страницы атласа: имя → (ширина, высота). 4096×4096 — 4 клетки 2048 (или 3 и 4 клетки 1024); мелочи — 12 клеток
+# 1024, природа — 7. Сжатие высокого качества (ASTC 4×4 на телефоне: 1 байт на пиксель, с мипами ×4/3).
 PAGES = {
-	"town": (2048, 2048),
-	"village": (2048, 2048),
-	"elves": (2048, 2048),
-	"port": (2048, 2048),
-	"small": (2048, 2048),
-	"nature": (2048, 1024),
+	"town": (4096, 4096),
+	"village": (4096, 4096),
+	"elves": (4096, 4096),
+	"port": (4096, 4096),
+	"small": (4096, 3072),
+	"nature": (4096, 2048),
 }
 
 # id → src (часть имени файла Meshy), fit — рамка X×Y×Z (м) после поворота (масштаб общий, наибольший, при
@@ -85,73 +93,77 @@ PAGES = {
 # center — центр по всем осям (крылья мельницы: ступица в начале координат), glow — свечение по цвету
 # (glow_max — его наибольшая сила, альфа цвета вершины),
 # lamp — фонарь: (центр x, y, z, полуразмер x, y, z) в долях габаритов; вершины в нём светятся, центр — точка «lamp».
+# Бюджеты треугольников (слова Максима «все модельки максимально к исходному качеству»): исходники Meshy — 10–15 тыс.
+# (у дома светлых эльфов 2.9 млн, корабля и дома тёмных эльфов 25–29 тыс.); дома и башни — 9 тыс. (было 3.5–4.5),
+# крупные — 12 тыс., средние постройки 4.5 тыс., мелочи 2–3 тыс., деревья 2 тыс. (+ сохранённые панели листвы), кусты и
+# камни 0.9 тыс. (их много — участки растительности). Прежние бюджеты были в 2.5–4 раза меньше.
 PROPS = {
 	# Город
-	"town_house": dict(src="Hearthwood_Cottage", fit=(5.6, 6.8, 5.0), tris=3500, tex=1024, rot=0, page="town"),
-	"town_house_b": dict(src="Amber_Hearth_Cottage", fit=(6.6, 6.8, 5.0), tris=3500, tex=1024, rot=0, page="town"),
-	"town_hall": dict(src="Ivybell_Cottage", fit=(8.6, 10.5, 7.2), tris=4500, tex=1024, rot=0, page="town"),
-	"well": dict(src="Mossy_Village_Well", fit=(2.4, 3.2, 2.2), tris=1500, tex=512, rot=0, page="town"),
-	"notice_board": dict(src="Village_Notice_Board", fit=(2.4, 2.8, 1.0), tris=1000, tex=512, rot=0, page="town"),
-	"town_gate": dict(src="Rustic_Garden_Gatehou", fit=(6.2, 6.0, 2.6), tris=1500, tex=512, rot=0, page="town"),
-	"merchant_stall": dict(src="Harvest_Market_Stall", fit=(3.0, 2.8, 2.6), tris=1500, tex=512, rot=0, page="town"),
+	"town_house": dict(src="Hearthwood_Cottage", fit=(5.6, 6.8, 5.0), tris=9000, tex=CELL_BIG, rot=0, page="town"),
+	"town_house_b": dict(src="Amber_Hearth_Cottage", fit=(6.6, 6.8, 5.0), tris=9000, tex=CELL_BIG, rot=0, page="town"),
+	"town_hall": dict(src="Ivybell_Cottage", fit=(8.6, 10.5, 7.2), tris=9000, tex=CELL_BIG, rot=0, page="town"),
+	"well": dict(src="Mossy_Village_Well", fit=(2.4, 3.2, 2.2), tris=4500, tex=CELL_SMALL, rot=0, page="town"),
+	"notice_board": dict(src="Village_Notice_Board", fit=(2.4, 2.8, 1.0), tris=4500, tex=CELL_SMALL, rot=0, page="town"),
+	"town_gate": dict(src="Rustic_Garden_Gatehou", fit=(6.2, 6.0, 2.6), tris=4500, tex=CELL_SMALL, rot=0, page="town"),
+	"merchant_stall": dict(src="Harvest_Market_Stall", fit=(3.0, 2.8, 2.6), tris=4500, tex=CELL_SMALL, rot=0, page="town"),
 	# Деревня людей
-	"human_house_thatch": dict(src="Thatchwood_Cottage", fit=(6.0, 6.6, 5.2), tris=3500, tex=1024, rot=0,
+	"human_house_thatch": dict(src="Thatchwood_Cottage", fit=(6.0, 6.6, 5.2), tris=9000, tex=CELL_BIG, rot=0,
 		page="village"),
-	"human_house_red": dict(src="Ivy_Hearth_Cottage", fit=(6.0, 6.6, 5.2), tris=3500, tex=1024, rot=0,
+	"human_house_red": dict(src="Ivy_Hearth_Cottage", fit=(6.0, 6.6, 5.2), tris=9000, tex=CELL_BIG, rot=0,
 		page="village"),
-	"windmill_tower": dict(src="Whisperwind_Watchtowe", fit=(5.4, 10.5, 6.0), tris=3500, tex=1024, rot=0,
+	"windmill_tower": dict(src="Whisperwind_Watchtowe", fit=(5.4, 10.5, 6.0), tris=9000, tex=CELL_BIG, rot=0,
 		page="village"),
-	"windmill_sails": dict(src="Tattered_Windmill_Sai", fit=(9.6, 9.6, 1.0), tris=1500, tex=512, rot=0,
+	"windmill_sails": dict(src="Tattered_Windmill_Sai", fit=(9.6, 9.6, 1.0), tris=4500, tex=CELL_SMALL, rot=0,
 		page="village", center=True),
-	"scarecrow": dict(src="Patchwork_Scarecrow", fit=(2.2, 2.6, 1.0), tris=800, tex=512, rot=0, page="village"),
-	"hay_bale": dict(src="Golden_Hay_Bale", fit=(1.1, 1.1, 1.2), tris=500, tex=512, rot=0, page="village"),
-	"trough": dict(src="Mosswood_Trough", fit=(1.7, 0.6, 0.7), tris=500, tex=512, rot=0, page="village"),
+	"scarecrow": dict(src="Patchwork_Scarecrow", fit=(2.2, 2.6, 1.0), tris=3000, tex=CELL_SMALL, rot=0, page="village"),
+	"hay_bale": dict(src="Golden_Hay_Bale", fit=(1.1, 1.1, 1.2), tris=2000, tex=CELL_SMALL, rot=0, page="village"),
+	"trough": dict(src="Mosswood_Trough", fit=(1.7, 0.6, 0.7), tris=2000, tex=CELL_SMALL, rot=0, page="village"),
 	# Светлые и тёмные эльфы
-	"light_elf_house": dict(src="Crystalspire_Manor", fit=(6.4, 7.6, 5.4), tris=4500, tex=1024, rot=0, page="elves",
+	"light_elf_house": dict(src="Crystalspire_Manor", fit=(6.4, 7.6, 5.4), tris=12000, tex=CELL_BIG, rot=0, page="elves",
 		glow=GLOW_BLUE_HOUSE, glow_max=0.55),
-	"light_elf_tower": dict(src="Crystal_Spire_Tower", fit=(5.0, 11.0, 5.0), tris=3500, tex=1024, rot=0,
+	"light_elf_tower": dict(src="Crystal_Spire_Tower", fit=(5.0, 11.0, 5.0), tris=9000, tex=CELL_BIG, rot=0,
 		page="elves", glow=GLOW_BLUE_HOUSE, glow_max=0.55),
-	"dark_elf_house": dict(src="Violet_Gloom_Manor_1031082549", fit=(6.4, 8.2, 5.4), tris=4500, tex=1024, rot=0,
+	"dark_elf_house": dict(src="Violet_Gloom_Manor_1031082549", fit=(6.4, 8.2, 5.4), tris=12000, tex=CELL_BIG, rot=0,
 		page="elves", glow=GLOW_PURPLE_HOUSE, glow_max=0.55),
-	"dark_elf_tower": dict(src="Amethyst_Spire", fit=(7.0, 16.0, 7.0), tris=3500, tex=1024, rot=0, page="elves",
+	"dark_elf_tower": dict(src="Amethyst_Spire", fit=(7.0, 16.0, 7.0), tris=9000, tex=CELL_BIG, rot=0, page="elves",
 		glow=GLOW_PURPLE_HOUSE, glow_max=0.55),
 	# Порт, лагеря, пещера
-	"lighthouse": dict(src="Crimson_Beacon", fit=(5.6, 15.0, 5.6), tris=3500, tex=1024, rot=0, page="port",
+	"lighthouse": dict(src="Crimson_Beacon", fit=(5.6, 15.0, 5.6), tris=9000, tex=CELL_BIG, rot=0, page="port",
 		lamp=(0.5, 0.78, 0.5, 0.2, 0.035, 0.2)),
-	"ship": dict(src="Sunlit_Voyager", fit=(6.5, 10.5, 9.6), tris=4500, tex=1024, rot=-90, page="port", sink=0.9),
-	"cave_entrance": dict(src="Overgrown_Mine_Entran", fit=(9.6, 6.6, 8.0), tris=3500, tex=1024, rot=0, page="port"),
-	"tent_bell": dict(src="Desert_Pavilion", fit=(4.4, 3.8, 4.4), tris=1500, tex=512, rot=0, page="port"),
-	"tent_ridge": dict(src="Wayfarer_s_Green_Pavi", fit=(3.2, 2.6, 3.6), tris=1500, tex=512, rot=90, page="port"),
-	"campfire": dict(src="Stone_Circle_Campfire", fit=(1.7, 0.8, 1.7), tris=800, tex=512, rot=0, page="port"),
-	"dock_crates": dict(src="Dockside_Stash", fit=(2.0, 1.6, 1.5), tris=1000, tex=512, rot=0, page="port"),
+	"ship": dict(src="Sunlit_Voyager", fit=(6.5, 10.5, 9.6), tris=12000, tex=CELL_BIG, rot=-90, page="port", sink=0.9),
+	"cave_entrance": dict(src="Overgrown_Mine_Entran", fit=(9.6, 6.6, 8.0), tris=9000, tex=CELL_BIG, rot=0, page="port"),
+	"tent_bell": dict(src="Desert_Pavilion", fit=(4.4, 3.8, 4.4), tris=4500, tex=CELL_SMALL, rot=0, page="port"),
+	"tent_ridge": dict(src="Wayfarer_s_Green_Pavi", fit=(3.2, 2.6, 3.6), tris=4500, tex=CELL_SMALL, rot=90, page="port"),
+	"campfire": dict(src="Stone_Circle_Campfire", fit=(1.7, 0.8, 1.7), tris=3000, tex=CELL_SMALL, rot=0, page="port"),
+	"dock_crates": dict(src="Dockside_Stash", fit=(2.0, 1.6, 1.5), tris=3000, tex=CELL_SMALL, rot=0, page="port"),
 	# Мелочи (город, деревни, порт, лагеря)
-	"lantern_town": dict(src="Rustic_Lantern_Post", fit=(1.4, 3.4, 1.0), tris=600, tex=512, rot=0, page="small",
+	"lantern_town": dict(src="Rustic_Lantern_Post", fit=(1.4, 3.4, 1.0), tris=3000, tex=CELL_SMALL, rot=0, page="small",
 		lamp=(0.11, 0.745, 0.5, 0.1, 0.05, 0.5)),
-	"lantern_elf": dict(src="Moonlit_Arcana_Lanter", fit=(1.8, 3.4, 1.0), tris=800, tex=512, rot=0, page="small",
+	"lantern_elf": dict(src="Moonlit_Arcana_Lanter", fit=(1.8, 3.4, 1.0), tris=3000, tex=CELL_SMALL, rot=0, page="small",
 		glow=GLOW_BLUE, lamp=(0.17, 0.62, 0.5, 0.08, 0.07, 0.5)),
-	"weapon_rack": dict(src="Wooden_Weapon_Rack", fit=(1.9, 1.7, 0.9), tris=800, tex=512, rot=0, page="small"),
-	"training_dummy": dict(src="Target_Scarecrow", fit=(1.6, 2.2, 0.8), tris=800, tex=512, rot=0, page="small"),
-	"bollard": dict(src="Weathered_Mooring_Pos", fit=(0.8, 0.8, 0.8), tris=900, tex=512, rot=0, page="small"),
-	"crate": dict(src="Ironbound_Adventurer", fit=(0.85, 0.85, 0.85), tris=400, tex=512, rot=0, page="small"),
-	"barrel": dict(src="Weathered_Barrel", fit=(0.85, 1.0, 0.85), tris=500, tex=512, rot=0, page="small"),
-	"brazier_dark": dict(src="Violet_Witchflame_Cau", fit=(1.4, 1.3, 1.4), tris=1000, tex=512, rot=0, page="small",
+	"weapon_rack": dict(src="Wooden_Weapon_Rack", fit=(1.9, 1.7, 0.9), tris=3000, tex=CELL_SMALL, rot=0, page="small"),
+	"training_dummy": dict(src="Target_Scarecrow", fit=(1.6, 2.2, 0.8), tris=3000, tex=CELL_SMALL, rot=0, page="small"),
+	"bollard": dict(src="Weathered_Mooring_Pos", fit=(0.8, 0.8, 0.8), tris=3000, tex=CELL_SMALL, rot=0, page="small"),
+	"crate": dict(src="Ironbound_Adventurer", fit=(0.85, 0.85, 0.85), tris=2000, tex=CELL_SMALL, rot=0, page="small"),
+	"barrel": dict(src="Weathered_Barrel", fit=(0.85, 1.0, 0.85), tris=2000, tex=CELL_SMALL, rot=0, page="small"),
+	"brazier_dark": dict(src="Violet_Witchflame_Cau", fit=(1.4, 1.3, 1.4), tris=3000, tex=CELL_SMALL, rot=0, page="small",
 		glow=GLOW_PURPLE),
-	"dark_spire": dict(src="Voidspire", fit=(2.6, 6.2, 2.6), tris=1000, tex=512, rot=0, page="small",
+	"dark_spire": dict(src="Voidspire", fit=(2.6, 6.2, 2.6), tris=3000, tex=CELL_SMALL, rot=0, page="small",
 		glow=GLOW_PURPLE),
-	"crystal_blue": dict(src="Crystal_Moss_Haven", fit=(1.9, 2.0, 1.9), tris=900, tex=512, rot=0, page="small",
+	"crystal_blue": dict(src="Crystal_Moss_Haven", fit=(1.9, 2.0, 1.9), tris=3000, tex=CELL_SMALL, rot=0, page="small",
 		glow=GLOW_BLUE),
-	"crystal_gold": dict(src="Golden_Crystal_Grove", fit=(1.7, 1.8, 1.7), tris=900, tex=512, rot=0, page="small",
+	"crystal_gold": dict(src="Golden_Crystal_Grove", fit=(1.7, 1.8, 1.7), tris=3000, tex=CELL_SMALL, rot=0, page="small",
 		glow=GLOW_GOLD),
-	"crystal_purple": dict(src="Amethyst_Grove", fit=(2.0, 2.1, 2.0), tris=900, tex=512, rot=0, page="small",
+	"crystal_purple": dict(src="Amethyst_Grove", fit=(2.0, 2.1, 2.0), tris=3000, tex=CELL_SMALL, rot=0, page="small",
 		glow=GLOW_PURPLE),
 	# Природа (IslandVegetation: склеиваются по участкам)
-	"tree_oak": dict(src="Whispering_Grove", fit=(6.0, 6.0, 6.0), tris=700, tex=512, rot=0, page="nature"),
-	"tree_pine": dict(src="Whispering_Evergreen", fit=(5.0, 7.0, 5.0), tris=520, tex=512, rot=0, page="nature"),
-	"tree_elf": dict(src="Blushbloom_Tree", fit=(5.6, 6.0, 5.6), tris=700, tex=512, rot=0, page="nature"),
-	"tree_dead": dict(src="Twisted_Elder", fit=(5.0, 5.2, 5.0), tris=650, tex=512, rot=0, page="nature"),
-	"bush": dict(src="Verdant_Whimsy", fit=(1.8, 1.5, 1.8), tris=280, tex=512, rot=0, page="nature"),
-	"rock": dict(src="Mossy_Boulder", fit=(2.0, 1.6, 2.0), tris=260, tex=512, rot=0, page="nature"),
-	"rock_dark": dict(src="Shadowcrag_Bloom", fit=(1.7, 1.8, 1.7), tris=280, tex=512, rot=0, page="nature"),
+	"tree_oak": dict(src="Whispering_Grove", fit=(6.0, 6.0, 6.0), tris=2000, tex=CELL_SMALL, rot=0, page="nature"),
+	"tree_pine": dict(src="Whispering_Evergreen", fit=(5.0, 7.0, 5.0), tris=2000, tex=CELL_SMALL, rot=0, page="nature"),
+	"tree_elf": dict(src="Blushbloom_Tree", fit=(5.6, 6.0, 5.6), tris=2000, tex=CELL_SMALL, rot=0, page="nature"),
+	"tree_dead": dict(src="Twisted_Elder", fit=(5.0, 5.2, 5.0), tris=2000, tex=CELL_SMALL, rot=0, page="nature"),
+	"bush": dict(src="Verdant_Whimsy", fit=(1.8, 1.5, 1.8), tris=900, tex=CELL_SMALL, rot=0, page="nature"),
+	"rock": dict(src="Mossy_Boulder", fit=(2.0, 1.6, 2.0), tris=900, tex=CELL_SMALL, rot=0, page="nature"),
+	"rock_dark": dict(src="Shadowcrag_Bloom", fit=(1.7, 1.8, 1.7), tris=900, tex=CELL_SMALL, rot=0, page="nature"),
 }
 
 GLB_IMPORT = """[remap]
@@ -183,7 +195,7 @@ source_file="res://assets/props/{name}"
 [params]
 
 compress/mode=2
-compress/high_quality=false
+compress/high_quality=true
 mipmaps/generate=true
 detect_3d/compress_to=0
 """
@@ -460,16 +472,21 @@ def corner_normals(pos: np.ndarray, tris: np.ndarray, angle: float = 50.0) -> np
 
 
 def unwrap(pos: np.ndarray, tris: np.ndarray, size: int) -> dict:
-	"""Своя развёртка (xatlas) под клетку size×size: вершины делятся по швам развёртки и по резким рёбрам."""
+	"""Своя развёртка (xatlas) под клетку size×size: вершины делятся по швам развёртки и по резким рёбрам.
+	Отступ между островами — UNWRAP_PADDING (у Meshy после упрощения ~1000 мелких островов: при отступе 16 px он
+	съедал больше половины клетки — плотность текстуры была ~0.8 исходной, при 4 px и плотной упаковке bruteForce
+	острова занимают ~0.67 клетки вместо 0.30 — плотность ~1.2 исходной у домов); пустое между ними залито цветом
+	ближайшего острова (bake), так что на дальних мипах соседи почти не смешиваются."""
 	import xatlas
 	cn = corner_normals(pos, tris)
 	atlas = xatlas.Atlas()
 	atlas.add_mesh(pos.astype(np.float32), tris.astype(np.uint32))
 	po = xatlas.PackOptions()
 	po.resolution = size
-	po.padding = max(2, size // 128)
+	po.padding = UNWRAP_PADDING
 	po.bilinear = True
 	po.rotate_charts = True
+	po.bruteForce = True
 	atlas.generate(xatlas.ChartOptions(), po)
 	if atlas.atlas_count != 1:
 		raise SystemExit("развёртка не влезла в одну клетку")
@@ -499,31 +516,42 @@ def unwrap(pos: np.ndarray, tris: np.ndarray, size: int) -> dict:
 
 
 def surface_samples(src: dict, n: int) -> tuple:
-	"""Точки поверхности исходника (по площади), их нормали граней и цвет текстуры."""
+	"""Точки поверхности исходника (по площади): точки, номера их треугольников, площадь поверхности."""
 	rng = np.random.default_rng(7)
-	p, t, uv = src["pos"], src["tris"], src["uv"]
+	p, t = src["pos"], src["tris"]
 	a, b, c = p[t[:, 0]], p[t[:, 1]], p[t[:, 2]]
-	cr = np.cross(b - a, c - a)
-	area = 0.5 * np.linalg.norm(cr, axis=1)
-	fn = cr / np.maximum(2.0 * area[:, None], 1e-12)
+	area = 0.5 * np.linalg.norm(np.cross(b - a, c - a), axis=1)
 	sel = rng.choice(len(t), n, p=area / area.sum())
 	r1, r2 = rng.random(n), rng.random(n)
 	flip = r1 + r2 > 1.0
 	r1[flip], r2[flip] = 1.0 - r1[flip], 1.0 - r2[flip]
 	pts = a[sel] + r1[:, None] * (b - a)[sel] + r2[:, None] * (c - a)[sel]
-	ta, tb, tc = uv[t[sel, 0]], uv[t[sel, 1]], uv[t[sel, 2]]
-	tuv = ta + r1[:, None] * (tb - ta) + r2[:, None] * (tc - ta)
-	tex = src["tex"]
+	return pts, sel, float(area.sum())
+
+
+def sample_bilinear(tex: np.ndarray, uv: np.ndarray) -> np.ndarray:
+	"""Цвет текстуры (h×w×3, uint8) в точках UV (glTF: v сверху вниз, повтор) — билинейно, float 0..255."""
 	h, w = tex.shape[:2]
-	col = tex[np.clip((tuv[:, 1] % 1.0) * h, 0, h - 1).astype(int), np.clip((tuv[:, 0] % 1.0) * w, 0, w - 1).astype(int)]
-	return pts, fn[sel], col.astype(np.float64), float(area.sum())
+	x = (uv[:, 0] % 1.0) * w - 0.5
+	y = (uv[:, 1] % 1.0) * h - 0.5
+	x0, y0 = np.floor(x).astype(np.int64), np.floor(y).astype(np.int64)
+	fx, fy = (x - x0)[:, None], (y - y0)[:, None]
+	x0, x1 = x0 % w, (x0 + 1) % w
+	y0, y1 = y0 % h, (y0 + 1) % h
+	t = tex.astype(np.float32)
+	top = t[y0, x0] * (1 - fx) + t[y0, x1] * fx
+	bot = t[y1, x0] * (1 - fx) + t[y1, x1] * fx
+	return top * (1 - fy) + bot * fy
 
 
 def bake(src: dict, m: dict, size: int, sign=None):
-	"""Текстура клетки: каждый тексель развёртки упрощённого меша берёт цвет ближайших точек исходника
-	(с нормалью в ту же сторону — тонкие доски и листья не берут цвет обратной стороны). Пустое — заливкой
-	от ближайшей развёртки (без тёмных швов на мипах). sign — знак граней после orient_faces: у перевёрнутых
-	граней сторона сравнивается с исходной (у исходника они смотрят внутрь)."""
+	"""Текстура клетки: каждый тексель развёртки упрощённого меша — точка его поверхности; её цвет — из текстуры
+	исходника в ближайшей точке исходной поверхности (точная ближайшая точка среди треугольников-кандидатов,
+	UV по барицентрическим, выборка билинейно — без размытия усреднением соседей, плотность деталей — как у
+	исходника, если клетка не меньше). Берутся только треугольники с нормалью в ту же сторону (тонкие доски и листья
+	не берут цвет обратной стороны), если таких рядом нет — просто ближайший. Пустое — заливкой от ближайшей
+	развёртки (без тёмных швов на мипах). sign — знак граней после orient_faces: у перевёрнутых граней сторона
+	сравнивается с исходной (у исходника они смотрят внутрь)."""
 	from PIL import Image
 	from scipy import ndimage
 	from scipy.spatial import cKDTree
@@ -558,16 +586,40 @@ def bake(src: dict, m: dict, size: int, sign=None):
 		nrm.append(np.repeat(fn[f][None], ins.sum(), 0))
 		owner.append(np.stack([gy[ins].astype(int), gx[ins].astype(int)], 1))
 	pts, nrm, owner = np.vstack(pts), np.vstack(nrm), np.vstack(owner)
-	n_samples = int(np.clip(len(pts) * 3, 300000, 3000000))
-	sp, sn, sc, _ = surface_samples(src, n_samples)
+	# Кандидаты — треугольники ближайших точек плотной выборки поверхности исходника (+ центры всех треугольников:
+	# мелкие тоже находятся)
+	sp_, st = src["pos"], src["tris"]
+	A, B, C = sp_[st[:, 0]], sp_[st[:, 1]], sp_[st[:, 2]]
+	sfn = np.cross(B - A, C - A)
+	sfn /= np.maximum(np.linalg.norm(sfn, axis=1, keepdims=True), 1e-12)
+	n_samples = int(np.clip(len(pts) * 2, 1000000, 6000000))
+	sp, sel, _ = surface_samples(src, n_samples)
+	sp = np.vstack([sp, (A + B + C) / 3.0])
+	sel = np.concatenate([sel, np.arange(len(st))])
 	tree = cKDTree(sp)
-	k = 8
-	dist, idx = tree.query(pts, k=k, workers=-1)
-	agree = (np.einsum("ijk,ik->ij", sn[idx], nrm) > 0.2).astype(np.float64)
-	wgt = agree / (dist + 1e-4)
-	none = wgt.sum(1) < 1e-9
-	wgt[none, 0] = 1.0
-	col = (sc[idx] * wgt[:, :, None]).sum(1) / wgt.sum(1, keepdims=True)
+	k = 12
+	col = np.zeros((len(pts), 3), dtype=np.float32)
+	tex = src["tex"]
+	suv = src["uv"]
+	chunk = 100000
+	for i0 in range(0, len(pts), chunk):
+		q = pts[i0:i0 + chunk]
+		qn = nrm[i0:i0 + chunk]
+		_, idx = tree.query(q, k=k, workers=-1)
+		cand = sel[idx]  # (n, k)
+		flat = cand.ravel()
+		qq = np.repeat(q, k, 0)
+		dist, bc = pc.closest_on_tris(qq, A[flat], B[flat], C[flat])
+		dist = dist.reshape(-1, k)
+		agree = np.einsum("ijk,ik->ij", sfn[cand], qn) > 0.2
+		score = np.where(agree, dist, dist + 1e6)
+		best = np.argmin(score, 1)
+		rows = np.arange(len(q))
+		bi = rows * k + best
+		tri = flat[bi]
+		w = bc[bi]
+		quv = w[:, :1] * suv[st[tri, 0]] + w[:, 1:2] * suv[st[tri, 1]] + w[:, 2:3] * suv[st[tri, 2]]
+		col[i0:i0 + chunk] = sample_bilinear(tex, quv)
 	img = np.zeros((size, size, 3))
 	cnt = np.zeros((size, size))
 	np.add.at(img, (owner[:, 0], owner[:, 1]), col)
@@ -576,7 +628,7 @@ def bake(src: dict, m: dict, size: int, sign=None):
 	img[filled] /= cnt[filled][:, None]
 	_, (iy, ix) = ndimage.distance_transform_edt(~filled, return_indices=True)
 	img = img[iy, ix]
-	return Image.fromarray(np.clip(img, 0, 255).astype(np.uint8))
+	return Image.fromarray(np.clip(np.round(img), 0, 255).astype(np.uint8))
 
 
 # ---------- Текстура ----------
@@ -683,8 +735,9 @@ def write_glb(path: str, name: str, pos: np.ndarray, nrm: np.ndarray, uv: np.nda
 
 
 def write_import(path: str, template: str) -> None:
+	"""<файл>.import: у текстуры — всегда (качество сжатия задаёт шаблон), у модели — только если файла нет."""
 	imp = path + ".import"
-	if not os.path.exists(imp):
+	if path.endswith(".png") or not os.path.exists(imp):
 		with open(imp, "w") as f:
 			f.write(template.format(name=os.path.basename(path)))
 
@@ -833,7 +886,7 @@ def check(preview: str) -> bool:
 		limit = cfg["tris"] * 1.25 + info.get("panel_tris", 0)
 		if len(m["tris"]) > limit:
 			bad.append("треугольников %d > %d" % (len(m["tris"]), limit))
-		if cfg["tex"] >= 1024:
+		if cfg["tex"] >= CELL_BIG:
 			# Постройки: снаружи не видно изнанки граней (одинарные панели Meshy развёрнуты наружу)
 			sign = orient_faces(m["pos"], m["tris"])
 			fa = 0.5 * np.linalg.norm(np.cross(m["pos"][m["tris"][:, 1]] - m["pos"][m["tris"][:, 0]],

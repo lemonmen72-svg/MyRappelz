@@ -3,12 +3,12 @@
 
 Вход — GLB из Meshy (один меш со скином, скелет «SmartRigArmature» с безликими костями Bone_NNN, без анимаций,
 высота 1.7 м). Для каждого зверя пишет в assets/creatures/:
-  <id>.glb            — меш ~7 тыс. треугольников (meshoptimizer: вершины не двигаются, у оставшихся — исходные
+  <id>.glb            — меш 10–28 тыс. треугольников (QUALITY_TRIS; meshoptimizer: вершины не двигаются, у оставшихся — исходные
                         UV, нормали и веса; швы UV не рвутся), один материал без картинок, масштаб под высоту
                         из CREATURES, ноги на y = 0, морда в +Z; узел «Armature» → кости с понятными именами
                         (Root, Spine*, Hips, Chest, Neck*, Head, Ear*, Tail*, LegFL1…/LegL1…, Toe*, Wing*);
                         клипы Idle, Walk, Run (циклы), Attack, Hit, Death, Cast — процедурные.
-  <id>.png            — цветовая текстура из GLB, 1024×1024 (cfg "tex": 0 — размер исходника как есть) (+ .png.import:
+  <id>.png            — цветовая текстура из GLB в размере исходника (cfg "tex": 0, у всех — 2048; число — уменьшить) (+ .png.import:
                         VRAM-сжатие, мипмапы; cfg "tex_hq" — compress/high_quality: ASTC 4×4 на телефоне вместо ETC2).
   <id>.glb.import     — встроенные картинки отбрасываются, LOD включены (пишется, только если файла нет).
   creatures.json      — размеры, скорости шага/бега без проскальзывания, длины клипов, момент удара и умения,
@@ -3624,6 +3624,22 @@ BIPED_CREATURES = {
 		"clips": {"Attack": ("ual2", ["Sword_Regular_B", "Sword_Regular_B_Rec"])}},
 }
 CREATURES.update(BIPED_CREATURES)
+
+# Качество моделей (решение Максима: «текстуры на максимум от исходного, чтобы модель была максимально качественной и
+# красивой»): у всех зверей текстура исходника 2048 без уменьшения (tex 0), сжатие высокого качества (tex_hq: ASTC 4×4
+# на телефоне вместо ETC2), треугольников — 1-я стадия ~16–18 тыс., 2-я ~20–24 тыс., 3-я ~24–28 тыс. (исходники Meshy:
+# у 1-х стадий пантеры, черепахи, фазана, кентавров, зубана и анатем 180–310 тыс., у остальных ~31 тыс.; дальние
+# модели упрощает LOD Godot, generate_lods). Прежде было 7–8.5 тыс. и 1024. Овца (декор загона) — 10 тыс.
+QUALITY_TRIS = {
+	"panther": 18000, "turtle": 18000, "pheasant": 18000, "wolf": 18000, "sheep": 10000,
+	"panther_2": 24000, "turtle_2": 24000, "pheasant_2": 24000, "wolf_2": 24000,
+	"panther_3": 26000, "turtle_3": 26000, "pheasant_3": 26000, "wolf_3": 26000,
+	"centaur": 18000, "centaur_2": 24000, "centaur_3": 28000,
+	"flyfish": 16000, "flyfish_sail": 20000, "flyfish_drake": 24000,
+	"anathema": 18000, "anathema_blade": 22000, "anathema_chief": 26000,
+}
+for _cid, _tris in QUALITY_TRIS.items():
+	CREATURES[_cid].update({"tris": _tris, "tex": 0, "tex_hq": True})
 # Пути к UAL1_Standard.glb / UAL2_Standard.glb (задаёт main по --ual1/--ual2)
 BIPED_UAL = {"ual1": "", "ual2": ""}
 

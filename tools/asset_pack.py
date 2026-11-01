@@ -13,7 +13,8 @@
 не просматриваются.
 
 Подкоманды (запуск из корня репозитория: python3 -I tools/asset_pack.py <команда>):
-  files [--part P] [--summary] — файлы частей и размеры исходников (не результат импорта);
+  files [--part P] [--summary] — файлы частей, размеры исходников и оценка после импорта (картинки с VRAM-сжатием —
+                          по размеру и сжатию: ASTC 4×4 высокого качества 1 байт на пиксель, ETC2 0.5, мипмапы ×4/3);
   check                 — три места совпадают, файл не попал в две части, все модели и картинки MUST_PACK
                           (герои, жители, звери, постройки, текстуры, оружие, значки; кроме запасных героев APK) —
                           в какой-то части, .json — не в частях и включены в APK, манифест включён в APK;
@@ -65,7 +66,7 @@ IN_APK = [
 	"assets/characters/hero_human_?_starter.glb",
 	"assets/characters/hero_human_?_starter.png",
 ]
-# Часть больше этого (исходники) — пора делить.
+# Часть больше этого (исходники или оценка после импорта — imported_mb) — пора делить.
 PART_WARN_MB = 120.0
 
 
@@ -171,22 +172,74 @@ def size_mb(files):
 	return sum(os.path.getsize(os.path.join(ROOT, rel)) for rel in files) / 1048576.0
 
 
+def png_size(path):
+	"""Ширина и высота PNG по заголовку (IHDR); не PNG — None."""
+	with open(path, "rb") as f:
+		head = f.read(24)
+	if len(head) < 24 or head[:8] != b"\x89PNG\r\n\x1a\n":
+		return None
+	return struct.unpack(">II", head[16:24])
+
+
+def import_params(path):
+	"""[params] файла .import: ключ → строка значения (пусто, если файла нет)."""
+	out = {}
+	imp = path + ".import"
+	if not os.path.exists(imp):
+		return out
+	sec = ""
+	with open(imp, encoding="utf-8") as f:
+		for line in f:
+			line = line.strip()
+			if line.startswith("["):
+				sec = line
+			elif sec == "[params]" and "=" in line:
+				k, v = line.split("=", 1)
+				out[k] = v
+	return out
+
+
+def imported_mb(files):
+	"""Оценка размера части после импорта для телефона (то, что ляжет в .pck): у картинок с VRAM-сжатием
+	(compress/mode=2) — ASTC 4×4 при compress/high_quality (1 байт на пиксель) или ETC2 (0.5), с мипмапами ×4/3;
+	(текстуры — и видеопамять, пока модель на экране); остальное — по размеру исходника. Возвращает
+	(всего МБ, из них текстуры VRAM МБ)."""
+	total = vram = 0.0
+	for rel in files:
+		path = os.path.join(ROOT, rel)
+		prm = import_params(path) if rel.lower().endswith(".png") else {}
+		wh = png_size(path) if prm.get("compress/mode") == "2" else None
+		if wh is None:
+			total += os.path.getsize(path)
+			continue
+		bpp = 1.0 if prm.get("compress/high_quality") == "true" else 0.5
+		b = wh[0] * wh[1] * bpp * (4.0 / 3.0 if prm.get("mipmaps/generate") == "true" else 1.0)
+		total += b
+		vram += b
+	return total / 1048576.0, vram / 1048576.0
+
+
 def cmd_files(a):
 	files = all_files()
 	names = [a.part] if a.part else [n for n, _ in parts()]
 	total_n = 0
-	total = 0.0
+	total = total_imp = total_vram = 0.0
 	for name in names:
 		fl = part_files(name, files)
 		if not a.summary:
 			for rel in fl:
 				print("%10d  %s" % (os.path.getsize(os.path.join(ROOT, rel)), rel))
 		mb = size_mb(fl)
-		print("часть %-14s %3d файлов, %6.1f МБ" % (name, len(fl), mb))
+		imp, vram = imported_mb(fl)
+		print("часть %-14s %3d файлов, %6.1f МБ исходников, ≈ %6.1f МБ после импорта (текстуры VRAM %5.1f МБ)" % (
+			name, len(fl), mb, imp, vram))
 		total_n += len(fl)
 		total += mb
+		total_imp += imp
+		total_vram += vram
 	if not a.part:
-		print("итого: %d частей, %d файлов, %.1f МБ" % (len(names), total_n, total))
+		print("итого: %d частей, %d файлов, %.1f МБ исходников, ≈ %.1f МБ после импорта (текстуры VRAM %.1f МБ)" % (
+			len(names), total_n, total, total_imp, total_vram))
 
 
 def cmd_check(_a):
@@ -230,8 +283,10 @@ def cmd_check(_a):
 				errors.append("%s — в двух частях: %s и %s" % (rel, owner[rel], n))
 			owner[rel] = n
 		mb = size_mb(fl)
-		if mb > PART_WARN_MB:
-			print("предупреждение: часть «%s» — %.1f МБ исходников, пора разделить" % (n, mb))
+		imp = imported_mb(fl)[0]
+		if max(mb, imp) > PART_WARN_MB:
+			print("предупреждение: часть «%s» — %.1f МБ исходников, ≈ %.1f МБ после импорта, пора разделить" % (
+				n, mb, imp))
 	loose = [rel for rel in files if match_any(rel, MUST_PACK) and not match_any(rel, IN_APK) and rel not in owner]
 	if loose:
 		errors.append("модели и картинки не попали ни в одну часть (попадут в APK): " + ", ".join(loose[:20]))
