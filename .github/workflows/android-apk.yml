@@ -78,12 +78,13 @@ jobs:
         with:
           path: |
             .godot/imported
+            .godot/editor/filesystem_cache8
             .godot/ci_import_state.json
             .godot/ci_import_files
           key: ${{ steps.ikey.outputs.key }}
           restore-keys: |
             ${{ steps.ikey.outputs.restore }}
-            godot-import-v1-${{ env.GODOT_VERSION }}-
+            godot-import-v2-${{ env.GODOT_VERSION }}-
 
       - name: Импорт проекта
         run: .github/scripts/import.sh
@@ -95,6 +96,7 @@ jobs:
         with:
           path: |
             .godot/imported
+            .godot/editor/filesystem_cache8
             .godot/ci_import_state.json
             .godot/ci_import_files
           key: ${{ steps.ikey.outputs.key }}
