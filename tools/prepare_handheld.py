@@ -413,6 +413,9 @@ def check(preview: str) -> bool:
 			bad.append("хват в %.3f м от предмета" % near)
 		if m["uv"].min() < 0.0 or m["uv"].max() > 1.0:
 			bad.append("UV вне [0, 1]")
+		us = pp.pc.uv_stats(m["pos"], m["uv"], m["tris"])  # треугольники, растянутые через атлас
+		if us["bad"] > pp.pc.UV_BAD_SHARE:
+			bad.append("UV: растянуто через атлас %.2f %% треуг." % (us["bad"] * 100))
 		img = Image.open(png)
 		if img.size != (cfg["tex"], cfg["tex"]):
 			bad.append("текстура %s" % (img.size,))

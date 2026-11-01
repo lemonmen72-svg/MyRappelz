@@ -8,7 +8,8 @@
                         из CREATURES, ноги на y = 0, морда в +Z; узел «Armature» → кости с понятными именами
                         (Root, Spine*, Hips, Chest, Neck*, Head, Ear*, Tail*, LegFL1…/LegL1…, Toe*, Wing*);
                         клипы Idle, Walk, Run (циклы), Attack, Hit, Death, Cast — процедурные.
-  <id>.png            — цветовая текстура из GLB, 1024×1024 (+ .png.import: VRAM-сжатие, мипмапы).
+  <id>.png            — цветовая текстура из GLB, 1024×1024 (cfg "tex": 0 — размер исходника как есть) (+ .png.import:
+                        VRAM-сжатие, мипмапы; cfg "tex_hq" — compress/high_quality: ASTC 4×4 на телефоне вместо ETC2).
   <id>.glb.import     — встроенные картинки отбрасываются, LOD включены (пишется, только если файла нет).
   creatures.json      — размеры, скорости шага/бега без проскальзывания, длины клипов, момент удара и умения,
                         роли костей → имена (для игры: куда цеплять эффекты, какая кость — голова и т. п.).
@@ -177,8 +178,12 @@ CREATURES["centaur"] = {
 		"td": {"BL": 0.0, "BR": 0.1, "FL": 0.42, "FR": 0.52}},
 }
 CREATURES["centaur_2"] = stage_cfg("centaur", 2.25)
-# У 3-й стадии (полный доспех) швы UV не дают упростить меш ниже ~13 тыс. — упрощение по сваренным позициям
-CREATURES["centaur_3"] = stage_cfg("centaur", 2.25, simplify="welded")
+# 3-я стадия (полный доспех, исходник Максима — c17.glb из Meshy, 228 тыс. треуг., текстура 2048): качество важнее
+# размера (слова Максима) — 28 тыс. треугольников (дальние — LOD Godot), текстура исходника 2048 без уменьшения,
+# сжатие высокого качества. Швы UV держат упрощение на ~13 тыс., а 28 тыс. обычное упрощение (со швами, UV исходника
+# точно) берёт с ошибкой 0.003; прежде здесь было 8.5 тыс. и "simplify": "welded" (по сваренным позициям — ошибка
+# с UV, см. simplify_welded).
+CREATURES["centaur_3"] = stage_cfg("centaur", 2.25, tris=28000, tex=0, tex_hq=True)
 
 
 # ---------- GLB: чтение ----------
@@ -230,6 +235,82 @@ def image_bytes(gltf: dict, binc: bytes, img: int) -> bytes:
 	bv = gltf["bufferViews"][gltf["images"][img]["bufferView"]]
 	o = bv.get("byteOffset", 0)
 	return binc[o:o + bv["byteLength"]]
+
+
+# ---------- Проверка UV (общая для зверей, героев, жителей, построек, оружия) ----------
+# Разброс UV треугольника — наибольший размах его UV по u или v (доля атласа). У целого меша Meshy и у упрощённого
+# без ошибок 99-й перцентиль ≈ 0.02–0.08; треугольник, чьи углы взяты с разных участков атласа (так было у
+# centaur_3 после упрощения «по сваренным позициям»: 27.7 % треугольников, 99-й перцентиль 0.86), тянет текстуру
+# через весь атлас — на модели пёстрые клочки чужих частей текстуры. Но у длинных тонких частей с развёрткой xatlas
+# (древко копья, клинок, обод щита) честный треугольник тоже бывает длиной в треть атласа — поэтому «растянутый»
+# ещё и плотнее по UV, чем меш в среднем, в UV_DENSITY_BAD раз (плотность — длина UV на метр поверхности; у всех
+# целых моделей ≤ 3.9 на 99-м перцентиле, у растянутых через атлас — 10–30).
+UV_SPREAD_BAD = 0.25  # разброс UV в треугольнике больше — подозрение
+UV_DENSITY_BAD = 4.0  # и плотность UV выше средней по мешу во столько раз — треугольник растянут через атлас
+UV_BAD_SHARE = 0.005  # таких больше 0.5 % — ПЛОХО
+
+
+def uv_spread(uv: np.ndarray, tris: np.ndarray) -> np.ndarray:
+	t = uv[tris]  # (n, 3, 2)
+	return (t.max(axis=1) - t.min(axis=1)).max(axis=1)
+
+
+def uv_density(pos: np.ndarray, uv: np.ndarray, tris: np.ndarray) -> np.ndarray:
+	"""Плотность UV треугольника (периметр в UV / периметр в 3D) относительно средней по мешу (√ площадей)."""
+	a, b, c = tris[:, 0], tris[:, 1], tris[:, 2]
+	per_uv = sum(np.linalg.norm(uv[x] - uv[y], axis=1) for x, y in ((a, b), (b, c), (c, a)))
+	per_3d = sum(np.linalg.norm(pos[x] - pos[y], axis=1) for x, y in ((a, b), (b, c), (c, a)))
+	d1, d2 = uv[b] - uv[a], uv[c] - uv[a]
+	area_uv = 0.5 * np.abs(d1[:, 0] * d2[:, 1] - d1[:, 1] * d2[:, 0])
+	area_3d = 0.5 * np.linalg.norm(np.cross(pos[b] - pos[a], pos[c] - pos[a]), axis=1)
+	mean = np.sqrt(max(float(area_uv.sum()), 1e-12) / max(float(area_3d.sum()), 1e-12))
+	return per_uv / np.maximum(per_3d, 1e-9) / mean
+
+
+def uv_stats(pos: np.ndarray, uv: np.ndarray, tris: np.ndarray) -> dict:
+	"""Доля треугольников, растянутых через атлас (разброс > UV_SPREAD_BAD и плотность > UV_DENSITY_BAD), и 99-й
+	перцентиль разброса."""
+	if len(tris) == 0:
+		return {"tris": 0, "bad": 0.0, "p99": 0.0, "spread": 0.0}
+	s = uv_spread(uv, tris)
+	bad = (s > UV_SPREAD_BAD) & (uv_density(pos, uv, tris) > UV_DENSITY_BAD)
+	return {"tris": int(len(tris)), "bad": float(bad.mean()), "p99": float(np.percentile(s, 99)),
+		"spread": float((s > UV_SPREAD_BAD).mean())}
+
+
+def uv_stats_glb(path: str) -> dict:
+	"""uv_stats по всем треугольным примитивам всех мешей GLB (позиции — как в файле, поза покоя)."""
+	gltf, binc = read_glb(path)
+	P, U, T = [], [], []
+	base = 0
+	for me in gltf.get("meshes", []):
+		for pr in me["primitives"]:
+			at = pr.get("attributes", {})
+			if "TEXCOORD_0" not in at or pr.get("mode", 4) != 4:
+				continue
+			uv = accessor(gltf, binc, at["TEXCOORD_0"]).astype(np.float64)
+			pos = accessor(gltf, binc, at["POSITION"]).astype(np.float64)
+			if "indices" in pr:
+				t = accessor(gltf, binc, pr["indices"]).astype(np.int64).reshape(-1, 3)
+			else:
+				t = np.arange(len(uv), dtype=np.int64).reshape(-1, 3)
+			P.append(pos)
+			U.append(uv)
+			T.append(t + base)
+			base += len(pos)
+	if not T:
+		return uv_stats(np.zeros((0, 3)), np.zeros((0, 2)), np.zeros((0, 3), dtype=np.int64))
+	return uv_stats(np.concatenate(P), np.concatenate(U), np.concatenate(T))
+
+
+def uv_check(path: str, label: str = "") -> bool:
+	"""Строка «UV: …»; ложь (и «ПЛОХО: UV»), если растянутых через атлас треугольников больше UV_BAD_SHARE."""
+	st = uv_stats_glb(path)
+	bad = st["bad"] > UV_BAD_SHARE
+	print("   %sUV: растянуто через атлас %.2f %% из %d треуг. (разброс > %.2f у %.2f %%, 99-й перцентиль %.3f)%s" % (
+		(label + " ") if label else "", st["bad"] * 100.0, st["tris"], UV_SPREAD_BAD, st["spread"] * 100.0, st["p99"],
+		"  ← ПЛОХО: UV" if bad else ""))
+	return not bad
 
 
 # ---------- Повороты (матрицы 3×3) ----------
@@ -782,8 +863,9 @@ def simplify_mesh(m: dict, target_tris: int, welded: bool = False) -> dict:
 	Швы UV (вершины с одной позицией и разными UV) meshoptimizer сам держит согласованными;
 	разница UV и нормалей входит в метрику ошибки, чтобы не плыли границы участков текстуры.
 	welded (cfg "simplify": "welded") — если швы UV не дают дойти до цели (у сложного доспеха кентавра 3-й стадии
-	упрощение встаёт на ~13 тыс.), упрощается меш со сваренными позициями, а у каждого угла треугольника берётся
-	та копия вершины, при которой UV треугольника компактнее (остаётся на своём участке текстуры)."""
+	упрощение встаёт на ~13 тыс.), упрощается меш со сваренными позициями, а потом вершины снова разводятся по
+	островам UV исходника (simplify_welded): у треугольника один остров, углы — копии вершин с него или точки его
+	поверхности."""
 	import ctypes
 	import meshoptimizer as mo
 	from meshoptimizer._loader import lib
@@ -836,9 +918,23 @@ def finish_simplify(m: dict, t: np.ndarray, err: float) -> dict:
 
 
 def simplify_welded(m: dict, target_tris: int) -> dict:
-	"""Упрощение по сваренным позициям (без швов UV), углы треугольников — копии вершин с компактными UV."""
+	"""Упрощение по сваренным позициям (без швов UV), затем вершины снова разводятся по участкам (островам) UV.
+
+	meshoptimizer упрощает меш, где у вершин с одной позицией одна вершина (швы UV не мешают). Но угол упрощённого
+	треугольника — уже не «вершина с UV», а точка, где в исходнике сходились копии с разных островов атласа. Раньше
+	у каждого угла бралась копия с самыми компактными UV треугольника; когда у трёх углов нет общего острова (а после
+	сильного упрощения так у четверти треугольников), треугольник тянул текстуру через весь атлас — у centaur_3
+	на теле были пёстрые клочки чужих частей текстуры (27.7 % треугольников с разбросом UV > 0.25).
+	Теперь: у треугольника выбирается один остров (у скольких углов он есть; при равенстве — ближайший к центру
+	треугольника исходный треугольник этого острова), угол берёт копию вершины с этого острова, а если такой нет —
+	UV ближайшей точки поверхности острова (по барицентрическим координатам исходного треугольника), нормаль и веса
+	костей — исходной вершины в этой точке. Углы одного острова в одной позиции — одна вершина; разные острова —
+	разные вершины (шов)."""
 	import ctypes
 	import itertools
+	from scipy.sparse import coo_matrix
+	from scipy.sparse.csgraph import connected_components
+	from scipy.spatial import cKDTree
 	from meshoptimizer._loader import lib
 	q = np.round(m["pos"] / 1e-5).astype(np.int64)
 	_, first, inv = np.unique(q, axis=0, return_index=True, return_inverse=True)
@@ -855,20 +951,150 @@ def simplify_welded(m: dict, target_tris: int) -> dict:
 	n = fn(dest.ctypes.data_as(P(ctypes.c_uint)), idx.ctypes.data_as(P(ctypes.c_uint)), len(idx),
 		vp.ctypes.data_as(P(ctypes.c_float)), len(vp), 12, target_tris * 3, 1.0, 0, ctypes.byref(err))
 	tw = dest[:n].astype(np.int64).reshape(-1, 3)
+
+	# Острова UV исходника: связные части по вершинам (после weld_same вершины с одной позицией и одним UV — одна)
+	tris = m["tris"]
+	V = len(m["pos"])
+	e = np.concatenate([tris[:, [0, 1]], tris[:, [1, 2]], tris[:, [2, 0]]])
+	_, island = connected_components(coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(V, V)), directed=False)
+	tri_island = island[tris[:, 0]]
+	pos, uv, nrm = m["pos"], m["uv"], m["nrm"]
+	A, B, C = pos[tris[:, 0]], pos[tris[:, 1]], pos[tris[:, 2]]
+	tree = cKDTree((A + B + C) / 3.0)
+	reach = float(np.max(np.linalg.norm(np.stack([A, B, C], 1) - ((A + B + C) / 3.0)[:, None, :], axis=2)))
 	order = np.argsort(inv, kind="stable")
 	starts = np.searchsorted(inv[order], np.arange(len(first) + 1))
-	uv = m["uv"]
+
+	def copies(w: int) -> np.ndarray:
+		return order[starts[w]:starts[w + 1]]
+
+	def nearest_on(p: np.ndarray, isl: int, k: int = 48) -> tuple:
+		"""Ближайшая к p точка исходных треугольников острова isl (isl < 0 — любого): (расстояние, треуг., бариц.)."""
+		cand = np.zeros(0, dtype=np.int64)
+		while k < 4 * len(tris):
+			cand = np.atleast_1d(tree.query(p, k=min(k, len(tris)))[1])
+			if isl >= 0:
+				cand = cand[tri_island[cand] == isl]
+			if len(cand):
+				break
+			k *= 4
+		if not len(cand):
+			cand = np.nonzero(tri_island == isl)[0]
+		d, _ = closest_on_tris(p, A[cand], B[cand], C[cand])
+		# Ближе найденного может быть только треугольник с центром не дальше d + reach — добираем их все
+		cand = np.array(tree.query_ball_point(p, float(d.min()) + reach), dtype=np.int64)
+		if isl >= 0:
+			cand = cand[tri_island[cand] == isl]
+		d, bc = closest_on_tris(p, A[cand], B[cand], C[cand])
+		j = int(np.argmin(d))
+		return float(d[j]), int(cand[j]), bc[j]
+
+	extra = {"pos": [], "nrm": [], "uv": [], "joints": [], "weights": []}
+	made = {}
+	gaps = []
+
+	def projected(w: int, isl: int) -> int:
+		"""Вершина в позиции w на поверхности острова isl (новая, общая для всех треугольников острова)."""
+		key = (w, isl)
+		if key not in made:
+			p = m["pos"][first[w]]
+			gap, ti, bc = nearest_on(p, isl)
+			gaps.append(gap)
+			vs = tris[ti]
+			# Нормаль и веса костей — у исходной вершины в этой же точке: все копии точки двигаются одинаково (шов не
+			# расходится в анимации); с поверхности острова — только UV
+			src = first[w]
+			extra["pos"].append(p)
+			extra["nrm"].append(nrm[src])
+			extra["uv"].append(bc @ uv[vs])
+			extra["joints"].append(m["joints"][src])
+			extra["weights"].append(m["weights"][src])
+			made[key] = V + len(extra["pos"]) - 1
+		return made[key]
+
 	t = np.zeros_like(tw)
+	moved = 0
 	for i, tri in enumerate(tw):
-		cands = [order[starts[w]:starts[w + 1]][:4] for w in tri]
-		best = None
+		cs = [copies(w) for w in tri]
+		count = {}
+		for c in cs:
+			for isl in set(island[c].tolist()):
+				count[isl] = count.get(isl, 0) + 1
+		top = max(count.values())
+		cent = m["pos"][first[tri]].mean(0)
+		if top >= 2:
+			best = [isl for isl, k in count.items() if k == top]
+			isl = best[0] if len(best) == 1 else min(best, key=lambda s: nearest_on(cent, s)[0])
+		else:
+			isl = int(tri_island[nearest_on(cent, -1)[1]])
+		cands = []
+		for w, c in zip(tri, cs):
+			own = c[island[c] == isl]
+			if len(own):
+				cands.append(own[:4])
+			else:
+				cands.append(np.array([projected(int(w), isl)]))
+				moved += 1
+		uvs = lambda v: uv[v] if v < V else extra["uv"][v - V]
+		best_combo = None
 		for combo in itertools.product(*cands):
-			a, b, c = uv[combo[0]], uv[combo[1]], uv[combo[2]]
+			a, b, c = uvs(combo[0]), uvs(combo[1]), uvs(combo[2])
 			d = float(np.linalg.norm(a - b) + np.linalg.norm(b - c) + np.linalg.norm(c - a))
-			if best is None or d < best[0]:
-				best = (d, combo)
-		t[i] = best[1]
-	return finish_simplify(m, t, float(err.value))
+			if best_combo is None or d < best_combo[0]:
+				best_combo = (d, combo)
+		t[i] = best_combo[1]
+	gaps = np.array(gaps or [0.0])
+	print("   упрощение по сваренным позициям: %d треуг., углов на поверхность своего острова UV %d (новых вершин %d, "
+		"до поверхности острова медиана %.1f мм, 95-й перцентиль %.1f мм, наибольшее %.1f мм)" % (
+		len(t), moved, len(made), np.median(gaps) * 1000, np.percentile(gaps, 95) * 1000, gaps.max() * 1000))
+	out = dict(m)
+	if made:
+		for k in extra:
+			out[k] = np.concatenate([m[k], np.array(extra[k], dtype=m[k].dtype)])
+	return finish_simplify(out, t, float(err.value))
+
+
+def closest_on_tris(p: np.ndarray, a: np.ndarray, b: np.ndarray, c: np.ndarray) -> tuple:
+	"""Ближайшая к точке p точка каждого треугольника (a, b, c — массивы n×3): расстояния (n) и барицентрические (n×3).
+	Ericson, «Real-Time Collision Detection», 5.1.5 — по областям Вороного треугольника."""
+	ab, ac, ap = b - a, c - a, p - a
+	d1, d2 = (ab * ap).sum(1), (ac * ap).sum(1)
+	bp = p - b
+	d3, d4 = (ab * bp).sum(1), (ac * bp).sum(1)
+	cp = p - c
+	d5, d6 = (ab * cp).sum(1), (ac * cp).sum(1)
+	va = d3 * d6 - d5 * d4
+	vb = d5 * d2 - d1 * d6
+	vc = d1 * d4 - d3 * d2
+	n = len(a)
+	bc = np.zeros((n, 3))
+	done = np.zeros(n, dtype=bool)
+
+	def put(mask, w):
+		nonlocal done
+		mask = mask & ~done
+		bc[mask] = w[mask] if w.ndim == 2 else w
+		done |= mask
+
+	one = np.ones(n)
+	zero = np.zeros(n)
+	put((d1 <= 0) & (d2 <= 0), np.stack([one, zero, zero], 1))
+	put((d3 >= 0) & (d4 <= d3), np.stack([zero, one, zero], 1))
+	put((d6 >= 0) & (d5 <= d6), np.stack([zero, zero, one], 1))
+	with np.errstate(divide="ignore", invalid="ignore"):
+		v = np.clip(d1 / (d1 - d3), 0.0, 1.0)
+		put((vc <= 0) & (d1 >= 0) & (d3 <= 0), np.stack([1 - v, v, zero], 1))
+		w = np.clip(d2 / (d2 - d6), 0.0, 1.0)
+		put((vb <= 0) & (d2 >= 0) & (d6 <= 0), np.stack([1 - w, zero, w], 1))
+		w = np.clip((d4 - d3) / ((d4 - d3) + (d5 - d6)), 0.0, 1.0)
+		put((va <= 0) & ((d4 - d3) >= 0) & ((d5 - d6) >= 0), np.stack([zero, 1 - w, w], 1))
+		den = va + vb + vc
+		den = np.where(np.abs(den) < 1e-30, 1e-30, den)
+		v = vb / den
+		w = vc / den
+		put(np.ones(n, dtype=bool), np.stack([1 - v - w, v, w], 1))
+	q = bc[:, :1] * a + bc[:, 1:2] * b + bc[:, 2:3] * c
+	return np.linalg.norm(q - p, axis=1), bc
 
 
 def mesh_stats(pos: np.ndarray, tris: np.ndarray) -> dict:
@@ -2993,7 +3219,7 @@ source_file="res://assets/creatures/{name}.png"
 [params]
 
 compress/mode=2
-compress/high_quality=false
+compress/high_quality={hq}
 mipmaps/generate=true
 detect_3d/compress_to=0
 """
@@ -3013,6 +3239,28 @@ source_file="res://assets/creatures/{name}.glb"
 gltf/embedded_image_handling=0
 meshes/generate_lods=true
 """
+
+
+def write_texture(image, cfg: dict, out_dir: str, cid: str) -> None:
+	"""<id>.png — цветовая текстура исходника: 1024×1024 или (cfg "tex": 0) размер исходника как есть; .png.import —
+	VRAM-сжатие и мипмапы, cfg "tex_hq" — compress/high_quality (на телефоне ASTC 4×4 вместо ETC2, на ПК BPTC вместо
+	S3TC). .png.import пишется всегда (качество — из cfg), .glb.import — только если файла нет."""
+	from PIL import Image
+	if image is not None:
+		im = Image.open(io.BytesIO(image)).convert("RGB")
+		src_size = im.size
+		side = cfg.get("tex", 1024)
+		if side and im.size != (side, side):
+			im = im.resize((side, side), Image.LANCZOS)
+		im.save(os.path.join(out_dir, cid + ".png"), optimize=True)
+		print("   текстура %d×%d (исходник %d×%d)%s" % (im.size + src_size
+			+ (", сжатие высокого качества" if cfg.get("tex_hq") else "",)))
+	hq = "true" if cfg.get("tex_hq") else "false"
+	for ext, tpl in ((".png.import", PNG_IMPORT), (".glb.import", GLB_IMPORT)):
+		p = os.path.join(out_dir, cid + ext)
+		if ext == ".png.import" or not os.path.exists(p):
+			with open(p, "w") as f:
+				f.write(tpl.format(name=cid, hq=hq))
 
 
 def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
@@ -3081,16 +3329,7 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 	os.makedirs(out_dir, exist_ok=True)
 	glb = os.path.join(out_dir, cid + ".glb")
 	write_glb(glb, cid, rig, mesh, clips)
-	if src["image"] is not None:
-		im = Image.open(io.BytesIO(src["image"])).convert("RGB")
-		if im.size != (1024, 1024):
-			im = im.resize((1024, 1024), Image.LANCZOS)
-		im.save(os.path.join(out_dir, cid + ".png"), optimize=True)
-	for ext, tpl in ((".png.import", PNG_IMPORT), (".glb.import", GLB_IMPORT)):
-		p = os.path.join(out_dir, cid + ext)
-		if not os.path.exists(p):
-			with open(p, "w") as f:
-				f.write(tpl.format(name=cid))
+	write_texture(src["image"], cfg, out_dir, cid)
 	nm = rig.names
 	lo, hi = mesh["pos"].min(0), mesh["pos"].max(0)
 	meta = {
@@ -3235,6 +3474,7 @@ def check(out_dir: str, ids: list, meta_all: dict, preview: str = "") -> bool:
 		print("== %s: %d костей, %d треуг., %d вершин, картинок в GLB %d; высота %.3f (y %.3f…%.3f), длина %.3f, ширина %.3f" % (
 			cid, len(m["joints"]), len(m["tris"]), len(m["pos"]), m["images"], hi[1] - lo[1], lo[1], hi[1],
 			hi[2] - lo[2], hi[0] - lo[0]))
+		ok &= uv_check(path)
 		face_ok = hz > 0.0 and G0[head][1, 3] > 0.3 * (hi[1] - lo[1])
 		if meta.get("kind") == "biped":
 			face_ok = biped_check_rest(meta, G0, idx)
@@ -3940,16 +4180,7 @@ def build_biped(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 		clips.append(cl)
 	os.makedirs(out_dir, exist_ok=True)
 	write_glb(os.path.join(out_dir, cid + ".glb"), cid, rig, mesh, clips)
-	if src["image"] is not None:
-		im = Image.open(io.BytesIO(src["image"])).convert("RGB")
-		if im.size != (1024, 1024):
-			im = im.resize((1024, 1024), Image.LANCZOS)
-		im.save(os.path.join(out_dir, cid + ".png"), optimize=True)
-	for ext, tpl in ((".png.import", PNG_IMPORT), (".glb.import", GLB_IMPORT)):
-		p = os.path.join(out_dir, cid + ext)
-		if not os.path.exists(p):
-			with open(p, "w") as f:
-				f.write(tpl.format(name=cid))
+	write_texture(src["image"], cfg, out_dir, cid)
 	lo, hi = mesh["pos"].min(0), mesh["pos"].max(0)
 	clip_meta = {cl["name"]: {"length": round(cl["T"], 3), "loop": cl["loop"], "source": cl["lib"]} for cl in clips}
 	for cl in clips:

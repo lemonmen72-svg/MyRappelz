@@ -855,6 +855,11 @@ def check(preview: str) -> bool:
 		u, v = m["uv"][:, 0] * pw, m["uv"][:, 1] * ph
 		if u.min() < x0 or u.max() > x0 + s or v.min() < y0 or v.max() > y0 + s:
 			bad.append("UV вне своей клетки атласа")
+		# Треугольники, растянутые через развёртку (углы с разных участков) — в долях своей клетки атласа
+		cell = np.stack([(u - x0) / s, (v - y0) / s], 1)
+		us = pc.uv_stats(m["pos"], cell, m["tris"])
+		if us["bad"] > pc.UV_BAD_SHARE:
+			bad.append("UV: растянуто через атлас %.2f %% треуг." % (us["bad"] * 100))
 		print("%-18s %-7s %5d тр. %s м %s" % (cid, cfg["page"], len(m["tris"]),
 			" × ".join("%5.2f" % d for d in hi - lo), "ok" if not bad else "ПЛОХО: " + "; ".join(bad)))
 		ok = ok and not bad
