@@ -1,0 +1,15 @@
+[remap]
+
+importer="scene"
+importer_version=1
+type="PackedScene"
+
+[deps]
+
+source_file="res://assets/handheld/weapon_sword_2h_r1.glb"
+
+[params]
+
+gltf/embedded_image_handling=0
+meshes/generate_lods=false
+meshes/create_shadow_meshes=false

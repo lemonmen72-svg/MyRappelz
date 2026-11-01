@@ -1,0 +1,15 @@
+[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+
+[deps]
+
+source_file="res://assets/handheld/weapon_staff_1h_r1.png"
+
+[params]
+
+compress/mode=2
+compress/high_quality=false
+mipmaps/generate=true
+detect_3d/compress_to=0

@@ -1244,6 +1244,31 @@ func run_step() -> void:
 			_gcam.queue_free()
 			main.cam.current = true
 			main.hud.visible = true
+			wait = 5
+			step = 1000
+		1000:
+			# Оружие и предметы в руках из файлов (Handheld, tools/prepare_handheld.py): ряды крупно
+			_handheld_row(HANDHELD_WEAPONS)
+			wait = 20
+			step = 1001
+		1001:
+			shot("150_handheld_weapons")
+			_handheld_row(HANDHELD_NPC)
+			wait = 20
+			step = 1002
+		1002:
+			shot("151_handheld_npc_items")
+			_weapon_heroes(HANDHELD_HEROES_A)
+			wait = 45
+			step = 1003
+		1003:
+			shot("152_heroes_weapons_a")
+			_weapon_heroes(HANDHELD_HEROES_B)
+			wait = 45
+			step = 1004
+		1004:
+			shot("153_heroes_weapons_b")
+			_handheld_clear()
 			ok_done()
 
 
@@ -1607,6 +1632,117 @@ func _animate_row(frame_i: int) -> void:
 			ca.update(1.0 / 30.0, float(ca.info["walk_speed"]) * float(MobData.get_type(id)["scale"]))
 		else:
 			CreatureModels.animate(holder, id, float(frame_i) / 30.0, 0.5)
+
+
+## Кадры 150–151: оружие 1-го ранга и предметы жителей из файлов (Handheld) в ряд, стоймя, камера спереди.
+const HANDHELD_WEAPONS := ["weapon_dagger_r1", "weapon_sword_1h_r1", "weapon_sword_2h_r1", "weapon_axe_1h_r1",
+	"weapon_axe_2h_r1", "weapon_mace_1h_r1", "weapon_mace_2h_r1", "weapon_staff_1h_r1", "weapon_staff_2h_r1",
+	"weapon_spear_r1", "npc_longbow", "weapon_shield_r1", "weapon_crossbow_r1"]
+const HANDHELD_NPC := ["npc_cane", "npc_wand", "npc_hammer", "npc_antlerstaff", "npc_grimoire", "npc_tome",
+	"npc_scroll", "npc_keys", "npc_quiver", "npc_longbow"]
+## Кадры 152–153: герои профессий с оружием из файлов [модель, вид, предмет, вторая рука].
+const HANDHELD_HEROES_A := [
+	["hero_swordsman_m", "sword_1h", "weapon_sword_1h_r1", "weapon_shield_r1"],
+	["hero_warrior_f", "axe_2h", "weapon_axe_2h_r1", ""],
+	["hero_wizard_f", "staff_2h", "weapon_staff_2h_r1", ""],
+	["hero_assassin_m", "daggers", "weapon_dagger_r1", "weapon_dagger_r1"],
+	["hero_beastmaster_m", "mace_2h", "weapon_mace_2h_r1", ""],
+	["hero_conjurer_m", "dual_axes", "weapon_axe_1h_r1", "weapon_axe_1h_r1"],
+]
+const HANDHELD_HEROES_B := [
+	["hero_swordsman_f", "sword_2h", "weapon_sword_2h_r1", ""],
+	["hero_warrior_m", "bow", "weapon_bow_r1", ""],
+	["hero_assassin_f", "crossbow", "crossbow_starter", ""],
+	["hero_neophyte_m", "staff_1h", "weapon_staff_1h_r1", ""],
+	["hero_adept_f", "dagger", "weapon_dagger_r1", "weapon_shield_r1"],
+	["hero_swordsman_m", "spear", "weapon_spear_r1", ""],
+]
+var _hh_row: Node3D = null
+var _hh_cam: Camera3D = null
+
+
+## Площадь города перед ратушей: ряд узлов, камера спереди (HUD и игрок скрыты).
+func _handheld_stage(look_h: float, dist: float) -> Vector3:
+	_handheld_clear()
+	var player: Player = main.player
+	player.visible = false
+	main.pets.recall()
+	var base := Vector3(0.0, 0.0, 3.0)
+	if IslandWorld.current != null:
+		base.y = IslandWorld.current.height_at(base.x, base.z)
+	player.global_position = base + Vector3(0, 0.1, -6.0)
+	_hh_row = Node3D.new()
+	_hh_row.name = "HandheldRow"
+	main.add_child(_hh_row)
+	_hh_cam = Camera3D.new()
+	main.add_child(_hh_cam)
+	_hh_cam.global_position = base + Vector3(0, look_h + 0.1, dist)
+	_hh_cam.look_at(base + Vector3(0, look_h, 0))
+	_hh_cam.current = true
+	main.hud.visible = false
+	return base
+
+
+## Предметы ids стоймя в ряд (нижний конец на земле; арбалет — ложем вбок на высоте пояса, лук — профилем).
+func _handheld_row(ids: Array) -> void:
+	var gap := 0.42
+	var base := _handheld_stage(0.9, 2.6)
+	for i in ids.size():
+		var id := String(ids[i])
+		var w := Handheld.make(id)
+		check(w != null, "кадр предметов: модель %s из файла" % id)
+		if w == null:
+			continue
+		_hh_row.add_child(w)
+		var x := (float(i) - float(ids.size() - 1) * 0.5) * gap
+		match Handheld.frame(id):
+			"crossbow":
+				w.rotation.y = PI * 0.5
+				w.global_position = base + Vector3(x, 0.9, 0)
+			"bow":
+				w.rotation.y = -PI * 0.5
+				w.global_position = base + Vector3(x, 0.75, 0)
+			_:
+				var butt := Handheld.point(id, "butt")
+				w.global_position = base + Vector3(x, 0.03 - butt.y, 0)
+		print("  %s: %s, длина %.2f м" % [id, Handheld.frame(id), float(Handheld.info(id).get("length", 0.0))])
+
+
+## Герои профессий с оружием из файлов в ряд (Idle), камера спереди.
+func _weapon_heroes(list: Array) -> void:
+	var gap := 1.25
+	var base := _handheld_stage(1.0, 3.6)
+	for i in list.size():
+		var e: Array = list[i]
+		var path := CharacterModel.HERO_ASSET_DIR + String(e[0]) + ".glb"
+		var spec := CharacterModel.spec_for("dark_elf", "assassin", String(e[1]), "f", ItemData.is_shield(String(e[3])),
+			String(e[2]), String(e[3]))
+		spec["asset"] = path
+		var m := CharacterModel.new()
+		m.setup(spec)
+		_hh_row.add_child(m)
+		var gp := base + Vector3((float(i) - float(list.size() - 1) * 0.5) * gap, 0, 0)
+		if IslandWorld.current != null:
+			gp.y = IslandWorld.current.height_at(gp.x, gp.z)
+		m.global_position = gp
+		m.rotation.y = PI + 0.3
+		var held: PackedStringArray = []
+		for mi in m.find_children("*", "MeshInstance3D", true, false):
+			if (mi as Node).has_meta("handheld"):
+				held.append("%s=%s" % [mi.name, String((mi as Node).get_meta("handheld"))])
+		print("  %s (%s): %s" % [String(e[0]), String(e[1]), ", ".join(held)])
+
+
+func _handheld_clear() -> void:
+	if _hh_row != null:
+		_hh_row.queue_free()
+		_hh_row = null
+	if _hh_cam != null:
+		_hh_cam.queue_free()
+		_hh_cam = null
+	main.cam.current = true
+	main.hud.visible = true
+	(main.player as Player).visible = true
 
 
 func shot(shot_name: String) -> void:

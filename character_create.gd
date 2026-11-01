@@ -364,8 +364,8 @@ func _preview(k: String, g: String, box: Vector2, on_tap: Callable) -> Control:
 	pivot.rotation.y = PI - 0.45
 	vp.add_child(pivot)
 	var model := CharacterModel.new()
-	model.setup(CharacterModel.spec_for(_race, ClassData.WANDERER,
-		ItemData.weapon_kind(ItemData.default_weapon(ClassData.WANDERER)), g))
+	var starter := ItemData.default_weapon(ClassData.WANDERER)
+	model.setup(CharacterModel.spec_for(_race, ClassData.WANDERER, ItemData.weapon_kind(starter), g, false, starter))
 	pivot.add_child(model)
 	_previews[k] = {"pivot": pivot, "model": model}
 	svc.gui_input.connect(_on_preview_input.bind(k, on_tap))

@@ -420,7 +420,8 @@ func _build_preview(p: Player) -> Control:
 	vp.add_child(_pivot)
 	var m := CharacterModel.new()
 	m.name = "PreviewModel"
-	m.setup(CharacterModel.spec_for(Game.race_id, Game.class_id, p.weapon_kind, Game.gender, p.has_shield))
+	m.setup(CharacterModel.spec_for(Game.race_id, Game.class_id, p.weapon_kind, Game.gender, p.has_shield,
+		Game.weapon, Game.offhand))
 	_pivot.add_child(m)
 	return svc
 
