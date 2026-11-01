@@ -214,6 +214,13 @@ func back_to_menu() -> Node:
 	Game.leave_slot()
 	AdminPanel.reset_session()
 	JobFxNeophyte.corpses.clear()
+	return restart_scene()
+
+
+## Запустить главную сцену заново с тем, что сейчас в Game и Accounts: герой есть — сразу мир, вошёл в аккаунт без
+## героя — выбор персонажа, иначе вход (back_to_menu; тест-бот — TestBot: в мир тестового героя и обратно к герою
+## игрока). Старая сцена до удаления (конец кадра) не обновляется. Возвращает новую главную сцену.
+func restart_scene() -> Node:
 	var fresh: Node = load("res://main.tscn").instantiate()
 	var p := get_parent()
 	var was_current := get_tree().current_scene == self

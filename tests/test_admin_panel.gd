@@ -11,7 +11,7 @@ extends "res://tests/test_base.gd"
 ## предметы, множитель опыта после загрузки). Окно с каждой вкладкой помещается в 1280×720 при всех размерах
 ## интерфейса.
 
-const TABS := ["hero", "xp", "items", "pets", "world"]
+const TABS := ["hero", "xp", "items", "pets", "world", "bot"]
 ## UiScale.SMALL, MEDIUM, LARGE.
 const LEVELS := [0, 1, 2]
 ## Допуск переноса: свободная точка ищется до AdminPanel.TP_SEARCH м от места.

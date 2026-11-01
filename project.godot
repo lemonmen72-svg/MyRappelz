@@ -17,6 +17,10 @@ config/icon="res://assets/branding/icon.png"
 
 Game="*res://game_state.gd"
 
+[debug]
+
+file_logging/enable_file_logging=true
+
 [display]
 
 window/size/viewport_width=1280

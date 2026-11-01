@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Плагин Godot v2 «MyRappelzDownload»: фоновая загрузка пакета ресурсов через DownloadManager.
+<!-- Плагин Godot v2 «MyRappelzDownload»: фоновая загрузка пакета ресурсов через DownloadManager, температура
+     телефона, отчёт тест-бота (общая папка «Загрузки», «Поделиться»).
      Разрешение на уведомления (Android 13+) — чтобы система показывала ход загрузки; игра спрашивает его
      при первом нажатии «Загрузить». -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -11,6 +12,13 @@
         <meta-data
             android:name="org.godotengine.plugin.v2.MyRappelzDownload"
             android:value="com.lemonmen.myrappelz.download.DownloadPlugin" />
+        <!-- Отчёт тест-бота: «Поделиться» и «Открыть» отдают файл через свой провайдер (только чтение, разовое
+             разрешение на адрес; класс — в этом же AAR, без androidx). -->
+        <provider
+            android:name="com.lemonmen.myrappelz.download.ReportProvider"
+            android:authorities="${applicationId}.darkpact_reports"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 
 </manifest>
