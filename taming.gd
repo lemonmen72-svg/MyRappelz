@@ -184,7 +184,8 @@ static func habitat_text(species: String) -> String:
 	for z in zones():
 		var zone: Dictionary = z
 		if (zone["mobs"] as Array).has(species):
-			var lv: Array = zone["levels"]
+			# Свои уровни вида в зоне ([вид, n, мин, макс]), иначе — уровни зоны
+			var lv: Array = (zone.get("species_levels", {}) as Dictionary).get(species, zone["levels"])
 			var lt := "ур. %d" % int(lv[0]) if int(lv[0]) == int(lv[1]) else "ур. %d–%d" % [int(lv[0]), int(lv[1])]
 			parts.append("%s (%s)" % [String(zone["name"]), lt])
 	return ", ".join(PackedStringArray(parts))
@@ -220,9 +221,16 @@ static func zones() -> Array:
 		var zone: Dictionary = z
 		var lv: Array = zone.get("levels", [1, 1])
 		var mobs: Array = []
+		var sp_lv := {}
 		for m in zone.get("mobs", []):
-			mobs.append(String((m as Array)[0]))
-		_zones.append({"name": String(zone.get("name", "")), "levels": [int(lv[0]), int(lv[1])], "mobs": mobs})
+			var e: Array = m
+			var sid := String(e[0])
+			mobs.append(sid)
+			if e.size() >= 4:
+				var old_lv: Array = sp_lv.get(sid, [int(e[2]), int(e[3])])
+				sp_lv[sid] = [mini(int(old_lv[0]), int(e[2])), maxi(int(old_lv[1]), int(e[3]))]
+		_zones.append({"name": String(zone.get("name", "")), "levels": [int(lv[0]), int(lv[1])], "mobs": mobs,
+			"species_levels": sp_lv})
 	return _zones
 
 

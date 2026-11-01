@@ -67,6 +67,9 @@ const WILD_STAGE_LEVELS := [1, 12, 22]
 const XP_BASE := 8.0
 const XP_LVL := 4.0
 const XP_SQ := 0.15
+## Множитель опыта за зверя (решение Максима: «опыта должно быть где-то на уровне ×3 ×4»): награда зверя —
+## base_xp × XP_GAIN, кривая уровня героя (xp_to_next) — по base_xp, т. е. зверей на уровень в XP_GAIN раз меньше.
+const XP_GAIN := 3.5
 ## Сколько зверей своего уровня нужно на уровень героя: KILLS_BASE + KILLS_LVL·L, после KILLS_HIGH_FROM ур. —
 ## ещё KILLS_HIGH·(L − KILLS_HIGH_FROM)² (Game.xp_to_next).
 const KILLS_BASE := 5.0
@@ -236,5 +239,5 @@ static func derived(type_id: String, lvl: int) -> Dictionary:
 		"crit": snappedf(Stats.crit_chance(s), 0.1),
 		"aspd": aspd,
 		"attack_cd": MobData.attack_cd(type_id) * 100.0 / float(aspd),
-		"xp": maxi(1, roundi(base_xp(lv) * pw * (BOSS_XP if boss else 1.0))),
+		"xp": maxi(1, roundi(base_xp(lv) * XP_GAIN * pw * (BOSS_XP if boss else 1.0))),
 	}

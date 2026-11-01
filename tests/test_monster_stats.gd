@@ -258,13 +258,14 @@ func _unit_xp() -> void:
 		grows = grows and int(game.xp_to_next(l + 1)) > int(game.xp_to_next(l))
 	check(grows, "кривая опыта растёт до 40 ур.")
 	for l in range(1, 20):
-		var per: float = float(game.xp_to_next(l)) / MobStats.base_xp(l)
+		var per: float = float(game.xp_to_next(l)) / (MobStats.base_xp(l) * MobStats.XP_GAIN)
 		if l < 10:
 			k1 += per
 		else:
 			k2 += per
-	check(k1 >= 90.0 and k1 <= 140.0, "до 10 ур.: %.0f зверей своего уровня" % k1)
-	check(k2 >= 220.0 and k2 <= 330.0, "с 10 до 20 ур.: %.0f зверей" % k2)
+	# Опыт за зверя ×XP_GAIN (3.5): до 10 ур. ≈ 31 зверь своего уровня (было ≈ 110), с 10 до 20 ≈ 77 (было ≈ 270)
+	check(k1 >= 90.0 / MobStats.XP_GAIN and k1 <= 140.0 / MobStats.XP_GAIN, "до 10 ур.: %.0f зверей своего уровня" % k1)
+	check(k2 >= 220.0 / MobStats.XP_GAIN and k2 <= 330.0 / MobStats.XP_GAIN, "с 10 до 20 ур.: %.0f зверей" % k2)
 
 
 ## Боссы: по одному на существо, модель 3-й стадии (у рыб и анатем — старшая), статы выше, не приручаются.
@@ -347,6 +348,32 @@ func _unit_zones() -> void:
 				check(Vector2(p.x, p.z).distance_to(IslandWorld.v2(zd["center"])) > float(zd["radius"]) + 12.0,
 					"%s дальше 12 м от безопасной зоны %s" % [id, zd["id"]])
 	check(lo <= 2 and hi == 30, "уровни зверей острова: %d–%d" % [lo, hi])
+	# Около деревень рас (решение Максима) — только звери 1–5 ур., больше всего 1–2: зоны старше 5 ур. — краем не
+	# ближе 30 м от центра деревни, у каждой деревни — свои «Окрестности» с фазанами 1–2 ур.
+	for v in w.cfg.get("safe_zones", []):
+		var vz: Dictionary = v
+		if not String(vz["id"]).ends_with("_village"):
+			continue
+		var vc := IslandWorld.v2(vz["center"])
+		var lo_n := 0
+		var all_n := 0
+		for z in w.cfg.get("mob_zones", []):
+			var zd: Dictionary = z
+			var edge := IslandWorld.v2(zd["center"]).distance_to(vc) - float(zd["radius"])
+			if int((zd["levels"] as Array)[1]) > 5:
+				check(edge >= 30.0, "у %s нет зверей старше 5 ур.: зона %s краем в %.0f м" % [vz["id"], zd["id"], edge])
+		for s in main._slots:
+			var sl: Dictionary = s
+			var p: Vector3 = sl["pos"]
+			var dv := Vector2(p.x, p.z).distance_to(vc)
+			if dv < 28.0:
+				check(int(sl["level"]) <= 5, "у %s: %s %d ур. в %.0f м" % [vz["id"], sl["type"], int(sl["level"]), dv])
+			if dv < 45.0 and int(sl["level"]) <= 5:
+				all_n += 1
+				if int(sl["level"]) <= 2:
+					lo_n += 1
+		check(all_n >= 6 and float(lo_n) >= 0.4 * float(all_n), "у %s звери 1–2 ур. — больше всего: %d из %d"
+			% [vz["id"], lo_n, all_n])
 	for k in MobData.TYPES:
 		if MobData.is_boss(String(k)):
 			check(int(bosses.get(String(k), 0)) == 1, "босс %s на острове — один" % k)

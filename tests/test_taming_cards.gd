@@ -306,7 +306,7 @@ func _unit_lines() -> void:
 	check(t.contains("Восточный лагерь") and t.contains("выпадает из волка"), "карта волка: " + t)
 	check(t.contains("синяя (обычная)") and t.contains("45%"), "карта волка — синяя, 45%: " + t)
 	t = "\n".join(PackedStringArray(Taming.card_lines("card_turtle")))
-	check(t.contains("Мёртвая роща (ур. 3–6)") and t.contains("коричневая (базовая)"), "карта черепахи: " + t)
+	check(t.contains("Мёртвая роща (ур. 3–5)") and t.contains("коричневая (базовая)"), "карта черепахи: " + t)
 	check(Taming.card_lines("card_golem").is_empty() and Taming.card_lines("card_boar").is_empty(), "карт стража и кабана нет")
 	t = "\n".join(PackedStringArray(Taming.card_lines("card_wolf_soul")))
 	check(t.contains("Сформируйте существо в окне «Питомцы» или кнопкой «Сформировать»"), "карта с душой: " + t)

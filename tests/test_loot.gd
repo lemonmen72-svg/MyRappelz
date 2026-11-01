@@ -113,6 +113,7 @@ func _unit_gold() -> void:
 		for m in mats:
 			price += float(ItemData.get_item(String(m))["sell"])
 		price /= maxf(1.0, float(mats.size()))
+		price *= MobData.GOLD_MULT
 		# На базовом уровне вида золото ≈ цене материала: ±20 %
 		check(int(gr[0]) >= 1 and float(gr[0]) <= price * 0.8 + 1.0 and float(gr[1]) >= price * 1.2 - 1.0
 			and float(gr[1]) <= price * 1.2 + 1.0, "%s: золото %d–%d при цене материала %.0f" % [id, int(gr[0]), int(gr[1]), price])
@@ -122,7 +123,7 @@ func _unit_gold() -> void:
 	# С уровнем — немного больше, но не больше чем в 1.5 раза
 	var lo: Array = MobData.gold_range("wolf", 3)
 	var hi: Array = MobData.gold_range("wolf", 30)
-	check(int(hi[1]) > int(lo[1]) and float(hi[1]) <= float(lo[1]) * 1.5 + 1.0, "золото волка растёт с уровнем мягко: %s → %s" % [lo, hi])
+	check(int(hi[1]) > int(lo[1]) and float(hi[1]) <= float(lo[1]) * 1.5 + MobData.GOLD_MULT, "золото волка растёт с уровнем мягко: %s → %s" % [lo, hi])
 
 
 # ---------- Ранги ----------

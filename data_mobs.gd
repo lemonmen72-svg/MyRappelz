@@ -270,9 +270,14 @@ static func respawn_time(id: String) -> float:
 ## Золото за зверя уровня lvl: [мин., макс.] (правило Максима — немного, ± цена материала): средняя цена продажи
 ## материалов (у босса — особого материала, если он дороже) × 0.8…1.2 и мягкий рост с уровнем ((lvl + 4) / (база + 4),
 ## 0.75…1.5). Нет материалов — прежняя вилка gold вида.
+## Множитель золота за зверя (решение Максима: «количество выпадаемых денег увеличь в 4 раза» — впереди новые
+## товары и механики): вилка gold_range — цена материала × 0.8…1.2 × уровень × GOLD_MULT.
+const GOLD_MULT := 4.0
+
+
 static func gold_range(id: String, lvl: int) -> Array:
 	var d := get_type(id)
-	var k := clampf(float(maxi(1, lvl) + 4) / float(int(d["level"]) + 4), 0.75, 1.5)
+	var k := clampf(float(maxi(1, lvl) + 4) / float(int(d["level"]) + 4), 0.75, 1.5) * GOLD_MULT
 	var base := maxf(_avg_sell(materials(id)), _avg_sell(special_materials(id)))
 	if base <= 0.0:
 		var g: Array = d["gold"]
