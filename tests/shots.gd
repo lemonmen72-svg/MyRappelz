@@ -1625,7 +1625,9 @@ func run_step() -> void:
 		1203:
 			for c in _heroes.get_children():
 				var m := c as CharacterModel
-				check(m.loco_clip().to_lower() == "mq_running", "кадр 252: бег — клип манекена (%s)" % m.loco_clip())
+				check(m.loco_clip().to_lower() == "mq_running", "кадр 252: бег — клип манекена (%s; оружие %s, клип %s, loco %s, скорость %.1f/%.1f, действие %.2f, таблица %d)"
+					% [m.loco_clip(), m.weapon_kind, m._anim.current_animation if m._anim != null else "-", m._loco, m._speed,
+					m._asset_speed, m._act_end, m._mq_loco_table().size()])
 			shot("252_run_live")
 			_clip_row_clear()
 			# Шаг, трусца и быстрый бег (кадр 253)
