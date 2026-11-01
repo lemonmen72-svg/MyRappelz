@@ -332,7 +332,14 @@ func _storage_details() -> void:
 	check(eco.withdraw(st.find_cell("pheasant_feather"), -1) == 4 and st.count("pheasant_feather") == 0
 		and inv.count("pheasant_feather") == 5, "забрана вся стопка")
 	# Надетое оружие ячейку сумки не занимает — на склад его не положить
-	check(game.weapon != "" and inv.find_cell(game.weapon) == -1, "надетое оружие не в ячейках сумки")
+	# (в наградах заданий бывает случайное оружие — такое же, как надетое, лежит в своей ячейке: ячеек на одну меньше)
+	var in_cells := 0
+	for c in inv.cells():
+		var cd: Dictionary = c if c is Dictionary else {}
+		if String(cd.get("id", "")) == game.weapon:
+			in_cells += int(cd.get("n", 1))
+	check(game.weapon != "" and in_cells == inv.count(game.weapon) - 1, "надетое оружие не в ячейках сумки (%d из %d)"
+		% [in_cells, inv.count(game.weapon)])
 	# Сумка полна — со склада не забрать
 	st.add("mirror_card", 2)
 	inv.add("sword_steel", Inventory.CAPACITY - inv.used_cells())
