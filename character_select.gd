@@ -13,9 +13,9 @@ signal create(slot: int)
 signal switch_account
 
 ## Карточка слота для «Среднего» размера интерфейса.
-const CARD_SIZE := Vector2(225, 300)
+const CARD_SIZE := Vector2(225, 230)
 ## Сторона портрета на карточке («Средний»).
-const PORTRAIT := 80.0
+const PORTRAIT := 72.0
 ## Затемнение главного арта на фоне (карточки поверх).
 const SHADE := 0.6
 
@@ -169,17 +169,31 @@ func _card(i: int) -> PanelContainer:
 		return panel
 	var cls := String(s.get("class", ClassData.WANDERER))
 	var col := _card_color(s)
+	# Портрет слева, ник, уровень и профессия справа от него (карточка невысокая — экран влезает в 720 px на «Крупном»)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", int(UiScale.px(8)))
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(top)
 	var pic := MenuKit.portrait(cls, String(s.get("race", "")), String(s.get("gender", "f")), PORTRAIT)
 	if pic != null:
-		v.add_child(pic)
+		pic.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		top.add_child(pic)
+	var info := VBoxContainer.new()
+	info.add_theme_constant_override("separation", int(UiScale.px(2)))
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(info)
 	var nick := _pass(MenuKit.label(String(s.get("name", "")), UiScale.FONT_NAME + 2, MenuKit.GOLD))
 	# Длинный ник (до 16 букв) не раздвигает карточку: обрезается многоточием, полностью — в подсказке
 	nick.clip_text = true
 	nick.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	nick.tooltip_text = nick.text
-	v.add_child(nick)
-	v.add_child(_pass(MenuKit.label("Уровень %d" % int(s.get("level", 1)), UiScale.FONT_HEAD, Color.WHITE)))
-	v.add_child(_pass(MenuKit.label(ClassData.job_name(cls), UiScale.FONT_HEAD, col)))
+	info.add_child(nick)
+	info.add_child(_pass(MenuKit.label("Уровень %d" % int(s.get("level", 1)), UiScale.FONT_HEAD, Color.WHITE)))
+	var job := _pass(MenuKit.label(ClassData.job_name(cls), UiScale.FONT_HEAD, col))
+	job.clip_text = true
+	job.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	info.add_child(job)
 	# Раса и пол — одной строкой (карточка невысокая: экран с подтверждением удаления влезает в 720 px на «Крупном»)
 	var race_name := String(ClassData.race(String(s.get("race", ""))).get("name", ""))
 	var who := _pass(MenuKit.label("%s · %s" % [race_name, ClassData.gender_name(String(s.get("gender", "f")))],

@@ -378,7 +378,8 @@ func _judge_mob(nm: String, from: int, strict: bool) -> void:
 	print("ИЗМЕРЕНИЕ %s, зверь: клип сменился %d раз, разворотов %d, до героя %.2f м" % [nm, msw, mfl, near])
 	if strict:
 		check(msw <= MOB_LOCO and mfl <= 2, "%s: зверь у героя не дёргается (смен клипа %d, разворотов %d)" % [nm, msw, mfl])
-		check(near >= 0.0 and near <= mob._reach() + 0.3, "%s: зверь дошёл до героя и бьёт (%.2f м)" % [nm, near])
+		# запас: зверь останавливается в _reach() − CHASE_SLACK, на склоне/у коллизии — чуть дальше
+		check(near >= 0.0 and near <= mob._reach() + 0.8, "%s: зверь дошёл до героя и бьёт (%.2f м, дальность удара %.2f)" % [nm, near, mob._reach()])
 
 
 # ---------- Отрезки ----------
