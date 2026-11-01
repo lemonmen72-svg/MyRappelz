@@ -7,6 +7,12 @@ extends "res://tests/test_base.gd"
 ## о размере, «Играть без загрузки», битый файл (sha256), обрыв сети, «Повторить», успешная проверка —
 ## переименование временного файла, удаление прежних версий, подключение .pck (его файл виден в res://);
 ## пакет того же хэша берётся из кэша без загрузки; манифест из сети (битый и верный).
+## Фоновая загрузка Android DownloadManager — подставной плагин FakeDownloads (Assets.plugin_override): без плагина
+## (не Android) и когда DownloadManager не принял загрузку — HTTPRequest; ход загрузки, ожидание сети, ошибка и отмена
+## («Повторить»), битый файл, успех — проверка sha256 с копированием из «внешней папки» в кэш и подключение; запись
+## о загрузке переживает перезапуск (следующий экран сразу следит за ней, запись другого хэша убирается);
+## «Играть, пока грузится» — фоновый AssetLoader допроверяет пакет, кладёт в кэш (не подключая посреди игры)
+## и пишет в HUD; плагин Android и его включение в проекте на месте.
 
 const TEST_DIR := "user://test_packs/"
 const SRC := "user://test_pack_probe.txt"
@@ -15,12 +21,79 @@ const PROBE_RES := "res://test_asset_pack/probe.txt"
 const H0 := "0000000000000000"
 const H1 := "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
 const H2 := "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+const H3 := "c3c3c3c3c3c3c3c3"
+const H4 := "d4d4d4d4d4d4d4d4"
+const PLUGIN_DIR := "res://android/plugins/myrappelz_download/"
 const STAGED := ["panther", "pheasant", "turtle", "wolf", "centaur"]
 
 var loader: AssetLoader
 var results: Array = []
 var m1: Dictionary = {}
 var good_bytes := PackedByteArray()
+var fake: FakeDownloads
+var m3: Dictionary = {}
+var m4: Dictionary = {}
+var dm_id := ""
+var bg: AssetLoader
+var saved_loaded := ""
+
+
+## Подставной плагин фоновой загрузки (те же методы, что у MyRappelzDownload на Android): загрузки — словари,
+## «внешняя папка приложения» — user://test_ext/. Тест сам меняет состояние загрузки (set_job) и кладёт файл.
+class FakeDownloads:
+	extends RefCounted
+	const DIR := "user://test_ext/"
+	var next_id := 100
+	var started: Array = []
+	var removed: Array = []
+	var asked := 0
+	var fail_start := false
+	var jobs: Dictionary = {}
+
+	func externalPath(rel: String) -> String:
+		return DIR + rel
+
+	func start(url: String, rel: String, title: String, text: String) -> String:
+		if fail_start:
+			return ""
+		next_id += 1
+		var id := str(next_id)
+		started.append([url, rel, title, text])
+		jobs[id] = {"status": AssetLoader.DM_PENDING, "reason": 0, "bytes": 0, "total": -1, "path": externalPath(rel)}
+		DirAccess.make_dir_recursive_absolute(externalPath(rel).get_base_dir())
+		return id
+
+	func query(id: String) -> Dictionary:
+		if not jobs.has(id):
+			return {"found": false}
+		var d: Dictionary = (jobs[id] as Dictionary).duplicate()
+		d["found"] = true
+		return d
+
+	## Как DownloadManager.remove: загрузка и её файл удаляются.
+	func remove(id: String) -> bool:
+		removed.append(id)
+		if not jobs.has(id):
+			return false
+		Assets.remove_file(String((jobs[id] as Dictionary)["path"]))
+		jobs.erase(id)
+		return true
+
+	func requestNotifications() -> void:
+		asked += 1
+
+	func notificationsAllowed() -> bool:
+		return true
+
+	func lastError() -> String:
+		return "тест"
+
+	func set_job(id: String, status: int, bytes: int, total: int, reason: int = 0) -> void:
+		var j: Dictionary = jobs[id]
+		j["status"] = status
+		j["bytes"] = bytes
+		j["total"] = total
+		j["reason"] = reason
 
 
 func race_class() -> Array:
@@ -155,6 +228,178 @@ func run_step() -> void:
 		9:
 			check(results == [true], "без загрузки, но с прошлым пакетом из кэша: %s" % str(results))
 			loader.queue_free()
+			_check_plugin_files()
+			# Фоновая загрузка: не Android — плагина нет, загрузка через HTTPRequest (всё, что выше)
+			check(Assets.download_plugin() == null, "не Android — плагина фоновой загрузки нет, загрузка HTTPRequest")
+			fake = FakeDownloads.new()
+			Assets.plugin_override = fake
+			check(Assets.download_plugin() == fake, "подставной плагин фоновой загрузки")
+			m3 = m1.duplicate()
+			m3["hash"] = H3
+			# DownloadManager не принял загрузку — откат на HTTPRequest
+			fake.fail_start = true
+			_new_loader(m3)
+			check(loader.state == AssetLoader.State.CONFIRM, "с плагином — то же предупреждение о размере")
+			(loader.buttons["main"] as Button).pressed.emit()
+			check(loader.state == AssetLoader.State.DOWNLOAD and loader._dm_id == "" and fake.started.is_empty(),
+				"DownloadManager не принял загрузку — загрузка через HTTPRequest")
+			check(Assets.read_job().is_empty(), "записи о фоновой загрузке нет")
+			check(loader._text.text.contains("Не закрывайте"), "HTTPRequest — «Не закрывайте игру»")
+			loader.queue_free()
+			fake.fail_start = false
+			_new_loader(m3)
+			(loader.buttons["main"] as Button).pressed.emit()
+			dm_id = loader._dm_id
+			var rel := Assets.download_rel_path(H3)
+			check(loader.state == AssetLoader.State.DOWNLOAD and dm_id != "" and fake.started.size() == 1,
+				"«Загрузить» — загрузка отдана DownloadManager")
+			check(fake.asked == 1, "спрошено разрешение на уведомления")
+			if fake.started.size() == 1:
+				var st: Array = fake.started[0]
+				check(String(st[0]) == String(m3["url"]) and String(st[1]) == rel, "адрес и файл загрузки: %s" % str(st))
+				check(String(st[2]).contains("MyRappelz") and String(st[3]).contains("МБ"), "уведомление: %s" % str(st))
+			var job := Assets.read_job()
+			check(String(job.get("hash", "")) == H3 and String(job.get("id", "")) == dm_id
+				and String(job.get("path", "")) == fake.externalPath(rel), "запись о загрузке: %s" % str(job))
+			check(loader._text.text.contains("свернуть") and loader._text.text.contains("уведомлени"),
+				"игру можно свернуть, ход — в уведомлениях: " + loader._text.text)
+			check(loader._skip_btn.visible and loader._skip_btn.text == "Играть, пока грузится", "«Играть, пока грузится»")
+			var size := int(m3["size"])
+			fake.set_job(dm_id, AssetLoader.DM_RUNNING, size >> 1, size)
+			loader._poll_dm()
+			check(absf(loader._bar.value - 100.0 * float(size >> 1) / float(size)) < 0.5 and loader._detail.text.contains(" из "),
+				"ход загрузки: %.0f %%, «%s»" % [loader._bar.value, loader._detail.text])
+			fake.set_job(dm_id, AssetLoader.DM_PAUSED, size >> 1, size, 2)
+			loader._poll_dm()
+			check(loader.state == AssetLoader.State.DOWNLOAD and loader._detail.text.contains("ожидание сети"),
+				"пауза — «%s»" % loader._detail.text)
+			loader._on_download_completed(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), PackedByteArray())
+			check(loader.state == AssetLoader.State.DOWNLOAD, "ответ HTTPRequest при загрузке DownloadManager не в счёт")
+			# Ошибка загрузки — «Повторить»
+			fake.set_job(dm_id, AssetLoader.DM_FAILED, 0, size, 1006)
+			loader._poll_dm()
+			check(loader.state == AssetLoader.State.ERROR and loader.error_text.contains("недостаточно места"),
+				"ошибка DownloadManager: " + loader.error_text)
+			check(fake.removed.has(dm_id) and Assets.read_job().is_empty(), "неудачная загрузка убрана, запись стёрта")
+			check(loader._main_btn.visible and loader._main_btn.text == "Повторить", "кнопка «Повторить»")
+			# Отмена в уведомлении («Загрузки») — загрузки больше нет
+			(loader.buttons["main"] as Button).pressed.emit()
+			(loader.buttons["main"] as Button).pressed.emit()
+			check(loader._dm_id != "" and loader._dm_id != dm_id, "«Повторить» — новая загрузка")
+			dm_id = loader._dm_id
+			fake.jobs.erase(dm_id)
+			loader._poll_dm()
+			check(loader.state == AssetLoader.State.ERROR and loader.error_text.contains("отменена"),
+				"отмена загрузки: " + loader.error_text)
+			check(Assets.read_job().is_empty(), "после отмены записи нет")
+			# Загружен битый файл
+			(loader.buttons["main"] as Button).pressed.emit()
+			(loader.buttons["main"] as Button).pressed.emit()
+			dm_id = loader._dm_id
+			var bad := good_bytes.duplicate()
+			bad[bad.size() >> 1] = (bad[bad.size() >> 1] + 1) % 256
+			_write(fake.externalPath(rel), bad)
+			fake.set_job(dm_id, AssetLoader.DM_SUCCESS, size, size)
+			loader._poll_dm()
+			check(loader.state == AssetLoader.State.VERIFY and loader._text.text.contains("перенос"),
+				"загружено — проверка и перенос в кэш")
+			wait = 3
+			step = 10
+		10:
+			if loader.state == AssetLoader.State.VERIFY:
+				return
+			check(loader.state == AssetLoader.State.ERROR and loader.error_text.contains("повреждён"),
+				"битый файл DownloadManager — ошибка: " + loader.error_text)
+			var rel := Assets.download_rel_path(H3)
+			check(not FileAccess.file_exists(Assets.part_path(H3)) and not FileAccess.file_exists(fake.externalPath(rel))
+				and not FileAccess.file_exists(Assets.pack_path(H3)), "битый файл и его копия удалены, в кэш не попали")
+			check(fake.removed.has(dm_id) and Assets.read_job().is_empty(), "загрузка битого файла убрана")
+			# Успех
+			(loader.buttons["main"] as Button).pressed.emit()
+			(loader.buttons["main"] as Button).pressed.emit()
+			dm_id = loader._dm_id
+			_write(fake.externalPath(rel), good_bytes)
+			fake.set_job(dm_id, AssetLoader.DM_SUCCESS, good_bytes.size(), good_bytes.size())
+			loader.poll_time = 0.0
+			wait = 3
+			step = 11
+		11:
+			if loader.state == AssetLoader.State.DOWNLOAD or loader.state == AssetLoader.State.VERIFY:
+				return
+			check(loader.state == AssetLoader.State.DONE, "загрузка DownloadManager проверена (%s)" % loader.error_text)
+			wait = 2
+			step = 12
+		12:
+			check(results == [true], "загрузка DownloadManager закончена с пакетом: %s" % str(results))
+			check(FileAccess.file_exists(Assets.pack_path(H3)) and not FileAccess.file_exists(Assets.part_path(H3)),
+				"файл скопирован в кэш: assets-<хэш>.pck")
+			check(not FileAccess.file_exists(fake.externalPath(Assets.download_rel_path(H3))) and fake.removed.has(dm_id),
+				"файл во внешней папке и загрузка убраны")
+			check(Assets.read_job().is_empty(), "запись о загрузке стёрта")
+			check(Assets.loaded_path == Assets.pack_path(H3), "пакет подключён: " + Assets.loaded_path)
+			loader.queue_free()
+			# Запись о загрузке другого хэша (прежняя версия игры) — загрузка убирается
+			m4 = m1.duplicate()
+			m4["hash"] = H4
+			var old_rel := Assets.download_rel_path(H2)
+			var old_id := String(fake.start("https://example.invalid/old.pck", old_rel, "", ""))
+			_write(fake.externalPath(old_rel), PackedByteArray([1, 2, 3]))
+			Assets.save_job(H2, old_id, fake.externalPath(old_rel))
+			_new_loader(m4)
+			check(loader.state == AssetLoader.State.CONFIRM, "запись другого хэша — снова предупреждение о размере")
+			check(fake.removed.has(old_id) and Assets.read_job().is_empty()
+				and not FileAccess.file_exists(fake.externalPath(old_rel)), "загрузка прежней версии убрана")
+			loader.queue_free()
+			# Загрузка шла, игру закрыли: следующий запуск сразу следит за ней, без вопроса
+			var rel := Assets.download_rel_path(H4)
+			dm_id = String(fake.start(String(m4["url"]), rel, "", ""))
+			var size := good_bytes.size()
+			fake.set_job(dm_id, AssetLoader.DM_RUNNING, int(size * 0.3), size)
+			Assets.save_job(H4, dm_id, fake.externalPath(rel))
+			_new_loader(m4)
+			check(loader.state == AssetLoader.State.DOWNLOAD and loader._dm_id == dm_id,
+				"после перезапуска — та же загрузка, без вопроса о размере")
+			check(absf(loader._bar.value - 100.0 * float(int(size * 0.3)) / float(size)) < 0.5, "ход загрузки сразу")
+			# «Играть, пока грузится»: загрузка не останавливается, за ней следит фоновый узел
+			(loader.buttons["skip"] as Button).pressed.emit()
+			check(not fake.removed.has(dm_id) and String(Assets.read_job().get("id", "")) == dm_id,
+				"загрузка DownloadManager продолжается")
+			check(Assets.skipped, "выбор «без загрузки» запомнен")
+			wait = 2
+			step = 13
+		13:
+			check(results.size() == 1, "экран загрузки закрыт: %s" % str(results))
+			loader.queue_free()
+			bg = null
+			for n in get_tree().root.get_children():
+				if n is AssetLoader and (n as AssetLoader).background:
+					bg = n as AssetLoader
+			check(bg != null and not bg.visible, "фоновый узел у корня дерева, невидимый")
+			if bg == null:
+				return
+			check(bg.state == AssetLoader.State.DOWNLOAD and bg._dm_id == dm_id, "фоновый узел следит за загрузкой")
+			saved_loaded = Assets.loaded_path
+			Assets.loaded_path = ""
+			_write(fake.externalPath(Assets.download_rel_path(H4)), good_bytes)
+			fake.set_job(dm_id, AssetLoader.DM_SUCCESS, good_bytes.size(), good_bytes.size())
+			bg.poll_time = 0.0
+			wait = 3
+			step = 14
+		14:
+			if is_instance_valid(bg) and (bg.state == AssetLoader.State.DOWNLOAD or bg.state == AssetLoader.State.VERIFY):
+				return
+			check(FileAccess.file_exists(Assets.pack_path(H4)), "фоновая загрузка — пакет в кэше")
+			check(Assets.read_job().is_empty() and fake.removed.has(dm_id)
+				and not FileAccess.file_exists(fake.externalPath(Assets.download_rel_path(H4))), "загрузка и её файл убраны")
+			check(Assets.loaded_path == "", "посреди игры пакет не подключается")
+			check(not Assets.skipped, "при следующем входе в мир экран загрузки возьмёт пакет из кэша")
+			wait = 2
+			step = 15
+		15:
+			check(not is_instance_valid(bg), "фоновый узел удалён")
+			check(String(main.hud._msg_label.text).contains("Пакет ресурсов загружен"),
+				"сообщение в HUD: " + String(main.hud._msg_label.text))
+			Assets.loaded_path = saved_loaded
 			_cleanup()
 			ok_done()
 
@@ -193,6 +438,26 @@ func _check_presets() -> void:
 	check(_split(String(cfg.get_value(apk, "include_filter", ""))).has("assets/characters/*.json"),
 		"роли костей героев (.json) — в APK")
 	check(bool(cfg.get_value(apk + ".options", "permissions/internet", false)), "у APK есть разрешение INTERNET")
+
+
+## Плагин Android фоновой загрузки: имя singleton совпадает с Assets.DOWNLOAD_PLUGIN (класс, манифест AAR),
+## плагин редактора включён в проекте и подключает AAR, который собирает сборка APK.
+func _check_plugin_files() -> void:
+	var java := FileAccess.get_file_as_string(PLUGIN_DIR + "src/main/java/com/lemonmen/myrappelz/download/DownloadPlugin.java")
+	var manifest_xml := FileAccess.get_file_as_string(PLUGIN_DIR + "src/main/AndroidManifest.xml")
+	check(java.contains("\"%s\"" % Assets.DOWNLOAD_PLUGIN) and java.contains("DownloadManager"),
+		"класс плагина — singleton %s" % Assets.DOWNLOAD_PLUGIN)
+	for m in ["externalPath", "start", "query", "remove", "requestNotifications", "notificationsAllowed", "lastError"]:
+		check(java.contains("public ") and java.contains(" %s(" % m), "метод плагина %s" % m)
+	check(manifest_xml.contains("org.godotengine.plugin.v2." + Assets.DOWNLOAD_PLUGIN)
+		and manifest_xml.contains("com.lemonmen.myrappelz.download.DownloadPlugin"), "манифест плагина v2")
+	check(manifest_xml.contains("android.permission.POST_NOTIFICATIONS"), "разрешение на уведомления (Android 13+)")
+	var enabled: Variant = ProjectSettings.get_setting("editor_plugins/enabled", PackedStringArray())
+	check(enabled is PackedStringArray and (enabled as PackedStringArray).has("res://addons/myrappelz_download/plugin.cfg"),
+		"плагин редактора включён в project.godot")
+	var gd := FileAccess.get_file_as_string("res://addons/myrappelz_download/plugin.gd")
+	check(gd.contains("_get_android_libraries") and gd.contains("myrappelz_download-release.aar"),
+		"плагин экспорта подключает AAR")
 
 
 ## Какие файлы в пакете: все модели героев, кроме запасных (FALLBACK_HEROES), и модели стадий зверей.
@@ -313,7 +578,15 @@ func _new_loader(m: Dictionary) -> void:
 func _cleanup() -> void:
 	Assets.simulate_missing(false)
 	Assets.skipped = false
+	Assets.plugin_override = null
+	Assets.clear_job()
 	_clear_dir()
+	for d in [FakeDownloads.DIR + Assets.DOWNLOAD_DIR, FakeDownloads.DIR]:
+		var da := DirAccess.open(String(d))
+		if da != null:
+			for f in da.get_files():
+				DirAccess.remove_absolute(String(d) + f)
+			DirAccess.remove_absolute(String(d).trim_suffix("/"))
 	Assets.packs_dir = "user://packs/"
 	for p in [SRC, GOOD]:
 		Assets.remove_file(p)

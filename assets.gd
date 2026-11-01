@@ -13,6 +13,13 @@ extends RefCounted
 ## Код моделей проверяет файлы через Assets.exists(path): без пакета модель из пакета «не существует», и
 ## CharacterModel / CreatureAsset берут запасную (стартовые модели людей в APK, модель 1-й стадии, примитивы).
 ## Экран загрузки — AssetLoader (main.gd показывает его до создания персонажа и входа в мир).
+##
+## Фоновая загрузка на Android — системный DownloadManager через плагин Godot v2 «MyRappelzDownload»
+## (download_plugin(); исходники android/plugins/myrappelz_download, AAR собирается при сборке APK с Gradle):
+## качает сам Android — игру можно свернуть, ход загрузки в уведомлении. Файл ложится во внешнюю папку приложения,
+## запись о загрузке (хэш, id, путь) — packs_dir + JOB_FILE (переживает перезапуск игры); после загрузки файл
+## проверяется (sha256) с копированием в assets-<хэш>.pck.part и ставится в кэш как обычно. Нет плагина (ПК,
+## редактор, тесты, APK без Gradle) — прежняя загрузка HTTPRequest.
 
 ## Файлы пакета (пути от res://, шаблоны String.matchn: * — любые символы, ? — один).
 ## Остаются в APK: hero_human_m_starter и hero_human_f_starter (запасные герои), звери 1-й стадии, постройки.
@@ -38,6 +45,12 @@ const EMBEDDED_MANIFEST := "res://assets_pack.json"
 const RELEASES_URL := "https://github.com/lemonmen72-svg/MyRappelz/releases/download/v%s/assets-manifest.json"
 const PACK_PREFIX := "assets-"
 const PART_SUFFIX := ".part"
+## Singleton плагина фоновой загрузки (Engine.get_singleton на Android).
+const DOWNLOAD_PLUGIN := "MyRappelzDownload"
+## Запись о фоновой загрузке DownloadManager в папке кэша (не начинается с PACK_PREFIX — remove_old её не трогает).
+const JOB_FILE := "download.cfg"
+## Папка загрузки DownloadManager во внешней папке приложения (getExternalFilesDir).
+const DOWNLOAD_DIR := "packs/"
 
 ## Папка кэша пакетов (тест подменяет на свою).
 static var packs_dir := "user://packs/"
@@ -47,6 +60,8 @@ static var loaded_path := ""
 static var skipped := false
 ## Тест: вести себя так, будто пакета нет (embedded и загруженный пакет не в счёт).
 static var force_missing := false
+## Тест: подставной плагин фоновой загрузки (те же методы, что у MyRappelzDownload); null — настоящий или нет.
+static var plugin_override: Object = null
 static var _embedded := -1
 
 
@@ -126,6 +141,48 @@ static func _is_hex(s: String, min_len: int, max_len: int) -> bool:
 		if not "0123456789abcdef".contains(c):
 			return false
 	return true
+
+
+## Плагин фоновой загрузки (Android DownloadManager) или null — нет (не Android, APK без плагина): тогда
+## загрузка через HTTPRequest. Методы (строки, bool, Dictionary): externalPath(rel), start(url, rel, title, text) → id
+## или "", query(id) → {found, status, reason, bytes, total, uri, error?}, remove(id), requestNotifications(),
+## notificationsAllowed(), lastError().
+static func download_plugin() -> Object:
+	if plugin_override != null:
+		return plugin_override
+	if OS.get_name() == "Android" and Engine.has_singleton(DOWNLOAD_PLUGIN):
+		return Engine.get_singleton(DOWNLOAD_PLUGIN)
+	return null
+
+
+## Файл загрузки DownloadManager относительно внешней папки приложения.
+static func download_rel_path(content_hash: String) -> String:
+	return DOWNLOAD_DIR + PACK_PREFIX + content_hash + ".pck.download"
+
+
+## Запись о фоновой загрузке: {hash, id, path}; {} — нет.
+static func read_job() -> Dictionary:
+	var cfg := ConfigFile.new()
+	if cfg.load(packs_dir + JOB_FILE) != OK:
+		return {}
+	var h := String(cfg.get_value("job", "hash", ""))
+	var id := String(cfg.get_value("job", "id", ""))
+	if h == "" or id == "":
+		return {}
+	return {"hash": h, "id": id, "path": String(cfg.get_value("job", "path", ""))}
+
+
+static func save_job(content_hash: String, id: String, path: String) -> void:
+	ensure_dir()
+	var cfg := ConfigFile.new()
+	cfg.set_value("job", "hash", content_hash)
+	cfg.set_value("job", "id", id)
+	cfg.set_value("job", "path", path)
+	cfg.save(packs_dir + JOB_FILE)
+
+
+static func clear_job() -> void:
+	remove_file(packs_dir + JOB_FILE)
 
 
 ## Путь пакета в кэше по хэшу содержимого.
@@ -232,7 +289,9 @@ static func file_sha256(path: String) -> String:
 
 
 ## Проверка загруженного файла по частям (экран загрузки — несколько МБ за кадр, без подвисания):
-## размер, затем sha256. done — закончено, ok — совпало, error — что не так.
+## размер, затем sha256. done — закончено, ok — совпало, error — что не так. copy_to — заодно копировать
+## прочитанное в этот файл (загрузка DownloadManager: из внешней папки приложения в кэш user://, за один проход;
+## при ошибке файл копии удаляет вызывающий).
 class Verifier:
 	extends RefCounted
 	var path := ""
@@ -245,9 +304,10 @@ class Verifier:
 	var error := ""
 	var digest := ""
 	var _file: FileAccess
+	var _out: FileAccess
 	var _ctx := HashingContext.new()
 
-	func _init(p: String, sha: String, sz: int) -> void:
+	func _init(p: String, sha: String, sz: int, copy_to: String = "") -> void:
 		path = p
 		expect_sha = sha.to_lower()
 		expect_size = sz
@@ -259,6 +319,11 @@ class Verifier:
 		if expect_size >= 0 and size != expect_size:
 			_finish("размер %d вместо %d байт" % [size, expect_size])
 			return
+		if copy_to != "":
+			_out = FileAccess.open(copy_to, FileAccess.WRITE)
+			if _out == null:
+				_finish("не удалось записать файл")
+				return
 		_ctx.start(HashingContext.HASH_SHA256)
 
 	## Прочитать до budget байт. true — проверка закончена.
@@ -271,12 +336,20 @@ class Verifier:
 			if chunk.is_empty():
 				break
 			_ctx.update(chunk)
+			if _out != null:
+				_out.store_buffer(chunk)
 			read += chunk.size()
 			left -= chunk.size()
 		if read >= size or _file.eof_reached():
 			digest = _ctx.finish().hex_encode()
+			var copied := true
+			if _out != null:
+				_out.flush()
+				copied = _out.get_error() == OK and int(_out.get_length()) == read
 			if read != size:
 				_finish("файл прочитан не целиком")
+			elif not copied:
+				_finish("не удалось записать файл — проверьте свободное место")
 			elif expect_sha != "" and digest != expect_sha:
 				_finish("контрольная сумма не совпала")
 			else:
@@ -292,3 +365,4 @@ class Verifier:
 		ok = err == ""
 		error = err
 		_file = null
+		_out = null
