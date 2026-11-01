@@ -10,7 +10,7 @@ const EXPECT := {
 	"assassin": ["dagger", "daggers", "sword_1h", "dual_swords", "crossbow"],
 	"adept": ["dagger", "staff_1h", "staff_2h", "shield"],
 	"neophyte": ["staff_1h", "staff_2h"],
-	"swordsman": ["sword_2h", "sword_1h", "dual_swords", "shield", "mace_2h", "mace_1h"],
+	"swordsman": ["sword_2h", "spear", "sword_1h", "dual_swords", "shield", "mace_2h", "mace_1h"],
 	"wizard": ["staff_1h", "staff_2h"],
 	"beastmaster": ["mace_2h", "staff_1h", "staff_2h"],
 	"warrior": ["bow", "axe_2h", "axe_1h", "dual_axes"],
@@ -19,17 +19,17 @@ const EXPECT := {
 }
 ## Оружие 1-го ранга всех видов (у торговца).
 const R1 := ["weapon_sword_1h_r1", "weapon_sword_2h_r1", "weapon_dagger_r1", "weapon_mace_1h_r1", "weapon_mace_2h_r1",
-	"weapon_axe_1h_r1", "weapon_axe_2h_r1", "weapon_staff_1h_r1", "weapon_staff_2h_r1", "weapon_shield_r1",
+	"weapon_axe_1h_r1", "weapon_axe_2h_r1", "weapon_staff_1h_r1", "weapon_staff_2h_r1", "weapon_spear_r1", "weapon_shield_r1",
 	"crossbow_starter", "weapon_bow_r1"]
 ## Скорость атаки вида, % (Максим; булавы — как топоры).
 const ASPD := {"sword_2h": -15, "sword_1h": -5, "dagger": 25, "axe_1h": -10, "axe_2h": -25, "crossbow": -20, "bow": -40,
-	"mace_1h": -10, "mace_2h": -20, "staff_1h": 0, "staff_2h": 0}
+	"mace_1h": -10, "mace_2h": -20, "staff_1h": 0, "staff_2h": 0, "spear": -15}
 ## Скорость каста, %.
 const CAST := {"staff_1h": 20, "staff_2h": 10}
 ## Какие атаки даёт вид.
 const STATS := {"sword_2h": ["atk"], "sword_1h": ["atk"], "dagger": ["atk", "matk"], "axe_1h": ["atk", "matk"],
 	"axe_2h": ["atk", "matk"], "crossbow": ["atk"], "bow": ["atk"], "staff_1h": ["matk"], "staff_2h": ["matk"],
-	"mace_1h": ["atk", "matk"], "mace_2h": ["atk", "matk"]}
+	"mace_1h": ["atk", "matk"], "mace_2h": ["atk", "matk"], "spear": ["atk"]}
 ## Стартовое оружие профессии: [в руке, во второй руке].
 const STARTER := {
 	"swordsman": ["weapon_sword_1h_r1", "weapon_shield_r1"], "warrior": ["weapon_axe_2h_r1", ""],

@@ -83,6 +83,8 @@ func _draw() -> void:
 			_blade(_p(0.28, 0.80), Vector2(1.0, -1.1), 0.66, 0.08, base)
 		"crossbow":
 			_crossbow(base)
+		"spear":
+			_spear(base)
 		"bow":
 			_bow(base)
 		"fang":
@@ -239,6 +241,21 @@ func _crystal(c: Color) -> void:
 
 
 ## Клинок: рукоять у base, лезвие по направлению dir длиной len_k (доля размера), ширина w.
+## Копьё по диагонали: древко и листовидный наконечник.
+func _spear(c: Color) -> void:
+	var a := _p(0.2, 0.84)
+	var tip := _p(0.84, 0.16)
+	var d := (tip - a).normalized()
+	var n := Vector2(-d.y, d.x)
+	var head := tip - d * _s(0.26)
+	draw_line(a, head, Color(0.55, 0.4, 0.25), _s(0.05), true)
+	draw_line(a, head, INK, maxf(1.0, _s(0.012)), true)
+	var hw := _s(0.075)
+	var leaf := PackedVector2Array([head, head + d * _s(0.08) + n * hw, tip, head + d * _s(0.08) - n * hw])
+	draw_colored_polygon(leaf, c.lightened(0.25))
+	_outline(leaf, INK, _s(0.02))
+
+
 func _blade(base: Vector2, dir: Vector2, len_k: float, w: float, c: Color) -> void:
 	var d := dir.normalized()
 	var n := Vector2(-d.y, d.x)

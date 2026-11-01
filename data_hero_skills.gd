@@ -273,6 +273,7 @@ const WEAPON_GROUPS := {
 	"dual_axes": {"kinds": ["dual_axes"], "name": "два топора", "need": "Нужны два топора"},
 	"sword_2h": {"kinds": ["sword_2h"], "name": "двуручный меч"},
 	"axe_2h": {"kinds": ["axe_2h"], "name": "двуручный топор"},
+	"spear": {"kinds": ["spear"], "name": "копьё"},
 }
 ## Требуемый уровень героя = JOB_REQ_BASE + JLv вики × JOB_REQ_K (JLv 1 → 11, 40 → 40).
 const JOB_REQ_BASE := 10.0

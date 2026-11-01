@@ -122,6 +122,11 @@ const ITEMS := {
 		"matk": 7, "range": 10.0, "crit": 0.0, "buy": 55, "sell": 12,
 		"color": Color(0.8, 0.64, 0.4), "desc": "Посох в две руки: магия сильнее, сгусток летит дальше.",
 	},
+	"weapon_spear_r1": {
+		"name": "Копьё новичка", "type": "weapon", "icon": "spear", "weapon": "spear", "rank": 1,
+		"atk": 7, "range": 3.3, "crit": 0.03, "buy": 55, "sell": 12,
+		"color": Color(0.82, 0.8, 0.72), "desc": "Длинное копьё в две руки: достаёт зверя дальше меча, бьёт сильно и точно.",
+	},
 	"weapon_shield_r1": {
 		"name": "Деревянный щит", "type": "weapon", "icon": "shield", "weapon": "shield", "rank": 1,
 		"def": 3, "block": 0.1, "range": 0.0, "crit": 0.0, "buy": 35, "sell": 7,
@@ -209,6 +214,7 @@ const WEAPON_KINDS := {
 	"dual_axes": {"name": "два топора", "hands": "dual", "attack": "melee", "model": "dual_axes", "of": "axe_1h"},
 	"staff_1h": {"name": "одноручный посох", "hands": 1, "attack": "magic", "model": "staff", "stats": ["matk"], "cast": 20},
 	"staff_2h": {"name": "двуручный посох", "hands": 2, "attack": "magic", "model": "staff", "stats": ["matk"], "cast": 10},
+	"spear": {"name": "копьё", "hands": 2, "attack": "melee", "model": "spear", "stats": ["atk"], "aspd": -15},
 	"crossbow": {"name": "арбалет", "hands": 2, "attack": "ranged", "model": "crossbow", "stats": ["atk"], "aspd": -20},
 	"bow": {"name": "лук", "hands": 2, "attack": "ranged", "model": "bow", "stats": ["atk"], "aspd": -40},
 	"shield": {"name": "щит", "hands": "off", "attack": "", "model": "", "stats": ["def", "block"]},

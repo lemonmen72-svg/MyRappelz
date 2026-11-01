@@ -34,7 +34,7 @@ const NPCS := {
 		"title": "Странствующий торговец", "shop_title": "Торговец", "dialog": false, "mark_y": 3.15,
 		"shop": ["hp_potion", "revive_scroll", "dagger_steel", "sword_steel", "crossbow_heavy", "crossbow_starter", "weapon_bow_r1",
 			"weapon_sword_1h_r1", "weapon_sword_2h_r1", "weapon_dagger_r1", "weapon_mace_1h_r1", "weapon_mace_2h_r1",
-			"weapon_axe_1h_r1", "weapon_axe_2h_r1", "weapon_staff_1h_r1", "weapon_staff_2h_r1", "weapon_shield_r1"],
+			"weapon_axe_1h_r1", "weapon_axe_2h_r1", "weapon_staff_1h_r1", "weapon_staff_2h_r1", "weapon_spear_r1", "weapon_shield_r1"],
 		"greet": {
 			"idle": "Зелья, свитки, клинки! Заходи, пока не разобрали.",
 		},

@@ -113,7 +113,7 @@ const GRIP_DIR_L := Vector3(-0.76, 0.12, 0.64)
 ## прямой кинематикой, как в tools/retarget_animations.py). Ось арбалета −Z (вперёд), +Y — вверх.
 const CROSSBOW_ROT := Quaternion(0.566, 0.311, -0.256, 0.719)
 ## Виды оружия, которые умеет модель из файла (остальные держат меч); щит — отдельно (spec "shield").
-const ASSET_WEAPONS := ["sword", "dual_swords", "daggers", "crossbow", "dagger", "axe", "dual_axes", "mace", "staff", "bow"]
+const ASSET_WEAPONS := ["sword", "dual_swords", "daggers", "crossbow", "dagger", "axe", "dual_axes", "mace", "staff", "bow", "spear"]
 ## Модели героя из файлов: hero_<профессия>_<пол>.glb (пол m / f), у Бродяги — hero_<раса>_<пол>_starter.glb
 ## (раса dark_elf / light_elf / human); откат — hero_asset.
 const HERO_ASSET_DIR := "res://assets/characters/"
@@ -366,6 +366,7 @@ static var _sword: ArrayMesh
 static var _dagger: ArrayMesh
 static var _crossbow: ArrayMesh
 static var _staff: ArrayMesh
+static var _spear: ArrayMesh
 static var _axe: ArrayMesh
 static var _mace: ArrayMesh
 static var _shield: ArrayMesh
@@ -405,6 +406,9 @@ static func model_weapon(weapon: String, asset: bool, shield: bool = false) -> S
 			mk = "sword"
 		"mace", "dual_axes":
 			mk = "axe"
+		"spear":
+			# Модель из примитивов копья не умеет — держит меч (удары те же)
+			mk = "sword"
 	if shield and mk == "sword":
 		mk = "sword_shield"
 	return mk
@@ -1849,6 +1853,8 @@ func _setup_asset(path: String) -> bool:
 					_hold(hand, "Axe", _axe_mesh(), _grip_xf(dir_r, pos_r))
 				"mace":
 					_hold(hand, "Mace", _mace_mesh(), _grip_xf(dir_r, pos_r))
+				"spear":
+					_hold(hand, "Spear", _spear_mesh(), _grip_xf(dir_r, pos_r))
 				_:
 					_hold(hand, "Sword", _sword_mesh(), _grip_xf(dir_r, pos_r))
 		if hand_l != null:
@@ -2156,6 +2162,24 @@ static func _staff_mesh() -> ArrayMesh:
 	b.add(_sphere(0.06, 0.12, 10, 5), Transform3D(Basis(), Vector3(0, 1.13, 0)), Color(0.55, 0.85, 1.0), 0)
 	_staff = _buf_mesh(b)
 	return _staff
+
+
+## Копьё: древко вдоль +Y (хват — в нижней трети), листовидный наконечник наверху, втулка и подток.
+static func _spear_mesh() -> ArrayMesh:
+	if _spear != null:
+		return _spear
+	var b := GeoBuf.new()
+	var wood := Color(0.6, 0.45, 0.28)
+	var bronze := Color(0.72, 0.52, 0.28)
+	var steel := Color(0.84, 0.87, 0.93)
+	b.add(_cyl(0.017, 0.02, 1.85, 8), Transform3D(Basis(), Vector3(0, 0.45, 0)), wood, 0)
+	b.add(_cyl(0.026, 0.026, 0.08, 8), Transform3D(Basis(), Vector3(0, 1.4, 0)), bronze, 0)
+	b.add(_cyl(0.022, 0.016, 0.06, 8), Transform3D(Basis(), Vector3(0, -0.47, 0)), bronze, 0)
+	# Наконечник: плоский ромб, широкий у основания
+	b.add(_box(Vector3(0.07, 0.24, 0.016)), Transform3D(Basis(), Vector3(0, 1.56, 0)), steel, 0)
+	b.add(_box(Vector3(0.045, 0.1, 0.014)), Transform3D(Basis(), Vector3(0, 1.72, 0)), steel, 0)
+	_spear = _buf_mesh(b)
+	return _spear
 
 
 ## Топор: рукоять вдоль +Y, лезвие сбоку у верхнего конца.
