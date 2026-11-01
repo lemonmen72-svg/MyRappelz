@@ -990,7 +990,7 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			global_position = dest
 			velocity = Vector3.ZERO
 			_engage(t)
-			_anim_dash()
+			_anim_by_kind("dash", sid, "melee")
 			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.5, 0.2, 0.7), 1.2, 0.3)
 			_announce(sname, "")
 		"self":
@@ -999,7 +999,7 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			shade_atk = HeroSkills.field_buff(sid, "atk_pct", n)
 			shade_crit = HeroSkills.field_buff(sid, "crit", n)
 			add_effect("shade", shade_time, StatusEffects.source_hero_skill(sid))
-			_anim_buff()
+			_anim_by_kind("buff", sid, "self")
 			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), col, 2.0, 0.4)
 			_announce(sname, "уклонение +%d%% на %d с" % [roundi(shade_eva * 100.0), roundi(shade_time)])
 		"near":
@@ -1007,7 +1007,7 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			if t == null:
 				return _no_target()
 			_engage(t)
-			_anim_cast()
+			_anim_by_kind("cast", sid, "near")
 			var sec := HeroSkills.field(sid, "sleep", n)
 			t.sleep(sec, StatusEffects.source_hero_skill(sid))
 			Projectile.burst(fx_parent, t.aim_point(), col, 1.3, 0.4)
@@ -1080,7 +1080,15 @@ func _bolt_effects(hit: Mob, sid: String, n: int) -> void:
 
 ## Анимация умения ближнего боя (SKILL_ANIM).
 func _anim_skill(sid: String) -> void:
-	match String(SKILL_ANIM.get(sid, "attack")):
+	_anim_by_kind(String(SKILL_ANIM.get(sid, "attack")), sid, "melee")
+
+
+## Анимация умения по виду (kind: "cast", "bash", "spin", "buff", "dash", "attack"): у модели из файла — движение
+## манекенов Meshy (CharacterModel.play_skill: по id умения, оружию и способу применения use), иначе — прежние жесты.
+func _anim_by_kind(kind: String, sid: String = "", use: String = "") -> void:
+	if _has_model() and _model.play_skill(kind, sid, use):
+		return
+	match kind:
 		"bash":
 			_anim_bash()
 		"dash":
@@ -1089,6 +1097,8 @@ func _anim_skill(sid: String) -> void:
 			_anim_spin()
 		"cast":
 			_anim_cast()
+		"buff":
+			_anim_buff()
 		_:
 			_anim_attack()
 
@@ -1253,7 +1263,7 @@ func _has_model() -> bool:
 ## Удар / выстрел / заклинание обычной атаки (вид — по оружию модели).
 func _anim_attack() -> void:
 	if _has_model():
-		_model.play_attack()
+		_model.play_attack(attack_time)
 
 
 ## Круговой удар (Рассечение): оборот всей модели.

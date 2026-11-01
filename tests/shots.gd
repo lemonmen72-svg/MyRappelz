@@ -32,6 +32,23 @@ const HERO_CASTERS := ["res://assets/characters/hero_neophyte_f.glb", "res://ass
 	"res://assets/characters/hero_beastmaster_f.glb", "res://assets/characters/hero_beastmaster_m.glb",
 	"res://assets/characters/hero_shaman_f.glb", "res://assets/characters/hero_shaman_m.glb",
 	"res://assets/characters/hero_conjurer_f.glb", "res://assets/characters/hero_conjurer_m.glb"]
+## Движения манекенов Meshy (кадры 140–141): [модель, вид оружия ItemData, щит, клип] — поза в момент удара.
+const MQ_ATTACK_ROW := [
+	["res://assets/characters/hero_swordsman_m.glb", "sword_1h", true, "mq_combo_b1"],
+	["res://assets/characters/hero_assassin_f.glb", "daggers", false, "mq_dual_a1"],
+	["res://assets/characters/hero_warrior_m.glb", "axe_2h", false, "mq_heavy_swing"],
+	["res://assets/characters/hero_warrior_f.glb", "bow", false, "mq_bow_shot"],
+	["res://assets/characters/hero_wizard_f.glb", "staff_2h", false, "mq_cast_a"],
+	["res://assets/characters/hero_swordsman_f.glb", "spear", false, "mq_thrust"],
+]
+const MQ_SKILL_ROW := [
+	["res://assets/characters/hero_swordsman_m.glb", "sword_1h", true, "mq_taunt"],
+	["res://assets/characters/hero_shaman_m.glb", "staff_2h", false, "mq_charged_cast"],
+	["res://assets/characters/hero_assassin_m.glb", "dual_swords", false, "mq_blade_spin"],
+	["res://assets/characters/hero_conjurer_f.glb", "axe_1h", false, "mq_axe_chop"],
+	["res://assets/characters/hero_neophyte_m.glb", "staff_2h", false, "mq_cast_beam"],
+	["res://assets/characters/hero_adept_f.glb", "dagger", false, "mq_judgment"],
+]
 ## Оружие героев (кадр 91): [модель, вид оружия ItemData, щит во второй руке] — одноручное со щитом, лук, пары,
 ## посох, двуручное.
 const WEAPON_ROW := [
@@ -1244,6 +1261,28 @@ func run_step() -> void:
 			_gcam.queue_free()
 			main.cam.current = true
 			main.hud.visible = true
+			# Движения манекенов Meshy (tools/retarget_mannequin.py): обычные атаки разным оружием — кадр 140
+			_mq_row(MQ_ATTACK_ROW)
+			wait = 30
+			step = 980
+		980:
+			shot("140_mq_attacks")
+			_heroes.queue_free()
+			_top.queue_free()
+			# Умения: «Вызов», заряд, кручение клинками, рубящий топором, луч, прыжок с ударом — кадр 141
+			_mq_row(MQ_SKILL_ROW)
+			wait = 30
+			step = 981
+		981:
+			shot("141_mq_skills")
+			_heroes.queue_free()
+			_top.queue_free()
+			main.cam.current = true
+			main.hud.visible = true
+			main.player.visible = true
+			wait = 2
+			step = 982
+		982:
 			wait = 5
 			step = 1000
 		1000:
@@ -1623,6 +1662,36 @@ func _heroes_row(paths: Array, gap: float, dist: float, weapons: Array = []) -> 
 	_top.look_at(base + Vector3(0, 0.95, 0))
 	_top.current = true
 	main.hud.visible = false
+
+
+## Герои в ряд (кадры 140–141), каждый замер в своём клипе манекена Meshy в момент удара (clips.<имя>.hit в
+## <модель>.json): клип с начала без смешивания, перемотка к удару, темп 0 — действие держит позу.
+func _mq_row(rows: Array) -> void:
+	var paths: Array = []
+	var weapons: Array = []
+	for r in rows:
+		var row: Array = r
+		paths.append(row[0])
+		weapons.append([row[0], row[1], row[2]])
+	_heroes_row(paths, 1.45, 7.4, weapons)
+	_top.global_position += Vector3(0, 0.3, 0)
+	for i in rows.size():
+		var row: Array = rows[i]
+		var m := _heroes.get_child(i) as CharacterModel
+		if m == null or m._anim == null:
+			continue
+		m.rotation.y = PI + 0.6
+		var c := String(m._clips.get(String(row[3]), ""))
+		check(c != "", "%s: есть клип %s" % [String(row[0]), String(row[3])])
+		if c == "":
+			continue
+		var clips: Dictionary = CharacterModel.asset_rig(String(row[0])).get("clips", {})
+		var info: Dictionary = clips.get(c, {})
+		m._anim.play(c, 0.0)
+		m._anim.seek(float(info.get("hit", 0.3)), true)
+		m._anim.speed_scale = 0.0
+		m._act_end = 99.0
+		m._act_hit = 99.0
 
 
 ## Игрок в dist м от ближайшей рыбы вида id, рыба — цель, камера за игроком смотрит на рыбу. Возвращает рыбу.

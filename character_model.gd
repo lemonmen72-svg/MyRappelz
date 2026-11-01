@@ -79,12 +79,62 @@ const ASSET_ACTIONS := {
 		["attack", 0.2, 1.4, 2.0]],
 	"cast": [["cast", 0.1, 1.4, 1.3], ["attack", 0.2, 1.4, 2.0]],
 	"wave": [["wave", 0.0, 2.0, 1.2], ["attack", 0.2, 1.4, 2.0]],
-	"hit": [["hit", 0.0, 0.33, 0.8], ["hit_reaction", 0.0, 0.45, 1.5]],
-	"pickup": [["pickup", 0.2, 2.3, 1.8]],
+	"hit": [["mq_hit", 0.0, 0.75, 1.2], ["hit", 0.0, 0.33, 0.8], ["hit_reaction", 0.0, 0.45, 1.5]],
+	"pickup": [["mq_pickup", 0.0, 1.5, 1.2], ["pickup", 0.2, 2.3, 1.8]],
 	"dodge": [["dodge", 0.0, 1.47, 1.3], ["standard_forward_charge_inplace", 0.0, 0.63, 1.0]],
 	# Смерть: клип есть, вызвать пока негде (игрок сразу возрождается)
-	"death": [["death", 0.0, 2.4, 1.0], ["hit_reaction", 0.0, 1.6, 1.0]],
+	"death": [["mq_death", 0.0, 2.7, 1.0], ["death", 0.0, 2.4, 1.0], ["hit_reaction", 0.0, 1.6, 1.0]],
 }
+## Движения манекенов Meshy (tools/retarget_mannequin.py, клипы «Mq_*» в GLB героя; длина и момент удара — clips в
+## <модель>.json). Обычная атака по хвату (mq_grip): клипы по кругу — части одного комбо Meshy идут подряд, серия
+## атак складывается в целое комбо; пауза дольше MQ_COMBO_RESET — снова с первой части. Темп — под интервал атаки
+## героя (play_attack(interval)). Нет клипов в модели (старый файл, запасной герой без пакета) — прежние удары.
+const MQ_ATTACKS := {
+	"sword": ["mq_sword_a1", "mq_sword_a2", "mq_sword_a3"],
+	"sword_shield": ["mq_combo_b1", "mq_combo_b2", "mq_left_slash"],
+	"sword_2h": ["mq_left_slash", "mq_heavy_swing", "mq_axe_spin"],
+	"dual_swords": ["mq_dual_a1", "mq_dual_a2", "mq_sword_a3"],
+	"daggers": ["mq_dual_a1", "mq_dual_a2", "mq_thrust"],
+	"dagger": ["mq_thrust", "mq_sword_a1", "mq_sword_a2"],
+	"axe": ["mq_combo_b1", "mq_combo_b2", "mq_combo_b3"],
+	"axe_2h": ["mq_heavy_swing", "mq_axe_spin"],
+	"dual_axes": ["mq_combo_b1", "mq_combo_b2", "mq_axe_spin"],
+	"mace": ["mq_combo_b1", "mq_combo_b2", "mq_combo_b3"],
+	"mace_2h": ["mq_heavy_swing", "mq_left_slash"],
+	"spear": ["mq_thrust", "mq_left_slash"],
+	"staff": ["mq_cast_a", "mq_cast_b", "mq_cast_c"],
+	"bow": ["mq_bow_shot"],
+}
+## Сильные удары умений (вид анимации "bash", "attack" ближнего боя) по хвату.
+const MQ_STRIKES := {
+	"sword": ["mq_charged_slash", "mq_judgment"], "sword_shield": ["mq_charged_slash", "mq_judgment"],
+	"sword_2h": ["mq_judgment", "mq_charged_slash"], "dual_swords": ["mq_charged_slash", "mq_judgment"],
+	"daggers": ["mq_charged_slash", "mq_judgment"], "dagger": ["mq_charged_slash", "mq_judgment"],
+	"axe": ["mq_axe_chop", "mq_leap_slam"], "axe_2h": ["mq_axe_chop", "mq_leap_slam"],
+	"dual_axes": ["mq_axe_chop", "mq_leap_slam"], "mace": ["mq_axe_chop", "mq_leap_slam"],
+	"mace_2h": ["mq_axe_chop", "mq_leap_slam"], "spear": ["mq_reap", "mq_judgment"],
+	"staff": ["mq_ground_slam", "mq_cast_slam"],
+}
+## Круговые удары умений ("spin") по хвату; нет в списке — mq_axe_spin.
+const MQ_SPINS := {"dual_swords": ["mq_blade_spin"], "daggers": ["mq_blade_spin"], "dual_axes": ["mq_blade_spin"],
+	"spear": ["mq_reap"]}
+## Заклинания ("cast"): на цель и на себя / питомца; усиления ("buff").
+const MQ_CASTS := ["mq_cast_wide", "mq_cast_beam", "mq_cast_up", "mq_charged_cast", "mq_cast_slam"]
+const MQ_CASTS_SELF := ["mq_cast_pray", "mq_cast_wide"]
+const MQ_BUFFS := ["mq_charged_cast1", "mq_cast_wide"]
+## Своё движение у отдельных умений: «Вызов» и «Дикий рёв» — удар в грудь, удары по земле, обвал с неба и т. п.
+const MQ_SKILL_BY_ID := {
+	"challenge": "mq_taunt", "wild_roar": "mq_taunt", "shield_thunder": "mq_ground_slam",
+	"stonebreaker": "mq_ground_slam", "crushing_toll": "mq_ground_slam", "rockslide": "mq_cast_slam",
+	"thunder_roll": "mq_cast_slam", "heaven_smite": "mq_charged_cast", "kindle_spark": "mq_charged_cast1",
+}
+## Пауза между атаками, после которой комбо начинается с первой части, с.
+const MQ_COMBO_RESET := 1.6
+## Темп атаки под интервал: не медленнее и не быстрее, раз.
+const MQ_SPEED_MIN := 0.8
+const MQ_SPEED_MAX := 2.2
+## Арбалет: после серии из стольких выстрелов, когда стрельба прервалась, — перезарядка (Mq_Reload).
+const MQ_RELOAD_AFTER := 3
 ## Покой: свой клип Idle (из Quaternius UAL, цикл). Если его нет (наборы Meshy без Idle) — кадры
 ## с какой секунды по какую проигрываются туда-обратно (дыхание): спокойная стойка в начале
 ## прыжка или стойка с мечом в начале «Sword_Judgment».
@@ -347,6 +397,15 @@ var _act_end := -1.0
 var _loco := ""
 var _alt := false
 var _swing := 0
+## Двуручное оружие (spec "two_handed"): свои удары у меча, топора и булавы (MQ_ATTACKS "sword_2h" и т. п.).
+var two_handed := false
+# Движения манекенов: номер части комбо, время последней атаки, момент удара текущего действия (после него действие
+# прерывается шагом), выстрелы арбалета подряд и интервал между ними
+var _mq_step := 0
+var _mq_last := -100.0
+var _act_hit := -1.0
+var _shots := 0
+var _shot_gap := 1.0
 
 ## Массивы примитивов (одинаковые детали у всех персонажей).
 static var _arr_cache: Dictionary = {}
@@ -444,6 +503,9 @@ static func spec_for(race_id: String, class_id: String, weapon: String = "", gen
 		"gender": gender,
 	}
 	if use_file:
+		# Двуручное оружие ItemData (sword_2h, axe_2h, mace_2h) — свои удары у модели из файла
+		var hv: Variant = ItemData.hands(w) if ItemData.WEAPON_KINDS.has(w) else 1
+		s["two_handed"] = typeof(hv) == TYPE_INT and int(hv) == 2
 		s["asset"] = asset
 		s["ears"] = true
 	return s
@@ -616,8 +678,12 @@ func setup(s: Dictionary) -> CharacterModel:
 	_anim = null
 	_clips.clear()
 	_act_end = -1.0
+	_act_hit = -1.0
 	_loco = ""
+	_mq_step = 0
+	_shots = 0
 	weapon_kind = String(s.get("weapon", ""))
+	two_handed = bool(s.get("two_handed", false))
 	if s.has("asset") and _setup_asset(String(s["asset"])):
 		return self
 	_girth = float(s.get("girth", 1.0))
@@ -1560,9 +1626,20 @@ func _process(delta: float) -> void:
 	_sync_bones()
 
 
-## Обычная атака под оружие: удар, выстрел из лука или взмах посохом.
-func play_attack() -> void:
+## Обычная атака под оружие: удар, выстрел из лука или взмах посохом. interval — интервал атаки героя, с (0 — темп
+## клипа): движение манекена Meshy укладывается в него (MQ_SPEED_MIN…MQ_SPEED_MAX).
+func play_attack(interval: float = 0.0) -> void:
 	if _asset != null:
+		if weapon_kind == "crossbow":
+			# Выстрел из стойки; после серии выстрелов, когда стрельба прервалась, — перезарядка (_asset_process)
+			_asset_act("shoot")
+			_shots = _shots + 1 if _t - _mq_last <= maxf(interval, 1.0) + 0.6 else 1
+			_mq_last = _t
+			if interval > 0.0:
+				_shot_gap = interval
+			return
+		if _mq_attack(interval):
+			return
 		match weapon_kind:
 			"crossbow", "bow":
 				_asset_act("shoot")
@@ -2031,8 +2108,11 @@ func _asset_process(delta: float) -> void:
 	if _anim == null:
 		return
 	if _act_end >= 0.0:
-		if _anim.is_playing() and _anim.current_animation_position < _act_end:
-			return
+		# Действие доигрывается; герой пошёл после момента удара — шаг и бег сразу
+		if _anim.is_playing():
+			var pos := _anim.current_animation_position
+			if pos < _act_end and not (_asset_speed > 0.3 and pos >= _act_hit):
+				return
 		_act_end = -1.0
 		_loco = ""
 	var want := "idle"
@@ -2040,6 +2120,13 @@ func _asset_process(delta: float) -> void:
 		want = "run"
 	elif _asset_speed > 0.3:
 		want = "walk"
+	# Арбалет: серия выстрелов прервалась (стоит, нового выстрела нет дольше интервала) — перезарядка
+	if weapon_kind == "crossbow" and _shots >= MQ_RELOAD_AFTER and want == "idle" and _t - _mq_last > _shot_gap + 0.15:
+		_shots = 0
+		var rl := _mq_names(["mq_reload"])
+		if not rl.is_empty():
+			_mq_play(rl[0], 1.0)
+			return
 	if want == "idle":
 		var idle: Array = []
 		if weapon_kind == "crossbow":
@@ -2079,6 +2166,95 @@ func _asset_act(kind: String) -> void:
 	_anim.play(c, 0.08, float(a[3]))
 	_anim.seek(float(a[1]), true)
 	_act_end = float(a[2])
+	_act_hit = _act_end
+	_loco = ""
+
+
+# ---------- Движения манекенов Meshy (клипы Mq_*) ----------
+
+## Хват для выбора движений: вид оружия модели, щит ("sword_shield"), двуручное ("sword_2h", "axe_2h", "mace_2h").
+func mq_grip() -> String:
+	if weapon_kind == "sword" and bool(spec.get("shield", false)):
+		return "sword_shield"
+	if two_handed and ["sword", "axe", "mace"].has(weapon_kind):
+		return weapon_kind + "_2h"
+	return weapon_kind
+
+
+## Настоящие имена клипов из списка ключей (в нижнем регистре), которые есть в модели — только точные совпадения.
+func _mq_names(keys: Array) -> Array[String]:
+	var out: Array[String] = []
+	for k in keys:
+		var c := String(_clips.get(String(k), ""))
+		if c != "":
+			out.append(c)
+	return out
+
+
+## Обычная атака движением манекена по хвату (MQ_ATTACKS). false — таких клипов в модели нет.
+func _mq_attack(interval: float) -> bool:
+	if _anim == null or not is_inside_tree():
+		return false
+	var names := _mq_names(MQ_ATTACKS.get(mq_grip(), []))
+	if names.is_empty():
+		return false
+	if _t - _mq_last > MQ_COMBO_RESET:
+		_mq_step = 0
+	var c := names[_mq_step % names.size()]
+	_mq_step += 1
+	_mq_last = _t
+	var sp := 1.0
+	if interval > 0.0:
+		sp = clampf(_anim.get_animation(c).length / interval, MQ_SPEED_MIN, MQ_SPEED_MAX)
+	_mq_play(c, sp)
+	return true
+
+
+## Умение героя движением манекена: kind — вид анимации умения ("cast", "bash", "spin", "buff", "dash", "attack"),
+## sid — id умения (MQ_SKILL_BY_ID; из нескольких подходящих вариантов умение всегда берёт один и тот же), use — как
+## применяется ("self"/"pet" — заклинание на себя или питомца, "ranged" — выстрел). false — подходящего клипа нет,
+## играет прежний жест.
+func play_skill(kind: String, sid: String = "", use: String = "") -> bool:
+	if _asset == null or _anim == null or not is_inside_tree():
+		return false
+	var opts: Array = []
+	if MQ_SKILL_BY_ID.has(sid):
+		opts = [MQ_SKILL_BY_ID[sid]]
+	else:
+		var g := mq_grip()
+		match kind:
+			"cast":
+				opts = MQ_CASTS_SELF if use == "self" or use == "pet" else MQ_CASTS
+			"buff":
+				opts = MQ_BUFFS
+			"spin":
+				opts = MQ_SPINS.get(g, ["mq_axe_spin"])
+			"dash":
+				opts = ["mq_leap_slam"] if ["axe", "mace", "dual_axes"].has(weapon_kind) else ["mq_judgment"]
+			_:
+				if use == "ranged":
+					opts = ["mq_bow_draw"] if weapon_kind == "bow" else []
+				else:
+					opts = MQ_STRIKES.get(g, ["mq_charged_slash"])
+	var names := _mq_names(opts)
+	if names.is_empty():
+		return false
+	var i := absi(hash(sid)) % names.size() if sid != "" else randi() % names.size()
+	_mq_play(names[i], 1.0)
+	return true
+
+
+## Клип манекена с начала с темпом sp: до конца клипа шаг и бег не включаются, после момента удара (clips.<имя>.hit
+## в <модель>.json, иначе 0.4 длины) движение героя прерывает его.
+func _mq_play(c: String, sp: float) -> void:
+	var length := _anim.get_animation(c).length
+	_anim.speed_scale = 1.0
+	_anim.play(c, 0.08, sp)
+	_anim.seek(0.0, true)
+	_act_end = maxf(0.0, length - 0.02)
+	var clips: Dictionary = asset_rig(String(spec.get("asset", ""))).get("clips", {})
+	var info: Dictionary = clips.get(c, {})
+	_act_hit = minf(_act_end, float(info.get("hit", length * 0.4)))
 	_loco = ""
 
 

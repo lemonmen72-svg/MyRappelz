@@ -263,6 +263,244 @@
 			"length": 0.633,
 			"loop": false,
 			"source": "ual1:Pistol_Shoot"
+		},
+		"Mq_Sword_A1": {
+			"length": 0.663,
+			"loop": false,
+			"source": "mannequin m3:Triple_Combo_Attack [0.00–1.05]",
+			"hit": 0.35
+		},
+		"Mq_Sword_A2": {
+			"length": 0.6,
+			"loop": false,
+			"source": "mannequin m3:Triple_Combo_Attack [1.05–1.85]",
+			"hit": 0.3
+		},
+		"Mq_Sword_A3": {
+			"length": 0.9,
+			"loop": false,
+			"source": "mannequin m3:Triple_Combo_Attack [1.85–3.40]",
+			"hit": 0.3
+		},
+		"Mq_Combo_B1": {
+			"length": 0.7,
+			"loop": false,
+			"source": "mannequin m3:Weapon_Combo_2 [0.20–1.40]",
+			"hit": 0.4
+		},
+		"Mq_Combo_B2": {
+			"length": 0.7,
+			"loop": false,
+			"source": "mannequin m3:Weapon_Combo_2 [1.40–2.45]",
+			"hit": 0.35
+		},
+		"Mq_Combo_B3": {
+			"length": 1.05,
+			"loop": false,
+			"source": "mannequin m3:Weapon_Combo_2 [2.45–4.30]",
+			"hit": 0.35
+		},
+		"Mq_Dual_A1": {
+			"length": 0.65,
+			"loop": false,
+			"source": "mannequin m2:Double_Combo_Attack [0.00–0.95]",
+			"hit": 0.35
+		},
+		"Mq_Dual_A2": {
+			"length": 0.95,
+			"loop": false,
+			"source": "mannequin m2:Double_Combo_Attack [0.95–2.60]",
+			"hit": 0.4
+		},
+		"Mq_Left_Slash": {
+			"length": 0.9,
+			"loop": false,
+			"source": "mannequin m3:Left_Slash [0.30–2.10]",
+			"hit": 0.4
+		},
+		"Mq_Thrust": {
+			"length": 0.65,
+			"loop": false,
+			"source": "mannequin m3:Thrust_Slash [0.10–1.25]",
+			"hit": 0.3
+		},
+		"Mq_Heavy_Swing": {
+			"length": 0.833,
+			"loop": false,
+			"source": "mannequin m3:Heavy_Hammer_Swing [0.25–1.83]",
+			"hit": 0.55
+		},
+		"Mq_Axe_Spin": {
+			"length": 1.1,
+			"loop": false,
+			"source": "mannequin m2:Axe_Spin_Attack [0.00–2.10]",
+			"hit": 0.5
+		},
+		"Mq_Axe_Chop": {
+			"length": 1.2,
+			"loop": false,
+			"source": "mannequin m2:Charged_Axe_Chop [3.00–5.30]",
+			"hit": 0.6
+		},
+		"Mq_Charged_Slash": {
+			"length": 1.2,
+			"loop": false,
+			"source": "mannequin m2:Charged_Slash [0.00–2.00]",
+			"hit": 0.7
+		},
+		"Mq_Judgment": {
+			"length": 1.4,
+			"loop": false,
+			"source": "mannequin m2:Sword_Judgment [0.20–2.70]",
+			"hit": 0.65
+		},
+		"Mq_Leap_Slam": {
+			"length": 1.35,
+			"loop": false,
+			"source": "mannequin m2:Attack [0.10–2.40]",
+			"hit": 0.65
+		},
+		"Mq_Blade_Spin": {
+			"length": 1.2,
+			"loop": false,
+			"source": "mannequin m2:Double_Blade_Spin [0.10–2.00]",
+			"hit": 0.6
+		},
+		"Mq_Reap": {
+			"length": 1.5,
+			"loop": false,
+			"source": "mannequin m1:Reaping_Swing [2.00–4.90]",
+			"hit": 0.7
+		},
+		"Mq_Ground_Slam": {
+			"length": 1.5,
+			"loop": false,
+			"source": "mannequin m1:Charged_Ground_Slam [0.00–3.00]",
+			"hit": 0.75
+		},
+		"Mq_Kick": {
+			"length": 1.0,
+			"loop": false,
+			"source": "mannequin m3:Simple_Kick [0.20–2.10]",
+			"hit": 0.45
+		},
+		"Mq_Jump": {
+			"length": 2.2,
+			"loop": false,
+			"source": "mannequin m2:Basic_Jump [1.20–3.40]",
+			"hit": 0.7
+		},
+		"Mq_Bow_Shot": {
+			"length": 0.95,
+			"loop": false,
+			"source": "mannequin m2:Archery_Shot_1+m3:Archery_Shot_3 [0.00–1.67]",
+			"hit": 0.6
+		},
+		"Mq_Bow_Draw": {
+			"length": 1.55,
+			"loop": false,
+			"source": "mannequin m3:Draw_and_Shoot_from_Back_2 [0.10–4.90]",
+			"hit": 1.1
+		},
+		"Mq_Reload": {
+			"length": 1.2,
+			"loop": false,
+			"source": "mannequin m1:Standing_Reload [0.50–2.80]",
+			"hit": 0.6
+		},
+		"Mq_Cast_A": {
+			"length": 0.85,
+			"loop": false,
+			"source": "mannequin m1:mage_soell_cast [0.00–1.80]",
+			"hit": 0.35
+		},
+		"Mq_Cast_B": {
+			"length": 0.9,
+			"loop": false,
+			"source": "mannequin m1:mage_soell_cast_4 [0.00–1.90]",
+			"hit": 0.35
+		},
+		"Mq_Cast_C": {
+			"length": 0.95,
+			"loop": false,
+			"source": "mannequin m1:mage_soell_cast_7 [0.20–2.40]",
+			"hit": 0.4
+		},
+		"Mq_Cast_Wide": {
+			"length": 1.2,
+			"loop": false,
+			"source": "mannequin m1:mage_soell_cast_1 [0.20–2.90]",
+			"hit": 0.6
+		},
+		"Mq_Cast_Slam": {
+			"length": 1.2,
+			"loop": false,
+			"source": "mannequin m1:mage_soell_cast_2 [0.00–2.40]",
+			"hit": 0.65
+		},
+		"Mq_Cast_Beam": {
+			"length": 1.35,
+			"loop": false,
+			"source": "mannequin m1:mage_soell_cast_3 [0.00–3.20]",
+			"hit": 0.45
+		},
+		"Mq_Cast_Up": {
+			"length": 1.1,
+			"loop": false,
+			"source": "mannequin m1:mage_soell_cast_6 [0.00–2.10]",
+			"hit": 0.55
+		},
+		"Mq_Cast_Pray": {
+			"length": 1.3,
+			"loop": false,
+			"source": "mannequin m1:mage_soell_cast_8 [0.00–1.33]",
+			"hit": 0.4
+		},
+		"Mq_Charged_Cast": {
+			"length": 1.3,
+			"loop": false,
+			"source": "mannequin m1:Charged_Spell_Cast [0.00–2.60]",
+			"hit": 0.7
+		},
+		"Mq_Charged_Cast1": {
+			"length": 1.5,
+			"loop": false,
+			"source": "mannequin m1:Charged_Spell_Cast_1 [0.30–4.00]",
+			"hit": 0.7
+		},
+		"Mq_Taunt": {
+			"length": 1.3,
+			"loop": false,
+			"source": "mannequin m1:Chest_Pound_Taunt [0.50–3.20]",
+			"hit": 0.7
+		},
+		"Mq_Hit": {
+			"length": 0.75,
+			"loop": false,
+			"source": "mannequin m1:Hit_Reaction_1 [0.00–1.10]",
+			"hit": 0.2
+		},
+		"Mq_Death": {
+			"length": 2.7,
+			"loop": false,
+			"source": "mannequin m1:Dead [0.00–2.70]",
+			"hit": 2.1
+		},
+		"Mq_Pickup": {
+			"length": 1.5,
+			"loop": false,
+			"source": "mannequin m1:Female_Bend_Over_Pick_Up_Inspect [0.20–2.75]",
+			"hit": 0.8
+		},
+		"Mq_Walking": {
+			"length": 1.154,
+			"loop": true,
+			"source": "mannequin m1:Walking + женская пластика"
+		},
+		"Mq_Running": {
+			"length": 0.699,
+			"loop": true,
+			"source": "mannequin m1:Running + женская пластика"
 		}
 	}
 }

@@ -200,6 +200,27 @@
   `python3 -I tools/prepare_hero.py --ual1 <UAL1_Standard.glb> --ual2 <UAL2_Standard.glb> hero_<профессия>_<пол>=<файл.glb>`
   (`--preview <папка>` — картинки-проверки: поза покоя и кадры клипов, оружие линиями). Тест `tests/test_hero_models.gd`
   (добавить новый файл в `HEROES`), кадры 86, 89 и 94 (`HERO_ROW`, `HERO_ROW2`, `HERO_CASTERS`) в `tests/shots.gd`.
+  **Движения манекенов Meshy** (слова Максима: «вот манекены, на которые я накинул большинство движений, все эти
+  движения надо перенести на наших персонажей»): `tools/retarget_mannequin.py` дописывает в готовые GLB всех 24 героев
+  и прежней героини клипы `Mq_*` (`MQ_CLIPS`: манекен m1/m2/m3, клип Meshy, отрезок, сжатие до/после удара, момент
+  удара; помечены `extras.mannequin`, повторный запуск заменяет только их), в `<id>.json` — `clips.<имя>.length` и
+  `hit`. Манекен — скелет Mixamo, `MixamoSource` отдаёт его под именами костей UAL, перенос — тот же `HeroRetarget`
+  (руки, кисти, пальцы). Комбо Meshy разрезаны по ударам на части, идущие подряд (Mq_Sword_A1…A3, Mq_Combo_B1…B3,
+  Mq_Dual_A1/A2); атаки ~0.6–1.1 с, умения 1.1–1.5 с, Mq_Death — лёжа. Клипы Meshy с перемещением (выпады, шаги)
+  ставятся на место (`plant_inplace`): корень по X/Z в покое, опоры (по исходнику) стоят, стопа у земли не едет —
+  шаг становится переступанием дугой. Шаг и бег манекена (`Mq_Walking`/`Mq_Running`, с женской пластикой у `_f`)
+  перенесены, но не подключены: шаг и бег UAL под `WALK_NATIVE`/`RUN_NATIVE` лучше (у бега Meshy нога не достаёт
+  опоры). Не перенесены дубли и неподвижные клипы (список — `MQ_LOCO` в скрипте). Запуск:
+  `python3 -I tools/retarget_mannequin.py --m1 <m1.glb> --m2 <m2.glb> --m3 <m3.glb> [герой.glb …]` (`--preview <папка>`
+  — кадры клипов с отметкой удара и линиями оружия, `--survey <папка>` — исходные клипы целиком, `--check`); после
+  `prepare_hero.py` — запустить снова. В игре (`CharacterModel`): обычная атака — `MQ_ATTACKS` по хвату `mq_grip()`
+  (вид оружия, `sword_shield`, двуручное `*_2h` — spec `two_handed`), части по кругу, пауза > `MQ_COMBO_RESET` — с
+  начала, темп под интервал атаки (`play_attack(attack_time)`, `MQ_SPEED_MIN…MAX`); арбалет — выстрел UAL, после
+  серии из 3+ выстрелов — Mq_Reload; умения — `play_skill(anim, id, use)` (`HeroSkillFx.anim` → `Player._anim_by_kind`):
+  `MQ_SKILL_BY_ID` («Вызов» — Mq_Taunt, удары по земле, обвал), `MQ_CASTS` / `MQ_CASTS_SELF` / `MQ_BUFFS` /
+  `MQ_STRIKES` / `MQ_SPINS`; урон, подбор, смерть — первыми в `ASSET_ACTIONS`. После момента удара движение героя
+  прерывает действие (`_act_hit`). Нет клипов `Mq_*` в модели — прежние удары. Пинок и прыжок перенесены, не
+  подключены. Тест — `_check_mq` в `tests/test_hero_models.gd`, кадры 140–141 в `tests/shots.gd` (шаги 980–981).
 - Звери из файлов: `assets/creatures/<id>.glb` + `<id>.png` (пантера `panther`, черепаха `turtle`, фазан `pheasant`,
   волк `wolf`, кентавр `centaur`; модели 2-й и 3-й стадий эволюции `<вид>_2`, `<вид>_3` у всех пяти; летающие рыбы `flyfish*`; анатемы `anathema*`; Meshy AI, сделаны Максимом). Скрипт `tools/prepare_creatures.py` (numpy, Pillow, meshoptimizer) из GLB Meshy со скелетом
   без анимаций делает: меш ~7 тыс. треугольников, реальный размер (высота в `CREATURES`), морда в +Z, ноги на y = 0,
