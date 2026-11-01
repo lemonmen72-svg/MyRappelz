@@ -196,7 +196,7 @@ static func _build_other(hud: HUD, page: VBoxContainer) -> void:
 	if not Assets.available():
 		var have := Assets.ready_count()
 		pack = ("Пакет моделей загружен частично (частей: %d из %d) — остальные модели запасные." % [have,
-			Assets.PACKS.size()]) if have > 0 else "Пакет моделей не загружен — показаны запасные модели героев и зверей."
+			Assets.PACKS.size()]) if have > 0 else "Пакет моделей не загружен — показаны запасные модели (мир, герои, звери, оружие, значки)."
 	page.add_child(_wrap_label(pack, UiScale.FONT_BODY, TEXT_COLOR))
 	# Админ-панель для тестирования — только у аккаунта Dedok_max (AdminPanel.enabled; ADMIN_TOOLS = false — убрать)
 	var main_node := hud.get_parent()

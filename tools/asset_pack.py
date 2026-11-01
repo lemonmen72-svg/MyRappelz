@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Пакет ресурсов MyRappelz (Assets в игре, assets.gd): части пакета, хэши содержимого, манифест, проверка .pck.
 
-Пакет разбит на части (герои по расам, жители, стадии зверей), у каждой свой хэш и свой файл .pck: изменилась
-одна модель — сборка экспортирует, а игрок скачивает только её часть. Список частей и их шаблоны — в трёх местах,
+Пакет разбит на части (герои по расам, жители, стадии зверей, мир, звери 1-й стадии, оружие в руках, значки), у
+каждой свой хэш и свой файл .pck: изменилась одна модель — сборка экспортирует, а игрок скачивает только её часть.
+В APK остаются запасные герои (IN_APK), все .json (роли костей, creatures.json, props.json, handheld.json),
+шейдеры, сцены, данные; всё тяжёлое из MUST_PACK должно быть в какой-то части. Список частей и их шаблоны — в трёх местах,
 которые должны совпадать (следит команда check и тест tests/test_asset_pack.gd):
   - Assets.PACKS в assets.gd (имя части → шаблоны файлов);
   - пресеты экспорта «Assets <часть>» в export_presets.cfg (include_filter части);
@@ -12,14 +14,17 @@
 
 Подкоманды (запуск из корня репозитория: python3 -I tools/asset_pack.py <команда>):
   files [--part P] [--summary] — файлы частей и размеры исходников (не результат импорта);
-  check                 — три места совпадают, файл не попал в две части, все модели героев, жителей и стадий
-                          зверей (кроме запасных героев APK) — в какой-то части, манифест включён в APK;
+  check                 — три места совпадают, файл не попал в две части, все модели и картинки MUST_PACK
+                          (герои, жители, звери, постройки, текстуры, оружие, значки; кроме запасных героев APK) —
+                          в какой-то части, .json — не в частях и включены в APK, манифест включён в APK;
   digest --godot 4.3 [--part P] — хэш содержимого части (sha256 имени части, путей и содержимого её файлов и их
                           .import + версия Godot): версия части, ключ кэша в игре. Без --part — строки «часть хэш»
                           по всем частям. Считать ДО импорта Godot (он переписывает .import);
   manifest --version V --base-url U --out F --part ИМЯ PCK ХЭШ [--part …] — манифест
                           {format: 2, version, parts: [{name, hash, sha256, size, url, file}]}, url = U/<имя файла>;
-  verify-pck --part P PCK — в .pck есть каждый файл части (его .import и импортированные данные).
+  verify-pck --part P PCK — в .pck есть каждый файл части (его .import и импортированные данные);
+  apk-check LIST        — список файлов APK (вывод unzip -l): файлов частей в нём нет, запасные герои, .json
+                          моделей и манифест пакета — есть.
 Сборка пакета — в .github/workflows/android-apk.yml (только при сборке APK).
 """
 import argparse
@@ -39,21 +44,29 @@ PART_PRESET = "Assets "
 PART_NAME = re.compile(r"[a-z0-9_]{1,32}")
 # Имя части старого манифеста (один пакет на всё) — не годится для новой части.
 LEGACY_PART = "all"
-# Должны быть в какой-то части (тяжёлые модели), кроме запасных героев, которые лежат в APK.
+# Должны быть в какой-то части (модели и картинки), кроме запасных героев, которые лежат в APK.
 MUST_PACK = [
 	"assets/characters/*.glb",
 	"assets/characters/*.png",
-	"assets/creatures/*_2.glb",
-	"assets/creatures/*_2.png",
-	"assets/creatures/*_3.glb",
-	"assets/creatures/*_3.png",
+	"assets/creatures/*.glb",
+	"assets/creatures/*.png",
+	"assets/props/*.glb",
+	"assets/props/*.png",
+	"assets/textures/*.png",
+	"assets/handheld/*.glb",
+	"assets/handheld/*.png",
+	"assets/icons/*.png",
+]
+# Данные моделей (роли костей, размеры, точки) — всегда в APK: код читает их до подключения частей.
+NEVER_PACK = [
+	"assets/*.json",
 ]
 IN_APK = [
 	"assets/characters/hero_human_?_starter.glb",
 	"assets/characters/hero_human_?_starter.png",
 ]
 # Часть больше этого (исходники) — пора делить.
-PART_WARN_MB = 150.0
+PART_WARN_MB = 120.0
 
 
 def read_presets(path=PRESETS):
@@ -221,7 +234,13 @@ def cmd_check(_a):
 			print("предупреждение: часть «%s» — %.1f МБ исходников, пора разделить" % (n, mb))
 	loose = [rel for rel in files if match_any(rel, MUST_PACK) and not match_any(rel, IN_APK) and rel not in owner]
 	if loose:
-		errors.append("модели не попали ни в одну часть (попадут в APK): " + ", ".join(loose[:20]))
+		errors.append("модели и картинки не попали ни в одну часть (попадут в APK): " + ", ".join(loose[:20]))
+	for rel in files:
+		if match_any(rel, NEVER_PACK):
+			if rel in owner:
+				errors.append("%s — данные моделей должны остаться в APK (в части «%s»)" % (rel, owner[rel]))
+			elif not match_any(rel, apk_inc):
+				errors.append("%s не попадёт в APK: добавьте шаблон в include_filter пресета «Android»" % rel)
 	for rel in files:
 		if match_any(rel, IN_APK) and rel in owner:
 			errors.append("запасная модель %s должна остаться в APK" % rel)
@@ -327,6 +346,48 @@ def cmd_verify(a):
 	print("все %d файлов части на месте" % len(want))
 
 
+def apk_names(path):
+	"""Имена файлов из вывода unzip -l (последний столбец строк с датой)."""
+	out = []
+	with open(path, encoding="utf-8", errors="replace") as f:
+		for line in f:
+			cols = line.split()
+			if len(cols) >= 4 and cols[0].isdigit() and re.match(r"\d", cols[1]):
+				out.append(cols[-1])
+	return out
+
+
+def in_apk(names, rel):
+	"""Файл проекта rel есть в APK (Godot кладёт проект в assets/ внутри APK; ресурс — его .import)."""
+	for want in (rel, rel + ".import"):
+		for n in names:
+			if n == want or n.endswith("/" + want):
+				return True
+	return False
+
+
+def cmd_apk_check(a):
+	names = apk_names(a.listing)
+	if not names:
+		sys.exit("список файлов APK пуст: " + a.listing)
+	files = all_files()
+	errors = []
+	packed = []
+	for n, _ in parts():
+		for rel in part_files(n, files):
+			if in_apk(names, rel + ".import"):
+				packed.append(rel)
+	if packed:
+		errors.append("в APK попали файлы пакета ресурсов (%d): %s" % (len(packed), ", ".join(packed[:20])))
+	need = [rel for rel in files if match_any(rel, IN_APK + NEVER_PACK)] + [EMBEDDED_MANIFEST]
+	missing = [rel for rel in need if not in_apk(names, rel)]
+	if missing:
+		errors.append("в APK нет: " + ", ".join(missing[:20]))
+	if errors:
+		sys.exit("\n".join(errors))
+	print("APK: файлов пакета нет; запасные герои, данные моделей (.json, %d) и манифест на месте" % len(need))
+
+
 def main():
 	ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 	sub = ap.add_subparsers(dest="cmd", required=True)
@@ -344,6 +405,9 @@ def main():
 		p.add_argument("--" + k, required=True)
 	p.add_argument("--part", nargs=3, action="append", required=True, metavar=("ИМЯ", "PCK", "ХЭШ"))
 	p.set_defaults(fn=cmd_manifest)
+	p = sub.add_parser("apk-check")
+	p.add_argument("listing")
+	p.set_defaults(fn=cmd_apk_check)
 	p = sub.add_parser("verify-pck")
 	p.add_argument("--part", required=True)
 	p.add_argument("pck")

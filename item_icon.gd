@@ -2,7 +2,7 @@ class_name ItemIcon
 extends Control
 ## Значок предмета (ячейки сумки, слоты экипировки, товары торговца, карточка предмета).
 ## Картинка: res://assets/icons/items/<id предмета>.png (PNG 128×128 с прозрачными углами), загружается только
-## через ResourceLoader/load() — так находится и в собранном APK. Нет картинки — процедурный значок по полю
+## через load() после Assets.exists (часть «icons» пакета ресурсов; без неё картинки «нет»). Нет картинки — процедурный значок по полю
 ## "icon" предмета (ItemData.icon_shape): мягкий круг цвета типа и простой силуэт (колба, свиток, карта существа,
 ## кристалл, клинки, арбалет, клык, шкура, перо, пластина, осколок, чешуя, плавник); неизвестный — первая буква названия.
 ## Карта существа: вертикальная карточка с рамкой цвета тира и буквой вида; с душой — яркая, с сиянием;
@@ -28,10 +28,15 @@ static func texture(id: String) -> Texture2D:
 	if _tex_cache.has(path):
 		return _tex_cache[path]
 	var tex: Texture2D = null
-	if ResourceLoader.exists(path):
+	if Assets.exists(path):
 		tex = load(path) as Texture2D
 	_tex_cache[path] = tex
 	return tex
+
+
+## Забыть картинки (Assets.reset_caches).
+static func reset_cache() -> void:
+	_tex_cache.clear()
 
 
 static func make(id: String, sz: float) -> ItemIcon:

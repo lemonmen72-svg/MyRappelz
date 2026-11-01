@@ -1,9 +1,10 @@
 class_name Assets
 extends RefCounted
-## Пакет ресурсов: тяжёлые модели (герои профессий, жители, стадии эволюции зверей) не лежат в APK, а загружаются
-## отдельными файлами .pck при первом запуске и хранятся в кэше игры. Пакет разбит на части (PACKS: герои по расам,
-## жители, звери) — у каждой свой хэш содержимого и свой файл в кэше user://packs/assets-<часть>-<хэш>.pck:
-## изменилась одна модель — игрок скачивает только её часть.
+## Пакет ресурсов: модели и картинки (герои профессий, жители, звери всех стадий, постройки и деревья мира, текстуры,
+## оружие в руках, значки) не лежат в APK, а загружаются отдельными файлами .pck при первом запуске и хранятся в кэше
+## игры. Пакет разбит на части (PACKS: герои по расам, жители, стадии зверей, мир, звери 1-й стадии, оружие, значки) —
+## у каждой свой хэш содержимого и свой файл в кэше user://packs/assets-<часть>-<хэш>.pck: изменилась одна модель —
+## игрок скачивает только её часть. Порядок загрузки — LOAD_ORDER (мир первым).
 ##
 ## Части и их шаблоны — PACKS (те же шаблоны, что include_filter пресетов экспорта «Assets <часть>», их объединение —
 ## часть exclude_filter пресета «Android» в export_presets.cfg; tools/asset_pack.py check и тест
@@ -14,8 +15,11 @@ extends RefCounted
 ## url) читается как одна часть ALL, которая заменяет все части (её файл в кэше — прежнее имя assets-<хэш>.pck).
 ##
 ## В редакторе и автотестах файлы пакета лежат прямо в res:// (embedded) — загрузка не нужна.
-## Код моделей проверяет файлы через Assets.exists(path): без своей части модель «не существует», и
-## CharacterModel / CreatureAsset берут запасную (стартовые модели людей в APK, модель 1-й стадии, примитивы).
+## Код проверяет файлы через Assets.exists(path): без своей части файл «не существует», и берётся запасное:
+## CharacterModel — стартовые модели людей в APK, CreatureAsset — модель 1-й стадии или примитивы CreatureModels,
+## PropAsset — процедурные постройки PoiModels и деревья IslandVegetation, WorldTextures — без текстур,
+## Handheld / NpcProps — процедурное оружие и жители без предметов, UiIcons / ItemIcon / SkillTree — процедурные
+## значки. load()/preload() файла части без проверки Assets.exists нельзя (в APK его нет).
 ## Части подключаются по отдельности: «Играть без загрузки» подключает те, что есть в кэше, — их модели настоящие.
 ## Экран загрузки — AssetLoader (main.gd показывает его до создания персонажа и входа в мир).
 ##
@@ -28,7 +32,8 @@ extends RefCounted
 ## загрузка HTTPRequest, части по очереди.
 
 ## Части пакета: имя → файлы (пути от res://, шаблоны String.matchn: * — любые символы, ? — один).
-## Остаются в APK: hero_human_m_starter и hero_human_f_starter (запасные герои), звери 1-й стадии, постройки.
+## Остаются в APK: hero_human_m_starter и hero_human_f_starter (запасные герои), все .json (роли костей, creatures.json,
+## props.json, handheld.json), шейдеры, сцены, данные мира.
 ## Новая модель героя профессии — шаблон в часть её расы (и в пресет «Assets <часть>», и в exclude_filter «Android»).
 const PACKS := {
 	"heroes_dark": [
@@ -71,7 +76,45 @@ const PACKS := {
 		"assets/creatures/*_3.glb",
 		"assets/creatures/*_3.png",
 	],
+	# Мир: постройки и атласы (props.json — в APK), деревья, кусты, камни, текстуры окружения, овцы в загоне.
+	"world": [
+		"assets/props/*.glb",
+		"assets/props/*.png",
+		"assets/textures/*.png",
+		"assets/creatures/sheep.glb",
+		"assets/creatures/sheep.png",
+	],
+	# Звери 1-й стадии, рыбы, анатемы (стадии — creatures; creatures.json — в APK). Новый вид — шаблон сюда.
+	"creatures_base": [
+		"assets/creatures/panther.glb",
+		"assets/creatures/panther.png",
+		"assets/creatures/turtle.glb",
+		"assets/creatures/turtle.png",
+		"assets/creatures/pheasant.glb",
+		"assets/creatures/pheasant.png",
+		"assets/creatures/wolf.glb",
+		"assets/creatures/wolf.png",
+		"assets/creatures/centaur.glb",
+		"assets/creatures/centaur.png",
+		"assets/creatures/flyfish*.glb",
+		"assets/creatures/flyfish*.png",
+		"assets/creatures/anathema*.glb",
+		"assets/creatures/anathema*.png",
+	],
+	# Оружие и предметы в руках (handheld.json — в APK).
+	"handheld": [
+		"assets/handheld/*.glb",
+		"assets/handheld/*.png",
+	],
+	# Значки: предметы, умения героя и питомцев, интерфейс.
+	"icons": [
+		"assets/icons/*.png",
+	],
 }
+## Порядок загрузки частей: сначала мир (с ним игра выглядит нормально), затем значки, оружие, звери; части не из
+## списка (герои, жители, стадии, новые) — после, в порядке манифеста. По нему идут HTTPRequest (по очереди) и
+## DownloadManager (все сразу, но в этом порядке).
+const LOAD_ORDER := ["world", "icons", "handheld", "creatures_base"]
 ## Часть старого манифеста (один пакет на все файлы, до разбиения на части): подключена — готовы все части.
 const ALL := "all"
 ## Файл пакета, по которому видно, что ресурсы уже лежат в res:// (редактор, автотесты, полная сборка).
@@ -102,6 +145,8 @@ static var force_missing := false
 ## Тест: подставной плагин фоновой загрузки (те же методы, что у MyRappelzDownload); null — настоящий или нет.
 static var plugin_override: Object = null
 static var _embedded := -1
+## part_of: путь → часть (PACKS не меняется).
+static var _part_cache: Dictionary = {}
 
 
 ## Ресурсы пакета лежат прямо в res:// (не нужно ничего грузить). Проверяется один раз, до подключения частей.
@@ -114,6 +159,20 @@ static func embedded() -> bool:
 ## Имена частей по порядку.
 static func part_names() -> Array:
 	return PACKS.keys()
+
+
+## Части манифеста в порядке загрузки: сначала LOAD_ORDER, остальные — в прежнем порядке.
+static func load_ordered(parts: Array) -> Array:
+	var first: Array = []
+	for n in LOAD_ORDER:
+		for p in parts:
+			if String((p as Dictionary).get("name", "")) == String(n):
+				first.append(p)
+	var out: Array = first.duplicate()
+	for p in parts:
+		if not first.has(p):
+			out.append(p)
+	return out
 
 
 ## Шаблоны всех частей (объединение).
@@ -153,20 +212,36 @@ static func ready_count() -> int:
 	return n
 
 
-## Тест: «пакета нет» (on) или как обычно; сбрасывает кэш наличия моделей зверей.
+## Тест: «пакета нет» (on) или как обычно; сбрасывает кэши наличия файлов.
 static func simulate_missing(on: bool) -> void:
 	force_missing = on
+	reset_caches()
+
+
+## Забыть, какие файлы пакета есть и что из них загружено (после подключения части или в тесте): модели зверей,
+## постройки, текстуры, оружие, значки. Уже построенное не меняется — новое берёт файлы заново.
+static func reset_caches() -> void:
 	CreatureAsset.reset_cache()
+	PropAsset.reset_cache()
+	WorldTextures.reset_cache()
+	Handheld.reset_cache()
+	UiIcons.reset_cache()
+	ItemIcon.reset_cache()
+	SkillTree.reset_cache()
 
 
 ## Часть, в которой лежит файл (путь res://… или от корня проекта); "" — файл в APK.
 static func part_of(path: String) -> String:
 	var p := path.trim_prefix("res://")
+	if _part_cache.has(p):
+		return String(_part_cache[p])
+	var out := ""
 	for n in PACKS:
 		for f in PACKS[n]:
-			if p.matchn(String(f)):
-				return String(n)
-	return ""
+			if out == "" and p.matchn(String(f)):
+				out = String(n)
+	_part_cache[p] = out
+	return out
 
 
 ## Файл из пакета (любой части).
@@ -394,10 +469,10 @@ static func cached_pack(p: Dictionary) -> String:
 	return path
 
 
-## Части манифеста, которых нет в кэше (по порядку манифеста).
+## Части манифеста, которых нет в кэше (в порядке загрузки: LOAD_ORDER, затем по порядку манифеста).
 static func missing_parts(m: Dictionary) -> Array:
 	var out: Array = []
-	for p in manifest_parts(m):
+	for p in load_ordered(manifest_parts(m)):
 		if cached_pack(p) == "":
 			out.append(p)
 	return out
@@ -504,7 +579,7 @@ static func load_part(part: String, path: String) -> bool:
 		return false
 	loaded[part] = path
 	loaded_files.append(path)
-	CreatureAsset.reset_cache()
+	reset_caches()
 	return true
 
 

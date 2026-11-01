@@ -6,7 +6,8 @@ extends RefCounted
 ## иначе процедурный рисунок (простые узнаваемые формы с тёмным контуром, 64×64, рисуется один раз и кэшируется).
 ## Список id — КОНТРАКТ с картинками: имя файла = id. Подпись к значку (подсказка, долгое касание) — title(id).
 ## Картинки: PNG с прозрачным фоном, квадратные (128 или 256), рисунок по центру с небольшим полем; грузятся
-## только через load() (в APK — импортированные ресурсы).
+## только через load() (в APK — импортированные ресурсы). Лежат в части «icons» пакета ресурсов: наличие — через
+## Assets.exists (без части — процедурные рисунки).
 
 const DIR := "res://assets/icons/ui/"
 ## Размер процедурного рисунка, px.
@@ -47,7 +48,12 @@ static func path(id: String) -> String:
 
 ## Есть ли картинка id (файл в assets/icons/ui).
 static func has_file(id: String) -> bool:
-	return not force_procedural and ResourceLoader.exists(path(id))
+	return not force_procedural and Assets.exists(path(id))
+
+
+## Забыть картинки (Assets.reset_caches: подключена часть пакета, тест без пакета).
+static func reset_cache() -> void:
+	_cache.clear()
 
 
 ## Текстура значка: картинка из файла или процедурный рисунок (null не бывает).

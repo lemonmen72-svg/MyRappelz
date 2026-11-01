@@ -1,8 +1,9 @@
 class_name AssetLoader
 extends CanvasLayer
 ## Экран «Загрузка ресурсов»: до создания персонажа и входа в мир подключает пакет ресурсов (Assets) — модели
-## героев профессий, жителей и стадий эволюции зверей, которых нет в APK. Пакет — несколько частей (Assets.PACKS),
-## у каждой свой хэш и файл в кэше: после обновления игры загружаются только изменившиеся части.
+## и картинки, которых нет в APK (мир, герои профессий, жители, звери, оружие, значки). Пакет — несколько частей
+## (Assets.PACKS), у каждой свой хэш и файл в кэше: после обновления игры загружаются только изменившиеся части.
+## Части грузятся в порядке Assets.LOAD_ORDER: мир первым, затем значки, оружие, звери, остальные.
 ## Порядок: манифест (из APK res://assets_pack.json, иначе assets-manifest.json из релиза версии игры; старый формат
 ## «один пакет» — одна часть) → части этих хэшей, что уже есть в кэше user://packs, не загружаются; все есть — сразу
 ## подключить; иначе предупреждение «Будет загружено N МБ» (сумма недостающих частей; на мобильной сети — лучше
@@ -28,6 +29,9 @@ extends CanvasLayer
 ## подключаются при следующем входе в мир («Сменить персонажа» или запуск игры) — посреди игры не подключаются:
 ## готовые модели остались бы запасными, а новые — нет.
 ## Нет плагина или DownloadManager не принял загрузку — загрузка HTTPRequest (игру не сворачивать).
+## «Играть, пока грузится» при загрузке HTTPRequest (быстрый старт: мир уже загружен — он подключается сразу):
+## фоновый AssetLoader (background, http_resume) у корня дерева загружает оставшиеся части по очереди, пока игра
+## открыта (часть, что шла, — заново), проверяет и кладёт в кэш; подключаются они так же — при следующем входе в мир.
 ## Тест (tests/test_asset_pack.gd): preset_manifest — манифест без файла и сети (формат Assets.manifest_from);
 ## offline — загрузка не идёт в сеть (тест сам кладёт временный файл части current и зовёт _on_download_completed);
 ## Assets.plugin_override — подставной плагин.
@@ -74,6 +78,8 @@ var error_text := ""
 var buttons: Dictionary = {}
 ## Фоновый режим: экрана нет, загрузка DownloadManager продолжается после «Играть без загрузки».
 var background := false
+## Фоновый режим загрузки HTTPRequest: недостающие части загружаются сразу, без вопроса («Играть, пока грузится»).
+var http_resume := false
 ## Сообщение фонового режима (показывается в HUD; тесты).
 var note_text := ""
 ## Опрос DownloadManager, с (тест ставит 0 или зовёт _poll_dm сам).
@@ -178,6 +184,9 @@ func _have_manifest() -> void:
 		_complete()
 		return
 	if _resume_jobs():
+		return
+	if background and http_resume:
+		start_download()
 		return
 	if background:
 		_bg_end("")
@@ -592,6 +601,18 @@ func skip() -> void:
 		bg.preset_manifest = manifest
 		bg.offline = offline
 		get_tree().root.add_child.call_deferred(bg)
+	elif state == State.DOWNLOAD and not background:
+		# Быстрый старт (HTTPRequest): готовые части подключаются сейчас, остальные загружает фоновый узел.
+		_http.cancel_request()
+		if not current.is_empty():
+			Assets.remove_file(Assets.part_path_of(current))
+		current = {}
+		var bgh := AssetLoader.new()
+		bgh.background = true
+		bgh.http_resume = true
+		bgh.preset_manifest = manifest
+		bgh.offline = offline
+		get_tree().root.add_child.call_deferred(bgh)
 	else:
 		_http.cancel_request()
 		_http_manifest.cancel_request()
@@ -701,13 +722,13 @@ func _set_state(s: State) -> void:
 	_detail.text = ""
 	_main_btn.visible = s == State.CONFIRM or s == State.ERROR
 	_skip_btn.visible = s != State.DONE and s != State.VERIFY
-	_skip_btn.text = "Играть, пока грузится" if s == State.DOWNLOAD and not jobs.is_empty() else "Играть без загрузки"
+	_skip_btn.text = "Играть, пока грузится" if s == State.DOWNLOAD else "Играть без загрузки"
 	_title.text = "Загрузка ресурсов"
 	match s:
 		State.START, State.MANIFEST:
 			_text.text = "Получаем сведения о пакете ресурсов…"
 		State.CONFIRM:
-			_text.text = ("Для героев всех профессий, жителей и старших стадий питомцев нужен пакет ресурсов.\n"
+			_text.text = ("Для мира, героев профессий, жителей, зверей, оружия и значков нужен пакет ресурсов.\n"
 				+ "Будет загружено %s%s. Загрузка нужна один раз: пакет сохранится в памяти игры, после обновлений "
 				+ "загружаются только изменившиеся части.\n"
 				+ "На мобильной сети за трафик может взиматься плата — лучше подключиться к Wi-Fi.") % [size_mb, _parts_note()]
@@ -721,6 +742,8 @@ func _set_state(s: State) -> void:
 				_text.text = "Загружается пакет ресурсов (%s). Не закрывайте игру." % size_mb
 				if _count > 1:
 					_text.text += "\nЧасть %d из %d." % [clampi(_count - todo.size() + 1, 1, _count), _count]
+				# Быстрый старт: уже загруженные части (мир — первым) подключатся, остальные — в фоне
+				_text.text += "\nМожно играть и сейчас: загруженное подключится, остальное загрузится в фоне."
 			_bar.value = 100.0 * float(done_bytes) / float(maxi(total_bytes, 1))
 			_detail.text = "%s из %s" % [_mb(done_bytes), size_mb]
 		State.VERIFY:
@@ -728,8 +751,8 @@ func _set_state(s: State) -> void:
 			_bar.value = 0.0
 		State.ERROR:
 			_title.text = "Ресурсы не загружены"
-			_text.text = error_text + ("\nБез пакета вместо героев профессий, жителей и старших стадий зверей — "
-				+ "запасные модели.")
+			_text.text = error_text + ("\nБез пакета — запасные модели: упрощённые постройки и деревья, звери из "
+				+ "фигур, герои-люди, простое оружие и значки.")
 			_main_btn.text = "Повторить"
 		State.DONE:
 			_text.text = "Готово."
