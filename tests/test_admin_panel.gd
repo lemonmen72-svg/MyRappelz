@@ -449,12 +449,19 @@ func _kill_xp(mult: int) -> Array:
 	var m: Mob = list[list.size() - 1]
 	player.select_target(m)
 	var pet := _pet()
+	# Герой 40 ур. с нулевым опытом: опыт за зверя ×XP_GAIN — ×50 на 30 ур. дал бы новый уровень
+	var keep_l: int = game.level
+	game.level = 40
+	game.xp = 0
 	var x0: int = game.xp
 	var l0: int = game.level
 	var p0 := pet.xp if pet != null else 0
 	_press("kill_target")
 	check(m.is_dead and game.level == l0, "волк убит (×%d), уровень героя тот же" % mult)
-	return [game.xp - x0, (pet.xp - p0) if pet != null else 0]
+	var res := [game.xp - x0, (pet.xp - p0) if pet != null else 0]
+	game.level = keep_l
+	game.xp = 0
+	return res
 
 
 # ---------- «Предметы» ----------

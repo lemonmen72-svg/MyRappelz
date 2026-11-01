@@ -391,9 +391,11 @@ func _world_xp() -> void:
 		game.xp_mult = int(e[1])
 		var m: Mob = main.spawn_mob("turtle", int(e[0]), pos)
 		check(m != null and m.slot == -1 and m.level == int(e[0]), "main.spawn_mob: черепаха %d ур." % int(e[0]))
+		game.level = 10
+		game.xp = 0
 		var x0: int = game.xp
 		m.take_damage(m.hp + 5, p)
-		gains.append(game.xp - x0)
+		gains.append(game.xp - x0 if game.level == 10 else -1)
 	game.xp_mult = 1
 	var base := int(gains[0])
 	check(base == MobStats.derived("turtle", 10)["xp"], "опыт за зверя своего уровня: %d" % base)
