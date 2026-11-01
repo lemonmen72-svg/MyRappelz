@@ -178,8 +178,9 @@ func _unit_world() -> void:
 	# Овцы из примитивов не ставятся (в загоне — только овцы-модели Максима из файла, PenSheep)
 	var sheep := pois.find_child("Sheep", true, false)
 	check(pois.find_child("Bodies", true, false) == null and (sheep == null or sheep is PenSheep), "овец из примитивов нет")
-	# Новички: на лугах фазаны и волки; зверь 1-го ур. (вход новичка — без прибавки HP, MobStats.MOB_HP_START) по силам
-	# герою 1-го ур. (Combat.power_ratio < 1; «Обычный» волк сильнее базовых — бой тяжелее, но без питомца тоже возможен)
+	# Новички: на лугах фазаны и волки; зверь 1-го ур. (вход новичка — меньше HP и атака, MobStats.MOB_HP_START и
+	# MOB_ATK_START) по силам герою 1-го ур. (Combat.power_ratio < 1; «Обычный» волк сильнее базовых — бой тяжелее, но
+	# без питомца тоже возможен)
 	var hprof := Combat.profile_of(main.player)
 	for id in ["pheasant", "wolf"]:
 		var m := Mob.new()

@@ -1,10 +1,11 @@
 extends "res://tests/test_base.gd"
 ## Звери мира со статами и единая модель боя (решения Максима): у зверей те же 7 статов (MobStats), зверь равного
 ## уровня без прибавки HP равен герою (Combat.power_ratio — «эффективная сила» HP × урон в секунду ≈ 1), затем HP
-## зверей ×MobStats.MOB_HP_MULT (3; у зверей 1–4 ур. — меньше, MOB_HP_START): один на один без умений зверь своего
-## уровня ≈ втрое сильнее героя, зверь на 5 ур. ниже — по силам; столкновение статов (Combat): герой 10 ур. по зверю
-## 30 ур. почти не попадает, а тот убивает героя за пару ударов; при равном уровне попадание ≥ 85 %; опыт по разнице
-## уровней (−6 ур. — 50 %, +6 — +25 %) и множитель Game.xp_mult; кривая опыта; боссы — по одному на существо (модель
+## зверей ×MobStats.MOB_HP_MULT (3): с 10 ур. один на один без умений зверь своего уровня ≈ втрое сильнее героя, зверь
+## на 5 ур. ниже — по силам; вход новичка (MOB_HP_START, MOB_ATK_START): на 1–5 ур. Бродяга побеждает зверя своего
+## уровня (сила 0.35–0.75), на 6–9 ур. — плавный переход к ×3; боссов и мини-боссов вход не касается; столкновение
+## статов (Combat): герой 10 ур. по зверю 30 ур. почти не попадает, а тот убивает героя за пару ударов; при равном
+## уровне попадание ≥ 85 %; опыт по разнице уровней (−6 ур. — 50 %, +6 — +25 %) и множитель Game.xp_mult; кривая опыта; боссы — по одному на существо (модель
 ## 3-й эволюции или старшая, статы выше, один на один почти непобедимы, не приручаются, логово на суше вне безопасных
 ## зон); уровни зон острова 1–30; main.spawn_mob; зверь не лечится в бою, вне боя — лечится.
 
@@ -123,27 +124,44 @@ func _unit_stats() -> void:
 		"черепаха 20 ур. сильнее 10-го")
 
 
-## Равный уровень: без прибавки HP зверь равен герою-Бродяге (0.9–1.1), с HP ×MOB_HP_MULT — втрое сильнее;
-## звери 1–4 ур. — вход новичка (MOB_HP_START: зверь 1-го ур. равен Бродяге 1-го).
+## Равный уровень: с 10 ур. без прибавки HP зверь равен герою-Бродяге (0.9–1.1), с HP ×MOB_HP_MULT — втрое сильнее;
+## звери 1–9 ур. — вход новичка (MOB_HP_START, MOB_ATK_START): на 1–5 ур. Бродяга побеждает (сила зверя 0.35–0.75),
+## на 6–9 ур. сила растёт к ×3; боссов и мини-боссов вход не касается.
 func _unit_equal_level() -> void:
 	check(is_equal_approx(MobStats.MOB_HP_MULT, 3.0), "HP зверей ×%.1f" % MobStats.MOB_HP_MULT)
-	check(is_equal_approx(MobStats.hp_mult(1), 1.0) and MobStats.hp_mult(2) < MobStats.hp_mult(4)
-		and MobStats.hp_mult(4) < MobStats.MOB_HP_MULT and is_equal_approx(MobStats.hp_mult(5), MobStats.MOB_HP_MULT)
-		and is_equal_approx(MobStats.hp_mult(30), MobStats.MOB_HP_MULT),
-		"вход новичка: HP зверей 1–5 ур. ×%.1f ×%.1f ×%.1f ×%.1f ×%.1f" % [MobStats.hp_mult(1), MobStats.hp_mult(2),
-		MobStats.hp_mult(3), MobStats.hp_mult(4), MobStats.hp_mult(5)])
+	var n := MobStats.MOB_HP_START.size()
+	var grows := MobStats.MOB_ATK_START.size() == n and n >= 5
+	for l in range(1, n + 1):
+		grows = grows and MobStats.hp_mult(l) < MobStats.hp_mult(l + 1) and MobStats.atk_mult(l) < MobStats.atk_mult(l + 1)
+	check(grows and is_equal_approx(MobStats.hp_mult(n + 1), MobStats.MOB_HP_MULT) and is_equal_approx(MobStats.atk_mult(n + 1), 1.0)
+		and is_equal_approx(MobStats.hp_mult(30), MobStats.MOB_HP_MULT) and is_equal_approx(MobStats.hp_mult(1, true), MobStats.MOB_HP_MULT)
+		and is_equal_approx(MobStats.atk_mult(1, true), 1.0),
+		"вход новичка 1–%d ур.: HP ×%.2f…×%.2f, атака ×%.2f…×%.2f, растут к ×%.0f и ×1; боссам и мини-боссам — нет"
+		% [n, MobStats.hp_mult(1), MobStats.hp_mult(n), MobStats.atk_mult(1), MobStats.atk_mult(n), MobStats.MOB_HP_MULT])
 	var d0 := MobStats.derived("turtle", 10)
 	check(int(d0["max_hp"]) > int(MobStats.derived("turtle", 9)["max_hp"]), "HP зверей растёт с уровнем")
 	var rows := ""
-	for lvl in [1, 5, 10, 20, 30]:
+	var prev := 0.0
+	for lvl in [1, 3, 5, 6, 7, 8, 9, 10, 20, 30]:
 		var r := _ratio(lvl)
-		var pre := r / MobStats.hp_mult(lvl)
-		rows += " %d:%.2f(%.2f)" % [lvl, r, pre]
-		check(pre >= 0.9 and pre <= 1.1, "Бродяга %d ур.: без прибавки HP зверь своего уровня равен герою — %.2f" % [lvl, pre])
-		if lvl >= 5:
+		rows += " %d:%.2f" % [lvl, r]
+		if lvl <= 5:
+			check(r >= 0.35 and r <= 0.75, "Бродяга %d ур. побеждает зверя своего уровня без питомца: сила зверя %.2f" % [lvl, r])
+		elif lvl < 10:
+			check(r > prev and r < 3.0, "Бродяга %d ур.: сила зверя своего уровня растёт к ×3 — %.2f" % [lvl, r])
+		else:
+			var pre := r / MobStats.hp_mult(lvl)
+			check(pre >= 0.9 and pre <= 1.1, "Бродяга %d ур.: без прибавки HP зверь своего уровня равен герою — %.2f" % [lvl, pre])
 			check(r >= 2.6 and r <= 3.4, "Бродяга %d ур.: зверь своего уровня с HP ×%.0f — %.2f силы героя (один на один без умений — проигрыш)"
 				% [lvl, MobStats.MOB_HP_MULT, r])
-	print("  Бродяга, сила зверя своего уровня (без прибавки HP):" + rows)
+		prev = r
+	print("  Бродяга, сила зверя своего уровня:" + rows)
+	# Мини-босс и босс без входа новичка: кентавр 3 ур. — полные HP и атака
+	var c3 := MobStats.derived("centaur", 3)
+	var w3 := MobStats.derived("wolf", 3)
+	check(int(c3["max_hp"]) > int(w3["max_hp"]) * 2 and int(c3["atk"]) > int(w3["atk"]) * 2,
+		"кентавр 3 ур. (мини-босс) без входа новичка: HP %d / волк %d, атака %d / %d" % [int(c3["max_hp"]), int(w3["max_hp"]),
+		int(c3["atk"]), int(w3["atk"])])
 
 
 ## Профессии без умений, со стартовым оружием: без прибавки HP зверь своего уровня примерно равен герою, с HP ×3 —
