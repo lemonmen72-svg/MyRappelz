@@ -85,7 +85,7 @@ func _check_presets() -> void:
 		check(sun != null and sun.shadow_enabled == Quality.shadows(), "«%s»: тени солнца %s" % [Quality.level_name(l),
 			Quality.shadows()])
 		var fx := _fx()
-		check(fx != null and fx.visible == (Quality.fxaa() or Quality.postfx()), "«%s»: постобработка" % Quality.level_name(l))
+		check(fx != null and fx.visible == (Quality.postfx_fxaa() or Quality.postfx()), "«%s»: постобработка" % Quality.level_name(l))
 		check(is_equal_approx(win.mesh_lod_threshold, Quality.lod_threshold()), "«%s»: порог LOD %.2f"
 			% [Quality.level_name(l), win.mesh_lod_threshold])
 		check(Quality.fps_limit() == int(Quality.PRESET_FPS[l]), "«%s»: предел кадров пресета %d"

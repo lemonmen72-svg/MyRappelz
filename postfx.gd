@@ -3,7 +3,8 @@ extends CanvasLayer
 ## Постобработка поверх 3D и под интерфейсом (layer = -1; HUD — слой 1): полноэкранный ColorRect
 ## со своим canvas_item-шейдером postfx.gdshader — сглаживание FXAA, цветокоррекция (насыщенность, тёплый
 ## баланс, виньетка), мягкое свечение светлых мест. Касания не перехватывает (MOUSE_FILTER_IGNORE).
-## Что включено — по Quality: fxaa() (сглаживание «FXAA»), postfx() (цвет), bloom() (свечение). Ничего —
+## Что включено — по Quality: postfx_fxaa() (сглаживание «FXAA» в Compatibility; в Mobile FXAA встроенный —
+## Viewport.screen_space_aa, здесь не считается), postfx() (цвет), bloom() (свечение). Ничего —
 ## слой скрыт, экран не копируется (на «Низком» и «Среднем» прохода нет). Вариант шейдера собирается из одного
 ## кода с #define вместо строки-метки (USE_FXAA, USE_GRADE, USE_BLOOM): лишние выборки не считаются.
 ## Создание: add_child(PostFx.new()); после смены настроек — Quality.apply(get_tree()).
@@ -40,7 +41,7 @@ func _ready() -> void:
 func apply_quality() -> void:
 	if _rect == null:
 		return
-	var fxaa := Quality.fxaa()
+	var fxaa := Quality.postfx_fxaa()
 	var grade := Quality.postfx()
 	var bloom := Quality.bloom()
 	var on := fxaa or grade

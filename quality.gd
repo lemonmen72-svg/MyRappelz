@@ -29,6 +29,18 @@ extends RefCounted
 ##   температуры Android из плагина) или кадры стабильно не успевают — шаги THROTTLE_STEPS: потолки настроек
 ##   поверх выбранных (кадры/с → разрешение 3D → тени → сглаживание и постобработка → всё ниже). Настройки
 ##   игрока не меняются: option() — выбранное, геттеры (shadows(), msaa()…) — с потолком throttle_level().
+##
+## Рендерер (RendererGuard; на Android с нормальным Vulkan — Mobile, иначе и в CI — Compatibility): настройки те же,
+## различия — ветками по mobile_renderer():
+## - разрешение 3D ниже экрана (720p, 900p) — FSR 1.0 вместо билинейного растяжения (в Compatibility 4.3 его нет);
+##   540p (слабый телефон, шаг 5 авто-снижения) — билинейно, дешевле всего;
+## - FXAA — встроенный (Viewport.screen_space_aa, в проходе тонмаппинга Mobile, почти бесплатно), свой проход PostFx
+##   — только в Compatibility (postfx_fxaa());
+## - фильтр теней — по числу выборок RD (SHADOW_LEVELS "filter_mobile": SOFT_LOW 4 / SOFT_MEDIUM 8 выборок вместо
+##   PCF 5 / 13 Compatibility);
+## - цветокоррекция и свечение — тот же PostFx в обоих рендерерах (одна картинка; проверена снимками CI).
+## Атлас и фильтр теней передаются RenderingServer только при изменении (в Mobile смена фильтра пересобирает
+## специализации шейдеров).
 
 const LOW := 0
 const MEDIUM := 1
@@ -108,14 +120,16 @@ const RENDER_HEIGHTS := [540, 720, 900, 0]
 ## (первый каскад 0–5.6 м — между камерой и героем, почти пустой; каждый объект с тенью — до 4 проходов).
 ## Стало: везде 2 каскада в атласе 2048 (первый каскад 13–15 м — герой и всё вокруг него в нём; 1.3–1.5 см на
 ## тексель при фильтре PCF — разницы с 4096 не видно), «Средние» 45 м без теней кустов, «Высокие» 60 м.
+## "filter_mobile" — фильтр в Mobile (RendererSceneRenderRD 4.3: SOFT_LOW — 4 выборки, SOFT_MEDIUM — 8, SOFT_HIGH —
+## 16 и шире ядро; 13 выборок PCF Compatibility ≈ SOFT_MEDIUM, 16 — лишний нагрев).
 const SHADOW_LEVELS := [
 	{},
-	{"atlas": 2048, "splits": 2, "distance": 32.0, "split": [0.42, 0.7, 0.9], "filter": 2, "blend": false,
-		"small": false},
-	{"atlas": 2048, "splits": 2, "distance": 45.0, "split": [0.33, 0.6, 0.85], "filter": 4, "blend": true,
-		"small": false},
-	{"atlas": 2048, "splits": 2, "distance": 60.0, "split": [0.25, 0.6, 0.85], "filter": 4, "blend": true,
-		"small": true},
+	{"atlas": 2048, "splits": 2, "distance": 32.0, "split": [0.42, 0.7, 0.9], "filter": 2, "filter_mobile": 2,
+		"blend": false, "small": false},
+	{"atlas": 2048, "splits": 2, "distance": 45.0, "split": [0.33, 0.6, 0.85], "filter": 4, "filter_mobile": 3,
+		"blend": true, "small": false},
+	{"atlas": 2048, "splits": 2, "distance": 60.0, "split": [0.25, 0.6, 0.85], "filter": 4, "filter_mobile": 3,
+		"blend": true, "small": true},
 ]
 ## Сдвиг тени (против «ряби» — самозатенения карты теней на гранях): по глубине и вдоль нормали.
 ## У Godot по умолчанию 0.1 / 1.0; у построек cull_disabled (двусторонние грани) рябь сильнее — нормаль больше.
@@ -144,6 +158,10 @@ const GRASS_LEVELS := [
 ]
 ## Доля частиц эффектов по уровню.
 const EFFECTS_SCALE := [0.5, 0.75, 1.0]
+## Резкость FSR 1.0 (Viewport.fsr_sharpness: 0 — резче всего, 2 — мягко); у Godot по умолчанию 0.2.
+const FSR_SHARPNESS := 0.3
+## FSR — только если 3D-кадр заметно меньше экрана (при масштабе ~1 растягивать нечего).
+const FSR_MAX_SCALE := 0.99
 
 ## Ограничение частоты кадров. Без него экраны 90–120 Гц рисуют в 1.5–2 раза больше кадров,
 ## чем нужно, и телефон греется. 30 — меньше всего греется и дольше держит батарея.
@@ -178,6 +196,11 @@ static var _background := false
 static var _throttle := 0
 static var _guard := -1
 static var _resize_hooked := false
+## Тесты: 1 — считать рендерер Mobile, 0 — Compatibility, −1 — как есть (RendererGuard.is_vulkan()).
+static var renderer_override := -1
+## Последние атлас и фильтр теней, переданные RenderingServer (−1 — ещё не передавали).
+static var _last_atlas := -1
+static var _last_filter := -1
 ## Материалы моделей (персонажи, звери, питомцы): тени на модели по model_shadows — WeakRef.
 static var _model_mats: Array[WeakRef] = []
 ## Материалы с контуром (next_pass по outlines; контур — meta "outline") — WeakRef.
@@ -526,9 +549,63 @@ static func bloom() -> bool:
 	return effective("postfx") >= 2
 
 
-## FXAA своим проходом в PostFx.
+## Выбрано сглаживание FXAA (в Compatibility — свой проход PostFx, в Mobile — встроенный).
 static func fxaa() -> bool:
 	return effective("aa") == 1
+
+
+## Рендерер Mobile (Vulkan): свои ветки разрешения, FXAA и фильтра теней.
+static func mobile_renderer() -> bool:
+	if renderer_override >= 0:
+		return renderer_override == 1
+	return RendererGuard.is_vulkan()
+
+
+## FXAA своим проходом PostFx — только в Compatibility (в Mobile — встроенный, screen_aa()).
+static func postfx_fxaa() -> bool:
+	return fxaa() and not mobile_renderer()
+
+
+## Встроенное экранное сглаживание окна (Viewport.screen_space_aa): FXAA в Mobile, иначе выключено.
+static func screen_aa() -> Viewport.ScreenSpaceAA:
+	if fxaa() and mobile_renderer():
+		return Viewport.SCREEN_SPACE_AA_FXAA
+	return Viewport.SCREEN_SPACE_AA_DISABLED
+
+
+## FSR 1.0 для экрана высотой screen_h px: Mobile, 720p или 900p и кадр заметно меньше экрана.
+static func use_fsr(screen_h: float) -> bool:
+	if not mobile_renderer():
+		return false
+	var r := effective("render")
+	return r >= 1 and RENDER_HEIGHTS[r] > 0 and render_scale_for(screen_h) < FSR_MAX_SCALE
+
+
+## Способ растяжения 3D-кадра: FSR 1.0 (use_fsr) или билинейно.
+static func scaling_mode_for(screen_h: float) -> Viewport.Scaling3DMode:
+	return Viewport.SCALING_3D_MODE_FSR if use_fsr(screen_h) else Viewport.SCALING_3D_MODE_BILINEAR
+
+
+## Фильтр карты теней (RenderingServer.SHADOW_QUALITY_*) текущего уровня теней и рендерера; −1 — тени выключены.
+static func shadow_filter() -> int:
+	var sh := _shadow()
+	if sh.is_empty():
+		return -1
+	return int(sh["filter_mobile"] if mobile_renderer() else sh["filter"])
+
+
+## Что Quality.apply передаст окну и солнцу на экране высотой screen_h (для тестов и отчёта): рендерер, масштаб и
+## способ растяжения 3D, MSAA, встроенный FXAA, FXAA PostFx, фильтр теней.
+static func render_params(screen_h: float) -> Dictionary:
+	return {
+		"mobile": mobile_renderer(),
+		"scale": render_scale_for(screen_h),
+		"scaling": scaling_mode_for(screen_h),
+		"msaa": msaa(),
+		"screen_aa": screen_aa(),
+		"postfx_fxaa": postfx_fxaa(),
+		"shadow_filter": shadow_filter(),
+	}
 
 
 ## MSAA 3D-кадра (Viewport.MSAA_*).
@@ -614,14 +691,16 @@ static func apply(tree: SceneTree) -> void:
 
 ## Разрешение и сглаживание окна. Интерфейс рисуется в родном разрешении (растяжение canvas_items, база
 ## 1280×720 — раскладка та же), 3D-мир — с высотой render_height() и растягивается билинейно
-## (Viewport.scaling_3d_scale; в GL Compatibility 4.3 есть только билинейное). MSAA — у 3D-кадра.
+## (Viewport.scaling_3d_scale; в GL Compatibility 4.3 есть только билинейное), в Mobile — FSR 1.0 (use_fsr).
+## MSAA — у 3D-кадра; FXAA в Mobile — встроенный (screen_aa).
 static func apply_resolution(tree: SceneTree) -> void:
 	var win := tree.root
 	win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 	win.content_scale_size = Vector2i(1280, 720)
 	win.msaa_3d = msaa()
-	win.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
-	win.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+	win.screen_space_aa = screen_aa()
+	win.scaling_3d_mode = scaling_mode_for(float(win.size.y))
+	win.fsr_sharpness = FSR_SHARPNESS
 	win.scaling_3d_scale = render_scale_for(float(win.size.y))
 	# Порог LOD мешей (модели героев, жителей, зверей — с LOD из импорта; выбор LOD есть и в Compatibility)
 	win.mesh_lod_threshold = lod_threshold()
@@ -630,6 +709,7 @@ static func apply_resolution(tree: SceneTree) -> void:
 		_resize_hooked = true
 		var on_resize := func() -> void:
 			if is_instance_valid(win):
+				win.scaling_3d_mode = Quality.scaling_mode_for(float(win.size.y))
 				win.scaling_3d_scale = Quality.render_scale_for(float(win.size.y))
 		win.size_changed.connect(on_resize)
 
@@ -641,8 +721,15 @@ static func apply_lights(root: Node) -> void:
 	var sh := _shadow()
 	var on := not sh.is_empty()
 	if on:
-		RenderingServer.directional_shadow_atlas_set_size(int(sh["atlas"]), true)
-		RenderingServer.directional_soft_shadow_filter_set_quality(int(sh["filter"]) as RenderingServer.ShadowQuality)
+		# Только при изменении: в Mobile смена фильтра пересобирает специализации шейдеров сцены
+		var atlas := int(sh["atlas"])
+		if atlas != _last_atlas:
+			_last_atlas = atlas
+			RenderingServer.directional_shadow_atlas_set_size(atlas, true)
+		var filter := shadow_filter()
+		if filter != _last_filter:
+			_last_filter = filter
+			RenderingServer.directional_soft_shadow_filter_set_quality(filter as RenderingServer.ShadowQuality)
 	for n in root.find_children("*", "DirectionalLight3D", true, false):
 		var sun := n as DirectionalLight3D
 		if sun == null:
