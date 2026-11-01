@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       shots:
-        description: "Части скриншотов: all, none или номера через запятую (1–6)"
+        description: "Части скриншотов: all, none или номера через запятую (1–8)"
         required: false
         default: "all"
       perf:
@@ -32,7 +32,7 @@ env:
   GODOT_VERSION: "4.3"
   # Число частей скриншотов (матрица visual; поле shots ручного запуска — номера 1…SHOTS_PARTS) и группы
   # пресетов замера (задачи perf). Части автотестов — список matrix.part задачи smoke.
-  SHOTS_PARTS: "6"
+  SHOTS_PARTS: "8"
   PERF_PARTS: "0,1 2,3"
 
 jobs:
@@ -93,6 +93,7 @@ jobs:
         with:
           path: |
             .godot/imported
+            .godot/editor/filesystem_cache8
             .godot/ci_import_state.json
             .godot/ci_import_files
           key: ${{ steps.ikey.outputs.key }}
@@ -108,6 +109,7 @@ jobs:
         with:
           path: |
             .godot/imported
+            .godot/editor/filesystem_cache8
             .godot/ci_import_state.json
             .godot/ci_import_files
           key: ${{ steps.ikey.outputs.key }}
@@ -157,6 +159,7 @@ jobs:
         with:
           path: |
             .godot/imported
+            .godot/editor/filesystem_cache8
             .godot/ci_import_state.json
             .godot/ci_import_files
           key: ${{ steps.ikey.outputs.key }}
@@ -220,6 +223,7 @@ jobs:
         with:
           path: |
             .godot/imported
+            .godot/editor/filesystem_cache8
             .godot/ci_import_state.json
             .godot/ci_import_files
           key: ${{ steps.ikey.outputs.key }}
