@@ -44,7 +44,10 @@ const CLIPS := ["idle", "walking", "running", "wave", "sword_idle", "sword_slash
 const MIN_TRIS := 50000
 const MAX_TRIS := 80000
 ## Плечевой сустав (среднее левого и правого за клип) позади основания шеи не дальше, м. Клипы — покой, стойки, шаг, бег.
-const SHOULDER_BACK := 0.035
+## После исправления ключиц у 24 героев худшее — 4.1–4.2 см (Sword_Idle у hero_light_elf_m_starter и
+## hero_beastmaster_m: стойка UAL наклоняет корпус вперёд), обычно 1–3 см; до исправления Idle, Crossbow_Idle и
+## Walking UAL — 6.2–7.7 см.
+const SHOULDER_BACK := 0.05
 const SHOULDER_CLIPS := ["idle", "sword_idle", "crossbow_idle", "walking", "mq_walking", "mq_running", "mq_cast_hold"]
 ## Бег Mq_Running: носок в переносе над своей высотой в покое — не выше доли роста (у манекена 0.47–0.50, у героев
 ## после tools/retarget_mannequin.py MQ_LIFT ≈ 0.3), колено ниже тазобедренного сустава хотя бы на долю роста (у

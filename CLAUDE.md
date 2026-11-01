@@ -220,7 +220,7 @@
   спиной. Теперь опорная поза ключицы — своя поза покоя Meshy (`HeroRetarget._build_ref`; у героини Mixamo — без
   ключиц в `retarget_animations.ALIGN`), поверх — повороты ключицы библиотеки от её покоя: Idle −1.0 см, Sword_Idle
   −1.8, Crossbow_Idle −0.7, шаг манекена −1.2 (у самого манекена −1.3). Тест — `_check_shoulders`
-  (`SHOULDER_BACK` 3.5 см) в `tests/test_hero_models.gd`. Рядом `<id>.json` — роли костей (`bones`: head, hand_r,
+  (`SHOULDER_BACK` 5 см: после исправления худшее 4.2 см — Sword_Idle, до — 6.2–7.7 см) в `tests/test_hero_models.gd`. Рядом `<id>.json` — роли костей (`bones`: head, hand_r,
   hand_l, hips, root, foot_*, руки, ноги, пальцы), хват оружия в пространстве кисти (`grip_r`/`grip_l`: pos, dir),
   поворот арбалета `crossbow_rot`, метка лица `face`, клипы. `CharacterModel.asset_rig(путь)` читает его, кости для
   оружия и меток берутся по ролям; нет `.json` — по именам Mixamo и `GRIP_*` (прежняя героиня). `.json` попадают в APK
