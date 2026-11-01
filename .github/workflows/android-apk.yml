@@ -40,14 +40,16 @@ jobs:
           V="${RAW_VERSION:-$(tr -d '[:space:]' < android/release_version.txt)}"
           echo "VERSION=${V#v}" >> "$GITHUB_ENV"
 
-      # Версия пакета ресурсов = хэш его содержимого (исходники моделей, их .import, версия Godot).
-      # Считается до импорта Godot: импорт переписывает .import. Не изменился — игра берёт пакет из кэша.
+      # Пакет ресурсов разбит на части (Assets.PACKS: герои по расам, жители, звери). Версия каждой части = хэш её
+      # содержимого (исходники моделей части, их .import, версия Godot) — строки «часть хэш» в asset_parts.txt.
+      # Считается до импорта Godot: импорт переписывает .import. Часть не изменилась — игра берёт её из кэша.
       - name: Хэш пакета ресурсов
         run: |
           set -euo pipefail
           python3 -I tools/asset_pack.py check
-          python3 -I tools/asset_pack.py files | tail -n 1
-          echo "ASSETS_HASH=$(python3 -I tools/asset_pack.py digest --godot "$GODOT_VERSION")" >> "$GITHUB_ENV"
+          python3 -I tools/asset_pack.py files --summary
+          python3 -I tools/asset_pack.py digest --godot "$GODOT_VERSION" | tee "$RUNNER_TEMP/asset_parts.txt"
+          test -s "$RUNNER_TEMP/asset_parts.txt"
 
       - uses: actions/setup-java@v4
         with:
@@ -114,38 +116,51 @@ jobs:
           sed -i "s|^config/name=.*|&\nconfig/version=\"$VERSION\"|" project.godot
           grep -n "^config/" project.godot
 
-      # Пакет ресурсов (пресет «Assets»): тяжёлые модели, которых нет в APK. Экспортируется до APK, чтобы
-      # манифест (хэш, sha256, размер, адрес) лёг в APK как res://assets_pack.json.
+      # Пакет ресурсов по частям (пресеты «Assets <часть>»): тяжёлые модели, которых нет в APK. Экспортируется до APK,
+      # чтобы манифест (части: хэш, sha256, размер, адрес) лёг в APK как res://assets_pack.json.
       - name: Экспорт пакета ресурсов
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -uo pipefail
+          set -euo pipefail
           mkdir -p build
-          PCK="build/MyRappelz-assets-${ASSETS_HASH:0:16}.pck"
-          # Модели не менялись (тот же хэш) — берём сам файл пакета из последнего релиза, где он есть:
-          # экспорт Godot побайтно не повторяется (другие sha256 и размер), и игра скачала бы пакет заново.
-          REUSED=""
-          URL=$(curl -sfL -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=30" \
-            | python3 -I -c "import json,sys; n=sys.argv[1]; print(next((a['browser_download_url'] for r in json.load(sys.stdin) for a in r.get('assets',[]) if a['name']==n), ''))" \
-              "$(basename "$PCK")" || true)
-          if [ -n "$URL" ] && curl -sfL -o "$PCK" "$URL" && test -s "$PCK"; then
-            echo "Пакет ресурсов не изменился — взят из прошлого релиза: $URL"
-            REUSED=1
-          else
-            rm -f "$PCK"
-            timeout 600 godot --headless --path . --export-pack "Assets" "$PCK" 2>&1 | tee export_pack.log
-          fi
-          set -e
+          # Часть не менялась (тот же хэш) — берём сам её файл из последнего релиза, где он есть: экспорт Godot
+          # побайтно не повторяется (другие sha256 и размер), и игра скачала бы часть заново. Файл загружается и в
+          # новый релиз (у каждого релиза полный комплект, адреса манифеста — на свой релиз; старые можно удалять).
+          curl -sfL -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=30" > "$RUNNER_TEMP/releases.json" \
+            || echo "[]" > "$RUNNER_TEMP/releases.json"
+          MANIFEST_ARGS=()
+          EXPORTED=0
+          REUSED=0
+          mapfile -t PARTS < "$RUNNER_TEMP/asset_parts.txt"
+          for LINE in "${PARTS[@]}"; do
+            NAME="${LINE%% *}"
+            HASH="${LINE##* }"
+            PCK="build/MyRappelz-assets-$NAME-${HASH:0:16}.pck"
+            URL=$(python3 -I -c "import json,sys; d=json.load(open(sys.argv[1])); n=sys.argv[2]; print(next((a['browser_download_url'] for r in (d if isinstance(d, list) else []) for a in r.get('assets', []) if a.get('name') == n), ''))" \
+              "$RUNNER_TEMP/releases.json" "$(basename "$PCK")" || true)
+            if [ -n "$URL" ] && curl -sfL -o "$PCK" "$URL" && test -s "$PCK" \
+                && python3 -I tools/asset_pack.py verify-pck --part "$NAME" "$PCK"; then
+              echo "Часть $NAME не изменилась — взята из прошлого релиза: $URL"
+              REUSED=$((REUSED + 1))
+            else
+              rm -f "$PCK"
+              echo "Часть $NAME: экспорт"
+              timeout 600 godot --headless --path . --export-pack "Assets $NAME" "$PCK" < /dev/null 2>&1 \
+                | tee -a export_pack.log || true
+              test -s "$PCK" || { echo "::error::часть пакета $NAME не экспортирована"; exit 1; }
+              python3 -I tools/asset_pack.py verify-pck --part "$NAME" "$PCK"
+              EXPORTED=$((EXPORTED + 1))
+            fi
+            MANIFEST_ARGS+=(--part "$NAME" "$PCK" "$HASH")
+          done
+          echo "Части пакета ресурсов: экспортировано $EXPORTED, взято из прошлых релизов $REUSED"
           ls -la build
-          test -s "$PCK"
-          python3 -I tools/asset_pack.py verify-pck "$PCK"
-          python3 -I tools/asset_pack.py manifest --pck "$PCK" --hash "$ASSETS_HASH" --version "$VERSION" \
-            --url "https://github.com/${{ github.repository }}/releases/download/v$VERSION/$(basename "$PCK")" \
-            --out build/assets-manifest.json
+          python3 -I tools/asset_pack.py manifest --version "$VERSION" \
+            --base-url "https://github.com/${{ github.repository }}/releases/download/v$VERSION" \
+            --out build/assets-manifest.json "${MANIFEST_ARGS[@]}"
           cp build/assets-manifest.json assets_pack.json
-          echo "ASSETS_PCK=$PCK" >> "$GITHUB_ENV"
 
       # Плагин фоновой загрузки: шаблон Gradle-сборки Godot в android/build (как «Проект → Установить шаблон сборки
       # Android»), AAR плагина → addons/myrappelz_download/bin (его подключает плагин редактора), Gradle-сборка у
@@ -241,14 +256,14 @@ jobs:
           prerelease: true
           files: |
             build/MyRappelz-${{ env.VERSION }}.apk
-            ${{ env.ASSETS_PCK }}
+            build/MyRappelz-assets-*.pck
             build/assets-manifest.json
           body: |
             Прототип MyRappelz ${{ env.VERSION }} для Android (сборка №${{ github.run_number }}, коммит ${{ github.sha }}).
 
             **Установка:** скачайте `MyRappelz-${{ env.VERSION }}.apk` на телефон, откройте его и разрешите установку из неизвестных источников.
 
-            **Пакет ресурсов:** модели героев профессий и старших стадий питомцев — отдельным файлом (`MyRappelz-assets-….pck`, `assets-manifest.json`). Игра сама загрузит его при первом запуске (покажет размер и спросит) и сохранит в своей памяти; следующие версии скачивают пакет заново, только если модели изменились. Вручную его скачивать не нужно. ${{ env.GRADLE_BUILD == '1' && 'Загрузка идёт в фоне средствами Android: игру можно свернуть, ход загрузки виден в уведомлении (на Android 13+ игра спросит разрешение на уведомления); можно и играть сразу на запасных моделях — пакет подключится при следующем входе в мир.' || '' }}
+            **Пакет ресурсов:** модели героев профессий, жителей и старших стадий питомцев — отдельными файлами по частям (`MyRappelz-assets-<часть>-….pck`: герои по расам, жители, звери; список — `assets-manifest.json`). Игра сама загрузит их при первом запуске (покажет размер и спросит) и сохранит в своей памяти; следующие версии скачивают только изменившиеся части. Вручную их скачивать не нужно. ${{ env.GRADLE_BUILD == '1' && 'Загрузка идёт в фоне средствами Android: игру можно свернуть, ход загрузки виден в уведомлении (на Android 13+ игра спросит разрешение на уведомления); можно и играть сразу на запасных моделях — пакет подключится при следующем входе в мир.' || '' }}
 
             **Новое в 0.23:** зелья 5 видов (здоровье, мана, скорость атаки, каста и бега) с рангами каждые 10 уровней; добыча — 2 предмета с обычного зверя, 3 с мини-босса, 4 с босса, золото всегда (мешочком); случайные предметы в наградах заданий; золото на складе; оружие 2-го ранга (13 моделей, с 21 ур.; на острове не продаётся). Обычные звери нейтральны (нападают, только если их задеть), боссы и «Редкие» звери нападают сами; на 1–9 уровне звери слабее — Бродяга побеждает своего зверя. Компактные панели (уровень в кружке, HP/MP/опыт внутри полосок), меню и кнопки — значками (подпись — удержанием), над жителями «!» (можно взять), «?» (взято), «=» (можно сдать), над зверями-целями задания — красная метка. Бег и шаг — с манекенов (без «прыжков»), трусца и быстрый бег, новые варианты ударов, отскок, блок, эмоции; герой больше не дёргается у стен и в бою, камера не трясётся на кочках.
 

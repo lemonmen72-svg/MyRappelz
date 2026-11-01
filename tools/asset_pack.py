@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
-"""Пакет ресурсов MyRappelz (Assets в игре, assets.gd): что в нём, хэш содержимого, манифест, проверка .pck.
+"""Пакет ресурсов MyRappelz (Assets в игре, assets.gd): части пакета, хэши содержимого, манифест, проверка .pck.
 
-Что в пакете — include_filter пресета экспорта «Assets» в export_presets.cfg (те же шаблоны — Assets.PACK_FILTERS
-в assets.gd и часть exclude_filter пресета «Android»; шаблоны как у Godot: * — любые символы, ? — один, без
-учёта регистра, путь от корня проекта; папки с точкой не просматриваются).
+Пакет разбит на части (герои по расам, жители, стадии зверей), у каждой свой хэш и свой файл .pck: изменилась
+одна модель — сборка экспортирует, а игрок скачивает только её часть. Список частей и их шаблоны — в трёх местах,
+которые должны совпадать (следит команда check и тест tests/test_asset_pack.gd):
+  - Assets.PACKS в assets.gd (имя части → шаблоны файлов);
+  - пресеты экспорта «Assets <часть>» в export_presets.cfg (include_filter части);
+  - exclude_filter пресета «Android» — объединение шаблонов всех частей (их файлы не попадают в APK).
+Шаблоны как у Godot: * — любые символы, ? — один, без учёта регистра, путь от корня проекта; папки с точкой
+не просматриваются.
 
 Подкоманды (запуск из корня репозитория: python3 -I tools/asset_pack.py <команда>):
-  files                 — список файлов пакета и их общий размер (исходники, не результат импорта);
-  check                 — шаблоны пакета совпадают с исключёнными из APK, манифест включён в APK;
-  digest --godot 4.3    — хэш содержимого (sha256 путей и содержимого файлов пакета и их .import + версия Godot):
-                          версия пакета, ключ кэша в игре. Считать ДО импорта Godot (он переписывает .import);
-  manifest --pck P --hash H --version V --url U --out F — манифест {version, hash, sha256, size, url, file};
-  verify-pck P          — в .pck есть каждый файл пакета (его .import и импортированные данные).
+  files [--part P] [--summary] — файлы частей и размеры исходников (не результат импорта);
+  check                 — три места совпадают, файл не попал в две части, все модели героев, жителей и стадий
+                          зверей (кроме запасных героев APK) — в какой-то части, манифест включён в APK;
+  digest --godot 4.3 [--part P] — хэш содержимого части (sha256 имени части, путей и содержимого её файлов и их
+                          .import + версия Godot): версия части, ключ кэша в игре. Без --part — строки «часть хэш»
+                          по всем частям. Считать ДО импорта Godot (он переписывает .import);
+  manifest --version V --base-url U --out F --part ИМЯ PCK ХЭШ [--part …] — манифест
+                          {format: 2, version, parts: [{name, hash, sha256, size, url, file}]}, url = U/<имя файла>;
+  verify-pck --part P PCK — в .pck есть каждый файл части (его .import и импортированные данные).
 Сборка пакета — в .github/workflows/android-apk.yml (только при сборке APK).
 """
 import argparse
@@ -25,12 +33,32 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PRESETS = os.path.join(ROOT, "export_presets.cfg")
+ASSETS_GD = os.path.join(ROOT, "assets.gd")
 EMBEDDED_MANIFEST = "assets_pack.json"
+PART_PRESET = "Assets "
+PART_NAME = re.compile(r"[a-z0-9_]{1,32}")
+# Имя части старого манифеста (один пакет на всё) — не годится для новой части.
+LEGACY_PART = "all"
+# Должны быть в какой-то части (тяжёлые модели), кроме запасных героев, которые лежат в APK.
+MUST_PACK = [
+	"assets/characters/*.glb",
+	"assets/characters/*.png",
+	"assets/creatures/*_2.glb",
+	"assets/creatures/*_2.png",
+	"assets/creatures/*_3.glb",
+	"assets/creatures/*_3.png",
+]
+IN_APK = [
+	"assets/characters/hero_human_?_starter.glb",
+	"assets/characters/hero_human_?_starter.png",
+]
+# Часть больше этого (исходники) — пора делить.
+PART_WARN_MB = 150.0
 
 
 def read_presets(path=PRESETS):
-	"""Пресеты экспорта: {имя: {ключ: значение}} (только простые строки key="value")."""
-	presets = {}
+	"""Пресеты экспорта по порядку: [(имя, {ключ: значение})] (только простые строки key="value")."""
+	presets = []
 	cur = None
 	with open(path, encoding="utf-8") as f:
 		for line in f:
@@ -38,7 +66,7 @@ def read_presets(path=PRESETS):
 			m = re.match(r"^\[preset\.(\d+)\]$", line)
 			if m:
 				cur = {}
-				presets["#" + m.group(1)] = cur
+				presets.append(cur)
 				continue
 			if line.startswith("["):
 				cur = None
@@ -49,35 +77,73 @@ def read_presets(path=PRESETS):
 			if v.startswith('"') and v.endswith('"'):
 				v = v[1:-1]
 			cur[k] = v
-	return {p.get("name", k): p for k, p in presets.items()}
+	return [(p.get("name", "#%d" % i), p) for i, p in enumerate(presets)]
+
+
+def preset(name):
+	for n, p in read_presets():
+		if n == name:
+			return p
+	return None
 
 
 def filters(s):
 	return [x.strip() for x in s.split(",") if x.strip()]
 
 
-def pack_filters():
-	p = read_presets().get("Assets")
-	if p is None:
-		sys.exit("export_presets.cfg: нет пресета «Assets»")
-	return filters(p.get("include_filter", "")), filters(p.get("exclude_filter", ""))
+def parts():
+	"""Части пакета по порядку пресетов: [(имя, include_filter)]."""
+	out = []
+	for n, p in read_presets():
+		if n.startswith(PART_PRESET):
+			out.append((n[len(PART_PRESET):], filters(p.get("include_filter", ""))))
+	if not out:
+		sys.exit("export_presets.cfg: нет пресетов «%s<часть>»" % PART_PRESET)
+	return out
+
+
+def part_filters(name):
+	for n, inc in parts():
+		if n == name:
+			return inc
+	sys.exit("нет части «%s» (есть: %s)" % (name, ", ".join(n for n, _ in parts())))
+
+
+def gd_packs(path=ASSETS_GD):
+	"""Assets.PACKS из assets.gd: [(имя, [шаблоны])]."""
+	with open(path, encoding="utf-8") as f:
+		text = f.read()
+	m = re.search(r"^const PACKS := \{\n(.*?)^\}", text, re.M | re.S)
+	if not m:
+		sys.exit("assets.gd: не найден const PACKS := { … }")
+	out = []
+	for name, body in re.findall(r'"([^"]+)"\s*:\s*\[(.*?)\]', m.group(1), re.S):
+		out.append((name, re.findall(r'"([^"]+)"', body)))
+	return out
 
 
 def godot_match(path, pat):
 	return fnmatch.fnmatchcase(path.lower(), pat.lower())
 
 
-def pack_files():
-	"""Файлы пакета: пути от корня проекта, по алфавиту (как обход Godot: include, затем exclude)."""
-	inc, exc = pack_filters()
+def all_files():
+	"""Все файлы проекта (пути от корня), без папок с точкой."""
 	out = []
 	for d, dirs, files in os.walk(ROOT):
 		dirs[:] = sorted(x for x in dirs if not x.startswith("."))
 		for fn in files:
-			rel = os.path.relpath(os.path.join(d, fn), ROOT).replace(os.sep, "/")
-			if any(godot_match(rel, p) for p in inc) and not any(godot_match(rel, p) for p in exc):
-				out.append(rel)
+			out.append(os.path.relpath(os.path.join(d, fn), ROOT).replace(os.sep, "/"))
 	return sorted(out)
+
+
+def match_any(rel, pats):
+	return any(godot_match(rel, p) for p in pats)
+
+
+def part_files(name, files=None):
+	"""Файлы части: пути от корня проекта, по алфавиту."""
+	inc = part_filters(name)
+	return [rel for rel in (files if files is not None else all_files()) if match_any(rel, inc)]
 
 
 def sha256_file(path):
@@ -88,38 +154,87 @@ def sha256_file(path):
 	return h.hexdigest()
 
 
-def cmd_files(_a):
-	total = 0
-	for rel in pack_files():
-		sz = os.path.getsize(os.path.join(ROOT, rel))
-		total += sz
-		print("%10d  %s" % (sz, rel))
-	print("итого: %d файлов, %.1f МБ" % (len(pack_files()), total / 1048576.0))
+def size_mb(files):
+	return sum(os.path.getsize(os.path.join(ROOT, rel)) for rel in files) / 1048576.0
+
+
+def cmd_files(a):
+	files = all_files()
+	names = [a.part] if a.part else [n for n, _ in parts()]
+	total_n = 0
+	total = 0.0
+	for name in names:
+		fl = part_files(name, files)
+		if not a.summary:
+			for rel in fl:
+				print("%10d  %s" % (os.path.getsize(os.path.join(ROOT, rel)), rel))
+		mb = size_mb(fl)
+		print("часть %-14s %3d файлов, %6.1f МБ" % (name, len(fl), mb))
+		total_n += len(fl)
+		total += mb
+	if not a.part:
+		print("итого: %d частей, %d файлов, %.1f МБ" % (len(names), total_n, total))
 
 
 def cmd_check(_a):
-	presets = read_presets()
-	apk = presets.get("Android")
+	errors = []
+	apk = preset("Android")
 	if apk is None:
 		sys.exit("export_presets.cfg: нет пресета «Android»")
-	inc, _exc = pack_filters()
+	cfg = parts()
+	gd = gd_packs()
+	names = [n for n, _ in cfg]
+	if len(set(names)) != len(names):
+		errors.append("пресеты частей повторяются: " + ", ".join(names))
+	for n in names:
+		if not PART_NAME.fullmatch(n) or n == LEGACY_PART:
+			errors.append("неверное имя части «%s» (a–z, 0–9, _; не «%s»)" % (n, LEGACY_PART))
+	if [n for n, _ in gd] != names:
+		errors.append("части Assets.PACKS (%s) ≠ пресеты экспорта (%s)" % (
+			", ".join(n for n, _ in gd), ", ".join(names)))
+	gdd = dict(gd)
+	for n, inc in cfg:
+		if n in gdd and sorted(gdd[n]) != sorted(inc):
+			errors.append("часть «%s»: шаблоны Assets.PACKS ≠ include_filter «%s%s»" % (n, PART_PRESET, n))
+		if not filters(preset(PART_PRESET + n).get("exclude_filter", "")) == []:
+			errors.append("пресет «%s%s»: exclude_filter должен быть пустым" % (PART_PRESET, n))
 	apk_exc = filters(apk.get("exclude_filter", ""))
 	apk_inc = filters(apk.get("include_filter", ""))
-	bad = [p for p in inc if p not in apk_exc]
+	union = [p for _, inc in cfg for p in inc]
+	bad = [p for p in union if p not in apk_exc]
 	if bad:
-		sys.exit("шаблоны пакета не исключены из APK: " + ", ".join(bad))
+		errors.append("шаблоны частей не исключены из APK: " + ", ".join(bad))
 	if EMBEDDED_MANIFEST not in apk_inc:
-		sys.exit("include_filter пресета «Android» должен включать " + EMBEDDED_MANIFEST)
-	files = pack_files()
-	if not files:
-		sys.exit("в пакет не попал ни один файл")
-	print("пакет ресурсов: %d файлов, шаблоны совпадают с исключёнными из APK" % len(files))
+		errors.append("include_filter пресета «Android» должен включать " + EMBEDDED_MANIFEST)
+	files = all_files()
+	owner = {}
+	for n, _ in cfg:
+		fl = part_files(n, files)
+		if not fl:
+			errors.append("в часть «%s» не попал ни один файл" % n)
+		for rel in fl:
+			if rel in owner:
+				errors.append("%s — в двух частях: %s и %s" % (rel, owner[rel], n))
+			owner[rel] = n
+		mb = size_mb(fl)
+		if mb > PART_WARN_MB:
+			print("предупреждение: часть «%s» — %.1f МБ исходников, пора разделить" % (n, mb))
+	loose = [rel for rel in files if match_any(rel, MUST_PACK) and not match_any(rel, IN_APK) and rel not in owner]
+	if loose:
+		errors.append("модели не попали ни в одну часть (попадут в APK): " + ", ".join(loose[:20]))
+	for rel in files:
+		if match_any(rel, IN_APK) and rel in owner:
+			errors.append("запасная модель %s должна остаться в APK" % rel)
+	if errors:
+		sys.exit("\n".join(errors))
+	print("пакет ресурсов: %d частей (%s), %d файлов; Assets.PACKS, пресеты частей и исключения APK совпадают" % (
+		len(cfg), ", ".join(names), len(owner)))
 
 
-def content_hash(godot):
+def content_hash(godot, name):
 	h = hashlib.sha256()
-	h.update(("godot=%s\nformat=1\n" % godot).encode())
-	for rel in pack_files():
+	h.update(("godot=%s\nformat=2\npart=%s\n" % (godot, name)).encode())
+	for rel in part_files(name):
 		full = os.path.join(ROOT, rel)
 		imp = full + ".import"
 		h.update(("%s\t%s\t%s\n" % (rel, sha256_file(full), sha256_file(imp) if os.path.exists(imp) else "-")).encode())
@@ -127,24 +242,36 @@ def content_hash(godot):
 
 
 def cmd_hash(a):
-	print(content_hash(a.godot))
+	if a.part:
+		print(content_hash(a.godot, a.part))
+		return
+	for n, _ in parts():
+		print("%s %s" % (n, content_hash(a.godot, n)))
 
 
 def cmd_manifest(a):
-	if not re.fullmatch(r"[0-9a-f]{16,64}", a.hash):
-		sys.exit("хэш содержимого должен быть 16–64 шестнадцатеричных знака")
-	m = {
-		"version": a.version,
-		"hash": a.hash,
-		"sha256": sha256_file(a.pck),
-		"size": os.path.getsize(a.pck),
-		"url": a.url,
-		"file": os.path.basename(a.pck),
-	}
+	known = [n for n, _ in parts()]
+	got = [p[0] for p in a.part]
+	if sorted(got) != sorted(known):
+		sys.exit("в манифесте должны быть все части ровно по разу: %s (дано: %s)" % (", ".join(known), ", ".join(got)))
+	out = []
+	for name, pck, h in sorted(a.part, key=lambda p: known.index(p[0])):
+		if not re.fullmatch(r"[0-9a-f]{16,64}", h):
+			sys.exit("часть %s: хэш содержимого должен быть 16–64 шестнадцатеричных знака" % name)
+		out.append({
+			"name": name,
+			"hash": h,
+			"sha256": sha256_file(pck),
+			"size": os.path.getsize(pck),
+			"url": a.base_url.rstrip("/") + "/" + os.path.basename(pck),
+			"file": os.path.basename(pck),
+		})
+	m = {"format": 2, "version": a.version, "parts": out}
 	with open(a.out, "w", encoding="utf-8") as f:
 		json.dump(m, f, ensure_ascii=False, indent=1)
 		f.write("\n")
 	print(json.dumps(m, ensure_ascii=False))
+	print("всего: %.1f МБ" % (sum(p["size"] for p in out) / 1048576.0))
 
 
 def read_pck(path):
@@ -177,36 +304,53 @@ def cmd_verify(a):
 		return
 	have = set(paths)
 	imported = [p for p in paths if p.startswith(".godot/imported/")]
+	want = part_files(a.part)
 	missing = []
-	for rel in pack_files():
+	for rel in want:
 		if rel + ".import" not in have:
 			missing.append(rel + ".import")
 			continue
 		base = os.path.basename(rel) + "-"
 		if not any(os.path.basename(p).startswith(base) for p in imported):
 			missing.append(rel + " (импортированные данные)")
-	print("в .pck %d файлов, %.1f МБ" % (len(paths), os.path.getsize(a.pck) / 1048576.0))
+	# Файлы других частей в этом .pck — лишний вес (и шаблоны разошлись с пресетом).
+	others = set()
+	for n, _ in parts():
+		if n != a.part:
+			others.update(part_files(n))
+	extra = [p for p in paths if p.endswith(".import") and p[:-len(".import")] in others]
+	print("часть %s: в .pck %d файлов, %.1f МБ" % (a.part, len(paths), os.path.getsize(a.pck) / 1048576.0))
 	if missing:
 		sys.exit("в .pck нет: " + ", ".join(missing[:20]))
-	print("все %d файлов пакета на месте" % len(pack_files()))
+	if extra:
+		sys.exit("в .pck файлы других частей: " + ", ".join(extra[:20]))
+	print("все %d файлов части на месте" % len(want))
 
 
 def main():
 	ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 	sub = ap.add_subparsers(dest="cmd", required=True)
-	sub.add_parser("files").set_defaults(fn=cmd_files)
+	p = sub.add_parser("files")
+	p.add_argument("--part")
+	p.add_argument("--summary", action="store_true")
+	p.set_defaults(fn=cmd_files)
 	sub.add_parser("check").set_defaults(fn=cmd_check)
 	p = sub.add_parser("digest")
 	p.add_argument("--godot", required=True)
+	p.add_argument("--part")
 	p.set_defaults(fn=cmd_hash)
 	p = sub.add_parser("manifest")
-	for k in ("pck", "hash", "version", "url", "out"):
+	for k in ("version", "base-url", "out"):
 		p.add_argument("--" + k, required=True)
+	p.add_argument("--part", nargs=3, action="append", required=True, metavar=("ИМЯ", "PCK", "ХЭШ"))
 	p.set_defaults(fn=cmd_manifest)
 	p = sub.add_parser("verify-pck")
+	p.add_argument("--part", required=True)
 	p.add_argument("pck")
 	p.set_defaults(fn=cmd_verify)
 	a = ap.parse_args()
+	if getattr(a, "part", None) and isinstance(a.part, str):
+		part_filters(a.part)
 	a.fn(a)
 
 
