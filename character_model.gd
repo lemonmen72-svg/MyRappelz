@@ -443,6 +443,8 @@ var _spinning := false
 # Готовая модель из файла: сцена glTF, её проигрыватель анимаций, клипы по имени в нижнем регистре
 var _asset: Node3D
 var _anim: AnimationPlayer
+## Житель за кадром (pause_offscreen): анимация и кости стоят, _process пропускается.
+var _offscreen := false
 var _clips: Dictionary = {}
 var _asset_speed := 0.0
 var _act_end := -1.0
@@ -1636,6 +1638,8 @@ func _apply_rest() -> void:
 # ---------- Анимации ----------
 
 func _process(delta: float) -> void:
+	if _offscreen:
+		return
 	if _asset != null:
 		_asset_process(delta)
 		return
@@ -2041,6 +2045,8 @@ func _setup_asset(path: String) -> bool:
 		m.set_meta("toon_done", true)
 		mi.material_override = m
 		_flash_mats.append(m)
+	# Дальше Quality.outline_far() м — без контура (второй проход модели со скелетом)
+	ModelLod.register(self, _flash_mats)
 
 	var skels := _asset.find_children("*", "Skeleton3D", true, false)
 	var skel: Skeleton3D = null
@@ -2264,6 +2270,44 @@ func _clip(key: String) -> String:
 
 
 ## Покой, шаг или бег по скорости; действие (удар, умение) доигрывается до конца.
+## Житель (Npc): за кадром анимация и кости стоят, _process пропускается — как у зверей (CreatureAsset);
+## в кадре — снова. Проверка видимости — VisibleOnScreenNotifier3D (без отрисовки, в headless, сигналов нет —
+## модель всегда «в кадре»); через секунду после включения невидимая сразу встаёт.
+func pause_offscreen() -> void:
+	if _anim == null or has_node("OnScreen"):
+		return
+	var vis := VisibleOnScreenNotifier3D.new()
+	vis.name = "OnScreen"
+	vis.aabb = AABB(Vector3(-1.3, -0.2, -1.3), Vector3(2.6, 2.9, 2.6))
+	vis.screen_entered.connect(_set_offscreen.bind(false))
+	vis.screen_exited.connect(_set_offscreen.bind(true))
+	add_child(vis)
+	if DisplayServer.get_name() == "headless":
+		return
+	# Таймер — дочерний узел (удаляется вместе с моделью)
+	var t := Timer.new()
+	t.name = "OnScreenCheck"
+	t.one_shot = true
+	t.wait_time = 1.0
+	t.autostart = true
+	t.timeout.connect(func() -> void:
+		if vis.is_inside_tree() and not vis.is_on_screen():
+			_set_offscreen(true)
+		t.queue_free())
+	add_child(t)
+
+
+func _set_offscreen(off: bool) -> void:
+	_offscreen = off
+	if _anim != null:
+		_anim.active = not off
+
+
+## За кадром ли модель (pause_offscreen).
+func is_offscreen() -> bool:
+	return _offscreen
+
+
 func _asset_process(delta: float) -> void:
 	_t += delta
 	_asset_speed = lerpf(_asset_speed, _speed, 1.0 - exp(-10.0 * delta))

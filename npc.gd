@@ -64,6 +64,8 @@ func _ready() -> void:
 	add_child(_model)
 	# Модель из файла (npc_<id>.glb): предметы в руках, на поясе и за спиной — отдельные файлы (NpcProps)
 	NpcProps.attach(_model, npc_id)
+	# За кадром житель не анимируется (кости не считаются) — бережение телефона
+	_model.pause_offscreen()
 
 	_build_extra()
 

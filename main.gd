@@ -119,11 +119,14 @@ func _ready() -> void:
 	_rng.seed = 1234
 	Quality.apply_resolution(get_tree())
 	Quality.apply_fps()
+	# Бережение телефона: фон, авто-снижение графики при нагреве, контур дальних моделей
+	add_child(ThermalGuard.new())
 	get_tree().node_added.connect(_on_node_added)
 	# Пакет ресурсов (модели героев профессий, стадии зверей) — до первого обращения к моделям.
 	# В редакторе и автотестах ресурсы встроены (Assets.available) — экрана нет, всё как раньше.
 	if not Assets.available() and not Assets.skipped:
 		var loader := AssetLoader.new()
+		Quality.set_screen_idle(true)
 		add_child(loader)
 		loader.finished.connect(func(_with_pack: bool) -> void:
 			loader.queue_free()
@@ -147,6 +150,8 @@ func _set_screen(n: Node) -> void:
 	if screen != null and is_instance_valid(screen):
 		screen.queue_free()
 	screen = n
+	# Экран до мира — не больше Quality.MENU_FPS кадров/с
+	Quality.set_screen_idle(n != null)
 	if n != null:
 		add_child(n)
 
@@ -226,6 +231,7 @@ func back_to_menu() -> Node:
 
 
 func _start_world() -> void:
+	Quality.set_screen_idle(false)
 	_build_world()
 	_build_hud()
 	_build_player()

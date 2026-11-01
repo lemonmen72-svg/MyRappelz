@@ -5,9 +5,15 @@ extends "res://tests/test_base.gd"
 ## каскады, дальность), постобработке (FXAA, цвет, свечение), растительности и мелочам построек (дальность), контурам
 ## и теням на моделях персонажей; каждая настройка меняет то, что должна. Окно настроек: вкладки, кнопки всех
 ## настроек, нажатие применяет сразу. Лимит сэмплеров toon.gdshader (8) не превышен.
+## Бережение телефона: предел кадров пресета, порог LOD, тени 2 каскада в атласе 2048, контур дальних моделей
+## (ModelLod) и участков растительности (двойники без контура), предел кадров окна, экрана до мира и фона,
+## авто-снижение ThermalGuard по подставному статусу температуры и по времени кадра (шаги, потолки поверх выбранного,
+## восстановление, гистерезис, повторный нагрев), выключатель «Беречь от перегрева».
 
 var _had_cfg := false
 var _cfg_backup := ""
+## Подставной статус температуры Android для ThermalGuard (−1 — неизвестно).
+var _fake_status := -1
 
 
 func race_class() -> Array:
@@ -51,6 +57,9 @@ func run_step() -> void:
 		4:
 			check(main.hud.is_window_open(), "окно настроек открыто после нажатий")
 			main.hud.close_window()
+			_check_model_lod()
+			_check_fps_caps()
+			_check_thermal()
 			_restore()
 			ok_done()
 
@@ -77,6 +86,10 @@ func _check_presets() -> void:
 			Quality.shadows()])
 		var fx := _fx()
 		check(fx != null and fx.visible == (Quality.fxaa() or Quality.postfx()), "«%s»: постобработка" % Quality.level_name(l))
+		check(is_equal_approx(win.mesh_lod_threshold, Quality.lod_threshold()), "«%s»: порог LOD %.2f"
+			% [Quality.level_name(l), win.mesh_lod_threshold])
+		check(Quality.fps_limit() == int(Quality.PRESET_FPS[l]), "«%s»: предел кадров пресета %d"
+			% [Quality.level_name(l), Quality.fps_limit()])
 	# Пресеты растут: выше пресет — не хуже ни одна настройка
 	for l in Quality.ULTRA:
 		var a: Dictionary = Quality.PRESETS[l]
@@ -92,6 +105,22 @@ func _check_presets() -> void:
 	for l in Quality.ULTRA + 1:
 		var pr: Dictionary = Quality.PRESETS[l]
 		check(int(pr["model_shadows"]) == 0, "пресет %d: модели персонажей без самозатенения" % l)
+	# Бережение телефона: «Высокое» и «Максимальное» — не родное разрешение и не больше 45 кадров/с; тени — не больше
+	# 2 каскадов в атласе 2048; дальше — меньше подробностей (порог LOD не ниже)
+	for l in [Quality.HIGH, Quality.ULTRA]:
+		var pr: Dictionary = Quality.PRESETS[l]
+		check(Quality.RENDER_HEIGHTS[int(pr["render"])] > 0, "пресет %d: не родное разрешение (нагрев)" % l)
+		check(int(Quality.PRESET_FPS[l]) <= 45, "пресет %d: не больше 45 кадров/с" % l)
+	for lvl in Quality.SHADOW_LEVELS:
+		var sl: Dictionary = lvl
+		if not sl.is_empty():
+			check(int(sl["atlas"]) <= 2048 and int(sl["splits"]) == 2, "тени: атлас %d, каскадов %d" % [sl["atlas"],
+				sl["splits"]])
+	for i in range(1, Quality.VIEW_LEVELS.size()):
+		var a: Dictionary = Quality.VIEW_LEVELS[i - 1]
+		var b: Dictionary = Quality.VIEW_LEVELS[i]
+		check(float(b["lod"]) <= float(a["lod"]) and float(b["outline"]) >= float(a["outline"]),
+			"дальность %d: порог LOD и дальность контура" % i)
 
 
 ## Ручное изменение → «Свои»; совпало с пресетом — снова пресет; сохранение и загрузка.
@@ -168,7 +197,7 @@ func _check_options() -> void:
 		check(sun.shadow_enabled and is_equal_approx(sun.directional_shadow_max_distance, float(lvl["distance"])),
 			"тени «%s»: дальность %.0f м" % [Quality.option_label("shadows", v), sun.directional_shadow_max_distance])
 		var want: DirectionalLight3D.ShadowMode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-		if int(lvl["splits"]) >= 4:
+		if int(lvl["splits"]) >= 4:  # сейчас у всех уровней 2 каскада
 			want = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 		check(sun.directional_shadow_mode == want, "тени «%s»: каскады" % Quality.option_label("shadows", v))
 		check(int(lvl["filter"]) >= int(RenderingServer.SHADOW_QUALITY_SOFT_LOW), "тени «%s»: мягкий фильтр PCF"
@@ -219,14 +248,17 @@ func _check_options() -> void:
 		Quality.apply(tree)
 		var trees := tree.get_nodes_in_group("veg_trees")
 		if not trees.is_empty():
-			var d := (trees[0] as GeometryInstance3D).visibility_range_end
+			var d := IslandVegetation.range_end_of(trees[0] as GeometryInstance3D)
 			check(d > prev, "дальность «%s»: деревья до %.0f м" % [Quality.option_label("view", v), d])
 			prev = d
+		check(is_equal_approx(win.mesh_lod_threshold, Quality.lod_threshold()), "дальность «%s»: порог LOD %.2f"
+			% [Quality.option_label("view", v), win.mesh_lod_threshold])
 		for n in tree.get_nodes_in_group("poi_props"):
 			check(is_equal_approx((n as GeometryInstance3D).visibility_range_end, Quality.props_distance()),
 				"дальность «%s»: мелочи построек до %.0f м" % [Quality.option_label("view", v), Quality.props_distance()])
 			break
 	check(not tree.get_nodes_in_group("poi_props").is_empty(), "мелочи построек в группе poi_props")
+	_check_veg_twins()
 
 	# Густота травы — при следующем построении
 	var dens: Array[float] = []
@@ -315,10 +347,18 @@ func _check_menu() -> void:
 			check(SettingsMenu.buttons.has("%s_%d" % [k, v]), "кнопка %s_%d" % [k, v])
 	check(SettingsMenu.buttons.has("admin") == AdminPanel.ADMIN_TOOLS, "админ-панель — во вкладке «Прочее»")
 	check((SettingsMenu.buttons["quality_1"] as Button).button_pressed, "выбран пресет «Среднее»")
+	for t in ["guard_0", "guard_1"]:
+		check(SettingsMenu.buttons.has(t), "в настройках кнопка %s" % t)
+	check((SettingsMenu.buttons["guard_1"] as Button).button_pressed, "«Беречь от перегрева» — по умолчанию вкл")
 	(SettingsMenu.buttons["shadows_3"] as Button).pressed.emit()
 	check(Quality.option("shadows") == 3 and Quality.level() == Quality.CUSTOM, "кнопка «Тени: Высокие» — «Свои»")
 	var sun := _sun()
-	check(sun != null and sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS, "тени применены сразу")
+	check(sun != null and is_equal_approx(sun.directional_shadow_max_distance, float(Quality.SHADOW_LEVELS[3]["distance"])),
+		"тени применены сразу")
+	(SettingsMenu.buttons["guard_0"] as Button).pressed.emit()
+	check(not Quality.guard_enabled(), "кнопка «Беречь от перегрева: Выкл»")
+	(SettingsMenu.buttons["guard_1"] as Button).pressed.emit()
+	check(Quality.guard_enabled(), "кнопка «Беречь от перегрева: Вкл»")
 	check(SettingsMenu.tab == "graphics" and (SettingsMenu.buttons["shadows_3"] as Button).button_pressed,
 		"окно открыто заново на вкладке «Графика»")
 	(SettingsMenu.buttons["tab_other"] as Button).pressed.emit()
@@ -327,6 +367,192 @@ func _check_menu() -> void:
 	check(SettingsMenu.tab == "ui", "вкладка «Интерфейс»")
 	(SettingsMenu.buttons["quality_1"] as Button).pressed.emit()
 	check(Quality.level() == Quality.MEDIUM and SettingsMenu.tab == "graphics", "пресет «Среднее» кнопкой")
+
+
+## Участки деревьев, кустов и камней: контур — только вблизи, дальше — двойник того же меша без контура.
+func _check_veg_twins() -> void:
+	var tree := get_tree()
+	Quality.set_level(Quality.ULTRA, false)
+	Quality.apply(tree)
+	var twins := 0
+	for n in tree.get_nodes_in_group("veg_trees") + tree.get_nodes_in_group("veg_small"):
+		var gi := n as GeometryInstance3D
+		var twin := gi.get_meta("far_twin", null) as MeshInstance3D
+		if twin == null:
+			continue
+		twins += 1
+		var mi := gi as MeshInstance3D
+		check(twin.mesh == mi.mesh, "двойник участка — тот же меш")
+		check(twin.material_override != null and twin.material_override.next_pass == null
+			and not twin.material_override.has_meta("outline"), "двойник участка без контура")
+		check(mi.material_override.next_pass != null, "участок вблизи — с контуром")
+		check(twin.visible and is_equal_approx(gi.visibility_range_end, Quality.veg_outline_far())
+			and is_equal_approx(twin.visibility_range_begin, Quality.veg_outline_far())
+			and twin.visibility_range_end > twin.visibility_range_begin, "контур участка до %.0f м, дальше — двойник до %.0f м"
+			% [gi.visibility_range_end, twin.visibility_range_end])
+		check(twin.cast_shadow == gi.cast_shadow, "у двойника те же тени")
+		break
+	check(twins > 0, "у участков растительности с контуром есть двойники")
+	Quality.set_option("outlines", 0, false)
+	Quality.apply(tree)
+	for n in tree.get_nodes_in_group("veg_trees"):
+		var gi := n as GeometryInstance3D
+		var twin := gi.get_meta("far_twin", null) as MeshInstance3D
+		if twin != null:
+			check(not twin.visible and gi.visibility_range_end > Quality.veg_outline_far() + 1.0,
+				"контуры «Выкл»: двойник скрыт, участок до %.0f м" % gi.visibility_range_end)
+			break
+	Quality.set_level(Quality.MEDIUM, false)
+	Quality.apply(tree)
+
+
+## Контур дальних моделей (ModelLod): камера далеко — у героя контур снят, Quality.apply его не возвращает; ближе —
+## снова есть. Жители за кадром: pause_offscreen (в headless сигналов видимости нет — житель анимируется).
+func _check_model_lod() -> void:
+	var tree := get_tree()
+	Quality.set_level(Quality.MEDIUM, false)
+	Quality.apply(tree)
+	check(ModelLod.count() > 0, "модели под наблюдением ModelLod: %d" % ModelLod.count())
+	var mats: Array[StandardMaterial3D] = main.player._model._flash_mats
+	if mats.is_empty():
+		return
+	var m: StandardMaterial3D = mats[0]
+	var cam: Camera3D = main.cam
+	var keep := cam.global_position
+	ModelLod.update_all()
+	check(m.next_pass != null and not ModelLod.is_far(m), "герой рядом с камерой — с контуром")
+	cam.global_position = main.player.global_position + Vector3(0, Quality.outline_far() + 30.0, 0)
+	ModelLod.update_all()
+	check(m.next_pass == null and ModelLod.is_far(m), "камера в %.0f м — контур героя снят" % (Quality.outline_far() + 30.0))
+	Quality.apply(tree)
+	check(m.next_pass == null, "Quality.apply не возвращает контур дальней модели")
+	cam.global_position = main.player.global_position + Vector3(0, Quality.outline_far() + ModelLod.HYST * 0.5, 0)
+	ModelLod.update_all()
+	check(m.next_pass == null, "у границы (запас %.0f м) контур не мигает" % ModelLod.HYST)
+	cam.global_position = keep
+	ModelLod.update_all()
+	check(m.next_pass != null and not ModelLod.is_far(m), "камера снова рядом — контур есть")
+	var npcs := tree.get_nodes_in_group("npc")
+	check(not npcs.is_empty(), "жители есть")
+	for n in npcs:
+		var cm := n.get_node_or_null("Model") as CharacterModel
+		if cm != null and cm._anim != null:
+			check(cm.has_node("OnScreen"), "у жителя проверка видимости (за кадром не анимируется)")
+			check(not cm.is_offscreen(), "без отрисовки житель анимируется")
+			break
+
+
+## Предел кадров: окно и экран до мира — не больше MENU_FPS, фон — BACKGROUND_FPS, авто-снижение — потолок шага.
+func _check_fps_caps() -> void:
+	Quality.set_level(Quality.ULTRA, false)
+	check(Quality.current_fps_cap() == 45, "«Максимальное»: 45 кадров/с")
+	Quality.set_menu_open(true)
+	check(Quality.current_fps_cap() == Quality.MENU_FPS, "окно открыто — %d кадров/с" % Quality.MENU_FPS)
+	Quality.set_menu_open(false)
+	Quality.set_screen_idle(true)
+	check(Quality.current_fps_cap() == Quality.MENU_FPS and Quality.menu_open(), "экран до мира — %d кадров/с" % Quality.MENU_FPS)
+	Quality.set_screen_idle(false)
+	Quality.set_background(true)
+	check(Quality.current_fps_cap() == Quality.BACKGROUND_FPS, "игра без фокуса — %d кадров/с" % Quality.BACKGROUND_FPS)
+	Quality.set_background(false)
+	check(Quality.current_fps_cap() == 45 and not Quality.menu_open(), "снова 45 кадров/с")
+	Quality.set_fps_limit(60, false)
+	Quality.set_throttle(1)
+	check(Quality.current_fps_cap() == 30 and Quality.fps_limit() == 60, "шаг 1 авто-снижения — 30 кадров/с, выбор игрока тот же")
+	Quality.set_throttle(0)
+
+
+## Авто-снижение ThermalGuard: подставной статус температуры, затем время кадра. Шаги вниз не чаще STEP_GAP,
+## потолки поверх выбранного, восстановление после COOL_TIME прохлады, повторный нагрев — вдвое дольше.
+func _check_thermal() -> void:
+	var tree := get_tree()
+	var g := ThermalGuard.current
+	check(g != null, "ThermalGuard в главной сцене")
+	if g == null:
+		return
+	check(not g.active(), "в автотестах авто-снижение выключено (без force)")
+	Quality.set_level(Quality.ULTRA, false)
+	Quality.set_guard_enabled(true, false)
+	Quality.apply(tree)
+	g.force = true
+	g.status_source = func() -> int: return _fake_status
+	g.headroom_source = func() -> int: return -1
+	g.reset()
+	g._settle = 0.0
+	var fast := 1.0 / 45.0
+	_fake_status = 0
+	_ticks(g, 3, 5.0, fast)
+	check(Quality.throttle_level() == 0, "прохладно — графика как выбрана")
+	# Нагрелся (MODERATE): шаг 1 — кадры/с
+	_fake_status = 2
+	_ticks(g, 1, 5.0, fast)
+	check(Quality.throttle_level() == 1 and g.reason == "thermal" and Quality.current_fps_cap() == 30,
+		"нагрелся — шаг 1: 30 кадров/с (шаг %d)" % Quality.throttle_level())
+	_ticks(g, 4, 5.0, fast)
+	check(Quality.throttle_level() == 1, "следующий шаг — не раньше %.0f с" % ThermalGuard.STEP_GAP)
+	_ticks(g, 2, 5.0, fast)
+	check(Quality.throttle_level() == 2, "всё ещё горячо — шаг 2")
+	var win := tree.root
+	check(Quality.render_height() == 720 and Quality.option("render") == int(Quality.PRESETS[Quality.ULTRA]["render"]),
+		"шаг 2: разрешение 720p, выбор игрока не изменился")
+	check(is_equal_approx(win.scaling_3d_scale, Quality.render_scale_for(float(win.size.y))), "шаг 2 применён к окну")
+	# SEVERE — шаги чаще
+	_fake_status = 3
+	_ticks(g, 2, 5.0, fast)
+	check(Quality.throttle_level() == 3, "сильный нагрев — шаг 3 через %.0f с" % ThermalGuard.STEP_GAP_SEVERE)
+	var sun := _sun()
+	check(sun != null and is_equal_approx(sun.directional_shadow_max_distance, float(Quality.SHADOW_LEVELS[1]["distance"])),
+		"шаг 3: тени «Низкие»")
+	check(Quality.option("shadows") == 3, "шаг 3: выбор игрока — «Высокие»")
+	# CRITICAL — сразу последний шаг
+	_fake_status = 4
+	_ticks(g, 2, 5.0, fast)
+	check(Quality.throttle_level() == Quality.throttle_max(), "критический нагрев — последний шаг")
+	check(sun != null and not sun.shadow_enabled and tree.root.msaa_3d == Viewport.MSAA_DISABLED and not Quality.outlines(),
+		"последний шаг: без теней, сглаживания и контуров")
+	# Остыл: шаг вверх только после COOL_TIME прохлады (гистерезис)
+	_fake_status = 0
+	_ticks(g, 6, 5.0, 1.0 / 30.0)
+	check(Quality.throttle_level() == Quality.throttle_max(), "остывает — через 30 с ещё снижено")
+	_ticks(g, 7, 5.0, 1.0 / 30.0)
+	check(Quality.throttle_level() == Quality.throttle_max() - 1, "прохладно %.0f с — шаг вверх (шаг %d)"
+		% [ThermalGuard.COOL_TIME, Quality.throttle_level()])
+	# Снова нагрелся вскоре — прохлады теперь нужно вдвое дольше
+	_fake_status = 2
+	_ticks(g, 7, 5.0, 1.0 / 30.0)
+	check(Quality.throttle_level() == Quality.throttle_max(), "снова горячо — шаг вниз")
+	check(is_equal_approx(g.cool_need(), ThermalGuard.COOL_TIME * 2.0), "повторный нагрев — прохлады нужно %.0f с"
+		% g.cool_need())
+	# Без данных о температуре — по времени кадра
+	_fake_status = -1
+	g.reset()
+	check(Quality.throttle_level() == 0 and is_equal_approx(g.cool_need(), ThermalGuard.COOL_TIME), "сброс авто-снижения")
+	g._settle = 0.0
+	_ticks(g, 20, 0.5, 0.06)
+	check(Quality.throttle_level() == 0, "долгий кадр меньше %.0f с — не снижаем" % ThermalGuard.SLOW_TIME)
+	_ticks(g, 12, 0.5, 0.06)
+	check(Quality.throttle_level() == 1 and g.reason == "frames", "кадр стабильно дольше бюджета — шаг 1 (кадр %.1f мс)"
+		% (g.frame_avg * 1000.0))
+	_ticks(g, 30, 5.0, 1.0 / 30.0)
+	check(Quality.throttle_level() == 0, "кадры успевают — графика восстановлена")
+	# Выключили «Беречь от перегрева» — сразу как выбрано, авто-снижение стоит
+	_fake_status = 4
+	Quality.set_guard_enabled(false, false)
+	g.reset()
+	check(not g.active() and Quality.throttle_level() == 0, "«Беречь от перегрева» выкл — графика как выбрана")
+	Quality.set_guard_enabled(true, false)
+	g.force = false
+	g.status_source = Callable()
+	g.headroom_source = Callable()
+	_fake_status = -1
+	Quality.set_throttle(0)
+	Quality.set_level(Quality.MEDIUM, false)
+	Quality.apply(tree)
+
+
+func _ticks(g: ThermalGuard, n: int, dt: float, frame_dt: float) -> void:
+	for i in n:
+		g.tick(dt, frame_dt)
 
 
 func _restore() -> void:

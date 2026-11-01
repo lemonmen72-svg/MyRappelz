@@ -15,6 +15,7 @@ extends RefCounted
 ## Открытие: SettingsMenu.open(hud) (действие HUD "settings_window"), SettingsMenu.open(hud, "ui") — на вкладке.
 ## Кнопки открытого окна для тестов (buttons): вкладки "tab_<graphics|ui|other>", "ui_<0..2>", "quality_<0..3>"
 ## (пресеты), "<настройка>_<вариант>" (например "shadows_2", "aa_1" — Quality.OPTIONS), "fps_<30|45|60>",
+## "guard_<0|1>" (беречь телефон от перегрева),
 ## "admin" (AdminPanel,
 ## только у аккаунта Dedok_max), "account" (сменить персонажа / выйти из аккаунта — main.back_to_menu).
 
@@ -143,6 +144,8 @@ static func _build_graphics(hud: HUD, page: VBoxContainer) -> void:
 		if key == "render":
 			_fps_row(hud, page)
 
+	_guard_rows(hud, page)
+
 	var note := "Всё, кроме густоты травы, меняется сразу. Густота травы и цветов — при следующем запуске игры."
 	var built := IslandVegetation.built_grass(hud.get_tree())
 	if built >= 0 and built != Quality.option("grass"):
@@ -170,8 +173,22 @@ static func _fps_row(hud: HUD, page: VBoxContainer) -> void:
 	for v in Quality.FPS_OPTIONS:
 		var fps := int(v)
 		_choice(row, "fps_%d" % fps, str(fps), fps == Quality.fps_limit(), func() -> void: SettingsMenu._select_fps(hud, fps))
-	page.add_child(_wrap_label("Не больше стольких кадров. Меньше — телефон меньше греется и дольше держит батарея.",
-		UiScale.FONT_SMALL, HINT_COLOR))
+	page.add_child(_wrap_label("Не больше стольких кадров. Меньше — телефон меньше греется и дольше держит батарея. "
+		+ "Пресет ставит свой предел (Низкое 30, Среднее 60, Высокое и Максимальное 45).", UiScale.FONT_SMALL, HINT_COLOR))
+
+
+## «Беречь телефон от перегрева» (авто-снижение ThermalGuard).
+static func _guard_rows(hud: HUD, page: VBoxContainer) -> void:
+	var row := _row(page)
+	row.add_child(_side_label("Беречь от перегрева"))
+	var on := Quality.guard_enabled()
+	_choice(row, "guard_0", "Выкл", not on, func() -> void: SettingsMenu._select_guard(hud, false))
+	_choice(row, "guard_1", "Вкл", on, func() -> void: SettingsMenu._select_guard(hud, true))
+	var hint := "Телефон нагрелся или не успевает рисовать кадры — графика снижается по шагам (кадры/с, разрешение, " \
+		+ "тени, сглаживание), остыл — возвращается. Выбранные настройки не меняются."
+	if on and Quality.throttle_level() > 0:
+		hint += "\nСейчас графика снижена: шаг %d из %d." % [Quality.throttle_level(), Quality.throttle_max()]
+	page.add_child(_wrap_label(hint, UiScale.FONT_SMALL, HINT_COLOR))
 
 
 # ---------- Интерфейс ----------
@@ -273,6 +290,16 @@ static func _select_option(hud: HUD, key: String, v: int) -> void:
 	if hud == null or not is_instance_valid(hud):
 		return
 	Quality.set_option(key, v)
+	Quality.apply(hud.get_tree())
+	open(hud, "graphics", true)
+
+
+static func _select_guard(hud: HUD, on: bool) -> void:
+	if hud == null or not is_instance_valid(hud):
+		return
+	Quality.set_guard_enabled(on)
+	if not on and ThermalGuard.current != null:
+		ThermalGuard.current.reset()
 	Quality.apply(hud.get_tree())
 	open(hud, "graphics", true)
 

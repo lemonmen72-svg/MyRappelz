@@ -20,7 +20,9 @@ extends RefCounted
 ## - трава и цветы — MultiMesh участками GRASS_CHUNK×GRASS_CHUNK, плотность и дальность из Quality;
 ##   вдали пучки плавно уходят в землю (шейдер), участки дальше дальности отсекаются visibility_range_end;
 ## - деревья, кусты, камни и кристаллы сливаются в один меш на участок DECOR_CHUNK×DECOR_CHUNK и группу
-##   материала (7 общих материалов на весь остров); коллизия — капсулы-столбы Util.pillar в одном StaticBody3D (слой 1).
+##   материала (7 общих материалов на весь остров); коллизия — капсулы-столбы Util.pillar в одном StaticBody3D (слой 1);
+##   контур участка (второй проход всех его треугольников) — только ближе Quality.veg_outline_far(), дальше тот же
+##   меш рисует двойник участка с материалом без контура (meta "far_twin", группа "veg_far").
 ## Модели из файлов (PropAsset, страница атласа «nature»: деревья tree_oak / tree_pine / tree_elf / tree_dead,
 ## куст bush, камни rock / rock_dark — модели Meshy от Максима) — свои группы G_PTREE и G_PSMALL (материал —
 ## атлас, prop.gdshader, контур по нормалям); нет файла — процедурные, как раньше. Колючие кусты тёмных земель,
@@ -202,9 +204,13 @@ static func apply_quality(tree: SceneTree) -> void:
 	var fd := gd * 0.85
 	_set_range(tree, "veg_grass", 0.0 if far else gd + GRASS_CHUNK * 0.75)
 	_set_range(tree, "veg_flowers", 0.0 if far else fd + GRASS_CHUNK * 0.75)
-	_set_range(tree, "veg_trees", 0.0 if far else Quality.tree_distance() + DECOR_CHUNK * 0.7)
-	_set_range(tree, "veg_small", 0.0 if far else Quality.detail_distance() + DECOR_CHUNK * 0.7)
-	_set_range(tree, "veg_glow", 0.0 if far else Quality.detail_distance() + DECOR_CHUNK * 0.7)
+	var tree_end := 0.0 if far else Quality.tree_distance() + DECOR_CHUNK * 0.7
+	var small_end := 0.0 if far else Quality.detail_distance() + DECOR_CHUNK * 0.7
+	# Контур участков — только вблизи (дальше — двойник участка без контура, _build_decor)
+	var ol_end := 0.0 if far or not outlines else Quality.veg_outline_far()
+	_set_range_twin(tree, "veg_trees", tree_end, ol_end)
+	_set_range_twin(tree, "veg_small", small_end, ol_end)
+	_set_range(tree, "veg_glow", small_end)
 	_set_fade(tree, "veg_grass", 1.0e5 if far else gd)
 	_set_fade(tree, "veg_flowers", 1.0e5 if far else fd)
 
@@ -215,9 +221,50 @@ static func apply_quality(tree: SceneTree) -> void:
 	if Quality.small_shadows():
 		small_sh = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	for n in tree.get_nodes_in_group("veg_trees"):
-		(n as GeometryInstance3D).cast_shadow = tree_sh
+		_set_cast(n as GeometryInstance3D, tree_sh)
 	for n in tree.get_nodes_in_group("veg_small"):
-		(n as GeometryInstance3D).cast_shadow = small_sh
+		_set_cast(n as GeometryInstance3D, small_sh)
+
+
+## Тень участка и его двойника без контура.
+static func _set_cast(gi: GeometryInstance3D, sh: GeometryInstance3D.ShadowCastingSetting) -> void:
+	if gi == null:
+		return
+	gi.cast_shadow = sh
+	var twin := gi.get_meta("far_twin", null) as GeometryInstance3D
+	if twin != null:
+		twin.cast_shadow = sh
+
+
+## Дальность участков группы с двойником без контура (_build_decor): контур виден до ol м (0 — контура нет или
+## дальность не ограничена — двойник скрыт), дальше до end м участок рисует двойник. Запас на границе 2 м —
+## переключение без мигания (Godot переключает оба по одному расстоянию до центра участка).
+static func _set_range_twin(tree: SceneTree, group: String, end: float, ol: float) -> void:
+	for n in tree.get_nodes_in_group(group):
+		var gi := n as GeometryInstance3D
+		if gi == null:
+			continue
+		var twin := gi.get_meta("far_twin", null) as GeometryInstance3D
+		var split := twin != null and ol > 0.0 and (end <= 0.0 or ol < end)
+		gi.visibility_range_end = ol if split else end
+		gi.visibility_range_end_margin = 2.0 if split else (0.0 if end <= 0.0 else 6.0)
+		if twin == null:
+			continue
+		twin.visible = split
+		twin.visibility_range_begin = ol if split else 0.0
+		twin.visibility_range_begin_margin = 2.0 if split else 0.0
+		twin.visibility_range_end = end
+		twin.visibility_range_end_margin = 0.0 if end <= 0.0 else 6.0
+
+
+## Дальше всего видимый край участка группы (с двойником): для тестов и замера.
+static func range_end_of(gi: GeometryInstance3D) -> float:
+	if gi == null:
+		return 0.0
+	var twin := gi.get_meta("far_twin", null) as GeometryInstance3D
+	if twin != null and twin.visible:
+		return twin.visibility_range_end
+	return gi.visibility_range_end
 
 
 ## Вид издалека (скриншот острова сверху): без ограничения дальности и затухания травы.
@@ -1099,6 +1146,36 @@ static func _build_decor(c: Ctx, holder: Node3D, mats: Array) -> void:
 		if k.z == G_GLOW:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		holder.add_child(mi)
+		# Двойник участка без контура (тот же меш): контур — второй проход всех треугольников участка, вдали его
+		# не видно. Ближе Quality.veg_outline_far() — участок с контуром, дальше — двойник (apply_quality)
+		var bare := _bare_mat(mats[k.z] as Material)
+		if bare != null:
+			var twin := MeshInstance3D.new()
+			twin.name = mi.name + "Far"
+			twin.mesh = mi.mesh
+			twin.position = center
+			twin.material_override = bare
+			twin.set_meta("no_outline", true)
+			twin.set_meta("no_toon", true)
+			twin.add_to_group("veg_far")
+			twin.visible = false
+			holder.add_child(twin)
+			mi.set_meta("far_twin", twin)
+
+
+## Тот же материал без контура (кэш в meta "bare" материала); null — у материала контура нет.
+static func _bare_mat(m: Material) -> Material:
+	if m == null or not m.has_meta("outline"):
+		return null
+	if m.has_meta("bare"):
+		return m.get_meta("bare") as Material
+	var b := m.duplicate() as Material
+	b.next_pass = null
+	for key in ["outline", "bare"]:
+		if b.has_meta(key):
+			b.remove_meta(key)
+	m.set_meta("bare", b)
+	return b
 
 
 static func _build_colliders(c: Ctx, holder: Node3D) -> void:

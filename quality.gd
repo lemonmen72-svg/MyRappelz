@@ -15,6 +15,20 @@ extends RefCounted
 ## в toon/prop-шейдерах тень мягко входит в cel-полосу; модели персонажей и зверей не затеняют сами себя
 ## (model_shadows = 0: только cel-свет, тень на землю они бросают).
 ## Сглаживание: MSAA 2×/4× 3D-кадра (в Compatibility 4.3 есть) или FXAA своим проходом в postfx.gdshader.
+##
+## Бережение телефона (жалоба Максима «выкрутил всё на максимум — телефон раскалился»):
+## - у пресета свой предел кадров (PRESET_FPS: 30 / 60 / 45 / 45 — выбор пресета ставит его, кнопки кадров/с
+##   меняют его отдельно и в пресет не входят); «Высокое» и «Максимальное» — 900p, а не родное разрешение (на
+##   экране 2400×1080 родное — в 2.8 раза больше пикселей, чем 720p), тени 2 каскада в атласе 2048 (было 4 каскада
+##   в 4096 — каждый отбрасывающий тень объект рисовался до 4 раз, атлас — 64 МБ записи за кадр);
+## - порог LOD мешей (Viewport.mesh_lod_threshold, VIEW_LEVELS "lod"): модели героев, жителей и зверей импортируются
+##   с LOD (meshes/generate_lods), выбор LOD работает и в GL Compatibility, и для мешей со скелетом;
+## - контур моделей и растительности — только вблизи (outline_far, veg_outline_far; ModelLod, IslandVegetation);
+## - открыто окно или экран до мира — не больше MENU_FPS кадров/с, игра свёрнута или без фокуса — BACKGROUND_FPS;
+## - авто-снижение (ThermalGuard, настройка «Беречь телефон от перегрева», guard): телефон нагрелся (статус
+##   температуры Android из плагина) или кадры стабильно не успевают — шаги THROTTLE_STEPS: потолки настроек
+##   поверх выбранных (кадры/с → разрешение 3D → тени → сглаживание и постобработка → всё ниже). Настройки
+##   игрока не меняются: option() — выбранное, геттеры (shadows(), msaa()…) — с потолком throttle_level().
 
 const LOW := 0
 const MEDIUM := 1
@@ -27,9 +41,11 @@ const SECTION := "graphics"
 const NAMES := ["Низкое", "Среднее", "Высокое", "Максимальное", "Свои"]
 const DESCRIPTIONS := [
 	"Без теней, рисованных текстур и постобработки, трава редкая и только рядом, без контуров. Для слабых телефонов.",
-	"Мягкие тени рядом с героем, сглаживание MSAA 2×, рисованные текстуры, трава средней густоты. Рекомендуется.",
-	"Родное разрешение, тени дальше и чётче, свечение светлых мест, густая трава вдаль, тени от кустов и камней.",
-	"Всё на максимум: тени в 4 каскада и дальше всех, MSAA 4×, дальше всего видно. Для мощных телефонов.",
+	"Мягкие тени рядом с героем, сглаживание MSAA 2×, рисованные текстуры, трава средней густоты, 60 кадров/с. "
+		+ "Рекомендуется.",
+	"Чёткая картинка (900p), тени дальше и мягче, свечение светлых мест, густая трава вдаль. 45 кадров/с.",
+	"Для мощных телефонов: тени дальше всех и от кустов и камней, MSAA 4×, дальше всего видно. 45 кадров/с, "
+		+ "900p (родное разрешение — вручную, телефон греется сильнее).",
 	"Настройки изменены вручную.",
 ]
 
@@ -55,7 +71,8 @@ const LABELS := {
 }
 ## Подсказки под настройками.
 const HINTS := {
-	"render": "Высота кадра 3D-мира (интерфейс всегда чёткий). Меньше — быстрее, но мягче картинка.",
+	"render": "Высота кадра 3D-мира (интерфейс всегда чёткий). Меньше — быстрее, но мягче картинка. «Родное» на "
+		+ "большом экране телефона — самое тяжёлое, телефон греется.",
 	"shadows": "Выше — тени дальше, чётче и с мягким краем, но тяжелее для телефона.",
 	"aa": "Убирает «лесенку» на краях моделей и контурах. MSAA — чище, FXAA — дешевле.",
 	"view": "Как далеко видны трава, кусты, камни, деревья и мелочи у построек.",
@@ -66,30 +83,38 @@ const HINTS := {
 	"effects": "Сколько частиц у умений, ударов и искр.",
 	"model_shadows": "Тени от карты теней на самих моделях. Выкл — чистый cel-свет (рекомендуется).",
 }
-## Значения настроек по пресетам (LOW, MEDIUM, HIGH, ULTRA).
+## Значения настроек по пресетам (LOW, MEDIUM, HIGH, ULTRA). «Высокое» и «Максимальное» — 900p (было родное:
+## на телефоне 2400×1080 — 2.6 млн пикселей против 1.8 млн, с MSAA 4× и свечением — главный нагрев видеочипа).
 const PRESETS := [
 	{"render": 1, "shadows": 0, "aa": 0, "view": 0, "grass": 0, "textures": 0, "outlines": 0, "postfx": 0,
 		"effects": 0, "model_shadows": 0},
 	{"render": 1, "shadows": 1, "aa": 2, "view": 1, "grass": 1, "textures": 1, "outlines": 1, "postfx": 0,
 		"effects": 1, "model_shadows": 0},
-	{"render": 3, "shadows": 2, "aa": 2, "view": 2, "grass": 2, "textures": 2, "outlines": 1, "postfx": 2,
+	{"render": 2, "shadows": 2, "aa": 2, "view": 2, "grass": 2, "textures": 2, "outlines": 1, "postfx": 2,
 		"effects": 2, "model_shadows": 0},
-	{"render": 3, "shadows": 3, "aa": 3, "view": 3, "grass": 2, "textures": 2, "outlines": 1, "postfx": 2,
+	{"render": 2, "shadows": 3, "aa": 3, "view": 3, "grass": 2, "textures": 2, "outlines": 1, "postfx": 2,
 		"effects": 2, "model_shadows": 0},
 ]
+## Предел кадров пресета (выбор пресета ставит его; кнопки «Кадров в секунду» — отдельно, в пресет не входят).
+## «Высокое» и «Максимальное» — 45: кадр тяжелее, а 60 кадров/с при нём — главный путь к нагреву.
+const PRESET_FPS := [30, 60, 45, 45]
 
 ## Разрешение 3D: высота кадра мира, px (0 — родное разрешение экрана).
 const RENDER_HEIGHTS := [540, 720, 900, 0]
 ## Тени по уровню (0 — выключены): размер карты теней (атлас солнца), режим каскадов, дальность, м,
 ## доли дальности границ каскадов, фильтр (RenderingServer.SHADOW_QUALITY_*: в Compatibility SOFT_LOW/MEDIUM —
 ## PCF 5 выборок, SOFT_HIGH — 13), смешивание каскадов, тени от кустов и камней.
+## Было (замер CI до оптимизации): «Средние» — атлас 4096, 50 м, тени кустов; «Высокие» — 4096, 4 каскада, 80 м
+## (первый каскад 0–5.6 м — между камерой и героем, почти пустой; каждый объект с тенью — до 4 проходов).
+## Стало: везде 2 каскада в атласе 2048 (первый каскад 13–15 м — герой и всё вокруг него в нём; 1.3–1.5 см на
+## тексель при фильтре PCF — разницы с 4096 не видно), «Средние» 45 м без теней кустов, «Высокие» 60 м.
 const SHADOW_LEVELS := [
 	{},
 	{"atlas": 2048, "splits": 2, "distance": 32.0, "split": [0.42, 0.7, 0.9], "filter": 2, "blend": false,
 		"small": false},
-	{"atlas": 4096, "splits": 2, "distance": 50.0, "split": [0.3, 0.6, 0.85], "filter": 4, "blend": true,
-		"small": true},
-	{"atlas": 4096, "splits": 4, "distance": 80.0, "split": [0.07, 0.18, 0.42], "filter": 4, "blend": true,
+	{"atlas": 2048, "splits": 2, "distance": 45.0, "split": [0.33, 0.6, 0.85], "filter": 4, "blend": true,
+		"small": false},
+	{"atlas": 2048, "splits": 2, "distance": 60.0, "split": [0.25, 0.6, 0.85], "filter": 4, "blend": true,
 		"small": true},
 ]
 ## Сдвиг тени (против «ряби» — самозатенения карты теней на гранях): по глубине и вдоль нормали.
@@ -97,12 +122,19 @@ const SHADOW_LEVELS := [
 const SHADOW_BIAS := 0.08
 const SHADOW_NORMAL_BIAS := 1.5
 ## Дальность прорисовки по уровню, м: трава, кусты/камни/кристаллы, деревья, мелочи у построек (ящики,
-## бочки, огни), декор полей (колосья).
+## бочки, огни), декор полей (колосья); "lod" — порог LOD мешей, пикселей (Viewport.mesh_lod_threshold: больше —
+## раньше упрощаются модели героев, жителей, зверей); "outline" — контур моделей персонажей и зверей до стольких м
+## (ModelLod), "veg_outline" — контур участков деревьев, кустов и камней до стольких м (IslandVegetation).
+## Было: «Далеко» 58 / 95 / 175 / 110 / 120, «Макс.» 72 / 120 / 220 / 140 / 150 (деревья до 248 м, контуры везде).
 const VIEW_LEVELS := [
-	{"grass": 24.0, "detail": 45.0, "trees": 90.0, "props": 70.0, "decor": 80.0},
-	{"grass": 38.0, "detail": 65.0, "trees": 125.0, "props": 90.0, "decor": 100.0},
-	{"grass": 58.0, "detail": 95.0, "trees": 175.0, "props": 110.0, "decor": 120.0},
-	{"grass": 72.0, "detail": 120.0, "trees": 220.0, "props": 140.0, "decor": 150.0},
+	{"grass": 24.0, "detail": 45.0, "trees": 90.0, "props": 70.0, "decor": 80.0, "lod": 3.0, "outline": 25.0,
+		"veg_outline": 40.0},
+	{"grass": 38.0, "detail": 65.0, "trees": 125.0, "props": 90.0, "decor": 100.0, "lod": 1.5, "outline": 30.0,
+		"veg_outline": 45.0},
+	{"grass": 50.0, "detail": 85.0, "trees": 150.0, "props": 100.0, "decor": 110.0, "lod": 1.25, "outline": 40.0,
+		"veg_outline": 55.0},
+	{"grass": 60.0, "detail": 100.0, "trees": 180.0, "props": 120.0, "decor": 130.0, "lod": 1.0, "outline": 50.0,
+		"veg_outline": 65.0},
 ]
 ## Густота травы по уровню: доля полной густоты, травинок в пучке, доля цветов.
 const GRASS_LEVELS := [
@@ -116,14 +148,35 @@ const EFFECTS_SCALE := [0.5, 0.75, 1.0]
 ## Ограничение частоты кадров. Без него экраны 90–120 Гц рисуют в 1.5–2 раза больше кадров,
 ## чем нужно, и телефон греется. 30 — меньше всего греется и дольше держит батарея.
 const FPS_OPTIONS := [30, 45, 60]
+## Предел кадров «Среднего» (по умолчанию) и для неверного значения.
 const DEFAULT_FPS := 60
-## Предел кадров при открытом окне.
+## Предел кадров при открытом окне и на экранах до мира (вход, выбор и создание персонажа, загрузка ресурсов).
 const MENU_FPS := 30
+## Игра без фокуса (шторка уведомлений, другое окно поверх) или свёрнута.
+const BACKGROUND_FPS := 10
+
+## Авто-снижение графики (ThermalGuard): шаг N — потолки настроек (берётся меньшее из выбранного и потолка) и
+## кадров/с. Порядок по стоимости для глаза: кадры/с → разрешение 3D → тени → сглаживание и постобработка → всё.
+const THROTTLE_STEPS := [
+	{},
+	{"fps": 30},
+	{"fps": 30, "render": 1},
+	{"fps": 30, "render": 1, "shadows": 1},
+	{"fps": 30, "render": 1, "shadows": 1, "aa": 2, "postfx": 0},
+	{"fps": 30, "render": 0, "shadows": 0, "aa": 0, "postfx": 0, "view": 1, "effects": 1, "outlines": 0},
+]
 
 static var _level := -1
 static var _opts: Dictionary = {}
 static var _fps := -1
 static var _menu_open := false
+## Экран до мира (вход, выбор, создание персонажа, загрузка ресурсов) — как открытое окно.
+static var _screen_idle := false
+## Игра без фокуса или свёрнута (ThermalGuard по уведомлениям приложения).
+static var _background := false
+## Шаг авто-снижения (0 — нет, THROTTLE_STEPS) и включено ли оно (настройка guard, по умолчанию да; −1 — не прочитано).
+static var _throttle := 0
+static var _guard := -1
 static var _resize_hooked := false
 ## Материалы моделей (персонажи, звери, питомцы): тени на модели по model_shadows — WeakRef.
 static var _model_mats: Array[WeakRef] = []
@@ -182,14 +235,25 @@ static func set_level(l: int, save: bool = true) -> void:
 	for k in OPTIONS:
 		_opts[k] = int(p[k])
 	_level = l
+	# Предел кадров пресета (дальше игрок может выбрать свой)
+	_fps = int(PRESET_FPS[l])
 	if save:
 		_save_all()
 
 
-## Значение настройки (номер варианта, см. LABELS).
+## Значение настройки (номер варианта, см. LABELS) — выбранное игроком (без авто-снижения).
 static func option(key: String) -> int:
 	_ensure()
 	return int(_opts.get(key, 0))
+
+
+## Действующее значение настройки: выбранное, но не выше потолка шага авто-снижения (THROTTLE_STEPS).
+static func effective(key: String) -> int:
+	var v := option(key)
+	var caps: Dictionary = THROTTLE_STEPS[clampi(_throttle, 0, THROTTLE_STEPS.size() - 1)]
+	if caps.has(key):
+		v = mini(v, int(caps[key]))
+	return v
 
 
 ## Сколько вариантов у настройки.
@@ -224,30 +288,52 @@ static func option_hint(key: String) -> String:
 	return String(HINTS.get(key, ""))
 
 
-## Предел кадров в секунду (одно из FPS_OPTIONS), по умолчанию 60. В пресет не входит.
+## Предел кадров пресета l (−1 — текущего; «Свои» — «Среднего»).
+static func preset_fps(l: int = -1) -> int:
+	var lv := level() if l < 0 else l
+	if lv < LOW or lv > ULTRA:
+		return DEFAULT_FPS
+	return int(PRESET_FPS[lv])
+
+
+## Предел кадров в секунду (одно из FPS_OPTIONS): записанный в файле, иначе — пресета (preset_fps). Выбор
+## пресета ставит его предел; кнопки кадров/с меняют только его.
 static func fps_limit() -> int:
 	if _fps < 0:
-		_fps = DEFAULT_FPS
 		var cf := ConfigFile.new()
 		if cf.load(PATH) == OK:
-			_fps = int(cf.get_value(SECTION, "fps", DEFAULT_FPS))
+			_fps = int(cf.get_value(SECTION, "fps", -1))
 		if not FPS_OPTIONS.has(_fps):
-			_fps = DEFAULT_FPS
+			_fps = preset_fps()
 	return _fps
 
 
 static func set_fps_limit(v: int, save: bool = true) -> void:
-	_fps = v if FPS_OPTIONS.has(v) else DEFAULT_FPS
+	_fps = v if FPS_OPTIONS.has(v) else preset_fps()
 	if save:
 		_save({"fps": _fps})
 	apply_fps()
+
+
+## Действующий предел кадров: игра без фокуса — BACKGROUND_FPS; иначе fps_limit(), не выше потолка шага
+## авто-снижения, а при открытом окне и на экране до мира — не выше MENU_FPS.
+static func current_fps_cap() -> int:
+	if _background:
+		return BACKGROUND_FPS
+	var f := fps_limit()
+	var caps: Dictionary = THROTTLE_STEPS[clampi(_throttle, 0, THROTTLE_STEPS.size() - 1)]
+	if caps.has("fps"):
+		f = mini(f, int(caps["fps"]))
+	if _menu_open or _screen_idle:
+		f = mini(f, MENU_FPS)
+	return f
 
 
 ## Включить предел кадров (в headless-тестах не ограничиваем — они идут быстрее реального времени).
 static func apply_fps() -> void:
 	if DisplayServer.get_name() == "headless":
 		return
-	Engine.max_fps = mini(fps_limit(), MENU_FPS) if _menu_open else fps_limit()
+	Engine.max_fps = current_fps_cap()
 
 
 ## Открыто окно (герой, питомцы, сумка, настройки): мир под окном рисуется не чаще MENU_FPS кадров
@@ -259,8 +345,68 @@ static func set_menu_open(on: bool) -> void:
 	apply_fps()
 
 
+## Открыто окно или экран до мира (предел MENU_FPS).
+static func menu_open() -> bool:
+	return _menu_open or _screen_idle
+
+
+## Экран до мира (вход, выбор и создание персонажа, загрузка ресурсов): не больше MENU_FPS кадров/с.
+static func set_screen_idle(on: bool) -> void:
+	if _screen_idle == on:
+		return
+	_screen_idle = on
+	apply_fps()
+
+
+## Игра без фокуса или свёрнута (ThermalGuard по уведомлениям приложения): BACKGROUND_FPS кадров/с.
+static func set_background(on: bool) -> void:
+	if _background == on:
+		return
+	_background = on
+	apply_fps()
+
+
+static func in_background() -> bool:
+	return _background
+
+
+# ---------- Авто-снижение (ThermalGuard) ----------
+
+## «Беречь телефон от перегрева» (по умолчанию включено; ключ guard секции [graphics]).
+static func guard_enabled() -> bool:
+	if _guard < 0:
+		_guard = 1
+		var cf := ConfigFile.new()
+		if cf.load(PATH) == OK:
+			_guard = 1 if bool(cf.get_value(SECTION, "guard", true)) else 0
+	return _guard == 1
+
+
+## Включить или выключить авто-снижение; выключили — графика сразу как выбрана (применить — Quality.apply).
+static func set_guard_enabled(on: bool, save: bool = true) -> void:
+	_guard = 1 if on else 0
+	if not on:
+		_throttle = 0
+	if save:
+		_save({"guard": on})
+
+
+## Шаг авто-снижения (0 — графика как выбрана).
+static func throttle_level() -> int:
+	return _throttle
+
+
+static func throttle_max() -> int:
+	return THROTTLE_STEPS.size() - 1
+
+
+## Задать шаг авто-снижения (применить — Quality.apply).
+static func set_throttle(n: int) -> void:
+	_throttle = clampi(n, 0, throttle_max())
+
+
 static func _save_all() -> void:
-	var vals := {"quality": _level}
+	var vals := {"quality": _level, "fps": fps_limit()}
 	for k in OPTIONS:
 		vals[k] = int(_opts[k])
 	_save(vals)
@@ -281,6 +427,7 @@ static func _save(vals: Dictionary) -> void:
 static func reload() -> void:
 	_level = -1
 	_fps = -1
+	_guard = -1
 
 
 static func level_name(l: int = -1) -> String:
@@ -294,7 +441,7 @@ static func description(l: int = -1) -> String:
 # ---------- Производные параметры ----------
 
 static func _view() -> Dictionary:
-	return VIEW_LEVELS[option("view")]
+	return VIEW_LEVELS[effective("view")]
 
 
 static func _grass() -> Dictionary:
@@ -302,7 +449,7 @@ static func _grass() -> Dictionary:
 
 
 static func _shadow() -> Dictionary:
-	return SHADOW_LEVELS[option("shadows")]
+	return SHADOW_LEVELS[effective("shadows")]
 
 
 static func grass_density() -> float:
@@ -341,8 +488,23 @@ static func decor_distance() -> float:
 	return float(_view()["decor"])
 
 
+## Порог LOD мешей, пикселей (Viewport.mesh_lod_threshold).
+static func lod_threshold() -> float:
+	return float(_view()["lod"])
+
+
+## Контур моделей персонажей, жителей и зверей — до стольких м от камеры (ModelLod).
+static func outline_far() -> float:
+	return float(_view()["outline"])
+
+
+## Контур участков деревьев, кустов и камней — до стольких м (до центра участка; IslandVegetation).
+static func veg_outline_far() -> float:
+	return float(_view()["veg_outline"])
+
+
 static func shadows() -> bool:
-	return option("shadows") > 0
+	return effective("shadows") > 0
 
 
 static func shadow_distance() -> float:
@@ -356,22 +518,22 @@ static func small_shadows() -> bool:
 
 ## Цветокоррекция и виньетка (PostFx).
 static func postfx() -> bool:
-	return option("postfx") >= 1
+	return effective("postfx") >= 1
 
 
 ## Мягкое свечение светлых мест (PostFx, полный вариант шейдера).
 static func bloom() -> bool:
-	return option("postfx") >= 2
+	return effective("postfx") >= 2
 
 
 ## FXAA своим проходом в PostFx.
 static func fxaa() -> bool:
-	return option("aa") == 1
+	return effective("aa") == 1
 
 
 ## MSAA 3D-кадра (Viewport.MSAA_*).
 static func msaa() -> Viewport.MSAA:
-	match option("aa"):
+	match effective("aa"):
 		2:
 			return Viewport.MSAA_2X
 		3:
@@ -392,12 +554,12 @@ static func textures() -> bool:
 
 ## Контуры (персонажи, звери, постройки, растительность).
 static func outlines() -> bool:
-	return option("outlines") >= 1
+	return effective("outlines") >= 1
 
 
 ## Доля частиц эффектов (Vfx).
 static func effects_scale() -> float:
-	return float(EFFECTS_SCALE[option("effects")])
+	return float(EFFECTS_SCALE[effective("effects")])
 
 
 ## Число частиц эффекта с учётом качества (не меньше 1).
@@ -412,7 +574,7 @@ static func model_shadows() -> bool:
 
 ## Высота кадра 3D-мира, px (0 — родное разрешение).
 static func render_height() -> int:
-	return int(RENDER_HEIGHTS[option("render")])
+	return int(RENDER_HEIGHTS[effective("render")])
 
 
 ## Масштаб 3D-кадра (Viewport.scaling_3d_scale) для экрана высотой screen_h px.
@@ -446,6 +608,8 @@ static func apply(tree: SceneTree) -> void:
 	_set_group_range(tree, "poi_decor", decor_distance(), 8.0)
 	_apply_models()
 	_apply_scene_models(tree.root)
+	# Контур дальних моделей — по расстоянию (дальность — из «Дальности прорисовки»)
+	ModelLod.update_all()
 
 
 ## Разрешение и сглаживание окна. Интерфейс рисуется в родном разрешении (растяжение canvas_items, база
@@ -459,6 +623,8 @@ static func apply_resolution(tree: SceneTree) -> void:
 	win.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
 	win.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
 	win.scaling_3d_scale = render_scale_for(float(win.size.y))
+	# Порог LOD мешей (модели героев, жителей, зверей — с LOD из импорта; выбор LOD есть и в Compatibility)
+	win.mesh_lod_threshold = lod_threshold()
 	# Окно сменило размер (поворот, выход из полноэкранного режима) — масштаб 3D по новой высоте
 	if not _resize_hooked:
 		_resize_hooked = true
@@ -563,7 +729,7 @@ static func _apply_scene_models(root: Node) -> void:
 				if bm.disable_receive_shadows != recv:
 					bm.disable_receive_shadows = recv
 			if mat.has_meta("outline"):
-				var want: Material = (mat.get_meta("outline") as Material) if ol else null
+				var want: Material = (mat.get_meta("outline") as Material) if ol and not ModelLod.is_far(mat) else null
 				if mat.next_pass != want:
 					mat.next_pass = want
 
@@ -581,7 +747,7 @@ static func _apply_models() -> void:
 			m.disable_receive_shadows = recv
 		# Контур модели — здесь же (модель героя или зверя с контуром: meta "outline")
 		if m.has_meta("outline"):
-			var mw: Material = (m.get_meta("outline") as Material) if ol else null
+			var mw: Material = (m.get_meta("outline") as Material) if ol and not ModelLod.is_far(m) else null
 			if m.next_pass != mw:
 				m.next_pass = mw
 	_model_mats = alive
@@ -591,7 +757,7 @@ static func _apply_models() -> void:
 		if om == null or not om.has_meta("outline"):
 			continue
 		alive_ol.append(wr)
-		var want: Material = (om.get_meta("outline") as Material) if ol else null
+		var want: Material = (om.get_meta("outline") as Material) if ol and not ModelLod.is_far(om) else null
 		if om.next_pass != want:
 			om.next_pass = want
 	_outline_mats = alive_ol
