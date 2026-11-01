@@ -21,6 +21,9 @@
     Ключи — все кадры исходника (30 к/с) в новом времени, прореживание только без видимой потери: ключ убирается,
     если он восстанавливается из соседних с ошибкой < ROT_TOL / POS_TOL.
   * Момент удара: hit в спецификации (с исходника) или самая быстрая кисть внутри отрезка.
+  * Петли каста умений героя (вид loop, имя кончается на «_Loop»: накопление силы, заряд, прицеливание из лука и
+    арбалета): отрезок без сжатия времени и без удара, последние LOOP_BLEND с сводятся к первому кадру (шов —
+    проверка LOOP_SEAM); в .json — loop: true. Игра крутит петлю, пока идёт каст (CharacterModel.MQ_CAST_LOOPS).
 
 Запуск из корня репозитория (Python с -I: входные GLB — чужие данные):
   python3 -I tools/retarget_mannequin.py --m1 <m1.glb> --m2 <m2.glb> --m3 <m3.glb> [герой.glb …]
@@ -65,11 +68,19 @@ TAG = "mannequin"
 ## STEP_LIFT × сдвиг (0.06…0.14 м — выше порога «у земли»).
 STEP_MIN = 0.06
 STEP_LIFT = 0.35
+## Доля дуги шага в начале и в конце, когда носок идёт только вверх (вниз), без сдвига вбок: между ключами он не
+## чертит по земле (Mq_Thrust у hero_assassin_f — в тесте Godot 0.098 м).
+STEP_RISE = 0.15
 ## Стопа «у земли» — не выше своего минимума в клипе (не ниже покоя) + STEP_LOW, м; шаг из шарканья — STEP_TIME, с.
 STEP_LOW = 0.05
 STEP_TIME = 0.3
 ## …и не выше высоты опоры в покое + STEP_GROUND (стопа, что весь клип в воздухе, у земли не бывает), м.
 STEP_GROUND = 0.08
+## Перенос стопы по воздуху (участок «A» в plant_inplace): у опоры носок AIR_EASE кадров идёт больше вверх, чем вбок,
+## и дуга выше исходной на AIR_LIFT · sin (м) — носок не чертит по земле между ключами (запас под проверку в Godot,
+## где ключи после импорта чуть другие: GROUND_MARGIN).
+AIR_EASE = 2
+AIR_LIFT = 0.03
 ## Опора стопы в исходнике: у земли, медленнее STANCE_SPEED (м/с) и не короче STANCE_MIN кадров.
 STANCE_SPEED = 0.3
 STANCE_MIN = 4
@@ -77,11 +88,22 @@ STANCE_GAP = 2
 ## Предел проверки ground_slide (как в tests/test_hero_models.gd), м.
 GROUND_SLIDE = 0.08
 GROUND_NEAR = 0.04
+## Для сведения (печатается «с запасом»): та же проверка с порогом «у земли» выше на GROUND_MARGIN — Godot при
+## импорте может чуть опустить носок между ключами (в тесте у hero_assassin_f Mq_Thrust было 0.098 м при 0.032 здесь).
+GROUND_MARGIN = 0.02
 ## Клипы, где стопы законно едут или не достают земли: кручение на колене, прыжки, пинок с шагом.
 FREE_FEET = {"Mq_Blade_Spin", "Mq_Judgment", "Mq_Leap_Slam", "Mq_Jump", "Mq_Kick"}
+## Петли каста: за сколько последних секунд поза сводится к первому кадру (не больше трети петли), с;
+## предел шва после сведения (угол между первым и последним кадром у любой кости), рад.
+LOOP_BLEND = 0.3
+## Действия (вид act): кадров в UPSAMPLE раз больше, чем у исходника (upsample — носки между кадрами не чертят по земле).
+UPSAMPLE = 3
+LOOP_SEAM = 0.002
 
 ## Клипы: имя в GLB → (манекен, клип Meshy («A+B» — подряд), t0, t1, вид, pre, post, hit).
-##   t0/t1 — отрезок исходника (с); вид: act — действие, death — смерть (лёжа на земле);
+##   t0/t1 — отрезок исходника (с); вид: act — действие, death — смерть (лёжа на земле), loop — петля каста
+##   (без сжатия времени и без удара: последние LOOP_BLEND с плавно сводятся к первому кадру — шва нет;
+##   швы t0/t1 подобраны по наименьшей разнице поз; имя кончается на «_Loop» — игра зацикливает);
 ##   pre/post — длительность до удара и после него в игре (с; None — без сжатия этой части);
 ##   hit — момент удара в исходнике (с; None — самая быстрая кисть в отрезке).
 ## Комбо Meshy разрезаны по ударам: части идут подряд (конец одной — начало следующей), обычные атаки чередуют их
@@ -97,7 +119,7 @@ MQ_CLIPS = {
 	"Mq_Dual_A1": ("m2", "Double_Combo_Attack", 0.0, 0.95, "act", 0.35, 0.3, 0.62),  # два клинка: удар снизу
 	"Mq_Dual_A2": ("m2", "Double_Combo_Attack", 0.95, 2.6, "act", 0.4, 0.55, 1.68),  # удар сверху
 	"Mq_Left_Slash": ("m3", "Left_Slash", 0.3, 2.1, "act", 0.4, 0.5, 1.3),  # косой удар справа налево
-	"Mq_Thrust": ("m3", "Thrust_Slash", 0.1, 1.25, "act", 0.3, 0.35, 0.72),  # выпад (кинжал, копьё)
+	"Mq_Thrust": ("m3", "Thrust_Slash", 0.0, 1.25, "act", 0.3, 0.35, 0.72),  # выпад (кинжал, копьё)
 	"Mq_Heavy_Swing": ("m3", "Heavy_Hammer_Swing", 0.25, 1.83, "act", 0.55, None, 1.5),  # двуручное: сверху вниз
 	"Mq_Axe_Spin": ("m2", "Axe_Spin_Attack", 0.0, 2.1, "act", 0.5, 0.6, 0.9),  # удар с разворота
 	# --- Умения ближнего боя (1–2 с) ---
@@ -125,6 +147,13 @@ MQ_CLIPS = {
 	"Mq_Cast_Pray": ("m1", "mage_soell_cast_8", 0.0, 1.33, "act", None, None, 0.4),  # ладони у лица (лечение)
 	"Mq_Charged_Cast": ("m1", "Charged_Spell_Cast", 0.0, 2.6, "act", 0.7, 0.6, 1.72),  # заряд и выброс вверх
 	"Mq_Charged_Cast1": ("m1", "Charged_Spell_Cast_1", 0.3, 4.0, "act", 0.7, 0.8, 1.9),  # усиление
+	"Mq_Cast_Release": ("m1", "mage_soell_cast_5", 8.73, 11.37, "act", 0.45, 0.65, None),  # финал долгого каста
+	"Mq_Charge_Release": ("m1", "Charged_Spell_Cast", 1.5, 2.67, "act", 0.25, 0.6, 1.72),  # выброс заряда вверх
+	# --- Петли каста (время каста умения героя: Player.cast_*; CharacterModel.MQ_CAST_LOOPS) ---
+	"Mq_Cast_Loop": ("m1", "mage_soell_cast_5", 5.77, 7.43, "loop", None, None, None),  # накопление силы, посох вверх
+	"Mq_Charge_Loop": ("m1", "Charged_Spell_Cast", 0.9, 1.5, "loop", None, None, None),  # заряд в ладонях, присед
+	"Mq_Bow_Aim_Loop": ("m3", "Archery_Shot_2", 1.43, 3.67, "loop", None, None, None),  # лук: неподвижное прицеливание
+	"Mq_Crossbow_Aim_Loop": ("m3", "Gun_Hold_Left_Turn", 0.13, 0.77, "loop", None, None, None),  # арбалет у плеча
 	# --- Прочее ---
 	"Mq_Taunt": ("m1", "Chest_Pound_Taunt", 0.5, 3.2, "act", 0.7, 0.6, 2.1),  # «Вызов»: удар в грудь
 	"Mq_Hit": ("m1", "Hit_Reaction_1", 0.0, 1.1, "act", None, 0.55, 0.2),  # урон
@@ -134,9 +163,9 @@ MQ_CLIPS = {
 ## Шаг и бег манекена (m1 Walking / Running) — тем же путём, что UAL в prepare_hero (растяжка под WALK_NATIVE /
 ## RUN_NATIVE, опоры, у героинь — женская пластика). В игре не подключены: шаг и бег UAL лучше (см. CLAUDE.md).
 MQ_LOCO = {"Mq_Walking": ("walk", "Walking"), "Mq_Running": ("run", "Running")}
-## Не перенесены: Archery_Shot (= Draw_and_Shoot_from_Back_2), Draw_and_Shoot_from_Back и _1 (то же, 7.8 с),
-## Archery_Shot_2 (неподвижное прицеливание), Archery_Aim_with_Lateral_Scan, Gun_Hold_Left_Turn, mage_soell_cast_5
-## (11 с почти без движения), Quick_Walk, RunFast, run_fast_3_inplace, Run_Turn_*, Walk_Turn_* (повороты и
+## Не перенесены: Archery_Shot (= Draw_and_Shoot_from_Back_2), Draw_and_Shoot_from_Back и _1 (то же движение, что
+## Mq_Bow_Draw, только 7.8 с), Archery_Aim_with_Lateral_Scan (прицел с поворотом в сторону — при касте по цели не к
+## месту; неподвижный прицел — Archery_Shot_2 в Mq_Bow_Aim_Loop), конец Gun_Hold_Left_Turn (поворот кругом), Quick_Walk, RunFast, run_fast_3_inplace, Run_Turn_*, Walk_Turn_* (повороты и
 ## разновидности бега — в игре шаг и бег одни, повороты делает код), дубли Walking/Running в m2 и m3.
 
 ## Кости UAL (как их ищут HeroRetarget/BipedRetarget) → кости Mixamo манекена.
@@ -398,7 +427,9 @@ def plant_inplace(rt, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, stance:
 			a = int(np.clip(int(np.argmax(v)) - m // 2, 0, n - m))
 			for k in range(n):
 				u = float(np.clip((k - a + 1) / float(m + 1), 0.0, 1.0))
-				w = u * u * (3.0 - 2.0 * u)
+				# Вбок — после отрыва и до постановки (STEP_RISE дуги носок идёт только вверх / вниз)
+				v = float(np.clip((u - STEP_RISE) / (1.0 - 2.0 * STEP_RISE), 0.0, 1.0))
+				w = v * v * (3.0 - 2.0 * v)
 				want[f + k, si] = Sx + (Ex - Sx) * w + np.array([0.0, h * math.sin(math.pi * u), 0.0])
 		for kind, f, g in segs:
 			if kind != "A":
@@ -412,7 +443,16 @@ def plant_inplace(rt, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, stance:
 				w = k / float(n - 1) if n > 1 else 0.5
 				p = P[k].copy()
 				p[[0, 2]] += (c0 + (c1 - c0) * w)[[0, 2]]
-				p[1] = max(p[1], rest_y[s])
+				# Отрыв от опоры и постановка: первые и последние AIR_EASE кадров носок идёт больше вверх, чем вбок
+				# (иначе между ключами он чертит по земле — проверка ground_slide и тест в Godot)
+				if f > 0:
+					a = min(1.0, (k + 1) / float(AIR_EASE + 1))
+					p[[0, 2]] = Sx[[0, 2]] + (p[[0, 2]] - Sx[[0, 2]]) * (a * a * (3.0 - 2.0 * a))
+				if g + 1 < F:
+					e = min(1.0, (n - k) / float(AIR_EASE + 1))
+					p[[0, 2]] = Ex[[0, 2]] + (p[[0, 2]] - Ex[[0, 2]]) * (e * e * (3.0 - 2.0 * e))
+				# Перенос по воздуху — с запасом над землёй (дуга AIR_LIFT)
+				p[1] = max(p[1], rest_y[s]) + AIR_LIFT * math.sin(math.pi * (k + 1) / float(n + 1))
 				want[f + k, si] = p
 	short = 0.0
 	for f in range(F):
@@ -434,14 +474,26 @@ def make_clip(rts: dict, hero: Hero, name: str, spec: tuple, female: bool) -> di
 	_Gq, Gp = rt.fk(Lq, Lt)
 	stance = stance_masks(rt, times, Gp)
 	ph.pin_xz(rt, Lt)
+	if kind == "loop":
+		loop_close(times, Lq, Lt)
 	short = 0.0
 	if kind != "death":
 		short = plant_inplace(rt, times, Lq, Lt, stance)
 	lift = pc.biped_ground(rt, hero.mesh, Lq, Lt, kind == "death")
+	if kind == "loop":
+		# IK стоп и подъём над землёй меняют кадры по отдельности — шов сводится ещё раз
+		loop_close(times, Lq, Lt)
+	if kind == "act" and UPSAMPLE > 1:
+		times, Lq, Lt, stance = upsample(rt, times, Lq, Lt, stance, UPSAMPLE)
 	_Gq, Gp = rt.fk(Lq, Lt)
 	T = float(times[-1])
-	h = hand_peak(rt, times, Gp, 0.08 * T, 0.85 * T) if hit is None else float(hit) - t0
-	new_t, new_hit = warp(times, h, pre, post)
+	if kind == "loop":
+		# Петля: время как в исходнике (темп петли не зависит от длины каста), удара нет
+		h = 0.0
+		new_t, new_hit = times.copy(), 0.0
+	else:
+		h = hand_peak(rt, times, Gp, 0.08 * T, 0.85 * T) if hit is None else float(hit) - t0
+		new_t, new_hit = warp(times, h, pre, post)
 	# Какая рука бьёт: средняя скорость кистей ±0.15 с вокруг удара
 	win = np.abs(times - h) <= 0.15
 	hv = {s: float(np.linalg.norm(np.gradient(Gp[:, c[3]], times, axis=0), axis=1)[win].mean())
@@ -449,6 +501,49 @@ def make_clip(rts: dict, hero: Hero, name: str, spec: tuple, female: bool) -> di
 	return {"hand": "R" if hv["R"] >= hv["L"] else "L", "hv": hv, "name": name, "src": "%s:%s [%.2f–%.2f]" % (src_id, src_clip, t0, t1), "kind": kind, "times": new_t,
 		"src_times": times, "rot": ra.continuous(Lq), "trans": Lt, "hit": float(new_hit), "T": float(new_t[-1]),
 		"travel": travel, "short": short, "lift": lift, "stance": stance}
+
+
+def upsample(rt, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, stance: dict, k_up: int) -> tuple:
+	"""Кадров в k_up раз больше: между кадрами — повороты slerp, сдвиги линейно, носки (опоры) — IK в точку на прямой
+	между их положениями в соседних кадрах. Без этого быстрые клипы (выпад, сжатый по времени вдвое) между ключами
+	чертили носком по земле: поворот бедра, голени и стопы по отдельности уводил носок на 2–3 см (а после импорта в
+	Godot — до 10 см). Лишние ключи потом убирает reduce_keys."""
+	_Gq, Gp = rt.fk(Lq, Lt)
+	F = len(times)
+	i0 = np.repeat(np.arange(F - 1), k_up)
+	fr = np.tile(np.arange(k_up) / float(k_up), F - 1)
+	i0 = np.append(i0, F - 1)
+	fr = np.append(fr, 0.0)
+	i1 = np.minimum(i0 + 1, F - 1)
+	nt = times[i0] + (times[i1] - times[i0]) * fr
+	nq = ra.slerp(Lq[i0], Lq[i1], np.repeat(fr[:, None], Lq.shape[1], 1))
+	nl = Lt[i0] + (Lt[i1] - Lt[i0]) * fr[:, None, None]
+	for k in range(len(nt)):
+		if fr[k] == 0.0:
+			nq[k] = Lq[i0[k]]
+			nl[k] = Lt[i0[k]]
+			continue
+		for s, b in sorted(rt.contact.items()):
+			want = Gp[i0[k], b] + (Gp[i1[k], b] - Gp[i0[k], b]) * fr[k]
+			Gq1, Gp1 = rt.fk(nq[k:k + 1], nl[k:k + 1])
+			rt.two_bone(Gq1[0], Gp1[0], nq[k], s, want)
+	ns = {s: np.array([bool(m[i0[k]] and m[i1[k]]) for k in range(len(nt))]) for s, m in stance.items()}
+	return nt, ra.continuous(nq), nl, ns
+
+
+def loop_close(times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray) -> None:
+	"""Петля: последние LOOP_BLEND с (не больше трети петли) плавно сводятся к первому кадру — повороты slerp,
+	сдвиги линейно (вес — smoothstep); последний кадр = первому, при зацикливании шва нет."""
+	T = float(times[-1])
+	B = min(LOOP_BLEND, T / 3.0)
+	for f in range(len(times)):
+		u = (float(times[f]) - (T - B)) / B
+		if u <= 0.0:
+			continue
+		w = min(1.0, u)
+		w = w * w * (3.0 - 2.0 * w)
+		Lq[f] = ra.slerp(Lq[f], Lq[0], np.full((Lq.shape[1], 1), w))
+		Lt[f] = Lt[f] + (Lt[0] - Lt[f]) * w
 
 
 def make_loco(rts: dict, hero: Hero, name: str, kind: str, src_clip: str, female: bool) -> dict:
@@ -548,18 +643,25 @@ def verify(rt, hero: Hero, cl: dict) -> list:
 	head = hero.roles["head"]
 	if cl["kind"] == "death" and Gp[-1, head, 1] > 0.6:
 		bad.append("в конце смерти голова на %.2f м" % Gp[-1, head, 1])
-	cl["slide"] = foot_slide(rt, cl, Gp) if cl["kind"] == "act" else 0.0
-	cl["gslide"] = ground_slide(hero, cl) if cl["kind"] == "act" else 0.0
+	act = cl["kind"] in ("act", "loop")
+	cl["slide"] = foot_slide(rt, cl, Gp) if act else 0.0
+	cl["gslide"] = ground_slide(hero, cl) if act else 0.0
+	cl["gslide_m"] = ground_slide(hero, cl, near=GROUND_NEAR + GROUND_MARGIN) if act else 0.0
+	if cl["kind"] == "loop":
+		seam = float(_qangle(cl["rot"][0], cl["rot"][-1]).max())
+		cl["seam"] = seam
+		if seam > LOOP_SEAM or float(np.abs(cl["trans"][0] - cl["trans"][-1]).max()) > 1e-4:
+			bad.append("шов петли %.4f рад" % seam)
 	if cl["gslide"] > GROUND_SLIDE and cl["name"] not in FREE_FEET:
 		bad.append("носок едет по земле на %.3f м" % cl["gslide"])
-	if cl["kind"] == "act" and cl["slide"] > 0.02:
+	if act and cl["slide"] > 0.02:
 		bad.append("стопа скользит на %.3f м" % cl["slide"])
-	if cl["kind"] == "act" and cl["short"] > 0.05 and cl["name"] not in FREE_FEET:
+	if act and cl["short"] > 0.05 and cl["name"] not in FREE_FEET:
 		bad.append("нога не дотянулась до опоры на %.3f м" % cl["short"])
 	return bad
 
 
-def ground_slide(hero: Hero, cl: dict, n: int = 60) -> float:
+def ground_slide(hero: Hero, cl: dict, n: int = 60, near: float = GROUND_NEAR) -> float:
 	"""Та же проверка, что в tests/test_hero_models.gd: опора стопы (носок) в n + 1 точках клипа (линейно между ключами); пока
 	он у земли (не выше своей высоты в покое + GROUND_NEAR), по земле он сдвигается не больше, м (поворот на носке —
 	не скольжение)."""
@@ -575,7 +677,7 @@ def ground_slide(hero: Hero, cl: dict, n: int = 60) -> float:
 	worst = 0.0
 	for c in hero.roles["legs"].values():
 		p = Gp[:, c[min(3, len(c) - 1)]]
-		low = p[:, 1] < hero.rig.gpos[c[min(3, len(c) - 1)], 1] + GROUND_NEAR
+		low = p[:, 1] < hero.rig.gpos[c[min(3, len(c) - 1)], 1] + near
 		start = -1
 		for i in range(len(t)):
 			if not low[i]:
@@ -718,7 +820,7 @@ def survey(out: str, hero: Hero, srcs: dict, names: list) -> None:
 
 # ---------- Главное ----------
 
-def process(path: str, srcs: dict, check: bool, prev: str) -> dict:
+def process(path: str, srcs: dict, check: bool, prev: str, only: list = None) -> dict:
 	hero = Hero(path)
 	female = hero.cid.replace("_starter", "").endswith("_f")
 	rts = {k: ph.HeroRetarget(s, hero.rig, hero.roles, hero.fingers) for k, s in srcs.items()}
@@ -727,15 +829,17 @@ def process(path: str, srcs: dict, check: bool, prev: str) -> dict:
 	clips = []
 	ok = True
 	for name, spec in MQ_CLIPS.items():
+		if only and name not in only:
+			continue
 		rt = rts[spec[0]]
 		cl = make_clip(rts, hero, name, spec, female)
 		bad = verify(rt, hero, cl)
 		ok = ok and not bad
 		print("   %-18s %5.2f с (исх. %5.2f) удар %.2f, рука %s (R %.1f / L %.1f м/с); таз уходил на %.2f м; опора %.3f, "
-			"скольжение %.3f (у земли %.3f), подъём %.3f%s" % (name, cl["T"], cl["src_times"][-1], cl["hit"], cl["hand"], cl["hv"]["R"],
-			cl["hv"]["L"], cl["travel"], cl["short"], cl["slide"], cl["gslide"], cl["lift"], ("  ПЛОХО: " + "; ".join(bad)) if bad else ""))
+			"скольжение %.3f (у земли %.3f, с запасом %.3f), подъём %.3f%s" % (name, cl["T"], cl["src_times"][-1], cl["hit"], cl["hand"], cl["hv"]["R"],
+			cl["hv"]["L"], cl["travel"], cl["short"], cl["slide"], cl["gslide"], cl["gslide_m"], cl["lift"], ("  ПЛОХО: " + "; ".join(bad)) if bad else ""))
 		clips.append(cl)
-	for name, (kind, src_clip) in MQ_LOCO.items():
+	for name, (kind, src_clip) in ([] if only else MQ_LOCO.items()):
 		cl = make_loco(rts, hero, name, kind, src_clip, female)
 		bad = verify(rts["m1"], hero, cl)
 		ok = ok and not bad
@@ -760,7 +864,7 @@ def process(path: str, srcs: dict, check: bool, prev: str) -> dict:
 			for k in [k for k, v in cm.items() if str(v.get("source", "")).startswith("mannequin ")]:
 				del cm[k]
 			for cl in clips:
-				loop = cl["kind"] in ("walk", "run")
+				loop = cl["kind"] in ("walk", "run", "loop")
 				cm[cl["name"]] = {"length": round(cl["T"], 3), "loop": loop, "source": "mannequin " + cl["src"]}
 				if not loop:
 					cm[cl["name"]]["hit"] = round(cl["hit"], 3)
@@ -782,7 +886,7 @@ def main() -> None:
 	ap.add_argument("--check", action="store_true", help="без записи")
 	ap.add_argument("--preview", default="", help="папка для картинок-проверок")
 	ap.add_argument("--survey", default="", help="папка: исходные клипы целиком на первом герое")
-	ap.add_argument("--only", default="", help="клипы через запятую (для --survey)")
+	ap.add_argument("--only", default="", help="клипы через запятую (для --survey; с --check — проверить только эти)")
 	args = ap.parse_args()
 	srcs = {k: MixamoSource(ra.Glb(p)) for k, p in (("m1", args.m1), ("m2", args.m2), ("m3", args.m3))}
 	heroes = args.heroes or sorted(glob.glob(os.path.join(ROOT, "assets", "characters", "hero_*.glb"))) + [
@@ -793,7 +897,10 @@ def main() -> None:
 	ok = True
 	tb, ta = 0, 0
 	for h in heroes:
-		r = process(h, srcs, args.check, args.preview)
+		only = [x for x in args.only.split(",") if x]
+		if only and not args.check:
+			raise SystemExit("--only без --check: запись заменяет все клипы Mq_* — запускайте без --only")
+		r = process(h, srcs, args.check, args.preview, only)
 		ok = ok and r["ok"]
 		tb += r["before"]
 		ta += r["after"]

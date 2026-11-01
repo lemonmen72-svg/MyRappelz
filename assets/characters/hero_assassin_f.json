@@ -321,7 +321,7 @@
 		"Mq_Thrust": {
 			"length": 0.65,
 			"loop": false,
-			"source": "mannequin m3:Thrust_Slash [0.10–1.25]",
+			"source": "mannequin m3:Thrust_Slash [0.00–1.25]",
 			"hit": 0.3
 		},
 		"Mq_Heavy_Swing": {
@@ -467,6 +467,38 @@
 			"loop": false,
 			"source": "mannequin m1:Charged_Spell_Cast_1 [0.30–4.00]",
 			"hit": 0.7
+		},
+		"Mq_Cast_Release": {
+			"length": 1.1,
+			"loop": false,
+			"source": "mannequin m1:mage_soell_cast_5 [8.73–11.37]",
+			"hit": 0.45
+		},
+		"Mq_Charge_Release": {
+			"length": 0.82,
+			"loop": false,
+			"source": "mannequin m1:Charged_Spell_Cast [1.50–2.67]",
+			"hit": 0.22
+		},
+		"Mq_Cast_Loop": {
+			"length": 1.6,
+			"loop": true,
+			"source": "mannequin m1:mage_soell_cast_5 [5.77–7.43]"
+		},
+		"Mq_Charge_Loop": {
+			"length": 0.6,
+			"loop": true,
+			"source": "mannequin m1:Charged_Spell_Cast [0.90–1.50]"
+		},
+		"Mq_Bow_Aim_Loop": {
+			"length": 2.233,
+			"loop": true,
+			"source": "mannequin m3:Archery_Shot_2 [1.43–3.67]"
+		},
+		"Mq_Crossbow_Aim_Loop": {
+			"length": 0.633,
+			"loop": true,
+			"source": "mannequin m3:Gun_Hold_Left_Turn [0.13–0.77]"
 		},
 		"Mq_Taunt": {
 			"length": 1.3,
