@@ -1150,14 +1150,16 @@ func _place_target() -> void:
 	_place_fx()
 
 
-## Ряды значков эффектов: у игрока — до панели цели; у цели — справа от полоски до меню,
+## Ряды значков эффектов: у игрока — до панели цели; у цели — справа от полоски до меню и трекера,
 ## а если там меньше трёх значков — под полоской.
 func _place_fx() -> void:
 	var fx := UiScale.px(FX_ICON)
 	var g := UiScale.px(FX_GAP)
 	_fx_player.set_layout(fx, g, _target_box.position.x - _fx_player.position.x - UiScale.px(10))
 	var tw := UiScale.px(TARGET_W)
-	var right := _menu.position.x - (_target_box.position.x + tw + UiScale.px(8)) - UiScale.px(6)
+	# справа — до меню и до трекера заданий под ним (трекер шире компактного меню, Quests.TRACKER_W)
+	var edge := minf(_menu.position.x, _view.x - UiScale.px(Quests.TRACKER_W) - UiScale.px(12))
+	var right := edge - (_target_box.position.x + tw + UiScale.px(8)) - UiScale.px(6)
 	if right >= (fx + g) * 3.0:
 		_fx_target.position = Vector2(tw + UiScale.px(8), _target_bar.position.y + (_target_bar.size.y - fx) * 0.5)
 		_fx_target.set_layout(fx, g, right)
