@@ -1,7 +1,8 @@
 extends "res://tests/test_base.gd"
 ## Предметы и торговля: добыча мешочком и подбор, торговец и безопасная зона, покупка и продажа,
 ## окна торговца и сумки (InventoryWindow: сетка, карточка, кнопки действий), зелье с перезарядкой и счётчиком
-## на кнопке, золото в мешочке. Подробно сумка — tests/test_inventory.gd, правила добычи — tests/test_loot.gd,
+## на кнопке, золото в мешочке; оружие продаёт не торговец, а Оружейник Бранд (диалог → «Торговля»; продать
+## трофей можно и ему). Подробно сумка — tests/test_inventory.gd, правила добычи — tests/test_loot.gd,
 ## зелья — tests/test_potions.gd.
 
 ## Сколько фазанов можно убить в поисках добычи (мешочек со зверя теперь всегда: золото и 2 предмета).
@@ -144,6 +145,10 @@ func run_step() -> void:
 				check(int(ItemData.get_item(ItemData.potion_id(String(kind), 2))["buy"]) > int(ItemData.get_item(ItemData.potion_id(String(kind), 1))["buy"]),
 					"зелье 2-го ранга дороже 1-го")
 			check(_find_button("good_weapon_sword_1h_r2") == null, "оружие 2-го ранга на острове не продаётся")
+			# Оружие — у Оружейника Бранда, у торговца его нет
+			for wid in ["weapon_dagger_r1", "weapon_sword_1h_r1", "crossbow_starter", "dagger_steel"]:
+				check(_find_button("good_" + String(wid)) == null, "у торговца нет оружия: %s" % wid)
+			check(not eco.buy("weapon_dagger_r1", 1, "merchant"), "у торговца оружие не купить")
 			# Не хватает золота
 			game.gold = 10
 			scrolls = game.inventory.count("revive_scroll")
@@ -221,6 +226,46 @@ func run_step() -> void:
 			player.hp = 10
 			main._on_action("potion")
 			check(player.hp > 10, "после перезарядки зелье снова работает")
+			# К Оружейнику Бранду
+			var ws: Npc = main.npcs.npc("weaponsmith")
+			check(ws != null and ws.is_in_group("trader"), "оружейник в мире и торгует")
+			if ws == null:
+				ok_done()
+				return
+			var fwd := Vector3(-sin(ws.face_yaw), 0, -cos(ws.face_yaw))
+			var to := ws.global_position + fwd * 1.8
+			var w := IslandWorld.current
+			if w != null:
+				to.y = w.height_at(to.x, to.z) + 0.1
+			player.global_position = to
+			wait = 4
+			step = 13
+		13:
+			check(main.npcs.nearest_talker() == "weaponsmith", "рядом оружейник: %s" % main.npcs.nearest_talker())
+			main.npcs.talk_to("weaponsmith")
+			var tb: Button = main.npcs.buttons.get("opt_trade")
+			check(tb != null, "в диалоге с оружейником — «Торговля»")
+			if tb != null:
+				tb.pressed.emit()
+			check(eco.is_shop_open() and eco.window.seller == "weaponsmith", "окно оружейной лавки открыто")
+			# Товары — по профессии героя (в тесте Воин: лук и топоры есть, кинжала нет)
+			if game.class_id == "warrior":
+				check(_find_button("good_weapon_bow_r1") != null and _find_button("good_weapon_axe_2h_r1") != null
+					and _find_button("good_weapon_dagger_r1") == null, "Воину — лук и топоры, без кинжала")
+			var wid := String(InventoryWindow.goods(game.class_id, "weaponsmith")[0])
+			game.gold = 1000
+			var have := game.inventory.count(wid)
+			_press("good_" + wid)
+			_press("act_buy")
+			check(game.inventory.count(wid) == have + 1 and game.gold == 1000 - int(ItemData.get_item(wid)["buy"]),
+				"куплено у оружейника: %s" % ItemData.item_name(wid))
+			# Трофей продаётся тому, кто рядом, — оружейнику
+			game.inventory.add("wolf_pelt", 1)
+			var sold_to: Array = []
+			eco.sold.connect(func(_id: String, _n: int, buyer: String) -> void: sold_to.append(buyer))
+			check(eco.sell_cell(game.inventory.find_cell("wolf_pelt"), 1) == 1 and sold_to == ["weaponsmith"],
+				"трофей продан оружейнику: %s" % [sold_to])
+			hud.close_window()
 			ok_done()
 
 

@@ -214,8 +214,9 @@ func run_step() -> void:
 			var kirk_goods := InventoryWindow.goods(game.class_id, "kirk")
 			check(kirk_goods.has("card_panther") and kirk_goods.has("mirror_card") and not kirk_goods.has("card_wolf"),
 				"карты существ — у Учителя Кирка: %s" % [kirk_goods])
-			# Наёмнику — его оружие (кинжалы, мечи, арбалет), лука у него нет
-			check(win.buttons.has("good_dagger_steel") and win.buttons.has("good_crossbow_starter") and not win.buttons.has("good_weapon_bow_r1"), "оружие Наёмника в товарах, лука нет")
+			# Оружия у торговца нет — оно у Оружейника Бранда
+			check(not win.buttons.has("good_dagger_steel") and not win.buttons.has("good_crossbow_starter"),
+				"у торговца оружия нет")
 			check(not win.buttons.has("good_boar_tusk"), "трофеи не продаются")
 			check(win.buttons.has("cell_0"), "сумка в окне торговца")
 			_press("good_potion_hp_r1")
@@ -224,6 +225,35 @@ func run_step() -> void:
 			var potions: int = inv.count("potion_hp_r1")
 			_press("act_buy5")
 			check(game.gold == 50 and inv.count("potion_hp_r1") == potions + 5, "куплено 5 зелий")
+			# Продажа в окне торговца — из ячейки сумки
+			var sc := inv.find_cell("shell_plate")
+			_press("cell_%d" % sc)
+			check(win.buttons.has("act_sell"), "продажа из сумки в окне торговца")
+			gold = game.gold
+			_press("act_sell")
+			check(game.gold == gold + int(ItemData.get_item("shell_plate")["sell"]), "продана пластина")
+			check(eco.is_shop_open(), "окно торговца открыто после сделок")
+			main.hud.close_window()
+			# К Оружейнику Бранду
+			var ws: Npc = main.npcs.npc("weaponsmith")
+			var fwd := Vector3(-sin(ws.face_yaw), 0, -cos(ws.face_yaw))
+			var to := ws.global_position + fwd * 1.8
+			if IslandWorld.current != null:
+				to.y = IslandWorld.current.height_at(to.x, to.z) + 0.1
+			player.global_position = to
+			wait = 4
+			step = 50
+		50:
+			# Лавка оружейника: «Торговля» в диалоге
+			main.npcs.talk_to("weaponsmith")
+			var tb: Button = main.npcs.buttons.get("opt_trade")
+			check(tb != null, "у оружейника — «Торговля»")
+			if tb != null:
+				tb.pressed.emit()
+			check(eco.is_shop_open() and win.seller == "weaponsmith", "окно оружейника открыто")
+			# Наёмнику — его оружие (кинжалы, мечи, арбалет), лука у него нет
+			check(win.buttons.has("good_dagger_steel") and win.buttons.has("good_crossbow_starter") and not win.buttons.has("good_weapon_bow_r1"), "оружие Наёмника в товарах, лука нет")
+			check(not win.buttons.has("good_potion_hp_r1"), "зелий у оружейника нет")
 			_press("good_dagger_steel")
 			check(not win.buttons.has("act_buy5"), "оружие — по одному")
 			check(_has_text_containing("разница с надетым"), "оружие сравнивается с надетым")
@@ -244,16 +274,8 @@ func run_step() -> void:
 			_press("act_buy")
 			check(inv.count("dagger_steel") == steel + 1 and game.gold == 500 - int(ItemData.get_item("dagger_steel")["buy"]),
 				"куплен стальной кинжал (было %d, стало %d, золото %d, место %d, в продаже %s, сообщение «%s»)" % [steel,
-				inv.count("dagger_steel"), game.gold, free_slots, InventoryWindow.goods(game.class_id).has("dagger_steel"),
+				inv.count("dagger_steel"), game.gold, free_slots, InventoryWindow.goods(game.class_id, "weaponsmith").has("dagger_steel"),
 				main.hud._msg_label.text])
-			# Продажа в окне торговца — из ячейки сумки
-			var sc := inv.find_cell("shell_plate")
-			_press("cell_%d" % sc)
-			check(win.buttons.has("act_sell"), "продажа из сумки в окне торговца")
-			gold = game.gold
-			_press("act_sell")
-			check(game.gold == gold + int(ItemData.get_item("shell_plate")["sell"]), "продана пластина")
-			check(eco.is_shop_open(), "окно торговца открыто после сделок")
 			# Сумка полна: покупка не проходит (клыков в сумке нет — для проверки добычи ниже)
 			inv.remove("boar_tusk", inv.count("boar_tusk"))
 			var room := Inventory.CAPACITY - inv.used_cells()
@@ -261,7 +283,7 @@ func run_step() -> void:
 			check(inv.is_full(), "сумка заполнена (%d/%d)" % [inv.used_cells(), Inventory.CAPACITY])
 			win.refresh()
 			_press("good_crossbow_heavy")
-			gold = game.gold
+			var gold: int = game.gold
 			# Тяжёлый арбалет мог остаться в сумке с проверки карточек выше — сравниваем количество
 			var heavy := inv.count("crossbow_heavy")
 			_press("act_buy")

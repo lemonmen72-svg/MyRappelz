@@ -131,15 +131,16 @@ func _unit_ranks() -> void:
 		check(ItemData.equip_rank_for_level(int(e[0])) == int(e[1]), "снаряжение %d ур. — %d-го ранга" % [int(e[0]), int(e[1])])
 	check(ItemData.rank_level_range(3, true) == [21, 30] and ItemData.rank_level_range(15, true) == [141, 150], "ранги зелий по 10 ур.")
 	check(ItemData.rank_level_range(2) == [21, 50], "2-й ранг снаряжения — 21–50 ур.")
-	# Торговец: зелья 1-го и 2-го рангов всех видов, оружие только 1-го ранга
+	# Торговец: зелья 1-го и 2-го рангов всех видов; оружие (только 1-го ранга) — у оружейника
 	var goods := InventoryWindow.goods("wanderer", "merchant")
 	for k in ItemData.POTION_KINDS:
 		for r in range(1, ItemData.POTION_RANKS + 1):
 			var id := ItemData.potion_id(String(k), r)
 			check(goods.has(id) == (r <= 2), "у торговца %s: %s" % [id, "есть" if r <= 2 else "нет"])
 	for g in goods:
-		if ItemData.is_weapon(String(g)):
-			check(ItemData.rank(String(g)) == 1, "оружие у торговца — 1-го ранга: %s" % g)
+		check(not ItemData.is_weapon(String(g)), "оружия у торговца нет (оно у оружейника): %s" % g)
+	for g in InventoryWindow.goods("wanderer", "weaponsmith"):
+		check(ItemData.rank(String(g)) == 1, "оружие у оружейника — 1-го ранга: %s" % g)
 
 
 # ---------- Ускорения ----------

@@ -691,6 +691,38 @@ static func merc_chief_spec() -> Dictionary:
 	}
 
 
+## Оружейник Бранд (город): крепкий, тёмные волосы и короткая борода, кожаный фартук поверх куртки, перевязь
+## через грудь и меч в ножнах за спиной.
+static func weaponsmith_spec() -> Dictionary:
+	return {
+		"skin": Color(0.84, 0.64, 0.5), "hair": Color(0.18, 0.14, 0.12), "hair_style": "short",
+		"eyes": Color(0.36, 0.26, 0.16), "eye_style": "normal", "ears": false,
+		"outfit": "weaponsmith", "main": Color(0.46, 0.34, 0.22), "accent": Color(0.72, 0.74, 0.78),
+		"weapon": "", "girth": 1.24, "beard": true, "beard_style": "short",
+	}
+
+
+## Бронница Хельга (город): женщина в стальной кирасе с наплечниками поверх светлой туники, тёмные волосы в высоком
+## хвосте, секира за спиной.
+static func armorer_spec() -> Dictionary:
+	return {
+		"skin": Color(0.95, 0.8, 0.68), "hair": Color(0.3, 0.2, 0.14), "hair_style": "ponytail",
+		"eyes": Color(0.4, 0.34, 0.26), "eye_style": "normal", "ears": false,
+		"outfit": "armorer", "main": Color(0.86, 0.84, 0.78), "accent": Color(0.6, 0.62, 0.66),
+		"weapon": "", "girth": 1.0,
+	}
+
+
+## Ювелир Лиора (город): изящная, рыжие кудри, тёмно-красный плащ, золотое ожерелье с камнем, серьги и обруч.
+static func jeweler_spec() -> Dictionary:
+	return {
+		"skin": Color(0.98, 0.86, 0.76), "hair": Color(0.82, 0.36, 0.16), "hair_style": "long",
+		"eyes": Color(0.34, 0.56, 0.4), "eye_style": "normal", "ears": false,
+		"outfit": "jeweler", "main": Color(0.42, 0.3, 0.24), "accent": Color(0.95, 0.78, 0.35),
+		"second": Color(0.62, 0.14, 0.14), "weapon": "", "girth": 0.94, "circlet": true,
+	}
+
+
 ## Путь модели NPC из файла (Meshy с родным скелетом, tools/prepare_npcs.py → prepare_hero.py: клипы Idle, Wave и
 ## другие, роли костей в npc_<id>.json; в пакете ресурсов — Assets.exists): есть — грузится вместо примитивов,
 ## предметы в руках вешает NpcProps.
@@ -699,7 +731,7 @@ static func npc_asset(npc_id: String) -> String:
 
 
 ## Внешность NPC по id (NpcData): торговец, Учитель Кирк, мудрец, кузнец, кладовщик, старосты, охотница, глава
-## наёмников; неизвестный — как торговец. Если есть модель из файла (npc_asset) — она (без оружия в руках).
+## наёмников, оружейник, бронница, ювелир; неизвестный — как торговец. Если есть модель из файла (npc_asset) — она (без оружия в руках).
 static func npc_spec(npc_id: String) -> Dictionary:
 	var s: Dictionary
 	match npc_id:
@@ -721,6 +753,12 @@ static func npc_spec(npc_id: String) -> Dictionary:
 			s = hunter_spec()
 		"merc_chief":
 			s = merc_chief_spec()
+		"weaponsmith":
+			s = weaponsmith_spec()
+		"armorer":
+			s = armorer_spec()
+		"jeweler":
+			s = jeweler_spec()
 		_:
 			s = merchant_spec()
 	var asset := npc_asset(npc_id)
@@ -941,6 +979,26 @@ func _palette(outfit: String) -> Dictionary:
 			p["belt"] = Color(0.36, 0.22, 0.12)
 			p["pants"] = Color(0.2, 0.18, 0.2)
 			p["boots"] = Color(0.14, 0.12, 0.12)
+		"weaponsmith":
+			p["sleeve"] = main_c.darkened(0.1)
+			p["skirt"] = main_c.darkened(0.3)
+			p["belt"] = Color(0.24, 0.16, 0.1)
+			p["pants"] = Color(0.24, 0.22, 0.2)
+			p["boots"] = Color(0.2, 0.14, 0.1)
+		"armorer":
+			# Светлая туника до колен, тёмные штаны и сапоги
+			p["sleeve"] = Color(0.2, 0.19, 0.2)
+			p["skirt"] = main_c.darkened(0.08)
+			p["skirt_len"] = "mid"
+			p["belt"] = Color(0.36, 0.22, 0.12)
+			p["pants"] = Color(0.16, 0.15, 0.16)
+			p["boots"] = Color(0.18, 0.14, 0.12)
+		"jeweler":
+			p["sleeve"] = main_c.lightened(0.05)
+			p["skirt"] = main_c.darkened(0.15)
+			p["belt"] = acc.darkened(0.25)
+			p["pants"] = Color(0.3, 0.24, 0.2)
+			p["boots"] = Color(0.4, 0.26, 0.16)
 	return p
 
 
@@ -1329,7 +1387,7 @@ func _build_outfit(outfit: String) -> void:
 			for i in cards.size():
 				_add(_torso, _box(Vector3(0.05, 0.08, 0.008)), Vector3(-0.27 + 0.04 * float(i), 0.11, -0.05), cards[i],
 					OL_THIN, Vector3(0, 0, 0.18 * (float(i) - 1.0)))
-		"elder", "lady", "noble_dark", "storekeeper", "smith", "sage", "hunter", "merc":
+		"elder", "lady", "noble_dark", "storekeeper", "smith", "sage", "hunter", "merc", "weaponsmith", "armorer", "jeweler":
 			_build_npc_outfit(outfit, main_c, acc)
 
 
@@ -1454,6 +1512,51 @@ func _build_npc_outfit(outfit: String, main_c: Color, acc: Color) -> void:
 			_add(sh, _box(Vector3(0.16, 0.03, 0.04)), Vector3(0, 0.02, 0), Color(0.62, 0.6, 0.55), OL_THIN)
 			_add(sh, _cyl(0.02, 0.02, 0.16, 6), Vector3(0, 0.11, 0), Color(0.3, 0.2, 0.14), OL_THIN)
 			_add(sh, _sphere(0.028, 0.056, 6, 3), Vector3(0, 0.2, 0), Color(0.62, 0.6, 0.55), OL_THIN)
+		"weaponsmith":
+			# Кожаный фартук с нагрудником, перевязь через грудь, меч в ножнах за спиной рукоятью над правым плечом
+			_add(_torso, _box(Vector3(0.3 * g, 0.38, 0.025)), Vector3(0, 0.23, front - 0.014), leather, OL)
+			_add(_torso, _box(Vector3(0.34 * g, 0.56, 0.025)), Vector3(0, -0.22, -0.25 * 0.85 * g - 0.02), leather, OL,
+				Vector3(0.12, 0, 0))
+			_add(_torso, _box(Vector3(0.045, 0.62, 0.02)), Vector3(0.0, 0.27, front - 0.03), leather.darkened(0.35),
+				OL_THIN, Vector3(0, 0, 0.62))
+			var sb := _node(_torso, "Scabbard", Vector3(0.0, 0.3, 0.17 * g))
+			sb.rotation = Vector3(0, 0, -0.55)
+			_add(sb, _cyl(0.03, 0.036, 0.78, 8), Vector3(0, -0.1, 0), Color(0.2, 0.15, 0.12), OL_THIN,
+				Vector3.ZERO, Vector3(1.0, 1.0, 0.45))
+			_add(sb, _box(Vector3(0.18, 0.03, 0.04)), Vector3(0, 0.3, 0), acc, OL_THIN)
+			_add(sb, _cyl(0.02, 0.02, 0.16, 6), Vector3(0, 0.39, 0), Color(0.3, 0.2, 0.14), OL_THIN)
+			_add(sb, _sphere(0.03, 0.06, 6, 3), Vector3(0, 0.48, 0), acc, OL_THIN)
+		"armorer":
+			# Стальная кираса с поясом пластин, наплечники, секира за спиной
+			var steel := acc
+			_add(_torso, _box(Vector3(0.27 * g, 0.34, 0.035)), Vector3(0, 0.26, front - 0.014), steel, OL)
+			_add(_torso, _box(Vector3(0.27 * g, 0.34, 0.035)), Vector3(0, 0.26, -front + 0.014), steel.darkened(0.15), OL)
+			for i in 2:
+				_add(_torso, _box(Vector3(0.25 * g, 0.03, 0.04)), Vector3(0, 0.12 + 0.14 * float(i), front - 0.035),
+					steel.darkened(0.3), OL_THIN)
+			_pads(0.12, 0.17, steel)
+			var ax := _node(_torso, "Axe", Vector3(0.02, 0.2, 0.19 * g))
+			ax.rotation = Vector3(0, 0, 0.5)
+			_add(ax, _cyl(0.022, 0.024, 0.95, 8), Vector3(0, 0, 0), Color(0.3, 0.2, 0.13), OL_THIN)
+			_add(ax, _cyl(0.17, 0.17, 0.03, 14), Vector3(0.11, 0.38, 0), steel.lightened(0.15), OL_THIN,
+				Vector3(PI * 0.5, 0, 0))
+			_add(ax, _cyl(0.17, 0.17, 0.03, 14), Vector3(-0.11, 0.38, 0), steel.lightened(0.15), OL_THIN,
+				Vector3(PI * 0.5, 0, 0))
+		"jeweler":
+			# Тёмно-красный плащ, золотое ожерелье с камнем, серьги-капли, перстни
+			var cloak: Color = spec.get("second", Color(0.62, 0.14, 0.14))
+			_add(_torso, _cyl(0.1, 0.24, 0.18, 12), Vector3(0, 0.47, 0), cloak, OL, Vector3.ZERO, Vector3(1.0, 1.0, 0.88))
+			_cape = _bone(_torso, "Cape", Vector3(0, 0.5, 0.12))
+			_cape_rest = -0.1
+			_add(_cape, _box(Vector3(0.4, 1.0, 0.025)), Vector3(0, -0.5, 0.03), cloak.darkened(0.1))
+			var nl := _node(_torso, "Necklace", Vector3(0, 0.5, -0.02))
+			_add(nl, _torus(0.1, 0.115), Vector3.ZERO, acc, OL_THIN, Vector3(0.35, 0, 0), Vector3(1.0, 1.0, 0.85))
+			_add(nl, _sphere(0.026, 0.052, 8, 4), Vector3(0, -0.08, front - 0.09), Color(0.35, 0.85, 0.75), OL_THIN)
+			for sd in [-1.0, 1.0]:
+				var side: float = sd
+				_add(_head, _sphere(0.018, 0.04, 6, 3), Vector3(0.215 * side, -0.1, 0.0), acc, 0.0)
+			for arm in [_arm_l, _arm_r]:
+				_add(arm, _torus(0.04, 0.05), Vector3(0, -0.5, 0), acc, 0.0)
 
 
 ## Книга (гроссбух) в левой руке: переплёт и обрез страниц.

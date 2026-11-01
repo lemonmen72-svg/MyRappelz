@@ -104,8 +104,8 @@ func _check_items() -> void:
 		var k := ItemData.weapon_kind(sid)
 		kinds[k] = true
 		check(ItemData.is_weapon(sid) and ItemData.rank(sid) == 1, "%s: оружие 1-го ранга" % sid)
-		check(NpcData.shop("merchant").has(sid) and int(ItemData.get_item(sid)["buy"]) > 0, "%s: продаёт торговец" % sid)
-		check(InventoryWindow.goods(ClassData.WANDERER).has(sid), "%s: Бродяге в товарах" % sid)
+		check(NpcData.shop("weaponsmith").has(sid) and int(ItemData.get_item(sid)["buy"]) > 0, "%s: продаёт оружейник" % sid)
+		check(InventoryWindow.goods(ClassData.WANDERER, "weaponsmith").has(sid), "%s: Бродяге в товарах" % sid)
 		var b := ItemData.weapon_bonus(sid)
 		if k == "shield":
 			check(int(b["def"]) > 0 and float(b["block"]) > 0.0 and int(b["atk"]) == 0 and int(b["aspd"]) == 0,
@@ -125,8 +125,8 @@ func _check_items() -> void:
 		else:
 			check(kinds.has(kind), "есть оружие 1-го ранга: %s" % ItemData.weapon_kind_name(kind))
 	check(ItemData.icon_shape("weapon_bow_r1") == "bow", "лук: процедурный значок «bow»")
-	check(InventoryWindow.goods("warrior").has("weapon_bow_r1") and not InventoryWindow.goods("warrior").has("weapon_staff_2h_r1"),
-		"Воину торговец предлагает лук, но не посох")
+	check(InventoryWindow.goods("warrior", "weaponsmith").has("weapon_bow_r1")
+		and not InventoryWindow.goods("warrior", "weaponsmith").has("weapon_staff_2h_r1"), "Воину оружейник предлагает лук, но не посох")
 
 
 func _check_offhand_rules() -> void:

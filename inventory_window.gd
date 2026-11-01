@@ -148,7 +148,8 @@ func select_store(i: int) -> void:
 	_on_cell("store", i)
 
 
-## Товары NPC who (NpcData.shop): продаётся (buy > 0), оружие — только подходящее классу героя class_id.
+## Товары NPC who (NpcData.shop): продаётся (buy > 0; id, которого ещё нет в ItemData, пропускается — у него
+## buy 0), оружие — только подходящее классу героя class_id.
 static func goods(class_id: String, who: String = "merchant") -> Array:
 	var res: Array = []
 	for key in NpcData.shop(who):
