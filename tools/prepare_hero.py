@@ -8,7 +8,8 @@
   <id>.glb         — меш ~30 тыс. треугольников (meshoptimizer, как tools/decimate_glb.py: вершины не двигаются,
                      швы UV не рвутся), рост по полу (мужчины 1.8 м, женщины 1.7 м; --height), ноги на y = 0,
                      лицом в +Z, родной скелет Meshy, клипы героя (список HERO_CLIPS), материал без картинок.
-  <id>.png         — цветовая текстура 2048×2048 (+ .png.import: VRAM-сжатие, мипмапы).
+  <id>.png         — цветовая текстура 2048×2048, как у исходника (+ .png.import: VRAM-сжатие высокого качества —
+                     ASTC 4×4 на телефоне вместо ETC2, на ПК BPTC; мипмапы; пишется всегда).
   <id>.json        — роли костей (голова, кисти, таз, …), хват оружия в пространстве кисти (grip_r/grip_l: центр
                      кулака и направление клинка), поворот арбалета в правой кисти (crossbow_rot), метка лица в
                      пространстве головы, клипы и их длины. CharacterModel берёт по нему кости для оружия и эффектов.
@@ -617,7 +618,7 @@ source_file="res://assets/characters/{name}.png"
 [params]
 
 compress/mode=2
-compress/high_quality=false
+compress/high_quality=true
 mipmaps/generate=true
 detect_3d/compress_to=0
 """
@@ -715,7 +716,7 @@ def build(cid: str, src_path: str, height: float, out_dir: str, preview: str = "
 		tex = np.asarray(im.resize((1024, 1024), Image.LANCZOS))
 	for ext, tpl in ((".png.import", PNG_IMPORT), (".glb.import", GLB_IMPORT)):
 		p = os.path.join(out_dir, cid + ext)
-		if not os.path.exists(p):
+		if ext == ".png.import" or not os.path.exists(p):
 			with open(p, "w") as f:
 				f.write(tpl.format(name=cid))
 	lo, hi = mesh["pos"].min(0), mesh["pos"].max(0)

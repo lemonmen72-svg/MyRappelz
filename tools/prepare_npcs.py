@@ -83,7 +83,7 @@ def main() -> None:
 					shutil.move(src, os.path.join(args.out, cid + ext))
 			for ext, tpl in ((".png.import", ph.PNG_IMPORT), (".glb.import", ph.GLB_IMPORT)):
 				p = os.path.join(args.out, cid + ext)
-				if not os.path.exists(p):
+				if ext == ".png.import" or not os.path.exists(p):
 					with open(p, "w") as f:
 						f.write(tpl.format(name=cid))
 		finally:
