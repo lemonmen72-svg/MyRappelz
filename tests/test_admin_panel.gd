@@ -466,6 +466,10 @@ func _kill_xp(mult: int) -> Array:
 		for l in range(pl0, pet.level):
 			pet_gain += PetData.xp_to_next(l)
 	var res := [game.xp - x0, pet_gain]
+	# Питомец — на прежний уровень: следующий замер с той же разницей уровней
+	if pet != null:
+		pet.level = pl0
+		pet.xp = p0
 	game.level = keep_l
 	game.xp = 0
 	return res
