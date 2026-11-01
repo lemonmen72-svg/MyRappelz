@@ -701,19 +701,19 @@
 				5.882,
 				2.7
 			],
-			"tris": 11995,
-			"verts": 22022,
+			"tris": 11996,
+			"verts": 21989,
 			"src_tris": 25363,
-			"open_edges": 3018,
-			"glow_verts": 66,
+			"open_edges": 3019,
+			"glow_verts": 63,
 			"glow_max": 0.55,
-			"panel_tris": 67,
-			"flipped": 381,
+			"panel_tris": 73,
+			"flipped": 385,
 			"markers": {
 				"glow": [
-					-0.157,
-					2.913,
-					-0.185
+					-0.146,
+					2.919,
+					-0.176
 				],
 				"front": [
 					0.022,

@@ -123,8 +123,10 @@ PROPS = {
 		glow=GLOW_BLUE_HOUSE, glow_max=0.55),
 	"light_elf_tower": dict(src="Crystal_Spire_Tower", fit=(5.0, 11.0, 5.0), tris=9000, tex=CELL_BIG, rot=0,
 		page="elves", glow=GLOW_BLUE_HOUSE, glow_max=0.55),
+	# panel_share 0.015: у двери — тонкая панель 1×2.45 м в 3 см от другой поверхности; при 12 тыс. треуг. от неё
+	# оставалась дыра 0.1 м² (2 % панели — меньше общего порога 3 %), луч теста стен проходил в дом насквозь
 	"dark_elf_house": dict(src="Violet_Gloom_Manor_1031082549", fit=(6.4, 8.2, 5.4), tris=12000, tex=CELL_BIG, rot=0,
-		page="elves", glow=GLOW_PURPLE_HOUSE, glow_max=0.55),
+		page="elves", glow=GLOW_PURPLE_HOUSE, glow_max=0.55, panel_share=0.015),
 	"dark_elf_tower": dict(src="Amethyst_Spire", fit=(7.0, 16.0, 7.0), tris=9000, tex=CELL_BIG, rot=0, page="elves",
 		glow=GLOW_PURPLE_HOUSE, glow_max=0.55),
 	# Порт, лагеря, пещера
@@ -305,7 +307,7 @@ def surface_points(pos: np.ndarray, tris: np.ndarray, n: int, seed: int = 3) -> 
 	return a[sel] + r1[:, None] * (b - a)[sel] + r2[:, None] * (c - a)[sel], sel
 
 
-def simplify(m: dict, target: int) -> dict:
+def simplify(m: dict, target: int, panel_share: float = -1.0) -> dict:
 	"""Упрощение по форме (meshoptimizer, сваренные позиции, без оглядки на развёртку Meshy — у неё сотни
 	мелких островов, которые держат упрощение и рвут текстуру): вершины не сдвигаются, остаются исходные.
 
@@ -354,7 +356,8 @@ def simplify(m: dict, target: int) -> dict:
 
 	# Дыра — больше PANEL_LOST м² и больше PANEL_SHARE площади части (у большой части — крыши из соломы,
 	# паруса — сглаженные мелочи по краям дырой не считаются)
-	lost_max = np.maximum(PANEL_LOST, PANEL_SHARE * np.bincount(flab, area, nc))
+	share = PANEL_SHARE if panel_share < 0.0 else panel_share  # cfg "panel_share" — строже у отдельных моделей
+	lost_max = np.maximum(PANEL_LOST, share * np.bincount(flab, area, nc))
 	keep = np.zeros(nc, bool)
 	err = 0.0
 	tt = t
@@ -775,7 +778,7 @@ def build(src_dir: str, only: list) -> dict:
 			src = place(load_source(path), cfg)
 			src["tex"] = np.asarray(src["img"])
 			x0, y0, size = slots[cid]
-			low = simplify(src, cfg["tris"])
+			low = simplify(src, cfg["tris"], cfg.get("panel_share", -1.0))
 			print("    ошибка упрощения %.4f, сохранено панелей %d (%d тр.)" % (low["err"], low["panels"],
 				low["panel_tris"]))
 			# Панели с нормалью внутрь — лицом наружу (порядок граней xatlas сохраняет — знак годится и для bake)
@@ -854,6 +857,46 @@ def read_built(path: str) -> dict:
 		"images": len(gltf.get("images", []))}
 
 
+# Постройки, у которых тест tests/test_props.gd (_check_walls) пускает лучи в стены — та же проверка в --check.
+WALL_CHECK = ("town_house", "town_house_b", "town_hall", "human_house_thatch", "human_house_red", "windmill_tower",
+	"light_elf_house", "light_elf_tower", "dark_elf_house", "dark_elf_tower", "lighthouse")
+
+
+def wall_holes(pos: np.ndarray, tris: np.ndarray) -> tuple:
+	"""Как _check_walls в tests/test_props.gd: с 8 сторон на высоте 0.7 м, 1.5 м и 40 % высоты (со сдвигом вбок ±0.2)
+	горизонтальный луч к середине модели должен упереться в стену до середины. (лучей насквозь, всего лучей)."""
+	F = pos[tris]
+	lo, hi = pos.min(0), pos.max(0)
+	size, ctr = hi - lo, (lo + hi) * 0.5
+	rays = holes = 0
+	for y in (0.7, 1.5, size[1] * 0.4):
+		yy = lo[1] + y
+		band = F[(F[:, :, 1].min(1) <= yy) & (F[:, :, 1].max(1) >= yy)]
+		a0, e1, e2 = band[:, 0], band[:, 1] - band[:, 0], band[:, 2] - band[:, 0]
+		for k in range(8):
+			ang = 2.0 * np.pi * k / 8.0 + 0.2
+			out = np.array([np.sin(ang), 0.0, np.cos(ang)])
+			side = np.array([out[2], 0.0, -out[0]])
+			ext = min(size[0] * 0.5 / max(abs(out[0]), 0.001), size[2] * 0.5 / max(abs(out[2]), 0.001))
+			for off in (-0.2, 0.2):
+				c = np.array([ctr[0], yy, ctr[2]]) + side * ext * off
+				o, d = c + out * (ext + 2.0), -out
+				pv = np.cross(d, e2)
+				det = (e1 * pv).sum(1)
+				good = np.abs(det) > 1e-12
+				inv = np.where(good, 1.0 / np.where(good, det, 1.0), 0.0)
+				sv = o - a0
+				u = (sv * pv).sum(1) * inv
+				qv = np.cross(sv, e1)
+				v = (qv * d).sum(1) * inv
+				t = (e2 * qv).sum(1) * inv
+				hit = good & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > 0)
+				rays += 1
+				if not hit.any() or ext + 2.0 - t[hit].min() < 0.0:
+					holes += 1
+	return holes, rays
+
+
 def check(preview: str) -> bool:
 	from PIL import Image
 	with open(os.path.join(OUT, "props.json")) as f:
@@ -894,6 +937,10 @@ def check(preview: str) -> bool:
 			back = float(fa[sign < 0].sum() / fa.sum())
 			if back > 0.01:
 				bad.append("изнанкой наружу %.1f %% площади" % (back * 100))
+		if cid in WALL_CHECK:
+			holes, rays = wall_holes(m["pos"], m["tris"])
+			if holes > 1:
+				bad.append("лучей сквозь стену %d из %d (как tests/test_props.gd: не больше 1)" % (holes, rays))
 		if np.any(hi - lo > np.array(cfg["fit"]) + 0.01):
 			bad.append("не влезает в рамку %s" % (cfg["fit"],))
 		if max((hi - lo)[k] / cfg["fit"][k] for k in range(3)) < 0.9:
