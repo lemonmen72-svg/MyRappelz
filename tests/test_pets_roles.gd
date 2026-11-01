@@ -212,6 +212,11 @@ func _fight(role: String) -> bool:
 		player.last_target = mob
 		# Бой с уже раненым зверем, чтобы тест шёл недолго
 		mob.hp = maxi(1, mob.max_hp / 3)
+		# Другие звери рядом не мешают: питомец отвлекался на соседнего зверя и погибал раньше, чем добивал цель
+		for n in get_tree().get_nodes_in_group("mobs"):
+			var other := n as Mob
+			if other != null and other != mob and other.global_position.distance_to(mob.global_position) < 30.0:
+				other.queue_free()
 		return false
 	stand_near(mob, 2.0)
 	player.last_target = mob
