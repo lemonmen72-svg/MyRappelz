@@ -115,7 +115,8 @@ func run_step() -> void:
 			_hero_check_pose("в покое")
 			# Стоя без дела — подбор добычи
 			hero.play_pickup()
-			check(hero._anim.current_animation == hero._pick(CharacterModel.ASSET_ACTIONS["pickup"])[0],
+			# вариант подбора случайный (Mq_Pickup / Mq_Pickup_B / UAL)
+			check(String(hero._anim.current_animation).to_lower().contains("pickup"),
 				"герой: подбор добычи играет свой клип (%s)" % hero._anim.current_animation)
 			# Усиление перебивает подбор; урон во время действия клип не сбивает
 			hero.play_buff()
