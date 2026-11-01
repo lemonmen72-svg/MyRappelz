@@ -39,7 +39,7 @@ const MQ_ATTACK_ROW := [
 	["res://assets/characters/hero_warrior_m.glb", "axe_2h", false, "mq_heavy_swing"],
 	["res://assets/characters/hero_warrior_f.glb", "bow", false, "mq_bow_shot"],
 	["res://assets/characters/hero_wizard_f.glb", "staff_2h", false, "mq_cast_a"],
-	["res://assets/characters/hero_swordsman_f.glb", "spear", false, "mq_thrust"],
+	["res://assets/characters/hero_swordsman_f.glb", "spear", false, "mq_leap_slam"],
 ]
 const MQ_SKILL_ROW := [
 	["res://assets/characters/hero_swordsman_m.glb", "sword_1h", true, "mq_taunt"],
@@ -1349,6 +1349,31 @@ func run_step() -> void:
 			main.hud.visible = true
 			main.player.visible = true
 			wait = 2
+			step = 1040
+		1040:
+			# Хват второй рукой (TwoHandIK, кадры 170–172): двуручное наперевес, лук и арбалет в покое
+			_two_hand_row(TWO_HAND_IDLE, 1.05, 3.5, 1.2)
+			wait = 45
+			step = 1041
+		1041:
+			_two_hand_log()
+			shot("170_two_hand_idle")
+			# Удары обеими руками (двуручные клипы манекенов), натяжение лука, выстрел из арбалета
+			_two_hand_row(TWO_HAND_ATTACK, 1.1, 3.6, 1.25)
+			wait = 45
+			step = 1042
+		1042:
+			_two_hand_log()
+			shot("171_two_hand_attack")
+			# Крупно: лук натянут, арбалет на изготовку, копьё наперевес
+			_two_hand_row(TWO_HAND_CLOSE, 1.2, 2.3, 0.95)
+			wait = 45
+			step = 1043
+		1043:
+			_two_hand_log()
+			shot("172_two_hand_close")
+			_handheld_clear()
+			wait = 2
 			step = 1060
 		1060:
 			# Время каста (кадры 180–182): Неофитка в петле накопления силы («Огненный смерч», 1.8 с) — полоса каста
@@ -1853,6 +1878,29 @@ const HANDHELD_HEROES_B := [
 ]
 var _hh_row: Node3D = null
 var _hh_cam: Camera3D = null
+## Хват второй рукой (кадры 170–172): [модель героя, вид ItemData, предмет, клип ("" — покой), момент клипа, с,
+## поворот к камере, рад].
+const TWO_HAND_IDLE := [
+	["hero_warrior_m", "sword_2h", "weapon_sword_2h_r1", "", 0.0, 0.35],
+	["hero_swordsman_f", "spear", "weapon_spear_r1", "", 0.0, 0.35],
+	["hero_warrior_f", "axe_2h", "weapon_axe_2h_r1", "", 0.0, 0.35],
+	["hero_wizard_f", "staff_2h", "weapon_staff_2h_r1", "", 0.0, 0.35],
+	["hero_light_elf_m_starter", "bow", "weapon_bow_r1", "", 0.0, 0.6],
+	["hero_assassin_f", "crossbow", "crossbow_starter", "", 0.0, 0.6],
+]
+const TWO_HAND_ATTACK := [
+	["hero_warrior_m", "sword_2h", "weapon_sword_2h_r1", "mq_heavy_swing", 0.3, 0.5],
+	["hero_swordsman_f", "spear", "weapon_spear_r1", "mq_leap_slam", 0.65, 0.5],
+	["hero_beastmaster_m", "mace_2h", "weapon_mace_2h_r1", "mq_heavy_swing", 0.55, 0.5],
+	["hero_warrior_f", "bow", "weapon_bow_r1", "mq_bow_draw", 0.9, 1.2],
+	["hero_light_elf_m_starter", "bow", "weapon_bow_r1", "mq_bow_shot", 0.5, 1.2],
+	["hero_assassin_m", "crossbow", "crossbow_starter", "crossbow_shoot", 0.2, 0.9],
+]
+const TWO_HAND_CLOSE := [
+	["hero_warrior_f", "bow", "weapon_bow_r1", "mq_bow_draw", 0.9, 1.3],
+	["hero_assassin_f", "crossbow", "crossbow_starter", "", 0.0, 0.8],
+	["hero_human_m_starter", "spear", "weapon_spear_r1", "", 0.0, 0.4],
+]
 
 
 ## Площадь города перед ратушей: ряд узлов, камера спереди (HUD и игрок скрыты).
@@ -1925,6 +1973,50 @@ func _weapon_heroes(list: Array) -> void:
 			if (mi as Node).has_meta("handheld"):
 				held.append("%s=%s" % [mi.name, String((mi as Node).get_meta("handheld"))])
 		print("  %s (%s): %s" % [String(e[0]), String(e[1]), ", ".join(held)])
+
+
+## Герои с двуручным, луком и арбалетом в ряд (кадры 170–172): покой или клип, замерший в момент (темп 0); камера
+## спереди на высоте look_h в dist м, шаг ряда gap м. В лог — вес и промах кулака второй руки (TwoHandIK).
+func _two_hand_row(list: Array, look_h: float, dist: float, gap: float) -> void:
+	var base := _handheld_stage(look_h, dist)
+	for i in list.size():
+		var e: Array = list[i]
+		var spec := CharacterModel.spec_for("dark_elf", "assassin", String(e[1]), "f", false, String(e[2]))
+		spec["asset"] = CharacterModel.HERO_ASSET_DIR + String(e[0]) + ".glb"
+		var m := CharacterModel.new()
+		m.setup(spec)
+		_hh_row.add_child(m)
+		var gp := base + Vector3((float(i) - float(list.size() - 1) * 0.5) * gap, 0, 0)
+		if IslandWorld.current != null:
+			gp.y = IslandWorld.current.height_at(gp.x, gp.z)
+		m.global_position = gp
+		m.rotation.y = PI + float(e[5])
+		check(m._ik != null, "кадр хвата: %s с «%s» — вторая рука на оружии (TwoHandIK)" % [String(e[0]), String(e[1])])
+		var key := String(e[3])
+		if key == "" or m._anim == null:
+			continue
+		var c := String(m._clips.get(key, ""))
+		check(c != "", "кадр хвата: %s — есть клип %s" % [String(e[0]), key])
+		if c == "":
+			continue
+		m._anim.play(c, 0.0)
+		m._anim.seek(float(e[4]), true)
+		m._anim.speed_scale = 0.0
+		m._act_end = 99.0
+		m._act_hit = 99.0
+
+
+## В лог: у каждого героя ряда — клип, вес хвата второй руки и промах кулака до цели (по позе костей).
+func _two_hand_log() -> void:
+	if _hh_row == null:
+		return
+	for n in _hh_row.get_children():
+		var m := n as CharacterModel
+		if m == null or m._ik == null:
+			continue
+		var ik := m._ik
+		print("  хват %s: %s, клип %s, вес %.2f, точка %s" % [String(m.spec.get("asset", "")).get_file(), ik.hold,
+			ik.clip, ik.last_weight, ik.last_point])
 
 
 func _handheld_clear() -> void:

@@ -89,33 +89,36 @@ const ASSET_ACTIONS := {
 ## <модель>.json). Обычная атака по хвату (mq_grip): клипы по кругу — части одного комбо Meshy идут подряд, серия
 ## атак складывается в целое комбо; пауза дольше MQ_COMBO_RESET — снова с первой части. Темп — под интервал атаки
 ## героя (play_attack(interval)). Нет клипов в модели (старый файл, запасной герой без пакета) — прежние удары.
+## Двуручное (меч, топор, булава, копьё) — только клипы, где у манекена обе руки на рукояти (TwoHandIK.TWO_HAND_CLIPS):
+## остальные удары манекенов — одной рукой, вторая рука с рукояти бы слетала.
 const MQ_ATTACKS := {
 	"sword": ["mq_sword_a1", "mq_sword_a2", "mq_sword_a3"],
 	"sword_shield": ["mq_combo_b1", "mq_combo_b2", "mq_left_slash"],
-	"sword_2h": ["mq_left_slash", "mq_heavy_swing", "mq_axe_spin"],
+	"sword_2h": ["mq_heavy_swing"],
 	"dual_swords": ["mq_dual_a1", "mq_dual_a2", "mq_sword_a3"],
 	"daggers": ["mq_dual_a1", "mq_dual_a2", "mq_thrust"],
 	"dagger": ["mq_thrust", "mq_sword_a1", "mq_sword_a2"],
 	"axe": ["mq_combo_b1", "mq_combo_b2", "mq_combo_b3"],
-	"axe_2h": ["mq_heavy_swing", "mq_axe_spin"],
+	"axe_2h": ["mq_heavy_swing"],
 	"dual_axes": ["mq_combo_b1", "mq_combo_b2", "mq_axe_spin"],
 	"mace": ["mq_combo_b1", "mq_combo_b2", "mq_combo_b3"],
-	"mace_2h": ["mq_heavy_swing", "mq_left_slash"],
-	"spear": ["mq_thrust", "mq_left_slash"],
+	"mace_2h": ["mq_heavy_swing"],
+	"spear": ["mq_heavy_swing"],
 	"staff": ["mq_cast_a", "mq_cast_b", "mq_cast_c"],
 	"bow": ["mq_bow_shot"],
 }
-## Сильные удары умений (вид анимации "bash", "attack" ближнего боя) по хвату.
+## Сильные удары умений (вид анимации "bash", "attack" ближнего боя) по хвату; у двуручного — двуручные клипы.
 const MQ_STRIKES := {
 	"sword": ["mq_charged_slash", "mq_judgment"], "sword_shield": ["mq_charged_slash", "mq_judgment"],
-	"sword_2h": ["mq_judgment", "mq_charged_slash"], "dual_swords": ["mq_charged_slash", "mq_judgment"],
+	"sword_2h": ["mq_leap_slam", "mq_heavy_swing"], "dual_swords": ["mq_charged_slash", "mq_judgment"],
 	"daggers": ["mq_charged_slash", "mq_judgment"], "dagger": ["mq_charged_slash", "mq_judgment"],
-	"axe": ["mq_axe_chop", "mq_leap_slam"], "axe_2h": ["mq_axe_chop", "mq_leap_slam"],
+	"axe": ["mq_axe_chop", "mq_leap_slam"], "axe_2h": ["mq_leap_slam", "mq_heavy_swing"],
 	"dual_axes": ["mq_axe_chop", "mq_leap_slam"], "mace": ["mq_axe_chop", "mq_leap_slam"],
-	"mace_2h": ["mq_axe_chop", "mq_leap_slam"], "spear": ["mq_reap", "mq_judgment"],
+	"mace_2h": ["mq_leap_slam", "mq_heavy_swing"], "spear": ["mq_leap_slam", "mq_heavy_swing"],
 	"staff": ["mq_ground_slam", "mq_cast_slam"],
 }
-## Круговые удары умений ("spin") по хвату; нет в списке — mq_axe_spin.
+## Круговые удары умений ("spin") по хвату; нет в списке — mq_axe_spin (одной рукой: у двуручного вторая рука на время
+## отпускает рукоять — TwoHandIK).
 const MQ_SPINS := {"dual_swords": ["mq_blade_spin"], "daggers": ["mq_blade_spin"], "dual_axes": ["mq_blade_spin"],
 	"spear": ["mq_reap"]}
 ## Заклинания ("cast"): на цель и на себя / питомца; усиления ("buff").
@@ -172,6 +175,10 @@ const GRIP_DIR_L := Vector3(-0.76, 0.12, 0.64)
 ## (первый кадр) ложе смотрит вперёд персонажа, а дуги — горизонтально (рассчитано по скелету героя
 ## прямой кинематикой, как в tools/retarget_animations.py). Ось арбалета −Z (вперёд), +Y — вверх.
 const CROSSBOW_ROT := Quaternion(0.566, 0.311, -0.256, 0.719)
+## Лук в левой кисти: поворот вокруг древка (−72°), тетива — к лучнику. Посчитан по клипам выстрела манекенов
+## (Mq_Bow_Shot, Mq_Bow_Draw) у всех героев: правая кисть при натяжении уходит от лука в сторону (−0.95, 0, 0.31)
+## рамки хвата левой (_grip_xf), а не по +Z; разброс по героям ±8°.
+const BOW_TURN := -1.2566
 ## Виды оружия, которые умеет модель из файла (остальные держат меч); щит — отдельно (spec "shield").
 const ASSET_WEAPONS := ["sword", "dual_swords", "daggers", "crossbow", "dagger", "axe", "dual_axes", "mace", "staff", "bow", "spear"]
 ## Модели героя из файлов: hero_<профессия>_<пол>.glb (пол m / f), у Бродяги — hero_<раса>_<пол>_starter.glb
@@ -417,6 +424,8 @@ var _shots := 0
 var _shot_gap := 1.0
 ## Петля каста умения героя (настоящее имя клипа; "" — каста нет): play_cast_loop / stop_cast_loop.
 var _cast_loop := ""
+## Хват второй рукой (двуручное, арбалет, лук) — модификатор скелета модели из файла; null — не нужен.
+var _ik: TwoHandIK = null
 
 ## Массивы примитивов (одинаковые детали у всех персонажей).
 static var _arr_cache: Dictionary = {}
@@ -693,6 +702,7 @@ func setup(s: Dictionary) -> CharacterModel:
 	_loco = ""
 	_mq_step = 0
 	_shots = 0
+	_ik = null
 	weapon_kind = String(s.get("weapon", ""))
 	two_handed = bool(s.get("two_handed", false))
 	if s.has("asset") and _setup_asset(String(s["asset"])):
@@ -1971,14 +1981,32 @@ func _setup_asset(path: String) -> bool:
 			elif weapon_kind == "dual_axes":
 				_hold_item(hand_l, "AxeL", oid, _axe_mesh(), _grip_xf(dir_l, pos_l))
 			elif weapon_kind == "bow":
-				# Лук в левой кисти: древко вдоль клинка хвата (вертикально в стойке), тетива к герою
-				_hold_item(hand_l, "Bow", wid, _bow_mesh(), _grip_xf(dir_l, pos_l))
+				# Лук в левой кисти: древко вдоль клинка хвата (вертикально в стойке), тетива к лучнику (BOW_TURN)
+				_hold_item(hand_l, "Bow", wid, _bow_mesh(), _grip_xf(dir_l, pos_l) * _bow_turn())
 			else:
 				_hold_item(hand_l, "SwordL", oid, _sword_mesh(), _grip_xf(dir_l, pos_l))
+		# Вторая рука на оружии (TwoHandIK): двуручное — левая на рукояти, арбалет — левая под ложем, лук — правая
+		# на тетиве; модель оружия — как на метке кисти (с поворотом рамки Handheld.hold_basis)
+		var hold := ""
+		var wxf := Transform3D.IDENTITY
+		var hb := Transform3D(Handheld.hold_basis(wid), Vector3.ZERO) if wid != "" else Transform3D.IDENTITY
+		if TwoHandIK.TWO_HANDED_KINDS.has(wkind):
+			hold = TwoHandIK.HOLD_TWO
+			wxf = _grip_xf(dir_r, pos_r) * hb
+		elif weapon_kind == "crossbow":
+			hold = TwoHandIK.HOLD_CROSSBOW
+			wxf = Transform3D(Basis(cb.normalized()), pos_r) * hb
+		elif weapon_kind == "bow":
+			hold = TwoHandIK.HOLD_BOW
+			wxf = _grip_xf(dir_l, pos_l) * _bow_turn() * hb
+		if hold != "":
+			_ik = TwoHandIK.create(skel, rig, hold, wkind, wid, wxf, _grip_xf(dir_r, pos_r), _grip_xf(dir_l, pos_l))
 
 	var aps := _asset.find_children("*", "AnimationPlayer", true, false)
 	if not aps.is_empty():
 		_anim = aps[0] as AnimationPlayer
+		if _ik != null:
+			_ik.anim = _anim
 		for an in _anim.get_animation_list():
 			var k := String(an).to_lower()
 			if k.contains("/"):
@@ -2021,6 +2049,11 @@ static func _rig_vec(d: Dictionary, key: String, def: Vector3) -> Vector3:
 		var a: Array = v
 		return Vector3(float(a[0]), float(a[1]), float(a[2]))
 	return def
+
+
+## Лук в левой кисти поверх хвата: поворот вокруг древка BOW_TURN.
+static func _bow_turn() -> Transform3D:
+	return Transform3D(Basis(Vector3.UP, BOW_TURN), Vector3.ZERO)
 
 
 ## Клинок в кулаке: ось клинка вдоль dir (в пространстве кости), рукоять в pos.
@@ -2118,6 +2151,8 @@ func _asset_process(delta: float) -> void:
 			m.emission = fc
 	if _anim == null:
 		return
+	if _ik != null:
+		_ik.update(delta)
 	if _act_end >= 0.0:
 		# Действие доигрывается; герой пошёл после момента удара — шаг и бег сразу
 		if _anim.is_playing():
