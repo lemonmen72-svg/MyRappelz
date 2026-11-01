@@ -49,7 +49,7 @@ func run_step() -> void:
 			p.recalc_stats()
 			check(Economy.best_potion("hp") == "potion_hp_r2" and Economy.potion_count("hp") == 4, "12 ур.: «Зелье» — 2-й ранг, всего 4")
 			eco._update_potion_button()
-			var ic := main.hud.button_icon("potion")
+			var ic: IconView = main.hud.button_icon("potion")
 			check(ic != null and String(ic.spec.get("item", "")) == "potion_hp_r2" and ic.count() == 4, "значок «Зелья» — 2-й ранг, число 4")
 			eco._potion_cd = 0.0
 			p.hp = 10
