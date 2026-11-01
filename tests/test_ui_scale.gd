@@ -338,8 +338,8 @@ func _check_panels(hud: HUD) -> void:
 			and absf(lr.get_center().x - br.get_center().x) <= 1.5,
 			"%s: число «%s» внутри полоски по центру (%s в %s)" % [e[2], l.text, lr, br])
 	var pr := hud.player_rect()
-	# у «Мелкого» шрифты не меньше минимальных — панель не ужимается строго в ×0.87
-	check(pr.size.y <= maxf(UiScale.px(56.0), 56.0) + 2.0 and pr.size.x <= maxf(UiScale.px(290.0), 290.0),
+	# высота — с запасом: в headless высота строк Label завышена (ник, золото); у «Мелкого» шрифты не меньше минимальных
+	check(pr.size.y <= maxf(UiScale.px(66.0), 60.0) + 2.0 and pr.size.x <= maxf(UiScale.px(290.0), 290.0),
 		"панель игрока компактная: %s (было ≈ 56 × 380)" % pr)
 	var lv := hud._lvl.get_global_rect()
 	check(lv.end.x <= hud._hp_bar.get_global_rect().position.x and hud._lvl_text.text == str(game.level),
