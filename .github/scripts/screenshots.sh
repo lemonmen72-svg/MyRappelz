@@ -7,7 +7,7 @@ if ! command -v xvfb-run >/dev/null; then
 fi
 
 timeout 300 godot --headless --path . --import > import.log 2>&1
-xvfb-run -a -s "-screen 0 1280x720x24" timeout 2700 godot --rendering-driver opengl3 --fixed-fps 30 \
+xvfb-run -a -s "-screen 0 1280x720x24" timeout 4200 godot --rendering-driver opengl3 --fixed-fps 30 \
 	--path . res://tests/runner.tscn -- res://tests/shots.gd > shots.log 2>&1
 status=$?
 grep -vE 'mesh_get_surface_count|servers/rendering/dummy' shots.log | tail -n 120

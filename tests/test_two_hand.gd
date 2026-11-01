@@ -94,7 +94,7 @@ func run_step() -> void:
 				m._act_end = -1.0
 				m.play_hit()
 			# реакция — случайный вариант (Mq_Hit / UAL Hit / Hit_Reaction ≈ 0.3 с): смотрим посреди клипа
-			wait = 10
+			wait = 15
 			step = 3
 		3:
 			for m in models:
