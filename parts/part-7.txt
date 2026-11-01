@@ -1,0 +1,19 @@
+# commit c33043715ea7940a75f04b76cea278a112d6b635
+190_bag_potion_ranks.png
+191_storage_gold.png
+192_loot_drops.png
+210_hud_panels.png
+211_mob_quest_mark.png
+212_npc_mark_active.png
+213_npc_mark_complete.png
+214_npc_mark_available.png
+215_settings_tabs_icons.png
+216_hero_tabs_icons.png
+217_hud_large.png
+250_run_cycle_hero.png
+251_run_cycle_heroine.png
+252_run_live.png
+253_walk_jog_sprint.png
+254_mq_new_moves.png
+255_mq_bow_loops.png
+256_mq_turns_emotes.png

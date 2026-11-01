@@ -1,0 +1,60 @@
+Godot Engine v4.3.stable.official.77dcf97d8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:360)
+OpenGL API 4.5 (Core Profile) Mesa 25.2.8-0ubuntu0.24.04.4 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 20.1.2, 256 bits)
+libpulse.so.0: cannot open shared object file: No such file or directory
+libpulse.so.0: cannot open shared object file: No such file or directory
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5731:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+ERROR: Condition "status < 0" is true. Returning: ERR_CANT_OPEN
+   at: init_output_device (drivers/alsa/audio_driver_alsa.cpp:90)
+WARNING: All audio drivers failed, falling back to the dummy driver.
+     at: initialize (servers/audio_server.cpp:247)
+
+Часть 1/8: шаги с 0 до 29
+Растительность (трава «Густая», 462 мс): трава 25217, цветы 2078, деревья 188, кусты 177, камни 156, кристаллы 12
+[OK] скриншот 00_island_top (1280x720), 85 с от запуска
+[OK] скриншот 01_start (1280x720), 96 с от запуска
+[OK] скриншот 02_mobs (1280x720), 114 с от запуска
+  HUD: Кнопка пуста: назначьте умение в окне героя (K)
+[OK] скриншот 03_combat (1280x720), 117 с от запуска
+[OK] скриншот 04_anathema_chief (1280x720), 136 с от запуска
+[OK] скриншот 05_pheasant (1280x720), 153 с от запуска
+[OK] скриншот 06_shop (1280x720), 179 с от запуска
+[OK] скриншот 07_pets (1280x720), 181 с от запуска
+[OK] скриншот 08_create (1280x720), 186 с от запуска
+[OK] скриншот 09_hero (1280x720), 198 с от запуска
+[OK] скриншот 10_hero_attack (1280x720), 204 с от запуска
+[OK] скриншот 11_hero_skill (1280x720), 215 с от запуска
+[OK] скриншот 12_town_high (1280x720), 286 с от запуска
+[OK] скриншот 13_town_medium (1280x720), 353 с от запуска
+[OK] скриншот 14_town_low (1280x720), 362 с от запуска
+  panther: модель из файла, высота 1.15 м
+  turtle: модель из файла, высота 0.85 м
+  pheasant: модель из файла, высота 0.85 м
+  HUD: Питомец «Серохвост» отозван
+[OK] скриншот 15_creatures (1280x720), 377 с от запуска
+[OK] скриншот 16_creatures_walk (1280x720), 388 с от запуска
+  HUD: Питомец «Теневая пантера» призван
+[OK] скриншот 17_creature_stats (1280x720), 408 с от запуска
+[OK] скриншот 18_creature_skills (1280x720), 412 с от запуска
+  HUD: Холодный расчёт: включено
+[OK] скриншот 19_hero_window (1280x720), 443 с от запуска
+[OK] скриншот 20_hero_tree (1280x720), 447 с от запуска
+[OK] скриншот 21_hero_tree_crossbow (1280x720), 451 с от запуска
+  HUD: В руках: Лёгкий арбалет
+[OK] скриншот 22_hero_crossbow (1280x720), 467 с от запуска
+[OK] скриншот 23_hero_crossbow_shot (1280x720), 470 с от запуска
+  HUD: Во второй руке: Стальной меч
+[OK] скриншот 24_hero_dual_swords (1280x720), 486 с от запуска
+[OK] скриншот 25_hero_dual_attack (1280x720), 491 с от запуска
+  HUD: Во второй руке: Кинжал новичка
+[OK] скриншот 26_hero_daggers (1280x720), 507 с от запуска
+Часть: дошли до шага 29 — дальше следующая часть (508 с)
+TEST OK (кадров: 813)

@@ -1,0 +1,10 @@
+# commit c33043715ea7940a75f04b76cea278a112d6b635
+170_two_hand_idle.png
+171_two_hand_attack.png
+172_two_hand_close.png
+180_cast_magic_loop.png
+181_cast_bow_aim.png
+182_cast_crossbow_aim.png
+230_handheld_weapons_r2.png
+231_heroes_weapons_r2_a.png
+232_heroes_weapons_r2_b.png

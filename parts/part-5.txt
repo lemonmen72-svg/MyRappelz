@@ -1,0 +1,10 @@
+# commit c33043715ea7940a75f04b76cea278a112d6b635
+150_handheld_weapons.png
+151_handheld_npc_items.png
+152_heroes_weapons_a.png
+153_heroes_weapons_b.png
+160_npc_row.png
+161_npc_storekeeper.png
+162_npc_smith.png
+163_npc_elder_light.png
+164_npc_hunter_back.png

@@ -1,0 +1,90 @@
+Godot Engine v4.3.stable.official.77dcf97d8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:360)
+OpenGL API 4.5 (Core Profile) Mesa 25.2.8-0ubuntu0.24.04.4 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 20.1.2, 256 bits)
+libpulse.so.0: cannot open shared object file: No such file or directory
+libpulse.so.0: cannot open shared object file: No such file or directory
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5731:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+ERROR: Condition "status < 0" is true. Returning: ERR_CANT_OPEN
+   at: init_output_device (drivers/alsa/audio_driver_alsa.cpp:90)
+WARNING: All audio drivers failed, falling back to the dummy driver.
+     at: initialize (servers/audio_server.cpp:247)
+
+Часть 3/8: шаги с 560 до 808
+Растительность (трава «Густая», 676 мс): трава 25217, цветы 2078, деревья 188, кусты 177, камни 156, кристаллы 12
+  HUD: Кнопка пуста: назначьте умение в окне героя (K)
+  panther: модель из файла, высота 1.15 м
+  turtle: модель из файла, высота 0.85 м
+  pheasant: модель из файла, высота 0.85 м
+  HUD: Питомец «Серохвост» отозван
+  HUD: Питомец «Теневая пантера» призван
+  HUD: Холодный расчёт: включено
+  HUD: В руках: Лёгкий арбалет
+  HUD: Во второй руке: Стальной меч
+  HUD: Во второй руке: Кинжал новичка
+  HUD: Новое задание: «Испытание связи»
+  лес у (-50, -54): вес 1.00 в (-54, -76)
+  лес у (38, -56): вес 1.00 в (30, -80)
+  стадия 1 panther: модель panther, высота 0.92 м
+  стадия 2 panther: модель panther_2, высота 1.25 м
+  стадия 3 panther: модель panther_3, высота 1.46 м
+  стадия 1 pheasant: модель pheasant, высота 0.72 м
+  стадия 2 pheasant: модель pheasant_2, высота 0.92 м
+  стадия 3 pheasant: модель pheasant_3, высота 1.07 м
+  стадия 1 turtle: модель turtle, высота 0.72 м
+  стадия 2 turtle: модель turtle_2, высота 0.87 м
+  стадия 3 turtle: модель turtle_3, высота 1.01 м
+  стадия 1 wolf: модель wolf, высота 0.76 м
+  стадия 2 wolf: модель wolf_2, высота 0.91 м
+  стадия 3 wolf: модель wolf_3, высота 1.06 м
+  стадия 1 centaur: модель centaur, высота 1.69 м
+  стадия 2 centaur: модель centaur_2, высота 2.02 м
+  стадия 3 centaur: модель centaur_3, высота 2.36 м
+Часть: перемотка до шага 560 — 1674 кадров за 17.7 с, дальше с отрисовкой
+[OK] скриншот 56_anathema_row (1280x720), 56 с от запуска
+[OK] скриншот 57_anathema_world (1280x720), 89 с от запуска
+[OK] скриншот 59_town_close (1280x720), 116 с от запуска
+[OK] скриншот 60_town_wide (1280x720), 138 с от запуска
+[OK] скриншот 61_human_village_mill (1280x720), 165 с от запуска
+[OK] скриншот 62_light_elf_village (1280x720), 184 с от запуска
+[OK] скриншот 63_dark_elf_village (1280x720), 202 с от запуска
+[OK] скриншот 64_port_lighthouse (1280x720), 215 с от запуска
+[OK] скриншот 65_ship (1280x720), 233 с от запуска
+[OK] скриншот 66_cave (1280x720), 260 с от запуска
+[OK] скриншот 67_camp (1280x720), 276 с от запуска
+  лес у (-30, -30): вес 1.00 в (-48, -54)
+[OK] скриншот 68_forest (1280x720), 294 с от запуска
+  HUD: Питомец «Теневая пантера» призван
+[OK] скриншот 69_status_icons (1280x720), 366 с от запуска
+  HUD: Питомец «Теневая пантера» отозван
+[OK] скриншот 70_npcs_town (1280x720), 397 с от запуска
+  elder_human: (86.0, 28.5)
+[OK] скриншот 71_npc_elders (1280x720), 416 с от запуска
+  elder_light: (-84.0, -57.0)
+[OK] скриншот 72_npc_elder_light (1280x720), 440 с от запуска
+  elder_dark: (77.9, -71.0)
+[OK] скриншот 73_npc_elder_dark (1280x720), 458 с от запуска
+  hunter: (-113.0, 5.8)
+[OK] скриншот 74_npc_hunter (1280x720), 475 с от запуска
+  merc_chief: (-89.8, 41.5)
+[OK] скриншот 75_npc_merc_chief (1280x720), 495 с от запуска
+[OK] скриншот 76_town_house_front (1280x720), 520 с от запуска
+[OK] скриншот 77_town_house_side (1280x720), 539 с от запуска
+[OK] скриншот 78_town_house_back (1280x720), 557 с от запуска
+[OK] скриншот 79_mill_close (1280x720), 586 с от запуска
+[OK] скриншот 80_light_elf_house_close (1280x720), 606 с от запуска
+[OK] скриншот 81_dark_elf_house_close (1280x720), 627 с от запуска
+  HUD: Питомец «Серохвост» призван
+[OK] скриншот 82_bridge_pet (1280x720), 699 с от запуска
+  HUD: Питомец «Серохвост» отозван
+[OK] скриншот 86_heroes_row (1280x720), 758 с от запуска
+[OK] скриншот 89_heroes_row2 (1280x720), 820 с от запуска
+Часть: дошли до шага 808 — дальше следующая часть (821 с)
+TEST OK (кадров: 3042)

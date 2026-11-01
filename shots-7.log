@@ -1,0 +1,326 @@
+Godot Engine v4.3.stable.official.77dcf97d8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:360)
+OpenGL API 4.5 (Core Profile) Mesa 25.2.8-0ubuntu0.24.04.4 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 20.1.2, 256 bits)
+libpulse.so.0: cannot open shared object file: No such file or directory
+libpulse.so.0: cannot open shared object file: No such file or directory
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5731:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+ERROR: Condition "status < 0" is true. Returning: ERR_CANT_OPEN
+   at: init_output_device (drivers/alsa/audio_driver_alsa.cpp:90)
+WARNING: All audio drivers failed, falling back to the dummy driver.
+     at: initialize (servers/audio_server.cpp:247)
+
+Часть 7/8: шаги с 1120 до 1260
+Растительность (трава «Густая», 616 мс): трава 25217, цветы 2078, деревья 188, кусты 177, камни 156, кристаллы 12
+  HUD: Кнопка пуста: назначьте умение в окне героя (K)
+  panther: модель из файла, высота 1.15 м
+  turtle: модель из файла, высота 0.85 м
+  pheasant: модель из файла, высота 0.85 м
+  HUD: Питомец «Серохвост» отозван
+  HUD: Питомец «Теневая пантера» призван
+  HUD: Холодный расчёт: включено
+  HUD: В руках: Лёгкий арбалет
+  HUD: Во второй руке: Стальной меч
+  HUD: Во второй руке: Кинжал новичка
+  HUD: Новое задание: «Испытание связи»
+  лес у (-50, -54): вес 1.00 в (-54, -76)
+  лес у (38, -56): вес 1.00 в (30, -80)
+  стадия 1 panther: модель panther, высота 0.92 м
+  стадия 2 panther: модель panther_2, высота 1.25 м
+  стадия 3 panther: модель panther_3, высота 1.46 м
+  стадия 1 pheasant: модель pheasant, высота 0.72 м
+  стадия 2 pheasant: модель pheasant_2, высота 0.92 м
+  стадия 3 pheasant: модель pheasant_3, высота 1.07 м
+  стадия 1 turtle: модель turtle, высота 0.72 м
+  стадия 2 turtle: модель turtle_2, высота 0.87 м
+  стадия 3 turtle: модель turtle_3, высота 1.01 м
+  стадия 1 wolf: модель wolf, высота 0.76 м
+  стадия 2 wolf: модель wolf_2, высота 0.91 м
+  стадия 3 wolf: модель wolf_3, высота 1.06 м
+  стадия 1 centaur: модель centaur, высота 1.69 м
+  стадия 2 centaur: модель centaur_2, высота 2.02 м
+  стадия 3 centaur: модель centaur_3, высота 2.36 м
+  лес у (-30, -30): вес 1.00 в (-48, -54)
+  HUD: Питомец «Теневая пантера» призван
+  HUD: Питомец «Теневая пантера» отозван
+  elder_human: (86.0, 28.5)
+  elder_light: (-84.0, -57.0)
+  elder_dark: (77.9, -71.0)
+  hunter: (-113.0, 5.8)
+  merc_chief: (-89.8, 41.5)
+  HUD: Питомец «Серохвост» призван
+  HUD: Питомец «Серохвост» отозван
+  HUD: Камнелом
+  HUD: Обвал
+  HUD: Целебная роса
+  HUD: Гнев стаи
+  HUD: Грозовой круг
+  HUD: Задание обновлено: Победить зверей вместе с питомцем 3/5
+  HUD: Сгусток пламени
+  HUD: Задание обновлено: Победить зверей вместе с питомцем 4/5
+  HUD: Нет цели рядом
+  HUD: Питомец «Теневая пантера» призван
+  HUD: Подобрано: 26 зол., Зелье здоровья I ×2
+  HUD: Новое задание: «Наставник укротителей»
+  HUD: Взято заданий: 8 — журнал (J)
+[OK] res://assets/characters/hero_swordsman_m.glb: есть клип mq_combo_b1
+[OK] res://assets/characters/hero_assassin_f.glb: есть клип mq_dual_a1
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_heavy_swing
+[OK] res://assets/characters/hero_warrior_f.glb: есть клип mq_bow_shot
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_cast_a
+[OK] res://assets/characters/hero_swordsman_f.glb: есть клип mq_leap_slam
+[OK] res://assets/characters/hero_swordsman_m.glb: есть клип mq_taunt
+[OK] res://assets/characters/hero_shaman_m.glb: есть клип mq_charged_cast
+[OK] res://assets/characters/hero_assassin_m.glb: есть клип mq_blade_spin
+[OK] res://assets/characters/hero_conjurer_f.glb: есть клип mq_axe_chop
+[OK] res://assets/characters/hero_neophyte_m.glb: есть клип mq_cast_beam
+[OK] res://assets/characters/hero_adept_f.glb: есть клип mq_judgment
+[OK] кадр предметов: модель weapon_dagger_r1 из файла
+  weapon_dagger_r1: blade, длина 0.38 м
+[OK] кадр предметов: модель weapon_sword_1h_r1 из файла
+  weapon_sword_1h_r1: blade, длина 0.95 м
+[OK] кадр предметов: модель weapon_sword_2h_r1 из файла
+  weapon_sword_2h_r1: blade, длина 1.45 м
+[OK] кадр предметов: модель weapon_axe_1h_r1 из файла
+  weapon_axe_1h_r1: blade, длина 0.70 м
+[OK] кадр предметов: модель weapon_axe_2h_r1 из файла
+  weapon_axe_2h_r1: blade, длина 1.40 м
+[OK] кадр предметов: модель weapon_mace_1h_r1 из файла
+  weapon_mace_1h_r1: blade, длина 0.75 м
+[OK] кадр предметов: модель weapon_mace_2h_r1 из файла
+  weapon_mace_2h_r1: blade, длина 1.40 м
+[OK] кадр предметов: модель weapon_staff_1h_r1 из файла
+  weapon_staff_1h_r1: blade, длина 0.80 м
+[OK] кадр предметов: модель weapon_staff_2h_r1 из файла
+  weapon_staff_2h_r1: blade, длина 1.70 м
+[OK] кадр предметов: модель weapon_spear_r1 из файла
+  weapon_spear_r1: blade, длина 2.00 м
+[OK] кадр предметов: модель npc_longbow из файла
+  npc_longbow: bow, длина 1.40 м
+[OK] кадр предметов: модель weapon_shield_r1 из файла
+  weapon_shield_r1: shield, длина 0.75 м
+[OK] кадр предметов: модель weapon_crossbow_r1 из файла
+  weapon_crossbow_r1: crossbow, длина 0.85 м
+  HUD: Питомец «Теневая пантера» отозван
+[OK] кадр предметов: модель npc_cane из файла
+  npc_cane: blade, длина 0.95 м
+[OK] кадр предметов: модель npc_wand из файла
+  npc_wand: blade, длина 0.45 м
+[OK] кадр предметов: модель npc_hammer из файла
+  npc_hammer: blade, длина 0.60 м
+[OK] кадр предметов: модель npc_antlerstaff из файла
+  npc_antlerstaff: blade, длина 1.70 м
+[OK] кадр предметов: модель npc_grimoire из файла
+  npc_grimoire: book, длина 0.30 м
+[OK] кадр предметов: модель npc_tome из файла
+  npc_tome: book, длина 0.30 м
+[OK] кадр предметов: модель npc_scroll из файла
+  npc_scroll: blade, длина 0.30 м
+[OK] кадр предметов: модель npc_keys из файла
+  npc_keys: blade, длина 0.20 м
+[OK] кадр предметов: модель npc_quiver из файла
+  npc_quiver: blade, длина 0.70 м
+[OK] кадр предметов: модель npc_longbow из файла
+  npc_longbow: bow, длина 1.40 м
+  hero_swordsman_m (sword_1h): Sword=weapon_sword_1h_r1, Shield=weapon_shield_r1
+  hero_warrior_f (axe_2h): Axe=weapon_axe_2h_r1
+  hero_wizard_f (staff_2h): Staff=weapon_staff_2h_r1
+  hero_assassin_m (daggers): DaggerR=weapon_dagger_r1, DaggerL=weapon_dagger_r1
+  hero_beastmaster_m (mace_2h): Mace=weapon_mace_2h_r1
+  hero_conjurer_m (dual_axes): Axe=weapon_axe_1h_r1, AxeL=weapon_axe_1h_r1
+  hero_swordsman_f (sword_2h): Sword=weapon_sword_2h_r1
+  hero_warrior_m (bow): Bow=npc_longbow
+  hero_assassin_f (crossbow): Crossbow=weapon_crossbow_r1
+  hero_neophyte_m (staff_1h): Staff=weapon_staff_1h_r1
+  hero_adept_f (dagger): DaggerR=weapon_dagger_r1, Shield=weapon_shield_r1
+  hero_swordsman_m (spear): Spear=weapon_spear_r1
+  storekeeper: (-7.0, 4.9)
+  smith: (6.9, 5.8)
+  elder_light: (-84.0, -57.0)
+[OK] кадр хвата: hero_warrior_m с «sword_2h» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_swordsman_f с «spear» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_warrior_f с «axe_2h» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_wizard_f с «staff_2h» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_light_elf_m_starter с «bow» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_assassin_f с «crossbow» — вторая рука на оружии (TwoHandIK)
+  хват hero_warrior_m.glb: two, клип idle, вес 1.00, точка (-0.0019, -0.203, 0.0019)
+  хват hero_swordsman_f.glb: two, клип idle, вес 1.00, точка (0.0005, -0.248667, 0.0036)
+  хват hero_warrior_f.glb: two, клип idle, вес 1.00, точка (-0.0011, -0.227045, 0.0011)
+  хват hero_wizard_f.glb: two, клип idle, вес 1.00, точка (0.0031, -0.117541, 0.0083)
+  хват hero_light_elf_m_starter.glb: bow, клип idle, вес 0.00, точка (0, 0, 0)
+  хват hero_assassin_f.glb: crossbow, клип crossbow_idle, вес 1.00, точка (0, 0.03, -0.073498)
+[OK] кадр хвата: hero_warrior_m с «sword_2h» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_warrior_m — есть клип mq_heavy_swing
+[OK] кадр хвата: hero_swordsman_f с «spear» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_swordsman_f — есть клип mq_leap_slam
+[OK] кадр хвата: hero_beastmaster_m с «mace_2h» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_beastmaster_m — есть клип mq_heavy_swing
+[OK] кадр хвата: hero_warrior_f с «bow» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_warrior_f — есть клип mq_bow_draw
+[OK] кадр хвата: hero_light_elf_m_starter с «bow» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_light_elf_m_starter — есть клип mq_bow_shot
+[OK] кадр хвата: hero_assassin_m с «crossbow» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_assassin_m — есть клип crossbow_shoot
+  хват hero_warrior_m.glb: two, клип mq_heavy_swing, вес 1.00, точка (-0.0019, -0.3295, 0.0019)
+  хват hero_swordsman_f.glb: two, клип mq_leap_slam, вес 0.83, точка (0.0005, -0.210205, 0.0036)
+  хват hero_beastmaster_m.glb: two, клип mq_heavy_swing, вес 1.00, точка (-0.0004, -0.359888, 0.0004)
+  хват hero_warrior_f.glb: bow, клип mq_bow_draw, вес 1.00, точка (0.0011, 0.05, 0.532929)
+  хват hero_light_elf_m_starter.glb: bow, клип mq_bow_shot, вес 1.00, точка (0.0011, 0.05, 0.537741)
+  хват hero_assassin_m.glb: crossbow, клип crossbow_shoot, вес 1.00, точка (0, 0.03, -0.069152)
+[OK] кадр хвата: hero_warrior_f с «bow» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_warrior_f — есть клип mq_bow_draw
+[OK] кадр хвата: hero_assassin_f с «crossbow» — вторая рука на оружии (TwoHandIK)
+[OK] кадр хвата: hero_human_m_starter с «spear» — вторая рука на оружии (TwoHandIK)
+  хват hero_warrior_f.glb: bow, клип mq_bow_draw, вес 1.00, точка (0.0011, 0.05, 0.532929)
+  хват hero_assassin_f.glb: crossbow, клип crossbow_idle, вес 1.00, точка (0, 0.03, -0.073498)
+  хват hero_human_m_starter.glb: two, клип idle, вес 1.00, точка (0.0005, -0.230718, 0.0036)
+[OK] кадр 180: каст «Огненного смерча»
+  HUD: Задание «Доклад мудрецу» выполнено — вернитесь к Мудрецу Альдерику
+[OK] кадр 180: полоса каста видна
+  HUD: В руках: Лук новичка
+[OK] кадр 181: прицеливание из лука
+  HUD: В руках: Лёгкий арбалет
+[OK] кадр 182: прицеливание из арбалета
+[OK] кадр предметов: модель weapon_dagger_r2 из файла
+  weapon_dagger_r2: blade, длина 0.38 м
+[OK] кадр предметов: модель weapon_sword_1h_r2 из файла
+  weapon_sword_1h_r2: blade, длина 0.95 м
+[OK] кадр предметов: модель weapon_sword_2h_r2 из файла
+  weapon_sword_2h_r2: blade, длина 1.50 м
+[OK] кадр предметов: модель weapon_axe_1h_r2 из файла
+  weapon_axe_1h_r2: blade, длина 0.70 м
+[OK] кадр предметов: модель weapon_axe_2h_r2 из файла
+  weapon_axe_2h_r2: blade, длина 1.45 м
+[OK] кадр предметов: модель weapon_mace_1h_r2 из файла
+  weapon_mace_1h_r2: blade, длина 0.75 м
+[OK] кадр предметов: модель weapon_mace_2h_r2 из файла
+  weapon_mace_2h_r2: blade, длина 1.45 м
+[OK] кадр предметов: модель weapon_staff_1h_r2 из файла
+  weapon_staff_1h_r2: blade, длина 0.80 м
+[OK] кадр предметов: модель weapon_staff_2h_r2 из файла
+  weapon_staff_2h_r2: blade, длина 1.70 м
+[OK] кадр предметов: модель weapon_spear_r2 из файла
+  weapon_spear_r2: blade, длина 2.00 м
+[OK] кадр предметов: модель weapon_bow_r2 из файла
+  weapon_bow_r2: bow, длина 1.40 м
+[OK] кадр предметов: модель weapon_shield_r2 из файла
+  weapon_shield_r2: shield, длина 0.80 м
+[OK] кадр предметов: модель weapon_crossbow_r2 из файла
+  weapon_crossbow_r2: crossbow, длина 0.85 м
+[OK] кадр оружия 2-го ранга: hero_swordsman_m, Sword — модель weapon_sword_1h_r2 (weapon_sword_1h_r2)
+[OK] кадр оружия 2-го ранга: hero_swordsman_m, Shield — модель weapon_shield_r2 (weapon_shield_r2)
+[OK] кадр оружия 2-го ранга: у hero_swordsman_m оружие в руках
+  hero_swordsman_m (sword_1h, предмет «weapon_sword_1h_r2»): Sword=weapon_sword_1h_r2, Shield=weapon_shield_r2
+[OK] кадр оружия 2-го ранга: hero_warrior_f, Axe — модель weapon_axe_2h_r2 (weapon_axe_2h_r2)
+[OK] кадр оружия 2-го ранга: у hero_warrior_f оружие в руках
+  hero_warrior_f (axe_2h, предмет «weapon_axe_2h_r2»): Axe=weapon_axe_2h_r2
+[OK] кадр оружия 2-го ранга: hero_wizard_f, Staff — модель weapon_staff_2h_r2 (weapon_staff_2h_r2)
+[OK] кадр оружия 2-го ранга: у hero_wizard_f оружие в руках
+  hero_wizard_f (staff_2h, предмет «weapon_staff_2h_r2»): Staff=weapon_staff_2h_r2
+[OK] кадр оружия 2-го ранга: hero_assassin_m, DaggerR — модель weapon_dagger_r2 (weapon_dagger_r2)
+[OK] кадр оружия 2-го ранга: hero_assassin_m, DaggerL — модель weapon_dagger_r2 (weapon_dagger_r2)
+[OK] кадр оружия 2-го ранга: у hero_assassin_m оружие в руках
+  hero_assassin_m (daggers, предмет «weapon_dagger_r2»): DaggerR=weapon_dagger_r2, DaggerL=weapon_dagger_r2
+[OK] кадр оружия 2-го ранга: hero_beastmaster_m, Mace — модель weapon_mace_2h_r2 (weapon_mace_2h_r2)
+[OK] кадр оружия 2-го ранга: у hero_beastmaster_m оружие в руках
+  hero_beastmaster_m (mace_2h, предмет «weapon_mace_2h_r2»): Mace=weapon_mace_2h_r2
+[OK] кадр оружия 2-го ранга: hero_conjurer_m, Axe — модель weapon_axe_1h_r2 (weapon_axe_1h_r2)
+[OK] кадр оружия 2-го ранга: hero_conjurer_m, AxeL — модель weapon_axe_1h_r2 (weapon_axe_1h_r2)
+[OK] кадр оружия 2-го ранга: у hero_conjurer_m оружие в руках
+  hero_conjurer_m (dual_axes, предмет «weapon_axe_1h_r2»): Axe=weapon_axe_1h_r2, AxeL=weapon_axe_1h_r2
+[OK] кадр оружия 2-го ранга: hero_swordsman_f, Sword — модель weapon_sword_2h_r2 (weapon_sword_2h_r2)
+[OK] кадр оружия 2-го ранга: у hero_swordsman_f оружие в руках
+  hero_swordsman_f (sword_2h, предмет «weapon_sword_2h_r2»): Sword=weapon_sword_2h_r2
+[OK] кадр оружия 2-го ранга: hero_warrior_m, Bow — модель weapon_bow_r2 (weapon_bow_r2)
+[OK] кадр оружия 2-го ранга: у hero_warrior_m оружие в руках
+  hero_warrior_m (bow, предмет «weapon_bow_r2»): Bow=weapon_bow_r2
+[OK] кадр оружия 2-го ранга: hero_assassin_f, Crossbow — модель weapon_crossbow_r2 (weapon_crossbow_r2)
+[OK] кадр оружия 2-го ранга: у hero_assassin_f оружие в руках
+  hero_assassin_f (crossbow, предмет «weapon_crossbow_r2»): Crossbow=weapon_crossbow_r2
+[OK] кадр оружия 2-го ранга: hero_neophyte_m, Staff — модель weapon_staff_1h_r2 (weapon_staff_1h_r2)
+[OK] кадр оружия 2-го ранга: у hero_neophyte_m оружие в руках
+  hero_neophyte_m (staff_1h, предмет «weapon_staff_1h_r2»): Staff=weapon_staff_1h_r2
+[OK] кадр оружия 2-го ранга: hero_human_m_starter, Mace — модель weapon_mace_1h_r2 (weapon_mace_1h_r2)
+[OK] кадр оружия 2-го ранга: hero_human_m_starter, Shield — модель weapon_shield_r2 (weapon_shield_r2)
+[OK] кадр оружия 2-го ранга: у hero_human_m_starter оружие в руках
+  hero_human_m_starter (mace_1h, предмет «weapon_mace_1h_r2»): Mace=weapon_mace_1h_r2, Shield=weapon_shield_r2
+[OK] кадр оружия 2-го ранга: hero_swordsman_m, Spear — модель weapon_spear_r2 (weapon_spear_r2)
+[OK] кадр оружия 2-го ранга: у hero_swordsman_m оружие в руках
+  hero_swordsman_m (spear, предмет «weapon_spear_r2»): Spear=weapon_spear_r2
+[OK] кадры 210–213: задание старосты взято
+Часть: перемотка до шага 1120 — 4733 кадров за 54.7 с, дальше с отрисовкой
+  HUD: Новое задание: «Незваные гости на полях»
+[OK] кадр 210: панель игрока — Тест · Ур. 12 · HP 388/388 · MP 45/93 · опыт 37.0% · золото 76
+[OK] скриншот 210_hud_panels (1280x720), 197 с от запуска
+[OK] кадр 211: над фазаном красный значок задания
+[OK] скриншот 211_mob_quest_mark (1280x720), 246 с от запуска
+[OK] кадр 212: над старостой «?»
+[OK] скриншот 212_npc_mark_active (1280x720), 281 с от запуска
+  HUD: Задание «Незваные гости на полях» выполнено — вернитесь к Старосте Ольвину
+[OK] кадр 213: над старостой «=»
+[OK] скриншот 213_npc_mark_complete (1280x720), 303 с от запуска
+[OK] кадр 214: над Кирком «!»
+[OK] скриншот 214_npc_mark_available (1280x720), 366 с от запуска
+[OK] скриншот 215_settings_tabs_icons (1280x720), 403 с от запуска
+[OK] скриншот 216_hero_tabs_icons (1280x720), 454 с от запуска
+[OK] скриншот 217_hud_large (1280x720), 502 с от запуска
+[OK] скриншот 190_bag_potion_ranks (1280x720), 574 с от запуска
+[OK] скриншот 191_storage_gold (1280x720), 618 с от запуска
+[OK] кадр 192: выпито potion_aspd_r2
+[OK] кадр 192: выпито potion_speed_r1
+  HUD: Зелье скорости бега I: +10% на 60 с
+[OK] скриншот 192_loot_drops (1280x720), 766 с от запуска
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_running
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_running
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_running
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_running
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_running
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_running
+[OK] скриншот 250_run_cycle_hero (1280x720), 930 с от запуска
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_running
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_running
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_running
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_running
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_running
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_running
+[OK] скриншот 251_run_cycle_heroine (1280x720), 1053 с от запуска
+[OK] кадр 252: бег — клип манекена (Mq_Running; оружие dual_swords, клип Mq_Running, loco run, скорость 7.0/7.0, действие -1.00, таблица 4)
+[OK] кадр 252: бег — клип манекена (Mq_Running; оружие crossbow, клип Mq_Running, loco run, скорость 7.0/7.0, действие -1.00, таблица 4)
+[OK] скриншот 252_run_live (1280x720), 1343 с от запуска
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_walking
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_running_b
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_sprint
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_walking
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_running_b
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_sprint
+[OK] скриншот 253_walk_jog_sprint (1280x720), 1481 с от запуска
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_thrust_b
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_blade_spin_b
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_kick
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_jump
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_guard
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_rise
+[OK] скриншот 254_mq_new_moves (1280x720), 1626 с от запуска
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_bow_draw_b
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_bow_draw_c
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_bow_draw_d
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_bow_scan_hold
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_crouch_charge_hold
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_pickup_b
+[OK] скриншот 255_mq_bow_loops (1280x720), 1767 с от запуска
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_turn_l90
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_turn_r90
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_turn_l180
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_turn_l180
+[OK] res://assets/characters/hero_warrior_m.glb: есть клип mq_charged_cast1
+[OK] res://assets/characters/hero_wizard_f.glb: есть клип mq_taunt
+[OK] скриншот 256_mq_turns_emotes (1280x720), 1903 с от запуска
+Часть: дошли до шага 1260 — дальше следующая часть (1907 с)
+TEST OK (кадров: 5079)
