@@ -74,6 +74,11 @@ var speed := 6.5
 var attack_range := 2.8
 var attack_time := 0.8
 var crit := 0.05
+## Множитель урона крита героя: CRIT_MULT + сила крита украшений (кольца и серьги «сокрушения»).
+var crit_mult := CRIT_MULT
+## Бонусы надетых брони и украшений (Game.gear_bonus: def, mdef, hp, mp, crit, crit_dmg, aspd, cast, eva, speed) —
+## для окна героя (источники показателей).
+var gear_bonus: Dictionary = {}
 ## "melee" | "ranged" | "magic"
 var attack_kind := "melee"
 ## Вид хвата (ItemData.grip_kind: вид оружия, у двух одинаковых — вид пары "daggers" и т. п.; "" — без оружия)
@@ -288,18 +293,28 @@ func recalc_stats() -> void:
 		attack_range = float(w.get("range", attack_range))
 		crit += float(w.get("crit", 0.0))
 	defense += int(wb["def"])
+	# Броня и украшения (Game.equip, решение Максима: на персонаже, модель не меняется): защиты и HP/MP — числа,
+	# крит, сила крита, скорости атаки, каста и бега, уклонение — доли
+	var gb: Dictionary = Game.gear_bonus()
+	gear_bonus = gb
+	defense += roundi(float(gb.get("def", 0.0)))
+	mdef += roundi(float(gb.get("mdef", 0.0)))
+	max_hp += roundi(float(gb.get("hp", 0.0)))
+	max_mp += roundi(float(gb.get("mp", 0.0)))
+	crit += float(gb.get("crit", 0.0))
+	crit_mult = CRIT_MULT + float(gb.get("crit_dmg", 0.0))
 	atk = roundi(float(atk) * (1.0 + _bv(b, "atk_pct") + (_bv(b, "matk_pct") if attack_kind == "magic" else 0.0))) + roundi(_bv(b, "atk_flat"))
 	matk = roundi(float(matk) * (1.0 + _bv(b, "matk_pct")))
 	defense = roundi(float(defense + roundi(_bv(b, "def_flat"))) * (1.0 + _bv(b, "def_pct")))
 	mdef += roundi(_bv(b, "mdef_flat"))
-	eva = clampf(eva + _bv(b, "eva"), 0.0, 0.6)
+	eva = clampf(eva + _bv(b, "eva") + float(gb.get("eva", 0.0)), 0.0, 0.6)
 	crit += _bv(b, "crit")
-	speed *= 1.0 + _bv(b, "speed_pct")
+	speed *= 1.0 + _bv(b, "speed_pct") + float(gb.get("speed", 0.0))
 	# Как в Rappelz: прибавки скорости атаки от оружия и умений складываются со скоростью от Ловкости
-	aspd = maxf(0.2, stat_aspd + weapon_aspd + _bv(b, "aspd"))
+	aspd = maxf(0.2, stat_aspd + weapon_aspd + _bv(b, "aspd") + float(gb.get("aspd", 0.0)))
 	attack_time /= aspd
 	# Скорость каста (посохи): обычная магическая атака и пауза после заклинания короче
-	cast_speed += _bv(b, "cast")
+	cast_speed += _bv(b, "cast") + float(gb.get("cast", 0.0))
 	if attack_kind == "magic":
 		attack_time /= 1.0 + cast_speed
 	basic_mult = 1.0 + _bv(b, "basic_pct")
@@ -444,6 +459,27 @@ func equip(id: String, second: bool = false) -> String:
 	message.emit(text)
 	stats_changed.emit()
 	return ""
+
+
+## Надеть броню или украшение id (ячейка gslot; "" — первая свободная подходящая). "" — получилось, иначе причина.
+func equip_gear(id: String, gslot: String = "") -> String:
+	var err: String = Game.equip_gear(id, gslot)
+	if err != "":
+		return err
+	recalc_stats()
+	message.emit("Надето: %s" % ItemData.item_name(id))
+	stats_changed.emit()
+	return ""
+
+
+## Снять броню или украшение из ячейки gslot (вещь — в сумку).
+func unequip_gear(gslot: String) -> void:
+	var id: String = Game.gear_in(gslot)
+	if not Game.unequip_gear(gslot):
+		return
+	recalc_stats()
+	message.emit("Снято: %s" % ItemData.item_name(id))
+	stats_changed.emit()
 
 
 ## Освободить вторую руку (щит или второй клинок — в сумку).
@@ -896,7 +932,7 @@ func _roll(mult: float, force_crit: bool, flat: float = 0.0) -> int:
 	_last_crit = force_crit or randf() < crit_rate()
 	_last_magic = attack_kind == "magic"
 	if _last_crit:
-		base *= CRIT_MULT
+		base *= crit_mult
 	return maxi(1, int(base))
 
 

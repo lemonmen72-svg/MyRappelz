@@ -3,7 +3,8 @@ extends RefCounted
 ## Сумка как в MMORPG: items — id предмета → количество (по нему считают все модули), и раскладка по ячейкам
 ## (окно сумки InventoryWindow). Ячейка — {"id": String, "n": int} или пустая {}. Вместимость — CAPACITY ячеек,
 ## в ячейке стопка до ItemData.stack_size (оружие и карты с душой по 1, пустые карты до 20, расходники и трофеи до 99).
-## Надетое оружие (equipped, его ставит Game через Game.weapon) числится в items, но ячейку не занимает.
+## Надетое оружие (equipped, его ставит Game через Game.weapon), вторая рука (equipped_off) и надетые броня
+## и украшения (worn {id: штук}, ставит Game через Game.equip) числятся в items, но ячейки не занимают.
 ## Раскладка подстраивается под items сама (_sync): лишнее снимается с последних стопок, новое докладывается
 ## в неполные стопки, затем в первые пустые ячейки. Принудительный add() не теряет предметы: если ячеек не хватает,
 ## они добавляются сверх вместимости. Добыча и покупки проверяют место (room_for, try_add) — «Сумка полна».
@@ -28,6 +29,11 @@ var equipped_off := "":
 		if v != equipped_off:
 			equipped_off = v
 			_dirty = true
+## Надетые броня и украшения: id → сколько штук надето (два одинаковых кольца — 2). Тоже не лежат в ячейках.
+var worn: Dictionary = {}:
+	set(v):
+		worn = v
+		_dirty = true
 
 var _cells: Array = []
 var _dirty := true
@@ -306,7 +312,7 @@ func load_layout(src: Variant) -> void:
 
 # ---------- Внутреннее ----------
 
-## Привести ячейки к количествам items (минус надетое оружие).
+## Привести ячейки к количествам items (минус надетое оружие, броня и украшения).
 func _sync() -> void:
 	if not _dirty:
 		return
@@ -316,7 +322,7 @@ func _sync() -> void:
 	var want: Dictionary = {}
 	for key in items:
 		var id := String(key)
-		var n := count(id) - (1 if id == equipped else 0) - (1 if id == equipped_off else 0)
+		var n := count(id) - (1 if id == equipped else 0) - (1 if id == equipped_off else 0) - int(worn.get(id, 0))
 		if n > 0:
 			want[id] = n
 	# Лишнее и чужое снимается с последних стопок (ранние стопки сохраняются)

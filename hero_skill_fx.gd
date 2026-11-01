@@ -198,7 +198,7 @@ func roll(e: Dictionary, n: int, sid: String = "") -> int:
 	p._last_crit = bool(e.get("crit", false)) or randf() < p.crit_rate()
 	p._last_magic = String(e.get("power", "atk")) == "matk"
 	if p._last_crit:
-		base *= Player.CRIT_MULT
+		base *= p.crit_mult
 	return maxi(1, int(base))
 
 

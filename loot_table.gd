@@ -17,13 +17,17 @@ extends RefCounted
 ## зверя (ItemData.equip_rank_for_level: 1–20 ур. — 1-й, 21–50 — 2-й; нет оружия такого ранга — старший из
 ## имеющихся ниже); карта — карта вида (приручаемые; у боссов — карта их вида) и зеркальная (MobData.drops_mirror),
 ## материал — MobData.materials, особый — MobData.special_materials.
-## Место под будущее снаряжение (этапы 2–3): категории armor (броня, как оружие, 25), jewelry (украшения, 15, только
-## боссы), cube (кубы: обычный зверь 10, минибосс 25, босс 35) уже в таблице — пока их предметов нет (пул пуст),
-## категория не выбирается.
+## Броня (armor, 25 — как оружие): обычная броня ранга по уровню зверя (как оружие), вид вещи — случайный поровну
+## (шлем, доспех, перчатки, ботинки — по 25 %), вариант доспеха — случайный (воин, маг, призыватель — по трети).
+## Украшения (jewelry, 15) — только с боссов: ранг по уровню босса, вид поровну (кольцо, серьги, кулон, пояс), вариант
+## внутри вида — случайный. Кубы (cube: обычный зверь 10, минибосс 25, босс 35) уже в таблице — пока их предметов нет
+## (пул пуст), категория не выбирается.
 ##
 ## Награды заданий (quest_reward): 1–2 случайных предмета сверх наград из данных; шансы вдвое ниже, чем в добыче
-## (зелье 37.5 %, оружие 12.5 % — подходящее профессии, карта существа — половина шанса приручения карты
-## случайного приручаемого вида острова), ранг — по уровню героя. Каждая категория бросается отдельно; выпало
+## (зелье 37.5 %, оружие 12.5 % — подходящее профессии, броня 12.5 % — доспех варианта профессии героя (Бродяге —
+## любой), шлем, перчатки, ботинки — всем; карта существа — половина шанса приручения карты случайного приручаемого
+## вида острова), ранг — по уровню героя. Украшения: правило «только с боссов» к заданию неприменимо (зверя нет) —
+## решено давать их и в наградах, с половиной шанса добычи босса: 7.5 %. Каждая категория бросается отдельно; выпало
 ## больше двух — остаются два случайных, не выпало ничего — один предмет категории, выбранной по тем же шансам.
 
 ## Категории: name — для игрока, chance — вес выбора (шанс из правил); "card" — по тиру карты (Taming.CHANCE);
@@ -50,7 +54,7 @@ const MIRROR_WEIGHT := 1.0
 const QUEST_MIN := 1
 const QUEST_MAX := 2
 const QUEST_CHANCE_MULT := 0.5
-const QUEST_CATEGORIES := ["potion", "weapon", "card"]
+const QUEST_CATEGORIES := ["potion", "weapon", "armor", "jewelry", "card"]
 
 
 ## Тип зверя для добычи: "boss" | "mini" | "normal".
@@ -120,10 +124,41 @@ static func pool(cat: String, type_id: String, lvl: int) -> Array:
 		"special":
 			for id in MobData.special_materials(type_id):
 				res.append([String(id), 1.0])
+		"armor", "jewelry":
+			res = gear_pool(cat, ItemData.equip_rank_for_level(lvl))
 		_:
-			# armor, jewelry, cube — предметов пока нет
+			# cube — предметов пока нет
 			pass
 	return res
+
+
+## Пул брони или украшений ранга rank_n (нет такого — младшего): [[id, вес], …]. Вид вещи (шлем, доспех, … / кольцо,
+## серьги …) — поровну, вариант внутри вида (доспех воина, мага, призывателя; кольцо жизни, маны …) — поровну.
+## only_variant — у доспеха только этот вариант ("" — любой; награды заданий — вариант профессии героя).
+static func gear_pool(cat: String, rank_n: int, only_variant: String = "") -> Array:
+	var key := "%s|%d|%s" % [cat, rank_n, only_variant]
+	if _gear_cache.has(key):
+		return _gear_cache[key]
+	var by_kind: Dictionary = {}
+	for k in ItemData.gear_of_rank(cat, rank_n):
+		var id := String(k)
+		if only_variant != "" and ItemData.armor_variant(id) != "" and ItemData.armor_variant(id) != only_variant:
+			continue
+		var kind := ItemData.gear_kind(id)
+		if not by_kind.has(kind):
+			by_kind[kind] = []
+		(by_kind[kind] as Array).append(id)
+	var res: Array = []
+	for kk in by_kind:
+		var list: Array = by_kind[kk]
+		for gid in list:
+			res.append([String(gid), 1.0 / float(list.size())])
+	_gear_cache[key] = res
+	return res
+
+
+## Пулы брони и украшений (предметы не меняются во время игры).
+static var _gear_cache: Dictionary = {}
 
 
 ## Обычное (не улучшенное) оружие ранга rank_n; нет такого — ближайшего младшего ранга, где оно есть.
@@ -178,6 +213,10 @@ static func category_of(id: String, type_id: String = "") -> String:
 		return "card"
 	if ItemData.is_weapon(id):
 		return "weapon"
+	if ItemData.is_armor(id):
+		return "armor"
+	if ItemData.is_jewelry(id):
+		return "jewelry"
 	if type_id != "" and MobData.special_materials(type_id).has(id):
 		return "special"
 	if ItemData.item_type(id) == "trophy":
@@ -229,6 +268,15 @@ static func quest_chances(hero_lvl: int, class_id: String = "", rng: RandomNumbe
 		weapons = fit
 	if not weapons.is_empty():
 		res["weapon"] = [float(CATEGORIES["weapon"]["chance"]) * QUEST_CHANCE_MULT, weapons]
+	# Броня — доспех варианта профессии (Бродяге — любой), шлем, перчатки, ботинки; украшения — половина шанса
+	# добычи босса (правило «только с боссов» к заданию неприменимо)
+	var er := ItemData.equip_rank_for_level(hero_lvl)
+	var armor := gear_pool("armor", er, ItemData.body_armor_for(class_id) if class_id != "" else "")
+	if not armor.is_empty():
+		res["armor"] = [float(CATEGORIES["armor"]["chance"]) * QUEST_CHANCE_MULT, armor]
+	var jewelry := gear_pool("jewelry", er)
+	if not jewelry.is_empty():
+		res["jewelry"] = [float(CATEGORIES["jewelry"]["chance"]) * QUEST_CHANCE_MULT, jewelry]
 	# Карта: случайный приручаемый вид острова, шанс — половина шанса приручения его карты
 	var species: Array = []
 	for k in MobData.TYPES:

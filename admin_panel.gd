@@ -15,8 +15,9 @@ extends RefCounted
 ##   «Опыт»: множитель опыта за зверей ×1/×2/×5/×10/×20/×50 (Game.xp_mult — в сохранении; герою и призванному
 ##     питомцу, main._on_mob_gone и PetManager.on_mob_killed; награды заданий не умножаются), опыт до следующего
 ##     уровня герою и питомцу.
-##   «Предметы»: любой предмет ItemData +1/+10 (по группам: оружие, расходники, карты существ, трофеи; кладётся
-##     столько, сколько поместится), «Очистить сумку» с подтверждением (надетое оружие и щит остаются).
+##   «Предметы»: любой предмет ItemData +1/+10 (по группам: оружие, броня, украшения, расходники, карты существ, трофеи;
+##     кладётся столько, сколько поместится), «Очистить сумку» с подтверждением (надетое оружие, щит, броня и украшения
+##     остаются).
 ##   «Питомцы»: питомец любого вида (PetData, кроме ушедших с острова Game.RETIRED_PETS) 1, 15 или 30 ур. (1–3 стадия,
 ##     сразу призывается), уровень призванного −5/−1/+1/+5 (стадия и модель меняются), полное HP/MP питомца,
 ##     воскресить погибших (без свитка), «Отпустить всех» с подтверждением.
@@ -57,7 +58,8 @@ const LEVEL_PRESETS := [1, 10, 15, 20, 30, 40]
 ## Уровни нового питомца — начала стадий эволюции (PetData.STAGE_LEVELS).
 const PET_LEVELS := [1, 15, 30]
 ## Группы предметов на вкладке «Предметы»: [тип ItemData, подпись]; прочие типы — «Прочее».
-const ITEM_GROUPS := [["weapon", "Оружие"], ["consumable", "Расходники"], ["card", "Карты существ"], ["trophy", "Трофеи"]]
+const ITEM_GROUPS := [["weapon", "Оружие"], ["armor", "Броня"], ["jewelry", "Украшения"], ["consumable", "Расходники"],
+	["card", "Карты существ"], ["trophy", "Трофеи"]]
 const KILL_RADIUS := 30.0
 const MOB_MAX_LEVEL := 50
 ## Зверь админ-панели ставится в SPAWN_DIST м перед героем.
@@ -415,7 +417,7 @@ static func _build_items(main: Node, body: VBoxContainer) -> void:
 			_btn(grid, "item_%s_10" % iid, "+10", func() -> void: AdminPanel.give_item(main, iid, 10), 64.0)
 	_head(body, "Очистить сумку")
 	if _confirm == "clear_bag":
-		body.add_child(_text("Удалить из сумки всё, кроме надетого оружия и щита?", UiScale.FONT_TEXT, Color(1.0, 0.6, 0.55)))
+		body.add_child(_text("Удалить из сумки всё, кроме надетого (оружие, щит, броня, украшения)?", UiScale.FONT_TEXT, Color(1.0, 0.6, 0.55)))
 		var cr := _row(body)
 		_btn(cr, "clear_bag_yes", "Да, очистить", func() -> void: AdminPanel.clear_bag(main))
 		_btn(cr, "clear_bag_no", "Отмена", func() -> void: AdminPanel.ask(main, ""))
@@ -460,7 +462,7 @@ static func ask(main: Node, what: String) -> void:
 		open(main)
 
 
-## Сумка пустеет; надетое оружие обеих рук (щит или второй такой же клинок) остаётся.
+## Сумка пустеет; надетое оружие обеих рук (щит или второй такой же клинок), броня и украшения остаются.
 static func clear_bag(main: Node) -> void:
 	_confirm = ""
 	var keep: Dictionary = {}
@@ -468,6 +470,10 @@ static func clear_bag(main: Node) -> void:
 		keep[Game.weapon] = 1
 	if Game.offhand != "" and Game.inventory.has(Game.offhand, int(keep.get(Game.offhand, 0)) + 1):
 		keep[Game.offhand] = int(keep.get(Game.offhand, 0)) + 1
+	for k in Game.equip:
+		var gid := String(Game.equip[k])
+		if gid != "":
+			keep[gid] = int(keep.get(gid, 0)) + 1
 	Game.inventory.from_dict(keep)
 	_done(main, "Сумка очищена")
 

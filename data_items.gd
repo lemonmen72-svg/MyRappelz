@@ -23,6 +23,9 @@ extends RefCounted
 ## Зелья (potion_<вид>_r<ранг>: здоровье, мана, скорость атаки, каста, бега; ранги 1–15) — POTION_KINDS, строятся
 ## в _static_init; ITEMS — BASE_ITEMS + зелья. Ранги предметов и требования уровня — «Ранги предметов» ниже.
 ## Добыча со зверей и случайные награды заданий — LootTable.
+## Броня (type "armor": шлем, доспех, перчатки, ботинки) и украшения (type "jewelry": кольца, серьги, кулон, пояс) —
+## раздел «Броня и украшения» ниже: строятся в _static_init из ARMOR_DEFS / JEWELRY_DEFS (ранги 1–2), надетое —
+## Game.equip {ячейка: id}, бонусы — Player.recalc_stats.
 
 const BASE_ITEMS := {
 	# ---------- Карты существ: базовые продаёт Учитель Кирк, остальные выпадают из зверей своего вида ----------
@@ -264,6 +267,12 @@ static func _static_init() -> void:
 		for r in range(1, POTION_RANKS + 1):
 			var kind := String(k)
 			ITEMS[potion_id(kind, r)] = _make_potion(kind, r)
+	for k in ARMOR_DEFS:
+		for r in range(1, GEAR_RANKS + 1):
+			ITEMS[gear_id(String(k), r)] = _make_gear(String(k), r, ARMOR_DEFS[k], "armor")
+	for k in JEWELRY_DEFS:
+		for r in range(1, GEAR_RANKS + 1):
+			ITEMS[gear_id(String(k), r)] = _make_gear(String(k), r, JEWELRY_DEFS[k], "jewelry")
 
 
 # ---------- Ранги предметов ----------
@@ -710,15 +719,301 @@ static func weapon_stats_text(id: String) -> String:
 	return ", ".join(parts)
 
 
+# ---------- Броня и украшения (этап 2, экипировка; решения Максима) ----------
+## Ячейки экипировки героя (кроме оружия): [ячейка, подпись, вид предмета "slot"]. Надетое — Game.equip {ячейка: id};
+## как оружие, надетая вещь числится в сумке, но ячейку сумки не занимает (Inventory.worn).
+## Броня (type "armor") — на персонаже, не на модели (внешне модель не меняется): шлем, доспех (тело), перчатки,
+## ботинки; украшения (type "jewelry") — 2 кольца, серьги, кулон, пояс. Ранги — как у оружия (EQUIP_RANKS: 1-й 1–20 ур.,
+## 2-й 21–50 …; надеть — с нижнего уровня ранга, level_block). Пока заведены ранги 1–2 (GEAR_RANKS), id —
+## <база>_r<ранг> (armor_body_warrior_r1, ring_hp_r2 …: контракт со значками и с ассортиментом торговцев).
+const GEAR_SLOTS := [
+	["head", "Голова", "head"], ["body", "Тело", "body"], ["hands", "Руки", "hands"], ["feet", "Ноги", "feet"],
+	["ring1", "Кольцо 1", "ring"], ["ring2", "Кольцо 2", "ring"], ["earring", "Серьги", "earring"],
+	["pendant", "Кулон", "pendant"], ["belt", "Пояс", "belt"],
+]
+## Вид вещи → что это, словами (карточка: «шлем»).
+const GEAR_KIND_NAMES := {
+	"head": "шлем", "body": "доспех", "hands": "перчатки", "feet": "ботинки", "ring": "кольцо", "earring": "серьги",
+	"pendant": "кулон", "belt": "пояс",
+}
+const GEAR_RANKS := 2
+## Варианты доспеха (тело) и кому они (решение Максима): воин — высокая физ. и низкая маг. защита (Наёмник, Воин,
+## Мечник), маг — низкая физ. и высокая маг. (Неофит, Волшебник, Шаман), призыватель — средние (Адепт, Зверолов,
+## Колдун). Бродяга носит любой. Шлем, перчатки, ботинки — немного физ. защиты, для всех.
+const BODY_ARMOR := {
+	"warrior": {"name": "доспех воина", "jobs": ["assassin", "warrior", "swordsman"], "who": "Наёмник, Воин, Мечник"},
+	"mage": {"name": "доспех мага", "jobs": ["neophyte", "wizard", "shaman"], "who": "Неофит, Волшебник, Шаман"},
+	"summoner": {"name": "доспех призывателя", "jobs": ["adept", "beastmaster", "conjurer"], "who": "Адепт, Зверолов, Колдун"},
+}
+## Броня по рангам (индекс — ранг − 1): def — физ. защита, mdef — маг. защита, buy / sell — цены (2-й ранг на острове
+## не продаётся — buy 0). Калибровка (tools/rappelz_strider_reference.md, «Броня и украшения»): защита против удара
+## зверя своего уровня — урон × (атака + защита героя) / (атака + защита героя + броня). Полный комплект 1-го ранга
+## (доспех + шлем + перчатки + ботинки) у воина — физ. защита +25: урон зверя своего уровня −25 % на 10 ур., −19 % на 15,
+## −15 % на 20; у мага — маг. защита +20 (−22 / −16 / −13 %), у призывателя +20 / +10. 2-й ранг — ×2.4 (у воина +59:
+## −29 % на 21 ур., −20 % на 35, −15 % на 50). На 1–5 ур. звери бьют слабо (вход новичка), там броня 1-го ранга
+## снимает до половины урона и больше.
+const ARMOR_DEFS := {
+	"armor_body_warrior": {"slot": "body", "armor": "warrior", "icon": "plate", "def": [16, 38], "mdef": [4, 10],
+		"buy": [60, 0], "sell": [15, 45], "names": ["Стёганый доспех бойца", "Кольчуга ветерана"],
+		"color": Color(0.72, 0.62, 0.5), "desc": "Доспех воина: крепко держит удары, но почти не защищает от магии."},
+	"armor_body_summoner": {"slot": "body", "armor": "summoner", "icon": "plate", "def": [11, 26], "mdef": [10, 24],
+		"buy": [60, 0], "sell": [15, 45], "names": ["Куртка укротителя", "Доспех заклинателя зверей"],
+		"color": Color(0.55, 0.68, 0.48), "desc": "Доспех призывателя: поровну защищает и от ударов, и от магии."},
+	"armor_body_mage": {"slot": "body", "armor": "mage", "icon": "plate", "def": [5, 12], "mdef": [20, 46],
+		"buy": [60, 0], "sell": [15, 45], "names": ["Мантия ученика", "Мантия чародея"],
+		"color": Color(0.5, 0.55, 0.85), "desc": "Доспех мага: зачарованная ткань хорошо держит магию, но не удары."},
+	"armor_helmet": {"slot": "head", "icon": "plate", "def": [3, 7], "mdef": [0, 0], "buy": [30, 0], "sell": [8, 25],
+		"names": ["Кожаный шлем", "Железный шлем"], "color": Color(0.7, 0.66, 0.6),
+		"desc": "Шлем: немного физ. защиты. Подходит всем."},
+	"armor_gloves": {"slot": "hands", "icon": "plate", "def": [3, 7], "mdef": [0, 0], "buy": [30, 0], "sell": [8, 25],
+		"names": ["Кожаные перчатки", "Латные перчатки"], "color": Color(0.68, 0.6, 0.5),
+		"desc": "Перчатки: немного физ. защиты. Подходят всем."},
+	"armor_boots": {"slot": "feet", "icon": "plate", "def": [3, 7], "mdef": [0, 0], "buy": [30, 0], "sell": [8, 25],
+		"names": ["Кожаные сапоги", "Окованные сапоги"], "color": Color(0.62, 0.52, 0.42),
+		"desc": "Ботинки: немного физ. защиты. Подходят всем."},
+}
+## Украшения по рангам: bonus — ключ (GEAR_BONUS_NAMES), value — по рангам: hp, mp, def, mdef — числа; crit (шанс крита),
+## crit_dmg (сила крита: к множителю Player.CRIT_MULT 1.8), aspd, cast, eva, speed — доли (0.04 = +4 %).
+## Числа: HP кольца 1-го ранга ≈ 11 % HP героя 10 ур., 2-го — ≈ 11 % на 35 ур.; скорости и крит — небольшие.
+## Украшения выпадают только с боссов (LootTable); 1-й ранг можно и продавать (buy), 2-й — нет.
+const JEWELRY_DEFS := {
+	"ring_hp": {"slot": "ring", "bonus": "hp", "value": [30, 90], "names": ["Бронзовое кольцо жизни", "Золотое кольцо жизни"],
+		"color": Color(0.95, 0.4, 0.4)},
+	"ring_mp": {"slot": "ring", "bonus": "mp", "value": [15, 45], "names": ["Бронзовое кольцо маны", "Золотое кольцо маны"],
+		"color": Color(0.4, 0.6, 1.0)},
+	"ring_crit": {"slot": "ring", "bonus": "crit", "value": [0.02, 0.03],
+		"names": ["Бронзовое кольцо меткого удара", "Золотое кольцо меткого удара"], "color": Color(1.0, 0.75, 0.3)},
+	"ring_critdmg": {"slot": "ring", "bonus": "crit_dmg", "value": [0.1, 0.2],
+		"names": ["Бронзовое кольцо сокрушения", "Золотое кольцо сокрушения"], "color": Color(1.0, 0.5, 0.25)},
+	"ring_aspd": {"slot": "ring", "bonus": "aspd", "value": [0.04, 0.06],
+		"names": ["Бронзовое кольцо быстроты", "Золотое кольцо быстроты"], "color": Color(0.98, 0.6, 0.2)},
+	"ring_cast": {"slot": "ring", "bonus": "cast", "value": [0.05, 0.08],
+		"names": ["Бронзовое кольцо чар", "Золотое кольцо чар"], "color": Color(0.72, 0.42, 0.98)},
+	"earring_crit": {"slot": "earring", "bonus": "crit", "value": [0.02, 0.03],
+		"names": ["Бронзовые серьги меткого удара", "Золотые серьги меткого удара"], "color": Color(1.0, 0.75, 0.3)},
+	"earring_critdmg": {"slot": "earring", "bonus": "crit_dmg", "value": [0.1, 0.2],
+		"names": ["Бронзовые серьги сокрушения", "Золотые серьги сокрушения"], "color": Color(1.0, 0.5, 0.25)},
+	"earring_aspd": {"slot": "earring", "bonus": "aspd", "value": [0.04, 0.06],
+		"names": ["Бронзовые серьги быстроты", "Золотые серьги быстроты"], "color": Color(0.98, 0.6, 0.2)},
+	"earring_cast": {"slot": "earring", "bonus": "cast", "value": [0.05, 0.08],
+		"names": ["Бронзовые серьги чар", "Золотые серьги чар"], "color": Color(0.72, 0.42, 0.98)},
+	"pendant_hp": {"slot": "pendant", "bonus": "hp", "value": [40, 120], "names": ["Бронзовый кулон жизни", "Золотой кулон жизни"],
+		"color": Color(0.95, 0.4, 0.4)},
+	"pendant_mp": {"slot": "pendant", "bonus": "mp", "value": [20, 60], "names": ["Бронзовый кулон маны", "Золотой кулон маны"],
+		"color": Color(0.4, 0.6, 1.0)},
+	"pendant_pdef": {"slot": "pendant", "bonus": "def", "value": [5, 12],
+		"names": ["Бронзовый кулон стойкости", "Золотой кулон стойкости"], "color": Color(0.75, 0.72, 0.65)},
+	"pendant_mdef": {"slot": "pendant", "bonus": "mdef", "value": [5, 12],
+		"names": ["Бронзовый кулон оберега", "Золотой кулон оберега"], "color": Color(0.55, 0.75, 1.0)},
+	"belt_pdef": {"slot": "belt", "bonus": "def", "value": [4, 10], "names": ["Кожаный пояс стойкости", "Золотой пояс стойкости"],
+		"color": Color(0.7, 0.55, 0.38)},
+	"belt_mdef": {"slot": "belt", "bonus": "mdef", "value": [4, 10], "names": ["Кожаный пояс оберега", "Золотой пояс оберега"],
+		"color": Color(0.55, 0.65, 0.9)},
+	"belt_eva": {"slot": "belt", "bonus": "eva", "value": [0.02, 0.03], "names": ["Кожаный пояс ловкости", "Золотой пояс ловкости"],
+		"color": Color(0.5, 0.85, 0.6)},
+	"belt_speed": {"slot": "belt", "bonus": "speed", "value": [0.04, 0.06],
+		"names": ["Кожаный пояс странника", "Золотой пояс странника"], "color": Color(0.35, 0.86, 0.5)},
+}
+## Цены украшений по рангам (2-й ранг не продаётся).
+const JEWELRY_BUY := [90, 0]
+const JEWELRY_SELL := [20, 60]
+## Бонусы брони и украшений: ключ → подпись; GEAR_PCT_KEYS — доли (показываются процентами).
+const GEAR_BONUS_NAMES := {
+	"def": "физ. защита", "mdef": "маг. защита", "hp": "макс. HP", "mp": "макс. MP", "crit": "шанс крита",
+	"crit_dmg": "сила крита", "aspd": "скорость атаки", "cast": "скорость каста", "eva": "уклонение", "speed": "скорость бега",
+}
+const GEAR_BONUS_ORDER := ["def", "mdef", "hp", "mp", "crit", "crit_dmg", "aspd", "cast", "eva", "speed"]
+const GEAR_PCT_KEYS := ["crit", "crit_dmg", "aspd", "cast", "eva", "speed"]
+
+
+## id вещи базы base ранга rank_n: «armor_body_warrior» + 1 → «armor_body_warrior_r1».
+static func gear_id(base: String, rank_n: int) -> String:
+	return "%s_r%d" % [base, rank_n]
+
+
+static func _make_gear(base: String, r: int, d: Dictionary, t: String) -> Dictionary:
+	var i := r - 1
+	var names: Array = d["names"]
+	var it := {
+		"name": String(names[mini(i, names.size() - 1)]), "type": t, "slot": String(d["slot"]), "rank": r,
+		"icon": String(d.get("icon", "crystal")), "icon_file": gear_id(base, mini(r, 2)), "color": d["color"],
+	}
+	if t == "armor":
+		it["def"] = int((d["def"] as Array)[i])
+		it["mdef"] = int((d["mdef"] as Array)[i])
+		it["buy"] = int((d["buy"] as Array)[i])
+		it["sell"] = int((d["sell"] as Array)[i])
+		it["desc"] = String(d["desc"])
+		if d.has("armor"):
+			var v := String(d["armor"])
+			it["armor"] = v
+			it["desc"] = String(d["desc"]) + " Для профессий: %s (и Бродяги)." % String(BODY_ARMOR[v]["who"])
+	else:
+		var key := String(d["bonus"])
+		var val: float = float((d["value"] as Array)[i])
+		it["bonus"] = {key: val}
+		it["buy"] = int(JEWELRY_BUY[i])
+		it["sell"] = int(JEWELRY_SELL[i])
+		it["desc"] = "Украшение (%s): %s. Подходит всем." % [String(GEAR_KIND_NAMES[String(d["slot"])]),
+			gear_bonus_text({key: val})]
+	return it
+
+
+static func is_armor(id: String) -> bool:
+	return item_type(id) == "armor"
+
+
+static func is_jewelry(id: String) -> bool:
+	return item_type(id) == "jewelry"
+
+
+## Броня или украшение (надевается в ячейки GEAR_SLOTS).
+static func is_gear(id: String) -> bool:
+	var t := item_type(id)
+	return t == "armor" or t == "jewelry"
+
+
+## Вид вещи: "head", "body", "hands", "feet", "ring", "earring", "pendant", "belt" ("" — не броня и не украшение).
+static func gear_kind(id: String) -> String:
+	return String(get_item(id).get("slot", "")) if is_gear(id) else ""
+
+
+## Ячейки GEAR_SLOTS, в которые встаёт вещь id (кольцо — в обе ячейки колец).
+static func gear_slots_for(id: String) -> Array:
+	var res: Array = []
+	var k := gear_kind(id)
+	if k == "":
+		return res
+	for s in GEAR_SLOTS:
+		if String(s[2]) == k:
+			res.append(String(s[0]))
+	return res
+
+
+## Ячейка экипировки существует.
+static func is_gear_slot(slot: String) -> bool:
+	for s in GEAR_SLOTS:
+		if String(s[0]) == slot:
+			return true
+	return false
+
+
+## Подпись ячейки («Кольцо 1»).
+static func gear_slot_name(slot: String) -> String:
+	for s in GEAR_SLOTS:
+		if String(s[0]) == slot:
+			return String(s[1])
+	return slot
+
+
+## Вид вещей ячейки ("ring1" → "ring").
+static func gear_slot_kind(slot: String) -> String:
+	for s in GEAR_SLOTS:
+		if String(s[0]) == slot:
+			return String(s[2])
+	return ""
+
+
+## Вариант доспеха (тело): "warrior" | "mage" | "summoner" ("" — не доспех).
+static func armor_variant(id: String) -> String:
+	return String(get_item(id).get("armor", ""))
+
+
+## Вариант доспеха профессии ("" — Бродяга и прочие: любой).
+static func body_armor_for(class_id: String) -> String:
+	var c := ClassData.migrate_id(class_id)
+	for v in BODY_ARMOR:
+		if (BODY_ARMOR[v]["jobs"] as Array).has(c):
+			return String(v)
+	return ""
+
+
+## Подходит ли броня или украшение профессии: доспех — свой вариант (Бродяге — любой), остальное — всем.
+static func armor_fits(id: String, class_id: String) -> bool:
+	if not is_gear(id):
+		return false
+	var v := armor_variant(id)
+	if v == "":
+		return true
+	var mine := body_armor_for(class_id)
+	return mine == "" or mine == v
+
+
+## Подходит ли снаряжение (оружие, броня, украшение) профессии.
+static func equip_fits(id: String, class_id: String) -> bool:
+	if is_weapon(id):
+		return weapon_fits(id, class_id)
+	return armor_fits(id, class_id)
+
+
+## Бонусы вещи id: {ключ GEAR_BONUS_NAMES: число} (только ненулевые).
+static func gear_bonus(id: String) -> Dictionary:
+	var res: Dictionary = {}
+	if not is_gear(id):
+		return res
+	var it := get_item(id)
+	for k in ["def", "mdef"]:
+		if int(it.get(k, 0)) != 0:
+			res[k] = float(it[k])
+	var b: Dictionary = it.get("bonus", {})
+	for k in b:
+		res[String(k)] = float(res.get(String(k), 0.0)) + float(b[k])
+	return res
+
+
+## Сумма бонусов вещей ids (все ключи GEAR_BONUS_ORDER, нули — тоже).
+static func gear_bonus_total(ids: Array) -> Dictionary:
+	var res: Dictionary = {}
+	for k in GEAR_BONUS_ORDER:
+		res[k] = 0.0
+	for id in ids:
+		var b := gear_bonus(String(id))
+		for k in b:
+			res[String(k)] = float(res.get(String(k), 0.0)) + float(b[k])
+	return res
+
+
+## Бонус одной строкой: «физ. защита +16, маг. защита +4, шанс крита +2%» (нули пропускаются).
+static func gear_bonus_text(b: Dictionary) -> String:
+	var parts: PackedStringArray = []
+	for k in GEAR_BONUS_ORDER:
+		var v := float(b.get(k, 0.0))
+		if absf(v) < 0.0001:
+			continue
+		parts.append("%s %s" % [String(GEAR_BONUS_NAMES[k]), gear_value_text(String(k), v)])
+	return ", ".join(parts)
+
+
+## Значение бонуса: «+16» или «+4%».
+static func gear_value_text(key: String, v: float) -> String:
+	if GEAR_PCT_KEYS.has(key):
+		return "%s%d%%" % ["+" if v >= 0.0 else "−", roundi(absf(v) * 100.0)]
+	return "%s%d" % ["+" if v >= 0.0 else "−", roundi(absf(v))]
+
+
+## Обычные (не улучшенные) вещи типа t ("armor" | "jewelry") ранга rank_n; нет такого ранга — ближайшего младшего.
+static func gear_of_rank(t: String, rank_n: int) -> Array:
+	var r := rank_n
+	var res: Array = []
+	while r >= 1 and res.is_empty():
+		for k in ITEMS:
+			var id := String(k)
+			if item_type(id) == t and rank(id) == r and rarity(id) == "common":
+				res.append(id)
+		r -= 1
+	return res
+
+
 # ---------- Сумка: типы, редкость, стопки, значки ----------
 
 ## Типы предметов: название, порядок сортировки, цвет рамки (у обычных расходников и трофеев; у карт — цвет тира).
 const TYPES := {
 	"weapon": {"name": "Оружие", "order": 0, "color": Color(0.7, 0.72, 0.78)},
-	"armor": {"name": "Доспех", "order": 1, "color": Color(0.7, 0.72, 0.78)},
-	"consumable": {"name": "Расходник", "order": 2, "color": Color(0.95, 0.45, 0.5)},
-	"card": {"name": "Карта существа", "order": 3, "color": Color(0.78, 0.56, 0.34)},
-	"trophy": {"name": "Трофей", "order": 4, "color": Color(0.85, 0.65, 0.4)},
+	"armor": {"name": "Броня", "order": 1, "color": Color(0.7, 0.72, 0.78)},
+	"jewelry": {"name": "Украшение", "order": 2, "color": Color(0.7, 0.72, 0.78)},
+	"consumable": {"name": "Расходник", "order": 3, "color": Color(0.95, 0.45, 0.5)},
+	"card": {"name": "Карта существа", "order": 4, "color": Color(0.78, 0.56, 0.34)},
+	"trophy": {"name": "Трофей", "order": 5, "color": Color(0.85, 0.65, 0.4)},
 }
 ## Редкость: название, ранг (для сортировки), цвет рамки и названия.
 const RARITIES := {
@@ -773,15 +1068,14 @@ static func frame_color(id: String) -> Color:
 	if is_card(id):
 		return MIRROR_COLOR if card_species(id) == "" else card_tier_color(card_tier(id))
 	var r := rarity(id)
-	if r != "common" or is_weapon(id) or not TYPES.has(item_type(id)):
+	if r != "common" or is_equipment(id) or not TYPES.has(item_type(id)):
 		return RARITIES[r]["color"]
 	return TYPES[item_type(id)]["color"]
 
 
-## Сколько штук лежит в одной ячейке сумки.
+## Сколько штук лежит в одной ячейке сумки (оружие, броня и украшения — по одному).
 static func stack_size(id: String) -> int:
-	var t := item_type(id)
-	if t == "weapon" or t == "armor":
+	if is_equipment(id):
 		return 1
 	return maxi(1, int(get_item(id).get("stack", STACK)))
 
@@ -791,11 +1085,13 @@ static func icon_shape(id: String) -> String:
 	return String(get_item(id).get("icon", ""))
 
 
-## Картинка значка: <id>.png; у зелий — одна на вид и размер колбы: potion_<вид>_t<1|2|3>.png (potion_tier).
+## Картинка значка: <id>.png; у зелий — одна на вид и размер колбы: potion_<вид>_t<1|2|3>.png (potion_tier);
+## у брони и украшений — поле icon_file (значок своего яруса: 1-й ранг — <база>_r1, 2-й и старше — <база>_r2).
 static func icon_path(id: String) -> String:
 	if is_potion(id):
 		return ICON_DIR + "potion_%s_t%d.png" % [potion_kind(id), potion_tier(rank(id))]
-	return ICON_DIR + id + ".png"
+	var f := String(get_item(id).get("icon_file", ""))
+	return ICON_DIR + (f if f != "" else id) + ".png"
 
 
 ## Порядок в сумке: тип, затем редкость (лучшие раньше; у карт — тир, заполненные раньше пустых, зеркальные

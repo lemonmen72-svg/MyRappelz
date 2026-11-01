@@ -2,8 +2,9 @@ class_name InventoryWindow
 extends Node
 ## Окно сумки как в MMORPG (кнопка «Сумка», клавиши I и B) и окно торговца в том же стиле. Живёт в Economy
 ## (main.economy.window); данные — Game.inventory (ячейки Inventory), Game.weapon, Game.gold.
-## Сумка: слева — экипировка героя (слоты «Оружие» и «Щит» рабочие, Голова / Тело / Руки / Ноги — заглушки
-## «скоро»), в центре — золото, занятость «N/40», «Сортировать» и сетка ячеек (COLS столбцов; если ячеек больше
+## Сумка: слева — экипировка героя в два столбца (EQUIP_SLOTS: «Оружие», «2-я рука», «Голова», «Тело», «Руки», «Ноги»;
+## «Кольцо 1», «Кольцо 2», «Серьги», «Кулон», «Пояс» — броня и украшения, Game.equip), в центре — золото,
+## занятость «N/40», «Сортировать» и сетка ячеек (COLS столбцов; если ячеек больше
 ## вместимости — окно прокручивается), справа — карточка выбранного: значок, название цветом редкости, тип и
 ## редкость, описание, характеристики (у оружия — сравнение с надетым: лучше зелёным, хуже красным), цена продажи
 ## и кнопки по типу: «Надеть», «Использовать», «Сформировать» (карта существа с душой — питомец в коллекцию),
@@ -11,7 +12,10 @@ extends Node
 ## «Переместить», «Выбросить» (с подтверждением, у стопок — сколько).
 ## Пальцем: касание ячейки — карточка; «Переместить», затем касание другой ячейки — стопки одного предмета
 ## складываются, разные предметы меняются местами; то же — перетаскиванием значка (касания эмулируют мышь),
-## оружие можно перетащить в слот «Оружие». Надетое оружие меняется местами с выбранным (старое — в ту же ячейку).
+## оружие можно перетащить в слот «Оружие», броню и украшения — в свою ячейку экипировки. Надетое меняется местами
+## с выбранным (старое — в ту же ячейку сумки). Карточка брони и украшения — бонусы, сравнение с надетым в той же
+## ячейке (лучше зелёным, хуже красным), кому подходит доспех, ранг и уровень; «Надеть» (кольцо — «Во 2-е кольцо»),
+## у надетого — «Снять».
 ## Торговля (у торговца или другого NPC — seller, ассортимент NpcData.shop): слева — товары (касание — карточка
 ## с «Купить» / «Купить ×5»), в центре — сумка (касание — карточка с «Продать» / «Продать все»), справа — карточка.
 ## Продать из сумки можно рядом с любым торгующим NPC.
@@ -23,13 +27,14 @@ extends Node
 ## Зелья (ItemData.POTION_KINDS): «Использовать» — Economy.drink; в карточке ранг и с какого уровня можно пить.
 ## Оружие: в карточке ранг и с какого уровня можно надеть (ниже — «Надеть» выключена).
 ## Кнопки открытого окна для тестов (buttons): "cell_<i>", "store_<i>", "equip_<слот>", "good_<id>", "sort",
-## "sort_store", "act_equip", "act_use", "act_form", "act_sell", "act_sell_all", "act_move", "act_move_cancel",
+## "sort_store", "act_equip", "act_equip_ring2", "act_unequip", "act_use", "act_form", "act_sell", "act_sell_all",
+## "act_move", "act_move_cancel",
 ## "act_drop", "act_drop_yes", "act_drop_no", "act_drop_minus", "act_drop_plus", "act_drop_all", "act_buy", "act_buy5",
 ## "act_store", "act_store_all", "act_take", "act_take_all", "gold_put", "gold_take", "gold_put_100",
 ## "gold_put_1000", "gold_put_all", "gold_take_100", "gold_take_1000", "gold_take_all"; поле суммы — gold_edit.
 
 ## Размеры — для «Среднего» размера интерфейса (умножаются на UiScale.k(); было окно 1240×680, ячейка 88).
-const WINDOW_SIZE := Vector2(1000, 580)
+const WINDOW_SIZE := Vector2(1060, 580)
 ## Сетка сумки: столбцов, размер ячейки в окне сумки и в окне торговца, зазор.
 const COLS := 8
 const CELL := 64.0
@@ -37,7 +42,7 @@ const SHOP_CELL := 54.0
 const GAP := 5.0
 ## Товары торговца: столбцов.
 const SHOP_COLS := 3
-const EQUIP_CELL := 58.0
+const EQUIP_CELL := 54.0
 ## Ширина карточки предмета (окно сумки / окно торговца).
 const CARD_W := 300.0
 const SHOP_CARD_W := 290.0
@@ -57,13 +62,15 @@ const SEL_COLOR := Color(1.0, 0.96, 0.62)
 const EMPTY_FRAME := Color(0.42, 0.44, 0.58, 0.75)
 const CELL_BG := Color(0.05, 0.06, 0.13, 0.92)
 
-## Слоты экипировки: [id, название]. Рабочие — «Оружие» (Game.weapon) и «2-я рука» (щит или второй такой же клинок,
-## Game.offhand),
-## остальные — заглушки (аксессуар вернётся вместе с экипировкой).
+## Слоты экипировки: [id, название]. «Оружие» (Game.weapon) и «2-я рука» (щит или второй такой же клинок,
+## Game.offhand), остальные — броня и украшения (ItemData.GEAR_SLOTS, Game.equip). Первые EQUIP_COL_A — левый
+## столбец (оружие и броня), остальные — правый (украшения).
 const EQUIP_SLOTS := [
 	["weapon", "Оружие"], ["offhand", "2-я рука"], ["head", "Голова"], ["body", "Тело"],
-	["hands", "Руки"], ["feet", "Ноги"],
+	["hands", "Руки"], ["feet", "Ноги"], ["ring1", "Кольцо 1"], ["ring2", "Кольцо 2"], ["earring", "Серьги"],
+	["pendant", "Кулон"], ["belt", "Пояс"],
 ]
+const EQUIP_COL_A := 6
 
 var main: Node
 var economy: Node
@@ -148,7 +155,7 @@ func select_store(i: int) -> void:
 	_on_cell("store", i)
 
 
-## Товары NPC who (NpcData.shop): продаётся (buy > 0), оружие — только подходящее классу героя class_id.
+## Товары NPC who (NpcData.shop): продаётся (buy > 0), оружие и доспех — только подходящие классу героя class_id.
 static func goods(class_id: String, who: String = "merchant") -> Array:
 	var res: Array = []
 	for key in NpcData.shop(who):
@@ -156,6 +163,8 @@ static func goods(class_id: String, who: String = "merchant") -> Array:
 		if int(ItemData.get_item(id).get("buy", 0)) <= 0:
 			continue
 		if ItemData.is_weapon(id) and not ItemData.weapon_fits(id, class_id):
+			continue
+		if ItemData.is_armor(id) and not ItemData.armor_fits(id, class_id):
 			continue
 		res.append(id)
 	return res
@@ -224,13 +233,45 @@ func _validate_selection() -> void:
 
 
 func _build_equipment(parent: VBoxContainer) -> void:
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", int(UiScale.px(GAP)))
+	parent.add_child(cols)
+	var col_a := VBoxContainer.new()
+	col_a.add_theme_constant_override("separation", int(UiScale.px(GAP)))
+	cols.add_child(col_a)
+	var col_b := VBoxContainer.new()
+	col_b.add_theme_constant_override("separation", int(UiScale.px(GAP)))
+	cols.add_child(col_b)
 	for i in EQUIP_SLOTS.size():
 		var slot_id := String(EQUIP_SLOTS[i][0])
-		var id: String = Game.weapon if slot_id == "weapon" else (Game.offhand if slot_id == "offhand" else "")
-		var b := _make_cell("equip", i, id, "", UiScale.px(EQUIP_CELL), sel_kind == "equip" and sel_index == i,
+		var b := _make_cell("equip", i, equipped_in(slot_id), "", UiScale.px(EQUIP_CELL), sel_kind == "equip" and sel_index == i,
 			String(EQUIP_SLOTS[i][1]))
-		parent.add_child(b)
+		(col_a if i < EQUIP_COL_A else col_b).add_child(b)
 		buttons["equip_" + slot_id] = b
+
+
+## Что надето в слоте slot_id ("weapon", "offhand" или ячейка брони и украшений): id предмета или "".
+static func equipped_in(slot_id: String) -> String:
+	if slot_id == "weapon":
+		return Game.weapon
+	if slot_id == "offhand":
+		return Game.offhand
+	return Game.gear_in(slot_id)
+
+
+## Индекс слота экипировки по id ("ring2" → 7; −1 — нет).
+static func equip_index(slot_id: String) -> int:
+	for i in EQUIP_SLOTS.size():
+		if String(EQUIP_SLOTS[i][0]) == slot_id:
+			return i
+	return -1
+
+
+## Выбрать слот экипировки (как касание): "weapon", "offhand", "head", … "belt".
+func select_equip(slot_id: String) -> void:
+	var i := equip_index(slot_id)
+	if i >= 0:
+		_on_cell("equip", i)
 
 
 func _build_goods(parent: VBoxContainer) -> void:
@@ -379,7 +420,7 @@ func _make_cell(kind: String, index: int, id: String, corner: String, sz: float,
 		ic.position = Vector2((sz - icon_sz) * 0.5, icon_y)
 		b.add_child(ic)
 	if caption != "":
-		var cap := _label(caption if id != "" or index <= 1 else caption + "\nскоро", UiScale.FONT_TINY, MUTED if id != "" else EMPTY_FRAME.lightened(0.3))
+		var cap := _label(caption, UiScale.FONT_TINY, MUTED if id != "" else EMPTY_FRAME.lightened(0.3))
 		cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		cap.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM if id != "" else VERTICAL_ALIGNMENT_CENTER
 		cap.position = Vector2(0, 0)
@@ -405,6 +446,8 @@ func _build_card(card: VBoxContainer) -> void:
 		var t := "Коснитесь ячейки, куда положить предмет. Тот же предмет сложится в стопку, другой поменяется местами."
 		if ItemData.is_weapon(sel_id):
 			t += " Слот «Оружие» — надеть."
+		elif ItemData.is_gear(sel_id):
+			t += " Своя ячейка экипировки — надеть."
 		card.add_child(_text(t, UiScale.FONT_TEXT, Color.WHITE))
 		card.add_child(_action_grid([["Отмена", "act_move_cancel", _on_move_cancel]]))
 		return
@@ -468,7 +511,7 @@ func _card_item(card: VBoxContainer) -> void:
 	var n := int(c.get("n", 1))
 	var sub := "В ячейке: %d" % n if n > 1 else ""
 	_card_head(card, id, sub)
-	_card_body(card, id, Game.shield if ItemData.is_shield(id) else Game.weapon)
+	_card_body(card, id, _compare_with(id))
 	if mode == "storage":
 		var sa: Array = [["На склад", "act_store", _on_store.bind(false)]]
 		if n > 1:
@@ -492,6 +535,12 @@ func _card_item(card: VBoxContainer) -> void:
 		if not ItemData.is_shield(id) and ItemData.weapon_fits(id, Game.class_id) \
 				and ItemData.offhand_block(id, Game.weapon, Game.class_id) == "":
 			acts.append(["Во 2-ю руку", "act_equip_off", _on_equip_off, Game.offhand_block(id) != ""])
+	elif ItemData.is_gear(id):
+		var gs: String = Game.gear_slot_for(id)
+		acts.append(["Надеть", "act_equip", _on_equip, Game.gear_block(id, gs) != ""])
+		# Кольцо — и именно во второе кольцо (если «Надеть» положит его в первое)
+		if ItemData.gear_kind(id) == "ring" and gs != "ring2":
+			acts.append(["Во 2-е кольцо", "act_equip_ring2", _on_equip_ring2, Game.gear_block(id, "ring2") != ""])
 	elif _usable(id):
 		acts.append(["Использовать", "act_use", _on_use])
 	elif ItemData.is_soul_card(id):
@@ -538,6 +587,12 @@ func _card_equip(card: VBoxContainer) -> void:
 		_card_body(card, Game.offhand, "")
 		card.add_child(_action_grid([["Снять щит" if Game.has_shield() else "Снять", "act_unshield", _on_unshield]]))
 		return
+	var worn: String = Game.gear_in(slot_id)
+	if worn != "":
+		_card_head(card, worn, "Надето · слот «%s»" % slot_name)
+		_card_body(card, worn, "")
+		card.add_child(_action_grid([["Снять", "act_unequip", _on_unequip.bind(slot_id)]]))
+		return
 	_card_head(card, "", "")
 	card.add_child(_label(slot_name, UiScale.FONT_HEAD, GOLD))
 	if slot_id == "weapon":
@@ -546,7 +601,12 @@ func _card_equip(card: VBoxContainer) -> void:
 		card.add_child(_text("Вторая рука — к одноручному оружию: щит (если профессия им владеет) или второй такой же кинжал, меч или топор (если профессия держит пару). Двуручное оружие занимает обе руки.",
 			UiScale.FONT_TEXT, MUTED))
 	else:
-		card.add_child(_text("Скоро: доспехи и украшения появятся вместе с экипировкой.", UiScale.FONT_TEXT, MUTED))
+		var what := String(ItemData.GEAR_KIND_NAMES.get(ItemData.gear_slot_kind(slot_id), "вещь"))
+		var t := "Здесь — %s. Коснитесь вещи в сумке и «Надеть» или перетащите её сюда." % what
+		if slot_id == "body":
+			var v := ItemData.body_armor_for(Game.class_id)
+			t += " Ваш доспех — %s." % (String(ItemData.BODY_ARMOR[v]["name"]) if v != "" else "любой (Бродяга)")
+		card.add_child(_text(t, UiScale.FONT_TEXT, MUTED))
 
 
 ## Карточка вещи на складе: «В сумку» / «В сумку все».
@@ -566,7 +626,7 @@ func _card_good(card: VBoxContainer) -> void:
 	var id := sel_id
 	var price := int(ItemData.get_item(id).get("buy", 0))
 	_card_head(card, id, "В сумке: %d" % Game.inventory.count(id))
-	_card_body(card, id, Game.shield if ItemData.is_shield(id) else Game.weapon)
+	_card_body(card, id, _compare_with(id))
 	var pl := _text("Цена: %d зол." % price, UiScale.FONT_TEXT, GOLD if Game.gold >= price else BAD)
 	pl.name = "price_label"
 	card.add_child(pl)
@@ -584,6 +644,8 @@ func _card_body(card: VBoxContainer, id: String, cmp: String) -> void:
 	match ItemData.item_type(id):
 		"weapon":
 			_weapon_stats(card, id, cmp)
+		"armor", "jewelry":
+			_gear_stats(card, id, cmp)
 		"card":
 			for line in Taming.card_lines(id):
 				card.add_child(_text(String(line), UiScale.FONT_BODY, MUTED))
@@ -633,6 +695,51 @@ func _weapon_stats(card: VBoxContainer, id: String, cmp: String) -> void:
 	elif ItemData.pair_kind(ItemData.weapon_kind(id)) != "":
 		hands_text += ", можно два — по одному в каждой руке"
 	card.add_child(_text("Хват: %s" % hands_text, UiScale.FONT_SMALL, MUTED))
+	if has_cmp:
+		card.add_child(_text("В скобках — разница с надетым: %s" % ItemData.item_name(cmp), UiScale.FONT_SMALL, MUTED))
+
+
+## С чем сравнивать предмет id в карточке: оружие — с надетым оружием (щит — со щитом), броня и украшение — с вещью
+## в той ячейке, куда он встанет («Надеть»); "" — не с чем.
+func _compare_with(id: String) -> String:
+	if ItemData.is_gear(id):
+		return Game.gear_in(Game.gear_slot_for(id))
+	if ItemData.is_weapon(id):
+		return Game.shield if ItemData.is_shield(id) else Game.weapon
+	return ""
+
+
+## Броня и украшения: вид, кому подходит доспех, бонусы со сравнением с надетым cmp (у того же вида ячейки).
+func _gear_stats(card: VBoxContainer, id: String, cmp: String) -> void:
+	var kind := ItemData.gear_kind(id)
+	var line := "Вид: %s" % String(ItemData.GEAR_KIND_NAMES.get(kind, kind))
+	var v := ItemData.armor_variant(id)
+	if v != "":
+		line += " · %s" % String(ItemData.BODY_ARMOR[v]["name"])
+	card.add_child(_text(line, UiScale.FONT_BODY, MUTED))
+	if not ItemData.armor_fits(id, Game.class_id):
+		card.add_child(_text("Не подходит вашей профессии: %s — для профессий %s" % [String(ItemData.BODY_ARMOR[v]["name"]),
+			String(ItemData.BODY_ARMOR[v]["who"])], UiScale.FONT_BODY, BAD))
+	var has_cmp := cmp != "" and cmp != id and ItemData.is_gear(cmp)
+	var gb := ItemData.gear_bonus(id)
+	var ob := ItemData.gear_bonus(cmp) if has_cmp else gb
+	var g := GridContainer.new()
+	g.columns = 2
+	g.add_theme_constant_override("h_separation", int(UiScale.px(12)))
+	g.add_theme_constant_override("v_separation", 0)
+	card.add_child(g)
+	for k in ItemData.GEAR_BONUS_ORDER:
+		var key := String(k)
+		var val := float(gb.get(key, 0.0))
+		var o := float(ob.get(key, 0.0))
+		if absf(val) < 0.0001 and not (has_cmp and absf(o) > 0.0001):
+			continue
+		var title := String(ItemData.GEAR_BONUS_NAMES[key])
+		title = title.substr(0, 1).to_upper() + title.substr(1)
+		if ItemData.GEAR_PCT_KEYS.has(key):
+			_stat(g, title, val * 100.0, o * 100.0, has_cmp, "+%.0f%%", "%.0f%%", true)
+		else:
+			_stat(g, title, val, o, has_cmp, "+%.0f", "%.0f", true)
 	if has_cmp:
 		card.add_child(_text("В скобках — разница с надетым: %s" % ItemData.item_name(cmp), UiScale.FONT_SMALL, MUTED))
 
@@ -690,6 +797,8 @@ func _on_cell(kind: String, index: int) -> void:
 			_move_to(index)
 		elif kind == "equip" and index <= 1:
 			_equip_cell(sel_index)
+		elif kind == "equip":
+			_equip_gear_cell(sel_index, String(EQUIP_SLOTS[index][0]))
 		refresh()
 		return
 	drop_confirm = false
@@ -745,6 +854,8 @@ func _on_drop(kind: String, index: int, from: int) -> void:
 		_move_to(index)
 	elif kind == "equip" and index <= 1:
 		_equip_cell(from, index == 1)
+	elif kind == "equip":
+		_equip_gear_cell(from, String(EQUIP_SLOTS[index][0]))
 	elif kind == "store":
 		economy.deposit(from, -1)
 		clear_selection()
@@ -772,6 +883,9 @@ func _can_drop(kind: String, index: int, from: int) -> bool:
 		if index == 0:
 			return not ItemData.is_shield(id)
 		return ItemData.is_shield(id) or ItemData.offhand_block(id, Game.weapon, Game.class_id) == ""
+	if kind == "equip" and index < EQUIP_SLOTS.size():
+		var gid := String(Game.inventory.cell(from).get("id", ""))
+		return ItemData.gear_slots_for(gid).has(String(EQUIP_SLOTS[index][0]))
 	return false
 
 
@@ -799,6 +913,40 @@ func _equip_cell(i: int, second: bool = false) -> void:
 	sel_id = "offhand" if off else "weapon"
 
 
+## Надеть броню или украшение из ячейки сумки i в ячейку экипировки gslot ("" — первая свободная подходящая);
+## прежняя вещь ячейки ложится в ту же ячейку сумки (обмен). Выделение — на ячейке экипировки.
+func _equip_gear_cell(i: int, gslot: String = "") -> void:
+	var inv: Inventory = Game.inventory
+	var id := String(inv.cell(i).get("id", ""))
+	if not ItemData.is_gear(id):
+		_msg("Это нельзя надеть сюда")
+		return
+	var target: String = gslot if gslot != "" else Game.gear_slot_for(id)
+	var old: String = Game.gear_in(target)
+	var err: String = main.player.equip_gear(id, target)
+	if err != "":
+		_msg(err)
+		return
+	if old != "" and old != id:
+		var j := inv.find_cell(old, true)
+		var here := String(inv.cell(i).get("id", ""))
+		if j >= 0 and j != i and (here == "" or here == id):
+			inv.move(j, i)
+	sel_kind = "equip"
+	sel_index = equip_index(target)
+	sel_id = target
+
+
+func _on_unequip(gslot: String) -> void:
+	main.player.unequip_gear(gslot)
+	refresh()
+
+
+func _on_equip_ring2() -> void:
+	_equip_gear_cell(sel_index, "ring2")
+	refresh()
+
+
 func _on_unshield() -> void:
 	main.player.unequip_offhand()
 	refresh()
@@ -810,7 +958,10 @@ func _on_equip_off() -> void:
 
 
 func _on_equip() -> void:
-	_equip_cell(sel_index)
+	if ItemData.is_gear(sel_id):
+		_equip_gear_cell(sel_index)
+	else:
+		_equip_cell(sel_index)
 	refresh()
 
 
@@ -973,7 +1124,8 @@ func _button(text: String, node_name: String, cb: Callable) -> Button:
 	return b
 
 
-## Ячейка-кнопка с перетаскиванием значка: из сумки — в другую ячейку, (оружие) в слот «Оружие» или на склад;
+## Ячейка-кнопка с перетаскиванием значка: из сумки — в другую ячейку, (оружие) в слот «Оружие», (броня, украшение)
+## в свою ячейку экипировки или на склад;
 ## со склада — в сумку.
 class Cell extends Button:
 	## "bag" (ячейка сумки), "equip" (слот экипировки), "good" (товар торговца), "store" (ячейка склада).

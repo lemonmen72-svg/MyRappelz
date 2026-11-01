@@ -109,6 +109,10 @@ const POTION_BAG := [
 	["potion_hp_r2", 6], ["potion_hp_r6", 2], ["potion_hp_r11", 1], ["potion_mp_r1", 5], ["potion_mp_r7", 2],
 	["potion_aspd_r2", 3], ["potion_cast_r12", 1], ["potion_speed_r1", 4], ["weapon_staff_2h_r2", 1], ["weapon_sword_1h_r2", 1],
 ]
+## Кадры 270–274 (экипировка): надето кроме доспеха (доспех — по профессии героя) и лежит в сумке.
+const GEAR_SHOT_WORN := ["armor_helmet_r1", "armor_gloves_r1", "armor_boots_r1", "ring_hp_r1", "ring_cast_r1",
+	"earring_crit_r1", "pendant_mdef_r1", "belt_speed_r1"]
+const GEAR_SHOT_BAG := ["pendant_hp_r1", "ring_critdmg_r2", "armor_body_warrior_r1", "armor_helmet_r2", "earring_aspd_r1"]
 ## Предметы для кадров сумки и торговца (27–30): [id, количество]. Карты существ: пустые, с душой, зеркальная.
 const BAG_ITEMS := [
 	["dagger_steel", 1], ["sword_steel", 2], ["crossbow_heavy", 1], ["card_panther", 4], ["card_wolf", 1], ["card_turtle", 1],
@@ -137,7 +141,7 @@ const PART_ENTRIES := [
 	[814, 152, 72], [816, 59, 23], [818, 120, 29], [960, 45, 12], [963, 64, 14], [925, 141, 33],
 	[940, 33, 9], [943, 63, 47], [946, 95, 46], [980, 40, 46], [1000, 42, 18], [1002, 95, 83],
 	[1025, 102, 102], [1021, 126, 144], [1040, 141, 181], [1060, 66, 67], [1160, 124, 148], [1120, 98, 101],
-	[1080, 60, 58], [1200, 178, 224],
+	[1080, 60, 58], [1200, 181, 224], [1240, 76, 40],
 ]
 ## Сколько кадров до точки входа часть уже рисует (компиляция шейдеров, тени, окна интерфейса).
 const PART_WARMUP := 10
@@ -1815,6 +1819,70 @@ func run_step() -> void:
 			main.cam.current = true
 			main.hud.visible = true
 			main.player.visible = true
+			wait = 3
+			step = 1240
+		# ---------- Кадры 270–274: экипировка — броня и украшения в сумке, карточки со сравнением, окно героя, добыча ----------
+		1240:
+			main.hud.close_window()
+			game.level = 15
+			main.player.apply_class()
+			# Сумка заново: надетое оружие, немного зелий, броня и украшения (герой кадров — Волшебник: доспех мага)
+			var keep: Dictionary = {}
+			if game.weapon != "":
+				keep[game.weapon] = 1
+			if game.offhand != "":
+				keep[game.offhand] = int(keep.get(game.offhand, 0)) + 1
+			game.inventory.from_dict(keep)
+			game.inventory.add("potion_hp_r2", 6)
+			game.inventory.add("potion_mp_r2", 5)
+			var v := ItemData.body_armor_for(game.class_id)
+			if v == "":
+				v = "mage"
+			var worn: Array = ["armor_body_%s_r1" % v] + GEAR_SHOT_WORN
+			for id in worn + GEAR_SHOT_BAG + ["armor_body_%s_r2" % v]:
+				game.inventory.add(String(id))
+			for id in worn:
+				check(main.player.equip_gear(String(id)) == "", "кадр 270: надето %s" % id)
+			main.player.hp = main.player.max_hp
+			main.economy.open_bag()
+			main.economy.window.select_equip("body")
+			wait = 12
+			step = 1241
+		1241:
+			shot("270_bag_equipment")
+			var v2 := ItemData.body_armor_for(game.class_id)
+			main.economy.window.select_cell(game.inventory.find_cell("armor_body_%s_r2" % (v2 if v2 != "" else "mage")))
+			wait = 8
+			step = 1242
+		1242:
+			shot("271_armor_card_compare")
+			main.economy.window.select_cell(game.inventory.find_cell("pendant_hp_r1"))
+			wait = 8
+			step = 1243
+		1243:
+			shot("272_jewelry_card_compare")
+			main.hud.close_window()
+			main.hero_window.open("hero")
+			wait = 12
+			step = 1244
+		1244:
+			shot("273_hero_window_equipment")
+			main.hud.close_window()
+			# Мешочки с бронёй и украшениями: дальний лежит, ближний подобран — сообщение «Подобрано: …»
+			var p: Player = main.player
+			var pos := Vector3(0.0, 0.0, 3.2)
+			if IslandWorld.current != null:
+				pos.y = IslandWorld.current.height_at(pos.x, pos.z) + 0.1
+			p.global_position = pos
+			main.cam_yaw = 0.25
+			main.cam_pitch = 0.3
+			main.cam_dist = 6.5
+			main.economy.spawn_drop(Vector3(-1.4, 0.0, -0.6), {"armor_helmet_r1": 1, "armor_boots_r2": 1, "belt_eva_r1": 1}, 14)
+			main.economy.spawn_drop(Vector3(0.3, 0.0, 2.6), {"armor_gloves_r1": 1, "ring_aspd_r1": 1}, 9)
+			wait = 30
+			step = 1245
+		1245:
+			shot("274_loot_armor_pickup")
 			ok_done()
 
 

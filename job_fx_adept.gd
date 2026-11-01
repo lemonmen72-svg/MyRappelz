@@ -85,7 +85,7 @@ static func _rain_hit(p: Player, m: Mob, raw: float) -> void:
 	p._last_crit = randf() < p.crit_rate()
 	var dmg := raw + float(randi_range(-2, 3))
 	if p._last_crit:
-		dmg *= Player.CRIT_MULT
+		dmg *= p.crit_mult
 	if p.is_inside_tree():
 		Vfx.hit_spark(p.get_parent(), m.aim_point(), BLOOD, 1.1)
 		Vfx.magic_burst(p.get_parent(), m.aim_point() + Vector3(0, 0.6, 0), BLOOD, 0.5, 0.25)

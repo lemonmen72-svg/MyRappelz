@@ -232,12 +232,12 @@ func run_step() -> void:
 			check(not inv.has("dagger_steel", 2) and game.gold == 10, "без золота не купить")
 			game.gold = 500
 			# Выше в сумку клали по одному каждому предмету игры (их стало больше 40 ячеек) — освободим место:
-			# уберём оружие 1-го и 2-го ранга (не надетое) и зелья всех рангов
+			# уберём оружие 1-го и 2-го ранга (не надетое), зелья всех рангов, броню и украшения (ничего не надето)
 			for key in ItemData.ITEMS:
 				var wid := String(key)
 				if wid.begins_with("weapon_") and wid != game.weapon and wid != game.offhand:
 					inv.remove(wid, inv.count(wid))
-				elif ItemData.is_potion(wid):
+				elif ItemData.is_potion(wid) or ItemData.is_gear(wid):
 					inv.remove(wid, inv.count(wid))
 			var steel: int = inv.count("dagger_steel")
 			var free_slots: int = inv.room_for("dagger_steel")
@@ -296,7 +296,8 @@ func _unit_stacks() -> void:
 	check(inv.used_cells() == 2 and int(inv.cell(0).get("n", 0)) == 99 and int(inv.cell(1).get("n", 0)) == 51,
 		"150 клыков — стопки 99 + 51")
 	check(inv.room_for("boar_tusk") == (Inventory.CAPACITY - 2) * 99 + 48, "место для клыков: %d" % inv.room_for("boar_tusk"))
-	check(ItemData.stack_size("dagger_steel") == 1 and ItemData.stack_size("potion_hp_r1") == ItemData.STACK, "размер стопок")
+	check(ItemData.stack_size("dagger_steel") == 1 and ItemData.stack_size("potion_hp_r1") == ItemData.STACK
+		and ItemData.stack_size("armor_helmet_r1") == 1 and ItemData.stack_size("ring_hp_r1") == 1, "размер стопок (броня и украшения по 1)")
 	inv.add("dagger_steel", 3)
 	check(inv.used_cells() == 5, "оружие — по одному в ячейке")
 	inv.add("sword_steel", Inventory.CAPACITY - 5)

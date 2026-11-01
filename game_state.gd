@@ -52,6 +52,10 @@ var offhand := "":
 	set(v):
 		offhand = v
 		inventory.equipped_off = v
+## Броня и украшения (ItemData.GEAR_SLOTS): {ячейка ("head", "body", "hands", "feet", "ring1", "ring2", "earring",
+## "pendant", "belt"): id предмета из сумки}. Надетое не занимает ячеек сумки (inventory.worn — _sync_worn после
+## каждого изменения). Менять — equip_gear / unequip_gear; в сохранении — ключ "equip" (у старых сохранений пусто).
+var equip: Dictionary = {}
 ## Щит во второй руке ("" — щита нет; запись — то же, что offhand).
 var shield: String:
 	get:
@@ -117,6 +121,8 @@ func reset() -> void:
 	inventory.from_dict({})
 	weapon = ""
 	offhand = ""
+	equip = {}
+	_sync_worn()
 	hero = {}
 	load_note = ""
 	pets.clear()
@@ -178,6 +184,7 @@ func ensure_hero() -> void:
 	if offhand != "" and offhand_block(offhand) != "":
 		offhand = ""
 	HeroSkills.drop_unfit_toggles(hero, weapon_kind(), has_shield())
+	ensure_gear()
 
 
 ## Стартовое оружие профессии в сумку (чего не хватает) и надеть: первое — в руку, повтор того же — во вторую руку
@@ -292,6 +299,115 @@ func unequip_shield() -> void:
 	unequip_offhand()
 
 
+# ---------- Броня и украшения ----------
+
+## Почему вещь id нельзя надеть в ячейку gslot ("" — можно): броня или украшение, ячейка того же вида, подходит
+## профессии (доспех — свой вариант, ItemData.armor_fits), уровень (ранг, ItemData.level_block), есть в сумке
+## свободная штука (не надетая в другую ячейку).
+func gear_block(id: String, gslot: String) -> String:
+	if not ItemData.is_gear(id):
+		return "Это не броня и не украшение"
+	if not ItemData.gear_slots_for(id).has(gslot):
+		return "Сюда надевается %s" % String(ItemData.GEAR_KIND_NAMES.get(ItemData.gear_slot_kind(gslot), "другое"))
+	if not ItemData.armor_fits(id, class_id):
+		return "Это %s — не для профессии «%s»" % [String(ItemData.BODY_ARMOR[ItemData.armor_variant(id)]["name"]),
+			ClassData.job_name(class_id)]
+	var lvl_err := ItemData.level_block(id, level)
+	if lvl_err != "":
+		return lvl_err
+	var used := 0
+	for s in equip:
+		if String(s) != gslot and String(equip[s]) == id:
+			used += 1
+	if not inventory.has(id, used + 1):
+		return "Этой вещи нет в сумке" if used == 0 else "Второй такой вещи нет в сумке"
+	return ""
+
+
+## Куда надеть вещь id, если ячейка не указана: первая свободная подходящая, иначе первая подходящая (замена).
+func gear_slot_for(id: String) -> String:
+	var slots := ItemData.gear_slots_for(id)
+	if slots.is_empty():
+		return ""
+	for s in slots:
+		if String(equip.get(String(s), "")) == "":
+			return String(s)
+	return String(slots[0])
+
+
+## Надеть броню или украшение id в ячейку gslot ("" — gear_slot_for). Прежняя вещь ячейки остаётся в сумке.
+## "" — получилось, иначе причина.
+func equip_gear(id: String, gslot: String = "") -> String:
+	var s := gslot if gslot != "" else gear_slot_for(id)
+	if s == "":
+		return "Это не броня и не украшение"
+	if String(equip.get(s, "")) == id:
+		return ""
+	var err := gear_block(id, s)
+	if err != "":
+		return err
+	equip[s] = id
+	_sync_worn()
+	changed.emit()
+	return ""
+
+
+## Снять вещь из ячейки gslot (остаётся в сумке; места в ячейках сумки не хватает — лежит сверх, как добыча).
+## true — что-то снято.
+func unequip_gear(gslot: String) -> bool:
+	if String(equip.get(gslot, "")) == "":
+		return false
+	equip.erase(gslot)
+	_sync_worn()
+	changed.emit()
+	return true
+
+
+## Что надето в ячейке gslot ("" — пусто).
+func gear_in(gslot: String) -> String:
+	return String(equip.get(gslot, ""))
+
+
+## Сумма бонусов надетых брони и украшений (ItemData.gear_bonus_total: def, mdef, hp, mp, crit, crit_dmg, aspd,
+## cast, eva, speed).
+func gear_bonus() -> Dictionary:
+	return ItemData.gear_bonus_total(equip.values())
+
+
+## Привести надетое к правилам: неизвестные ячейки и вещи, нет в сумке, не по профессии (доспех после смены
+## профессии) или не по уровню — снимается (вещь остаётся в сумке). Вызывается из ensure_hero (создание, загрузка,
+## смена профессии). Возвращает снятые id.
+func ensure_gear() -> Array:
+	var dropped: Array = []
+	var keep: Dictionary = {}
+	var counts: Dictionary = {}
+	for s in ItemData.GEAR_SLOTS:
+		var gslot := String(s[0])
+		var id := String(equip.get(gslot, ""))
+		if id == "":
+			continue
+		var ok := ItemData.gear_slots_for(id).has(gslot) and ItemData.armor_fits(id, class_id) \
+			and ItemData.level_block(id, level) == "" and inventory.has(id, int(counts.get(id, 0)) + 1)
+		if ok:
+			keep[gslot] = id
+			counts[id] = int(counts.get(id, 0)) + 1
+		else:
+			dropped.append(id)
+	equip = keep
+	_sync_worn()
+	return dropped
+
+
+## Сколько штук каждой вещи надето → inventory.worn (надетое не лежит в ячейках сумки).
+func _sync_worn() -> void:
+	var w: Dictionary = {}
+	for s in equip:
+		var id := String(equip[s])
+		if id != "":
+			w[id] = int(w.get(id, 0)) + 1
+	inventory.worn = w
+
+
 # ---------- Профессия ----------
 
 ## Можно ли сейчас сменить профессию на job ("" — можно): только Бродяга, с ClassData.JOB_LEVEL, профессия своей расы.
@@ -387,6 +503,8 @@ func to_dict() -> Dictionary:
 		"bag": inventory.layout_to_array(),
 		"weapon": weapon,
 		"offhand": offhand,
+		# Броня и украшения {ячейка: id} (у старых сохранений нет — ничего не надето)
+		"equip": equip.duplicate(),
 		"hero": hero.duplicate(true),
 		"pets": pets.duplicate(true),
 		"active_pet": active_pet,
@@ -511,6 +629,16 @@ func from_dict(d: Dictionary) -> void:
 		off = ItemData.migrate_id(w)
 	weapon = ItemData.migrate_id(w)
 	offhand = ItemData.migrate_id(off)
+	# Броня и украшения (старые сохранения — пусто); проверка правил — ensure_hero → ensure_gear
+	equip = {}
+	var eq: Variant = d.get("equip", {})
+	if eq is Dictionary and not converted:
+		for k in eq:
+			var gslot := String(k)
+			var gid := ItemData.migrate_id(String((eq as Dictionary)[k]))
+			if ItemData.is_gear_slot(gslot) and gid != "":
+				equip[gslot] = gid
+	_sync_worn()
 	# Умения героя: старые сохранения — JP, как будто копились с 1 уровня, стартовые умения
 	var h: Variant = d.get("hero", null)
 	if converted:
