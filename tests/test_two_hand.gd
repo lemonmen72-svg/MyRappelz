@@ -93,7 +93,8 @@ func run_step() -> void:
 				m._anim.speed_scale = 1.0
 				m._act_end = -1.0
 				m.play_hit()
-			wait = 20
+			# реакция — случайный вариант (Mq_Hit / UAL Hit / Hit_Reaction ≈ 0.3 с): смотрим посреди клипа
+			wait = 10
 			step = 3
 		3:
 			for m in models:
@@ -101,7 +102,7 @@ func run_step() -> void:
 				if m._ik == null or m._ik.hold != TwoHandIK.HOLD_TWO:
 					continue
 				var who := "%s с «%s»" % [String(e[0]), String(e[1])]
-				check(m._ik.clip == "mq_hit" or m._ik.clip == "hit", "%s: при уроне клип реакции (%s)" % [who, m._ik.clip])
+				check(["mq_hit", "hit", "hit_reaction"].has(m._ik.clip), "%s: при уроне клип реакции (%s)" % [who, m._ik.clip])
 				check(m._ik.weight_hold < 0.1, "%s: при уроне вторая рука отпускает рукоять (вес %.2f)" % [who,
 					m._ik.weight_hold])
 			for m in models + one_handed:
