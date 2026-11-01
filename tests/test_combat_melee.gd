@@ -67,9 +67,9 @@ func run_step() -> void:
 			player.select_target(mob)
 			player.mp = player.max_mp
 			hp_before = mob.hp
-			check(player.use_skill("skill1"), "«Карающий удар» применён")
+			check(use_now(player, "skill1"), "«Карающий удар» применён")
 			check(not mob_ok(mob) or mob.hp < hp_before, "«Карающий удар» нанёс урон")
-			check(player.cooldown_frac("skill1") > 0.9 and not player.use_skill("skill1"), "«Карающий удар» на перезарядке")
+			check(player.cooldown_frac("skill1") > 0.9 and not use_now(player, "skill1"), "«Карающий удар» на перезарядке")
 			step = 3
 		3:
 			mob = find_mob("wolf")
@@ -77,12 +77,12 @@ func run_step() -> void:
 				mob = find_mob("pheasant")
 			stand_near(mob)
 			player.select_target(mob)
-			check(player.use_skill("skill2"), "«Сковывающий удар» применён")
+			check(use_now(player, "skill2"), "«Сковывающий удар» применён")
 			check(not mob_ok(mob) or (mob.slow_time > 0.0 and mob.effects.has("slow")), "зверь замедлен, значок у цели")
 			mob = find_mob("pheasant")
 			stand_near(mob)
 			player.select_target(mob)
-			check(player.use_skill("skill3"), "«Вызов» применён")
+			check(use_now(player, "skill3"), "«Вызов» применён")
 			check(mob.returning or (mob.target == player and mob.taunt_time > 0.0), "зверь бьёт героя (провокация)")
 			# Двуручное оружие снимает щит
 			game.inventory.add("weapon_sword_2h_r1")
@@ -104,11 +104,11 @@ func run_step() -> void:
 			player.select_target(mob)
 			player.mp = player.max_mp
 			hp_before = mob.hp
-			check(player.use_skill("skill1"), "«Удар в спину» применён")
+			check(use_now(player, "skill1"), "«Удар в спину» применён")
 			check(player._last_crit, "«Удар в спину» — гарантированный крит")
 			check(not mob_ok(mob) or hp_before - mob.hp >= 12, "«Удар в спину» нанёс урон")
 			check(player.cooldown_frac("skill1") > 0.9, "«Удар в спину» на перезарядке")
-			check(not player.use_skill("skill1"), "повтор «Удара в спину» не срабатывает")
+			check(not use_now(player, "skill1"), "повтор «Удара в спину» не срабатывает")
 			step = 5
 		5:
 			mob = find_mob("wolf")
@@ -118,12 +118,12 @@ func run_step() -> void:
 			place_far(mob, 8.0)
 			player.select_target(mob)
 			var before := player.global_position.distance_to(mob.global_position)
-			check(player.use_skill("skill2"), "«Шаг тени» применён")
+			check(use_now(player, "skill2"), "«Шаг тени» применён")
 			var after := player.global_position.distance_to(mob.global_position)
 			check(after < 2.0 and after > 1.0, "рывок к цели: %.1f м → %.1f м" % [before, after])
 			check(player.current_target == mob, "цель сохранена после рывка")
 			check(player.cooldown_frac("skill2") > 0.9, "«Шаг тени» на перезарядке")
-			check(not player.use_skill("skill2"), "повтор «Шага тени» не срабатывает")
+			check(not use_now(player, "skill2"), "повтор «Шага тени» не срабатывает")
 			ok_done()
 
 

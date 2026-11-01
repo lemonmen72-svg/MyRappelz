@@ -87,7 +87,7 @@ func run_step() -> void:
 			mob = find_mob("pheasant")
 			stand_near(mob)
 			player.select_target(mob)
-			check(not player.use_skill("skill1"), "с арбалетом «Удар в спину» не применить")
+			check(not use_now(player, "skill1"), "с арбалетом «Удар в спину» не применить")
 			check(main.hud._msg_label.text.contains("Нужны клинки"), "сообщение: %s" % main.hud._msg_label.text)
 			check(_swords(player), "снова два меча")
 			check(player.slot_block("skill1") == "" and not main.hud.is_blocked("skill1"), "с мечами кнопка 1 доступна")
@@ -113,14 +113,14 @@ func run_step() -> void:
 			player.mp = player.max_mp
 			mp_before = player.mp
 			hp_before = mob.hp
-			check(player.use_skill("skill3"), "«Пронзающий выпад» применён")
+			check(use_now(player, "skill3"), "«Пронзающий выпад» применён")
 			check(player.mp == mp_before - HeroSkills.mp_cost("charge_stab", 1), "потрачено MP: %d → %d" % [mp_before, player.mp])
 			check(not mob_ok(mob) or mob.hp < hp_before, "«Пронзающий выпад» нанёс урон")
 			check(player.cooldown_frac("skill3") > 0.9, "«Пронзающий выпад» на перезарядке")
-			check(not player.use_skill("skill3"), "повтор на перезарядке не срабатывает")
+			check(not use_now(player, "skill3"), "повтор на перезарядке не срабатывает")
 			player.mp = 0
 			player.skill_cd.clear()
-			check(not player.use_skill("skill3"), "без MP не применить")
+			check(not use_now(player, "skill3"), "без MP не применить")
 			check(main.hud._msg_label.text.contains("MP"), "сообщение о MP: %s" % main.hud._msg_label.text)
 			player.mp = player.max_mp
 			# Арбалетное активное: с мечами — нельзя, с арбалетом — болты
@@ -130,7 +130,7 @@ func run_step() -> void:
 			main.refresh_skill_buttons()
 			check(main.hud.is_blocked("skill4") and main.hud.button_text("skill4").contains("нужен арбалет"),
 				"с мечами кнопка «Сдвоенного болта» затемнена")
-			check(not player.use_skill("skill4"), "с мечами «Сдвоенный болт» не применить")
+			check(not use_now(player, "skill4"), "с мечами «Сдвоенный болт» не применить")
 			check(main.hud._msg_label.text.contains("Нужен арбалет"), "сообщение: %s" % main.hud._msg_label.text)
 			check(player.equip("crossbow_starter") == "", "надет арбалет")
 			check(not main.hud.is_blocked("skill4") and main.hud.is_blocked("skill3"), "с арбалетом: кнопка 4 доступна, 3 — нет")
@@ -139,7 +139,7 @@ func run_step() -> void:
 			player.select_target(mob)
 			mp_before = player.mp
 			var before := get_tree().get_nodes_in_group("projectiles").size()
-			check(player.use_skill("skill4"), "«Сдвоенный болт» применён")
+			check(use_now(player, "skill4"), "«Сдвоенный болт» применён")
 			check(get_tree().get_nodes_in_group("projectiles").size() > before, "болт летит")
 			check(player.mp == mp_before - HeroSkills.mp_cost("dual_shot", 1), "«Сдвоенный болт» потратил MP")
 			check(player.cooldown_frac("skill4") > 0.9, "«Сдвоенный болт» на перезарядке")
@@ -157,7 +157,7 @@ func run_step() -> void:
 			stand_near(mob)
 			player.select_target(mob)
 			player.mp = player.max_mp
-			check(player.use_skill("sleeping_dust"), "«Сонная пыльца» применена")
+			check(use_now(player, "sleeping_dust"), "«Сонная пыльца» применена")
 			check(mob.sleep_time >= 7.9, "фазан спит %.1f с" % mob.sleep_time)
 			mob.take_damage(1, player)
 			check(mob.sleep_time == 0.0, "удар будит")
@@ -214,7 +214,7 @@ func run_step() -> void:
 			check((game.hero["skills"] as Dictionary).is_empty(), "у Бродяги нет умений")
 			for i in 4:
 				check(not main.hud.is_button_visible("skill%d" % (i + 1)), "кнопка умения %d скрыта" % (i + 1))
-			check(not player.use_skill("skill1") and main.hud._msg_label.text.contains("10 уровне"),
+			check(not use_now(player, "skill1") and main.hud._msg_label.text.contains("10 уровне"),
 				"кнопка пуста: %s" % main.hud._msg_label.text)
 			var hw: CharacterWindow = main.hero_window
 			hw.open("hero")
@@ -458,8 +458,8 @@ func _check_toggles(player: Player) -> void:
 	check(player.mp == m0 - player.toggle_upkeep(), "поддержка списана")
 	# Кнопкой: назначить на кнопку и нажать — выключить и включить
 	check(player.assign_slot("concentration", 2), "«Холодный расчёт» — на кнопку 3")
-	check(player.use_skill("skill3") and not HeroSkills.toggle_on(rec, "concentration"), "кнопка выключила")
-	check(player.use_skill("skill3") and HeroSkills.toggle_on(rec, "concentration"), "кнопка включила")
+	check(use_now(player, "skill3") and not HeroSkills.toggle_on(rec, "concentration"), "кнопка выключила")
+	check(use_now(player, "skill3") and HeroSkills.toggle_on(rec, "concentration"), "кнопка включила")
 	var sb := (main.hud._buttons["skill3"]["panel"] as Panel).get_theme_stylebox("panel") as StyleBoxFlat
 	check(sb != null and sb.bg_color == MainScript.TOGGLE_ON_COLOR, "кнопка включённого умения подсвечена")
 	player.mp = 0

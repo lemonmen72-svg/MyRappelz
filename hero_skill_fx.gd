@@ -1,6 +1,8 @@
 class_name HeroSkillFx
 extends RefCounted
 ## Движок эффектов умений героя: активные умения с полем fx (формат — HeroSkills, раздел «Движок эффектов»).
+## Умение с временем каста (поле cast): Player сначала кастует (can_cast — проверки профессии без траты запасов),
+## cast зовётся в конце каста — _find_target отдаёт цель, запомненную в начале.
 ## Player.use_skill → _use_hero_skill → HeroSkillFx.cast: выбор цели по use ("melee", "ranged", "magic", "near",
 ## "self", "pet"), анимация (anim), снаряд (у "ranged" и у "magic" с proj = true — урон первого эффекта "damage"
 ## несёт снаряд, остальные эффекты — при попадании) и эффекты fx по порядку: damage, heal, hot, status, dot,
@@ -297,6 +299,17 @@ func job_pre_cast(sid: String, n: int, sk: Dictionary) -> String:
 		if why != "":
 			return why
 	return ""
+
+
+## Проверки механик профессий перед началом каста (Player._begin_cast) без траты запасов: pre_cast на state,
+## затем state как был (искры духа Воина тратятся в конце каста, в cast). "" — можно начинать.
+func can_cast(sid: String, n: int, sk: Dictionary) -> String:
+	var saved := state.duplicate(true)
+	var why := job_pre_cast(sid, n, sk)
+	state.clear()
+	state.merge(saved)
+	JobFxWarrior.show_sparks(self)
+	return why
 
 
 func job_special(handler: String, sid: String, n: int, t: Mob, e: Dictionary) -> bool:

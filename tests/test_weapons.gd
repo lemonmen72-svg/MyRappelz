@@ -389,7 +389,7 @@ func _check_assassin(player: Player) -> void:
 		player.mp = player.max_mp
 		player.skill_cd.clear()
 		var hp0 := mob.hp
-		check(player.use_skill("skill3"), "%s: «Пронзающий выпад» применён" % String(e[2]))
+		check(use_now(player, "skill3"), "%s: «Пронзающий выпад» применён" % String(e[2]))
 		check(not mob_ok(mob) or mob.hp < hp0, "%s: урон нанесён" % String(e[2]))
 	check(player.equip("crossbow_starter") == "" and game.offhand == "", "арбалет: вторая рука свободна")
 	check(player.slot_block("skill3") == "Нужны клинки" and player.slot_block("skill4") == "", "с арбалетом — наоборот")
@@ -398,7 +398,7 @@ func _check_assassin(player: Player) -> void:
 	player.select_target(mob)
 	player.mp = player.max_mp
 	player.skill_cd.clear()
-	check(player.use_skill("skill4"), "«Сдвоенный болт» с арбалетом")
+	check(use_now(player, "skill4"), "«Сдвоенный болт» с арбалетом")
 
 
 ## Умения щита (Мечник), лука и двух топоров (Воин), посоха (Волшебник).

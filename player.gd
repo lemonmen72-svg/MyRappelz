@@ -11,6 +11,13 @@ extends CharacterBody3D
 ## сила — маг. атака).
 ## Умения на кнопках "skill1"…"skill4" (Game.hero.slots): умения Наёмника — _cast_hero, умения с полем fx — движок
 ## HeroSkillFx; требуют MP, подходящее оружие и перезарядку. У Бродяги умений нет (кнопки скрыты).
+## Время каста (поле cast умения, HeroSkills.cast_time; скорость каста сокращает — skill_cast_time): умение с кастом
+## сначала кастуется (_begin_cast: цель найдена и запомнена, MP и запасы профессии проверены, но не списаны; модель —
+## петля каста CharacterModel.play_cast_loop, HUD — полоса каста), в конце (_finish_cast) MP списывается и умение
+## срабатывает как мгновенное (эффект, клип выпуска, перезарядка). Каст прерывают: ходьба (джойстик), смерть или уход
+## цели дальше дальности умения (+ CAST_SLACK), уход питомца у умений на питомца, смерть героя, смена оружия; урон
+## каст не сбивает (как в Rappelz). При прерывании MP не тратится, перезарядки нет. Во время каста другие умения и
+## обычная атака не идут; повторное нажатие того же умения ничего не делает.
 ## Временные усиления. Внешний вид — CharacterModel (раса, пол, профессия, оружие).
 
 signal stats_changed
@@ -38,6 +45,10 @@ const SKILL_ANIM := {"backstab": "bash", "charge_stab": "dash", "dark_strike": "
 const HIT_GAP := 0.14
 ## Время каста заклинания при скорости каста 0 (обычная атака после него — не раньше), с: cast_time().
 const CAST_TIME := 0.6
+## Каст умения: джойстик сильнее этого — герой пошёл, каст прерван; цель может отойти дальше дальности умения
+## на столько метров, прежде чем каст прервётся.
+const CAST_MOVE := 0.1
+const CAST_SLACK := 1.0
 
 var max_hp := 100
 var hp := 100
@@ -104,6 +115,20 @@ var last_target: Node3D = null
 var current_target: Mob = null
 ## Последний зверь, ударивший героя (питомец в режиме «Защита» нападает на него). Без типа: зверь мог исчезнуть.
 var last_attacker: Variant = null
+## Каст умения: id умения ("" — каста нет), уровень, цель (запомнена в начале; null — умение без цели), длительность
+## (с учётом скорости каста) и сколько прошло, с.
+var casting := ""
+var cast_level := 0
+var cast_target: Mob = null
+var cast_total := 0.0
+var cast_elapsed := 0.0
+## Дальность умения, что кастуется (цель дальше + CAST_SLACK — каст прерван; < 0 — без цели).
+var _cast_reach := -1.0
+## Цель, которую _find_target отдаёт в конце каста (запомненная в начале), и выпуск после каста (клип с удара).
+var _forced_target: Mob = null
+var _cast_release := false
+## Сработало ли умение в конце последнего каста (MP хватило, цель была) — для тестов и сообщений.
+var cast_ok := false
 
 ## Оставшаяся перезарядка умений: id умения → секунды.
 var skill_cd: Dictionary = {}
@@ -374,6 +399,7 @@ func equip(id: String, second: bool = false) -> String:
 	var err: String = Game.equip_offhand(id) if second else Game.equip_weapon(id)
 	if err != "":
 		return err
+	cancel_cast("")
 	recalc_stats()
 	attack_cd = 0.0
 	_build_model()
@@ -390,6 +416,7 @@ func equip(id: String, second: bool = false) -> String:
 
 ## Освободить вторую руку (щит или второй клинок — в сумку).
 func unequip_offhand() -> void:
+	cancel_cast("")
 	Game.unequip_offhand()
 	recalc_stats()
 	_build_model()
@@ -476,6 +503,7 @@ func _physics_process(delta: float) -> void:
 	_tick_timed(delta)
 	_tick_mp(delta)
 	_fx.tick(delta)
+	_tick_cast(delta)
 
 	if current_target != null and (not is_instance_valid(current_target) or current_target.is_dead):
 		_set_target(null)
@@ -659,6 +687,7 @@ func clear_pet_aura(src: Object) -> void:
 
 
 func clear_buffs() -> void:
+	cancel_cast("")
 	atk_buff_time = 0.0
 	atk_buff = 0.0
 	speed_buff_time = 0.0
@@ -686,7 +715,7 @@ func clear_buffs() -> void:
 
 ## Обычная атака по цели. true, если удар/выстрел состоялся.
 func try_attack() -> bool:
-	if attack_cd > 0.0:
+	if attack_cd > 0.0 or casting != "":
 		return false
 	var target := _find_target(attack_range)
 	if target == null:
@@ -770,6 +799,10 @@ func select_target(t: Mob) -> void:
 
 ## Цель: текущая, если жива и в радиусе r, иначе ближайший зверь в радиусе r.
 func _find_target(r: float) -> Mob:
+	# Конец каста: цель, запомненная в начале (могла чуть отойти — в пределах CAST_SLACK)
+	if _forced_target != null and is_instance_valid(_forced_target) and not _forced_target.is_dead:
+		if global_position.distance_to(_forced_target.global_position) <= r + CAST_SLACK:
+			return _forced_target
 	if current_target != null and is_instance_valid(current_target) and not current_target.is_dead:
 		if global_position.distance_to(current_target.global_position) <= r:
 			return current_target
@@ -890,6 +923,11 @@ func use_skill(slot: String) -> bool:
 		return false
 	if not HeroSkills.is_skill(sid):
 		return false
+	# Идёт каст: то же умение — ничего (каст продолжается), другое — нельзя
+	if casting != "":
+		if sid != casting:
+			message.emit("Идёт каст «%s» — другое умение после него" % String(HeroSkills.get_skill(casting).get("name", casting)))
+		return false
 	return _use_hero_skill(sid)
 
 
@@ -927,6 +965,15 @@ func _use_hero_skill(sid: String) -> bool:
 	if mp < cost:
 		message.emit("«%s»: не хватает MP (нужно %d)" % [sname, cost])
 		return false
+	var ct := skill_cast_time(sid, n)
+	if ct > 0.0:
+		return _begin_cast(sid, n, sk, ct)
+	return _apply_skill(sid, n, sk, cost)
+
+
+## Умение срабатывает (мгновенное — сразу, с кастом — в конце каста): MP, эффект, перезарядка. false — не
+## применилось (нет цели, нет питомца, нет запаса профессии): MP и перезарядка не тратятся.
+func _apply_skill(sid: String, n: int, sk: Dictionary, cost: int) -> bool:
 	# MP списывается до действия: MP, которое умение возвращает («Разбитая воля», «Остаток силы»),
 	# не упирается в максимум при полном MP. Не применилось — MP обратно.
 	mp -= cost
@@ -941,6 +988,151 @@ func _use_hero_skill(sid: String) -> bool:
 		attack_cd = maxf(attack_cd, cast_time())
 	stats_changed.emit()
 	return true
+
+
+# ---------- Каст ----------
+
+## Время каста умения sid уровня n с учётом скорости каста героя, с (0 — мгновенное).
+func skill_cast_time(sid: String, n: int) -> float:
+	return HeroSkills.cast_time(sid, n) / (1.0 + maxf(cast_speed, -0.5))
+
+
+## Дальность умения: до цели не дальше, м; -1 — умению цель не нужна (на себя, на питомца).
+func skill_reach(sk: Dictionary) -> float:
+	var how := String(sk.get("use", "")) if sk.has("fx") else String(sk.get("target", ""))
+	match how:
+		"melee":
+			return attack_range + MELEE_SKILL_REACH
+		"ranged":
+			return attack_range
+		"magic":
+			return float(sk.get("range", maxf(attack_range, 10.0)))
+		"near":
+			return float(sk.get("radius", 6.0))
+		"dash":
+			return HeroSkills.value_at(sk.get("dash", 12.0), 1)
+	return -1.0
+
+
+## Начать каст: цель (если нужна) найдена и запомнена, питомец на месте, запасы профессии есть (не тратятся),
+## MP хватает (списывается в конце). true — каст начался.
+func _begin_cast(sid: String, n: int, sk: Dictionary, sec: float) -> bool:
+	var reach := skill_reach(sk)
+	var t: Mob = null
+	if reach >= 0.0:
+		t = _find_target(reach)
+		if t == null:
+			return _no_target()
+	if String(sk.get("use", "")) == "pet" and _active_pet() == null:
+		message.emit("Нет призванного питомца")
+		return false
+	if sk.has("fx"):
+		var why := _fx.can_cast(sid, n, sk)
+		if why != "":
+			message.emit("«%s»: %s" % [String(sk.get("name", sid)), why])
+			return false
+	if t != null:
+		_engage(t)
+	cast_ok = false
+	casting = sid
+	cast_level = n
+	cast_target = t
+	cast_total = sec
+	cast_elapsed = 0.0
+	_cast_reach = reach
+	_mp_delay = MP_COMBAT_TIME
+	if _has_model():
+		_model.play_cast_loop(_cast_loop_kind(sid, sk))
+	stats_changed.emit()
+	return true
+
+
+## Петля каста по виду умения: лук и арбалет — прицеливание, заклинания — накопление силы, остальное — заряд.
+func _cast_loop_kind(sid: String, sk: Dictionary) -> String:
+	var how := String(sk.get("use", "")) if sk.has("fx") else String(sk.get("target", ""))
+	if how == "ranged":
+		if weapon_kind == "crossbow" or weapon_kind == "bow":
+			return weapon_kind
+		return "charge"
+	var anim := String(sk.get("anim", SKILL_ANIM.get(sid, "attack")))
+	if anim == "cast" or how == "magic":
+		return "magic"
+	return "charge"
+
+
+## Каст идёт: ходьба, цель (погибла, ушла), питомец — прерывают; время вышло — умение срабатывает.
+func _tick_cast(delta: float) -> void:
+	if casting == "":
+		return
+	if move_input.length() > CAST_MOVE:
+		cancel_cast("герой сдвинулся с места")
+		return
+	if _cast_reach >= 0.0:
+		if cast_target == null or not is_instance_valid(cast_target) or cast_target.is_dead:
+			cancel_cast("цели больше нет")
+			return
+		if global_position.distance_to(cast_target.global_position) > _cast_reach + CAST_SLACK:
+			cancel_cast("цель слишком далеко")
+			return
+		_face(cast_target.global_position)
+	if String(HeroSkills.get_skill(casting).get("use", "")) == "pet" and _active_pet() == null:
+		cancel_cast("питомца нет рядом")
+		return
+	cast_elapsed += delta
+	if cast_elapsed >= cast_total:
+		_finish_cast()
+
+
+## Конец каста: MP (не хватило — умение не срабатывает) и действие умения по запомненной цели, клип выпуска.
+func _finish_cast() -> void:
+	var sid := casting
+	var n := cast_level
+	var t := cast_target
+	_end_cast()
+	var sk := HeroSkills.get_skill(sid)
+	var cost := HeroSkills.mp_cost(sid, n)
+	cast_ok = false
+	if mp < cost:
+		message.emit("«%s»: не хватает MP (нужно %d)" % [String(sk.get("name", sid)), cost])
+		return
+	if t != null and is_instance_valid(t) and not t.is_dead:
+		_forced_target = t
+		_set_target(t)
+	_cast_release = true
+	cast_ok = _apply_skill(sid, n, sk, cost)
+	_cast_release = false
+	_forced_target = null
+
+
+## Прервать каст (why — причина в сообщении; "" — молча: смерть, смена оружия). MP не тратится, перезарядки нет.
+func cancel_cast(why: String) -> void:
+	if casting == "":
+		return
+	var sname := String(HeroSkills.get_skill(casting).get("name", casting))
+	_end_cast()
+	if why != "":
+		message.emit("«%s»: каст прерван — %s" % [sname, why])
+		if is_inside_tree():
+			Util.float_text(get_parent(), global_position + Vector3(0, 2.6, 0), "Каст прерван", Color(1, 0.6, 0.45))
+
+
+func _end_cast() -> void:
+	casting = ""
+	cast_level = 0
+	cast_target = null
+	cast_total = 0.0
+	cast_elapsed = 0.0
+	_cast_reach = -1.0
+	if _has_model():
+		_model.stop_cast_loop()
+	stats_changed.emit()
+
+
+## Доля пройденного каста (0..1; 0 — каста нет).
+func cast_progress() -> float:
+	if casting == "" or cast_total <= 0.0:
+		return 0.0
+	return clampf(cast_elapsed / cast_total, 0.0, 1.0)
 
 
 ## Заклинание ли умение (магическое: use "magic" или анимация каста) — его ускоряет скорость каста.
@@ -1086,7 +1278,7 @@ func _anim_skill(sid: String) -> void:
 ## Анимация умения по виду (kind: "cast", "bash", "spin", "buff", "dash", "attack"): у модели из файла — движение
 ## манекенов Meshy (CharacterModel.play_skill: по id умения, оружию и способу применения use), иначе — прежние жесты.
 func _anim_by_kind(kind: String, sid: String = "", use: String = "") -> void:
-	if _has_model() and _model.play_skill(kind, sid, use):
+	if _has_model() and _model.play_skill(kind, sid, use, _cast_release):
 		return
 	match kind:
 		"bash":
@@ -1184,6 +1376,7 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 	# Механики профессий: ответный урон («Огненная кожа» Шамана)
 	if hp > 0:
 		_fx.on_hurt(attacker, amount)
+	# Урон каст не сбивает (как в Rappelz); смерть — сбивает (clear_buffs → cancel_cast)
 	if _has_model():
 		_model.play_hit()
 	Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), str(amount), Color(1, 0.3, 0.3))

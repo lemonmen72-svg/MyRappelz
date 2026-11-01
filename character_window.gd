@@ -524,6 +524,10 @@ func _card(id: String, p: Player) -> Control:
 	var on := kind == "toggle" and HeroSkills.toggle_on(Game.hero, id)
 	box.add_child(_label(String(sk["name"]), UiScale.FONT_NAME, GOLD, w))
 	var meta := "%s · оружие: %s · ур. %d/%d" % [HeroSkills.kind_name(id), HeroSkills.weapon_name(id), cur, mx]
+	# Время каста активного: «Каст: 1.2 с» (со скоростью каста героя — «сейчас …») / «Мгновенно»
+	var cast_t := HeroSkills.cast_text(id, maxi(1, cur), p.cast_speed)
+	if cast_t != "":
+		meta += " · " + cast_t
 	if on:
 		meta += " · ВКЛЮЧЕНО"
 	box.add_child(_label(meta, UiScale.FONT_BODY, GOOD if on else MUTED, w))

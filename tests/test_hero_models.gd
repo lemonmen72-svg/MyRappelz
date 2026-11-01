@@ -43,7 +43,10 @@ const MQ_CLIPS := ["mq_sword_a1", "mq_sword_a2", "mq_sword_a3", "mq_combo_b1", "
 	"mq_charged_slash", "mq_judgment", "mq_leap_slam", "mq_blade_spin", "mq_reap", "mq_ground_slam", "mq_kick",
 	"mq_jump", "mq_bow_shot", "mq_bow_draw", "mq_reload", "mq_cast_a", "mq_cast_b", "mq_cast_c", "mq_cast_wide",
 	"mq_cast_slam", "mq_cast_beam", "mq_cast_up", "mq_cast_pray", "mq_charged_cast", "mq_charged_cast1", "mq_taunt",
-	"mq_hit", "mq_death", "mq_pickup", "mq_walking", "mq_running"]
+	"mq_hit", "mq_death", "mq_pickup", "mq_walking", "mq_running", "mq_cast_release", "mq_charge_release",
+	"mq_cast_loop", "mq_charge_loop", "mq_bow_aim_loop", "mq_crossbow_aim_loop"]
+## Петли каста умений героя (CharacterModel.MQ_CAST_LOOPS): зацикленные, первый и последний кадр совпадают.
+const MQ_LOOPS := ["mq_cast_loop", "mq_charge_loop", "mq_bow_aim_loop", "mq_crossbow_aim_loop"]
 ## Длина клипа обычной атаки при темпе 1 (игра ускоряет до MQ_SPEED_MAX под интервал атаки), умений и прочих, с.
 const MQ_ATTACK_MAX := 1.25
 const MQ_ACT_MAX := 2.8
@@ -174,6 +177,30 @@ func run_step() -> void:
 				var m := models[i]
 				var cur := m._anim.current_animation.to_lower()
 				check(CharacterModel.MQ_CASTS.has(cur), "%s: заклинание — клип манекена (%s)" % [HEROES[i], cur])
+				# Каст умения: петля накопления силы, пока не снята
+				check(m.play_cast_loop("magic"), "%s: петля каста магии есть" % HEROES[i])
+			wait = 120
+			step = 9
+		9:
+			for i in models.size():
+				var m := models[i]
+				var cur := m._anim.current_animation.to_lower()
+				check(cur == "mq_cast_loop" and m._anim.is_playing(), "%s: через 2 с петля каста ещё играет (%s)" % [HEROES[i], cur])
+				m.stop_cast_loop()
+				# Выпуск после каста: клип умения с момента незадолго до удара
+				m.play_skill("cast", "fire_spark", "magic", true)
+				var cn := m._anim.current_animation
+				var hit := float(CharacterModel.asset_rig(String(m.spec.get("asset", ""))).get("clips", {}).get(cn, {}).get("hit", 0.0))
+				check(absf(m._anim.current_animation_position - maxf(0.0, hit - CharacterModel.MQ_RELEASE_LEAD)) < 0.05,
+					"%s: выпуск — %s с %.2f с (удар %.2f)" % [HEROES[i], cn, m._anim.current_animation_position, hit])
+			wait = 90
+			step = 10
+		10:
+			for i in models.size():
+				var m := models[i]
+				var idle := m._pick(CharacterModel.ASSET_IDLE_CROSSBOW if m.weapon_kind == "crossbow" else CharacterModel.ASSET_IDLE)
+				check(not idle.is_empty() and m._anim.current_animation == String(idle[0]), "%s: после выпуска — покой (%s)" % [
+					HEROES[i], m._anim.current_animation])
 				m.queue_free()
 			heroine.queue_free()
 			ok_done()
@@ -293,19 +320,34 @@ func _check_mq(m: CharacterModel, who: String, skel: Skeleton3D, rig: Dictionary
 		var ci: Dictionary = info.get(cn, {})
 		check(not ci.is_empty() and absf(float(ci.get("length", 0.0)) - a.length) < 0.05,
 			"%s: %s — длина в .json (%.2f / %.2f с)" % [who, cn, float(ci.get("length", 0.0)), a.length])
-		var loop: bool = c == "mq_walking" or c == "mq_running"
+		var loop: bool = c == "mq_walking" or c == "mq_running" or MQ_LOOPS.has(c)
+		if MQ_LOOPS.has(c):
+			check(bool(ci.get("loop", false)) and a.loop_mode == Animation.LOOP_LINEAR, "%s: %s — петля" % [who, cn])
+			check(_loop_seam(a) < 0.01, "%s: %s — шов петли %.4f" % [who, cn, _loop_seam(a)])
 		if not loop:
 			var hit := float(ci.get("hit", -1.0))
 			check(hit > 0.0 and hit < a.length, "%s: %s — момент удара %.2f с в клипе %.2f с" % [who, cn, hit, a.length])
 			var lim := MQ_ATTACK_MAX if attacks.has(c) else MQ_ACT_MAX
 			check(a.length <= lim, "%s: %s — длина %.2f с (до %.2f)" % [who, cn, a.length, lim])
 		check(_root_still(a, String(bones.get("root", ""))), "%s: %s на месте (корень по X/Z не уходит)" % [who, cn])
-		if attacks.has(c) or c == "mq_charged_slash" or c == "mq_axe_chop":
+		if attacks.has(c) or c == "mq_charged_slash" or c == "mq_axe_chop" or MQ_LOOPS.has(c):
 			for side in ["L", "R"]:
 				var leg: Array = bones.get("legs", {}).get(side, [])
 				var toe := String(leg[mini(3, leg.size() - 1)]) if not leg.is_empty() else ""
 				var s := _ground_slide(skel, a, skel.find_bone(toe))
 				check(s <= MQ_GROUND_SLIDE, "%s: %s — стопа %s не едет по земле (%.3f м)" % [who, cn, side, s])
+
+
+## Шов петли: наибольший угол (рад) между первым и последним ключом поворота у всех костей.
+func _loop_seam(a: Animation) -> float:
+	var worst := 0.0
+	for t in a.get_track_count():
+		if a.track_get_type(t) != Animation.TYPE_ROTATION_3D or a.track_get_key_count(t) < 2:
+			continue
+		var q0: Quaternion = a.track_get_key_value(t, 0)
+		var q1: Quaternion = a.track_get_key_value(t, a.track_get_key_count(t) - 1)
+		worst = maxf(worst, q0.angle_to(q1))
+	return worst
 
 
 ## Корень по X/Z во всех ключах как в первом.

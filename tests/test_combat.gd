@@ -59,19 +59,19 @@ func run_step() -> void:
 			player.mp = player.max_mp
 			var mp0 := player.mp
 			hp_before = mob.hp
-			check(player.use_skill("skill1"), "«Удар с разворота» применён")
+			check(use_now(player, "skill1"), "«Удар с разворота» применён")
 			check(not mob_ok(mob) or mob.hp < hp_before, "«Удар с разворота» нанёс урон")
 			check(player.mp == mp0 - HeroSkills.mp_cost("spin_strike", 1), "потрачено MP")
 			check(player.cooldown_frac("skill1") > 0.9, "«Удар с разворота» на перезарядке")
-			check(not player.use_skill("skill1"), "повтор на перезарядке не срабатывает")
+			check(not use_now(player, "skill1"), "повтор на перезарядке не срабатывает")
 			step = 3
 		3:
 			val_before = player.cur_crit()
-			check(player.use_skill("skill2"), "«Миг сосредоточения» применён")
+			check(use_now(player, "skill2"), "«Миг сосредоточения» применён")
 			check(player.cur_crit() > val_before + 0.1, "шанс крита: %.2f → %.2f" % [val_before, player.cur_crit()])
 			check(player.timed_bonus.has("focus_moment") and player.effects.has("buff:focus_moment"),
 				"усиление на время и значок у полоски HP")
-			check(not player.use_skill("skill2"), "повтор не срабатывает")
+			check(not use_now(player, "skill2"), "повтор не срабатывает")
 			# Короткое усиление движка заканчивается само
 			player.add_timed_bonus("test_buff", 0.5, {"crit": 0.5})
 			check(player.cur_crit() > val_before + 0.5, "тестовое усиление действует")
@@ -87,7 +87,7 @@ func run_step() -> void:
 			if Util.nearest(player, "mobs", player.attack_range + 1.0) != null:
 				print("Пропуск проверки «Нет цели рядом»: рядом зверь")
 			else:
-				check(not player.use_skill("skill1"), "без цели умение не срабатывает")
+				check(not use_now(player, "skill1"), "без цели умение не срабатывает")
 				check(main.hud._msg_label.text == "Нет цели рядом", "сообщение «Нет цели рядом»")
 				check(player.cooldown_frac("skill1") == 0.0, "перезарядка не потрачена")
 				check(not player.try_attack(), "без цели атака не срабатывает")

@@ -18,6 +18,8 @@ extends CanvasLayer
 ## перезарядка — тёмный сектор по часовой стрелке, неподходящее оружию — красная метка. Справа от полосок HP
 ## игрока, питомца и цели — значки действующих эффектов (StatusRow по реестру StatusEffects сущности);
 ## касание по значку эффекта — подпись (название, сколько осталось).
+## Полоса каста (update_cast): пока герой кастует умение — под героем по центру экрана, название умения и сколько
+## осталось; не на кнопках и не на джойстике (tests/test_ui_scale.gd).
 
 ## Нажатие кнопки действия (касание, клавиша или кнопка меню).
 signal action(id: String)
@@ -72,6 +74,13 @@ const PET_BTN_GAP := 6.0
 const PET_BTN_TOP := 6.0
 ## Кольцо на кнопке текущего режима питомца.
 const PET_MODE_ON := Color(0.35, 0.9, 1.0, 0.7)
+## Полоса каста: ширина, высота, шрифт подписи и где по высоте экрана центр полосы (доля: под героем, выше кнопок
+## «Говорить» / «Торговец»).
+const CAST_W := 240.0
+const CAST_H := 12.0
+const CAST_FONT := 15
+const CAST_Y := 0.7
+const CAST_COLOR := Color(1.0, 0.78, 0.3)
 
 var move_vec := Vector2.ZERO
 
@@ -130,6 +139,10 @@ var _fx_pet: StatusRow
 var _fx_target: StatusRow
 var _fx_tip: Label
 var _fx_tip_time := 0.0
+## Полоса каста: рамка (подпись над полосой), полоса, подпись.
+var _cast_box: Control
+var _cast_bar: ProgressBar
+var _cast_label: Label
 
 
 func _ready() -> void:
@@ -174,6 +187,17 @@ func _ready() -> void:
 
 	_fx_tip = _label(self)
 	_fx_tip.visible = false
+
+	_cast_box = Control.new()
+	_cast_box.name = "CastBar"
+	_cast_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_cast_box)
+	_cast_label = _label(_cast_box)
+	_cast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_cast_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.8))
+	_cast_bar = _bar(_cast_box, CAST_COLOR)
+	_cast_bar.max_value = 1.0
+	_cast_box.visible = false
 
 	_menu = HBoxContainer.new()
 	_menu.name = "Menu"
@@ -248,6 +272,13 @@ func _apply_sizes() -> void:
 	_place_square(_tame_tier, Vector2(-bs - ts - UiScale.px(10), bar_y + (bar_h - ts) * 0.5), ts, 2)
 
 	_font(_msg_label, UiScale.fs(MSG_FONT))
+	var cw := UiScale.px(CAST_W)
+	var cf := UiScale.fs(CAST_FONT)
+	_font(_cast_label, cf)
+	_cast_label.position = Vector2.ZERO
+	_cast_label.size = Vector2(cw, float(cf) * 1.4)
+	_size_bar(_cast_bar, Vector2(0, float(cf) * 1.4), Vector2(cw, UiScale.px(CAST_H)))
+	_cast_box.size = Vector2(cw, float(cf) * 1.4 + UiScale.px(CAST_H))
 	_font(_fx_tip, UiScale.fs(UiScale.FONT_SMALL))
 	var fx := UiScale.px(FX_ICON)
 	_fx_player.position = Vector2(x + w + UiScale.px(8), x + (hp_h + mp_h + 2.0 - fx) * 0.5)
@@ -660,6 +691,28 @@ func set_target(t: Node3D) -> void:
 	_refresh_target()
 
 
+## Полоса каста: skill_name — что кастуется ("" — скрыть), frac — доля пройденного (0..1), left — сколько
+## осталось, с.
+func update_cast(skill_name: String, frac: float, left: float) -> void:
+	if skill_name == "":
+		_cast_box.visible = false
+		return
+	_cast_box.visible = true
+	_cast_bar.value = clampf(frac, 0.0, 1.0)
+	var t := "%s  %.1f с" % [skill_name, maxf(0.0, left)]
+	if t != _cast_label.text:
+		_cast_label.text = t
+
+
+## Видна ли полоса каста и где она (для тестов).
+func is_cast_visible() -> bool:
+	return _cast_box.visible
+
+
+func cast_rect() -> Rect2:
+	return Rect2(_cast_box.position, _cast_box.size)
+
+
 ## Сообщение внизу экрана на sec секунд.
 func show_message(t: String, sec: float = 3.0) -> void:
 	_msg_label.text = t
@@ -817,6 +870,7 @@ func _layout() -> void:
 		var p: Panel = b["panel"]
 		p.position = _view - b["offset"] - p.size / 2.0
 	_place_pet_buttons()
+	_cast_box.position = Vector2((_view.x - _cast_box.size.x) * 0.5, _view.y * CAST_Y - _cast_box.size.y * 0.5)
 	_msg_label.position = Vector2(0, UiScale.px(MSG_Y))
 	_msg_label.size = Vector2(_view.x, float(UiScale.fs(MSG_FONT)) * 1.5)
 	var edge := UiScale.px(12)
