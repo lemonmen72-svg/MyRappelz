@@ -206,6 +206,8 @@ func roll(e: Dictionary, n: int, sid: String = "") -> int:
 func status(m: Mob, st: String, sec: float, value: float, src: Dictionary) -> void:
 	if m == null or not is_instance_valid(m) or m.is_dead or sec <= 0.0:
 		return
+	# Ослабление — нападение: нейтральный зверь вступает в бой с героем (Mob.provoke)
+	m.provoke(p)
 	match st:
 		"stun", "root":
 			m.stun(sec, src)

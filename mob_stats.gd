@@ -14,9 +14,14 @@ extends RefCounted
 ## • Калибровка (решение Максима: «персонажа равным монстру равного уровня, и HP монстров ×3»): без прибавки HP
 ##   зверь своего уровня равен герою по «эффективной силе» HP × урон в секунду (Combat.power_ratio ≈ 0.96–1.04 у
 ##   Бродяги с учебным мечом на всех уровнях 1–30; ATK_FLAT держит низкие уровни, ATK_LVL — высокие, где герой быстрее
-##   бьёт от Ловкости), затем HP всех зверей × MOB_HP_MULT (3): зверь своего уровня ≈ втрое сильнее героя без умений,
-##   питомца и зелий — бой 1×1 проигрышный, с питомцем — уверенная победа. Вход новичка: у зверей 1–4 ур. прибавка
-##   HP меньше (MOB_HP_START), иначе Бродяга 1-го ур. без питомца и умений не одолел бы ни одного зверя.
+##   бьёт от Ловкости), затем HP всех зверей × MOB_HP_MULT (3): с 10 ур. зверь своего уровня ≈ втрое сильнее героя без
+##   умений, питомца и зелий — бой 1×1 проигрышный, с питомцем или умениями — уверенная победа.
+## • Вход новичка (решение Максима: «на первом уровне я не в состоянии справиться ни с кем, а меня убивают за 3–4
+##   удара»): у зверей 1–9 ур. атака ниже (MOB_ATK_START) и прибавка HP меньше (MOB_HP_START). Зверь бьёт реже героя
+##   (1.3 с против 0.75 с), поэтому при равной силе его удар снимал 20–25 % HP героя. Теперь на 1–5 ур. удар зверя
+##   своего уровня — 8–10 % HP Бродяги (у «Обычного» волка 10–12 %), до смерти 10–12 ударов, а Бродяга с учебным мечом
+##   без питомца побеждает его, теряя 45–60 % HP (сила зверя 0.46–0.61); с 6 по 9 ур. плавно к полной модели
+##   (сила 0.9 → 1.4 → 2.0 → 2.5), с 10 ур. — ×3 и полная атака. Боссов и мини-боссов (aggressive) вход не касается.
 ##   Расчёт — tools/rappelz_strider_reference.md, раздел «Звери мира».
 ## • Поверх: сила редкости MobData.power (HP, атака, опыт), защита вида MobData.defense (анатемы — ниже), темп ударов
 ##   MobData.attack_cd; боссы — BOSS_* (HP, атака, защита, опыт, размер).
@@ -33,9 +38,12 @@ const ATK_FLAT := 9.0
 const ATK_LVL := 0.003
 ## HP всех зверей мира (и боссов) × MOB_HP_MULT — решение Максима; одно место для настройки.
 const MOB_HP_MULT := 3.0
-## Вход новичка: множитель HP зверей 1-го, 2-го, 3-го, 4-го ур. вместо MOB_HP_MULT (Бродяга без питомца и умений:
-## зверь 1-го ур. ему равен, дальше всё тяжелее; луга новичков 1–3 ур.). Пустой массив — ×MOB_HP_MULT с 1-го ур.
-const MOB_HP_START := [1.0, 1.5, 2.0, 2.5]
+## Вход новичка: множитель HP зверей 1-го … 9-го ур. вместо MOB_HP_MULT и множитель их атаки (с 10 ур. — ×MOB_HP_MULT
+## и ×1). На 1–5 ур. Бродяга без питомца и умений побеждает зверя своего уровня, теряя 45–60 % HP, удар зверя —
+## 8–10 % HP героя; 6–9 ур. — переход к полной модели. Пустые массивы — полная модель с 1-го ур. Боссов и мини-боссов
+## (aggressive) вход не касается.
+const MOB_HP_START := [1.1, 1.15, 1.2, 1.25, 1.3, 1.55, 1.95, 2.4, 2.7]
+const MOB_ATK_START := [0.45, 0.47, 0.48, 0.49, 0.5, 0.6, 0.72, 0.84, 0.93]
 const DEF_K := 1.0
 const MDEF_K := 0.75
 ## Профили статов видов без питомца [Str, Vit, Agi, Int, Wis, Dex, Luck] (доли; масштаб задаёт уровень).
@@ -146,12 +154,34 @@ static func body_scale(type_id: String, lvl: int) -> float:
 	return s
 
 
-## Множитель HP зверя уровня lvl: MOB_HP_MULT, у зверей 1–4 ур. — меньше (MOB_HP_START).
-static func hp_mult(lvl: int) -> float:
+## Множитель HP зверя уровня lvl: MOB_HP_MULT, у зверей 1–9 ур. — меньше (MOB_HP_START). elite — босс или мини-босс:
+## входа новичка нет.
+static func hp_mult(lvl: int, elite: bool = false) -> float:
 	var l := maxi(1, lvl)
-	if l <= MOB_HP_START.size():
+	if not elite and l <= MOB_HP_START.size():
 		return float(MOB_HP_START[l - 1])
 	return MOB_HP_MULT
+
+
+## Множитель атаки зверя уровня lvl: 1.0, у зверей 1–9 ур. — меньше (MOB_ATK_START), кроме боссов и мини-боссов.
+static func atk_mult(lvl: int, elite: bool = false) -> float:
+	var l := maxi(1, lvl)
+	if not elite and l <= MOB_ATK_START.size():
+		return float(MOB_ATK_START[l - 1])
+	return 1.0
+
+
+## Мини-босс — «Редкий» зверь мира, не босс (вожак анатем, змеекрыл, кентавр). То же правило, что у
+## MobData.is_mini_boss (после слияния можно звать его).
+static func is_mini_boss(type_id: String) -> bool:
+	return MobData.TYPES.has(type_id) and not MobData.is_boss(type_id) \
+		and String(MobData.get_type(type_id).get("rarity", "common")) == "rare"
+
+
+## Агрессивный зверь (решение Максима): боссы и мини-боссы нападают сами, когда герой или его питомец подходит на
+## дистанцию их атаки (Mob.aggro_range); остальные нейтральны — не вступают в бой, пока их не атакуют.
+static func is_aggressive(type_id: String) -> bool:
+	return MobData.is_boss(type_id) or is_mini_boss(type_id)
 
 
 ## Опыт за зверя своего уровня lvl (до силы редкости и разницы уровней).
@@ -183,8 +213,9 @@ static func derived(type_id: String, lvl: int) -> Dictionary:
 	var pw := MobData.power(type_id)
 	var boss := MobData.is_boss(type_id)
 	var dm := MobData.defense(type_id)
-	var hp_m := HP_K * hp_mult(lv) * n * pw * (BOSS_HP if boss else 1.0)
-	var atk_m := pw * (BOSS_ATK if boss else 1.0)
+	var elite := is_aggressive(type_id)
+	var hp_m := HP_K * hp_mult(lv, elite) * n * pw * (BOSS_HP if boss else 1.0)
+	var atk_m := pw * (BOSS_ATK if boss else 1.0) * atk_mult(lv, elite)
 	var def_m := DEF_K * dm * (BOSS_DEF if boss else 1.0)
 	var ka := float(k["atk"]) * ATK_K * n * (1.0 + ATK_LVL * float(lv - 1))
 	var patk := maxi(1, roundi((ka * Stats.raw_patk(s, lf) + ATK_FLAT) * atk_m))

@@ -112,6 +112,10 @@ func run_step() -> void:
 			mob.setup("golem", -1, IslandWorld.current.ground(30.0, 34.0), 10)
 			main.add_child(mob)
 			check(find_mob("golem") == mob, "дикий каменный страж поставлен")
+			# Страж не босс и не «Редкий» — нейтрален (MobStats.is_aggressive): сам не нападает, герой бьёт первым
+			check(not mob.aggressive, "дикий каменный страж нейтрален")
+			mob.take_damage(1, player)
+			check(mob.target == player, "после удара героя страж бьёт его")
 			timer = 0
 			step = 10
 		10:

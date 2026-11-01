@@ -1,6 +1,11 @@
 class_name Mob
 extends CharacterBody3D
-## Дикий зверь: бродит около дома, нападает на игрока рядом, уходит домой с лечением.
+## Дикий зверь: бродит около дома, в бою преследует обидчика, уходит домой с лечением.
+## Нейтральные и агрессивные (решение Максима): обычные звери нейтральны — героя и питомца сами не замечают и вступают
+## в бой, только когда их атакуют (удар героя или питомца, урон по площади и со временем, ослабление умением героя —
+## take_damage, add_dot, provoke); соседи и стая на помощь не приходят (как в Rappelz). Боссы и мини-боссы
+## (MobStats.is_aggressive: «Редкие» звери мира — вожак анатем, змеекрыл, кентавр) агрессивны: нападают сами, когда
+## герой или его питомец подходит на дистанцию их атаки с запасом (aggro_range = _reach() + AGGRO_MARGIN).
 ## Модели видов строит CreatureModels (пантера, черепаха и фазан — модели из файлов, CreatureAsset:
 ## клипы Idle/Walk/Run по скорости, Attack с моментом удара, Hit, Death; пока зверь спит, анимации стоят).
 ## Метка приручения (Taming) видна кольцом под зверем и ромбом-печатью над головой.
@@ -25,6 +30,8 @@ const SLAM_CD := 8.0
 const SLAM_WINDUP := 0.9
 const SLAM_RADIUS := 4.5
 const SLAM_POWER := 1.3
+## Агрессивный зверь замечает героя или питомца на дистанции своей атаки + столько метров.
+const AGGRO_MARGIN := 3.5
 
 var slot := -1
 var type_id := "boar"
@@ -55,7 +62,10 @@ var model_id := "boar"
 var color := Color(0.5, 0.4, 0.3)
 var body_scale := 1.0
 var home := Vector3.ZERO
-var aggro_range := 7.0
+## Агрессивный (босс или мини-босс, MobStats.is_aggressive): нападает сам на героя или питомца ближе aggro_range.
+## Нейтральный (остальные) — только в ответ. Подпись над зверем может показывать это (интерфейс).
+var aggressive := false
+var aggro_range := 0.0
 var leash := 22.0
 var attack_cd := 0.0
 ## Пауза между ударами (MobData.attack_cd с учётом скорости атаки от Ловкости: у анатем удары чаще).
@@ -133,6 +143,7 @@ func setup(id: String, spawn_slot: int, pos: Vector3, lvl: int = -1) -> void:
 	speed = d["speed"]
 	color = d["color"]
 	is_boss = MobData.is_boss(type_id)
+	aggressive = MobStats.is_aggressive(type_id)
 	model_species = MobData.species_of(type_id)
 	model_stage = MobStats.stage_for(type_id, level)
 	model_id = MobStats.model_id(type_id, level)
@@ -150,6 +161,7 @@ func setup(id: String, spawn_slot: int, pos: Vector3, lvl: int = -1) -> void:
 	crit = float(stats["crit"])
 	attack_every = float(stats["attack_cd"])
 	xp_reward = int(stats["xp"])
+	aggro_range = _reach() + AGGRO_MARGIN if aggressive else 0.0
 	home = pos
 	position = pos
 
@@ -311,11 +323,9 @@ func _physics_process(delta: float) -> void:
 			elif not _missed(target):
 				target.call("take_damage", dmg, self)
 	else:
-		# Ищем игрока («Тихая поступь» героя: замечаем его ближе)
-		var p := get_tree().get_first_node_in_group("player") as Node3D
-		var seen := aggro_range * (1.0 - clampf(_stealth_of(p), 0.0, 0.9))
-		if p != null and global_position.distance_to(p.global_position) < seen and not _in_safe_zone(p):
-			target = p
+		# Агрессивный зверь замечает героя или его питомца на дистанции атаки; нейтральный — никого
+		if aggressive:
+			target = _spot_intruder()
 		# Бродим около дома
 		var to_w := _wander_to - global_position
 		to_w.y = 0.0
@@ -507,6 +517,7 @@ func add_dot(id: String, dps: float, sec: float, by: Node3D, no_regen: bool = fa
 	dots[id] = {"dps": dps, "left": sec, "acc": carried, "by": by, "fx": fx}
 	if no_regen:
 		no_regen_time = maxf(no_regen_time, sec)
+	provoke(by)
 	var info := StatusEffects.effect_info("dot", src)
 	if no_regen:
 		info["name"] = String(info["name"]) + ", без лечения"
@@ -552,6 +563,38 @@ func _flee(delta: float) -> void:
 	move_and_slide()
 	IslandWorld.constrain(self, prev)
 	rotation.y = lerp_angle(rotation.y, atan2(-dir.x, -dir.z), 8.0 * delta)
+
+
+## Агрессивный зверь: герой («Тихая поступь» — замечает ближе) или питомец ближе aggro_range, не в безопасной зоне.
+func _spot_intruder() -> Node3D:
+	var best: Node3D = null
+	var best_d := INF
+	var p := get_tree().get_first_node_in_group("player") as Node3D
+	if p != null and p.get("is_down") != true:
+		var seen := aggro_range * (1.0 - clampf(_stealth_of(p), 0.0, 0.9))
+		var d := global_position.distance_to(p.global_position)
+		if d < seen and not _in_safe_zone(p):
+			best = p
+			best_d = d
+	for n in get_tree().get_nodes_in_group("pets"):
+		var pet := n as Node3D
+		if pet == null or not pet.visible or pet.get("is_down") == true:
+			continue
+		var dp := global_position.distance_to(pet.global_position)
+		if dp < aggro_range and dp < best_d and not _in_safe_zone(pet):
+			best = pet
+			best_d = dp
+	return best
+
+
+## Втянуть зверя в бой без урона (ослабление умением героя, урон со временем): нейтральный начинает бить by.
+## Зверь, что уже дерётся или идёт домой, цель не меняет.
+func provoke(by: Node3D) -> void:
+	if is_dead or returning or target != null or not is_instance_valid(by):
+		return
+	if by.get("is_down") == true:
+		return
+	target = by
 
 
 ## Незаметность героя («Тихая поступь»): 0, если у узла её нет.
