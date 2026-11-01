@@ -7,6 +7,7 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
 import android.util.Log;
 
 import org.godotengine.godot.Dictionary;
@@ -24,8 +25,10 @@ import java.io.File;
  * во внешнюю папку приложения (getExternalFilesDir — без разрешений на память), игра проверяет sha256 и переносит
  * его в user://packs.
  * <p>
- * Типы параметров и результатов — только String, boolean, Dictionary: JNI Godot 4.3 передаёт int-параметры
+ * Типы параметров и результатов — только String, boolean, int, Dictionary: JNI Godot 4.3 передаёт int-параметры
  * как jint и читает результат int-метода (long-метод вызвать нельзя), поэтому id загрузки — строкой.
+ * <p>
+ * Заодно — температура телефона для бережения (ThermalGuard в игре): thermalStatus, thermalHeadroom.
  */
 public class DownloadPlugin extends GodotPlugin {
 	private static final String TAG = "MyRappelzDownload";
@@ -203,6 +206,58 @@ public class DownloadPlugin extends GodotPlugin {
 				Log.w(TAG, "requestPermissions failed", e);
 			}
 		});
+	}
+
+	/**
+	 * Статус температуры телефона (PowerManager.getCurrentThermalStatus, Android 10+): 0 нет, 1 лёгкий, 2 умеренный,
+	 * 3 сильный, 4 критический, 5 аварийный, 6 отключение; -1 — неизвестно (старый Android, ошибка).
+	 */
+	@UsedByGodot
+	public int thermalStatus() {
+		if (Build.VERSION.SDK_INT < 29) {
+			return -1;
+		}
+		try {
+			PowerManager pm = powerManager();
+			return pm != null ? pm.getCurrentThermalStatus() : -1;
+		} catch (Exception e) {
+			lastError = e.toString();
+			return -1;
+		}
+	}
+
+	/**
+	 * Прогноз запаса до троттлинга через 10 с (PowerManager.getThermalHeadroom, Android 11+), в тысячных:
+	 * 1000 — телефон начнёт снижать частоты. -1 — неизвестно (старый Android, нет данных, чаще раза в секунду).
+	 * Целым: JNI Godot 4.3 надёжно читает только int-результат.
+	 */
+	@UsedByGodot
+	public int thermalHeadroom() {
+		if (Build.VERSION.SDK_INT < 30) {
+			return -1;
+		}
+		try {
+			PowerManager pm = powerManager();
+			if (pm == null) {
+				return -1;
+			}
+			float h = pm.getThermalHeadroom(10);
+			if (Float.isNaN(h) || h < 0.0f) {
+				return -1;
+			}
+			return Math.round(h * 1000.0f);
+		} catch (Exception e) {
+			lastError = e.toString();
+			return -1;
+		}
+	}
+
+	private PowerManager powerManager() {
+		Context c = context();
+		if (c == null) {
+			return null;
+		}
+		return (PowerManager)c.getSystemService(Context.POWER_SERVICE);
 	}
 
 	/** Текст последней ошибки (для журнала). */

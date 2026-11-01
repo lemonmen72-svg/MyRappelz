@@ -108,7 +108,7 @@ func run_step() -> void:
 			check(Quality.fps_limit() == 30, "предел кадров сохранён и прочитан")
 			check(Quality.level() == Quality.HIGH, "предел кадров не сбросил качество")
 			Quality.set_fps_limit(999, false)
-			check(Quality.fps_limit() == Quality.DEFAULT_FPS, "неверный предел кадров — по умолчанию")
+			check(Quality.fps_limit() == Quality.preset_fps(), "неверный предел кадров — предел пресета")
 			Quality.set_level(Quality.MEDIUM, false)
 			Quality.apply(get_tree())
 			check(sun.shadow_enabled and not _fx.visible, "«Среднее»: тени без постобработки (экономия на телефоне)")

@@ -93,6 +93,8 @@ const WEAPON_ROW := [
 var _heroes: Node3D = null
 ## Камера кадров настроек графики (120–129) и место героя в городе (у ратуши, видно с камеры кадров 12–14).
 var _gcam: Camera3D = null
+## Кадры 290–292: пресет до блока бережения телефона.
+var _thermal_level := -1
 const GFX_HERO := Vector2(4.5, -6.5)
 var _top: Camera3D = null
 var _row: Node3D = null
@@ -145,7 +147,7 @@ const PART_ENTRIES := [
 	[814, 152, 72], [816, 59, 23], [818, 120, 29], [960, 45, 12], [963, 64, 14], [925, 141, 33],
 	[940, 33, 9], [943, 63, 47], [946, 95, 46], [980, 40, 46], [1000, 42, 18], [1002, 95, 83],
 	[1025, 102, 102], [1021, 126, 144], [1040, 141, 181], [1060, 66, 67], [1160, 124, 148], [1120, 98, 101],
-	[1080, 60, 58], [1200, 181, 224], [1260, 224, 112], [1220, 103, 52], [1240, 76, 40],
+	[1080, 60, 58], [1200, 181, 224], [1260, 224, 112], [1220, 103, 52], [1240, 76, 40], [1300, 55, 29],
 ]
 ## Сколько кадров до точки входа часть уже рисует (компиляция шейдеров, тени, окна интерфейса).
 const PART_WARMUP := 10
@@ -2036,7 +2038,61 @@ func run_step() -> void:
 			step = 1245
 		1245:
 			shot("274_loot_armor_pickup")
+			wait = 2
+			step = 1300
+		1300:
+			# Бережение телефона (кадры 290–292): вкладка «Графика» — «Беречь от перегрева», авто-снижение по
+			# подставному статусу температуры и восстановление
+			_thermal_level = Quality.level()
+			Quality.set_level(Quality.ULTRA, false)
+			Quality.apply(get_tree())
+			SettingsMenu.open(main.hud, "graphics")
+			wait = 6
+			step = 1301
+		1301:
+			if is_instance_valid(SettingsMenu._scroll):
+				SettingsMenu._scroll.scroll_vertical = 100000
+			wait = 4
+			step = 1302
+		1302:
+			shot("290_settings_guard")
+			main.hud.close_window()
+			# Сильный нагрев (статус 3): три шага вниз — 30 кадров/с, 720p, тени «Низкие»
+			_thermal_run(3, 5, 5.0)
+			check(Quality.throttle_level() == 3, "кадр 291: авто-снижение — шаг %d" % Quality.throttle_level())
+			wait = 20
+			step = 1303
+		1303:
+			shot("291_thermal_throttled")
+			# Остыл: шаг вверх раз в минуту прохлады — до графики как выбрана
+			_thermal_run(0, 50, 5.0)
+			check(Quality.throttle_level() == 0, "кадр 292: графика восстановлена (шаг %d)" % Quality.throttle_level())
+			wait = 20
+			step = 1304
+		1304:
+			shot("292_thermal_restored")
+			if _thermal_level >= Quality.LOW and _thermal_level <= Quality.ULTRA:
+				Quality.set_level(_thermal_level, false)
+			Quality.apply(get_tree())
 			ok_done()
+
+
+## Кадры 291–292: ThermalGuard с подставным статусом температуры status, n шагов логики по dt с (кадры в бюджете).
+func _thermal_run(status: int, n: int, dt: float) -> void:
+	var g := ThermalGuard.current
+	if g == null:
+		fail("нет ThermalGuard в главной сцене")
+		return
+	var st := status
+	g.force = true
+	g.status_source = func() -> int: return st
+	g.headroom_source = func() -> int: return -1
+	g._settle = 0.0
+	for i in n:
+		g.tick(dt, 1.0 / float(maxi(Quality.current_fps_cap(), 1)))
+	g.force = false
+	g.status_source = Callable()
+	g.headroom_source = Callable()
 
 
 ## Кадры 96–101: герой профессии job 40 ур. с изученным древом, умения slots на кнопках 1–4, включённые toggles,

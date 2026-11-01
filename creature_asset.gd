@@ -308,6 +308,8 @@ func _setup_material(id: String, color: Color, tint: Color) -> void:
 	# Без самозатенения картой теней (Quality.model_shadows) и контур — меняются сразу в настройках
 	Quality.track_model(material, _outline_mat())
 	material.set_meta("toon_done", true)
+	# Дальше Quality.outline_far() м — без контура (ModelLod)
+	ModelLod.register(self, [material])
 
 
 func _map_clips() -> void:
