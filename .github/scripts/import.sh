@@ -15,7 +15,9 @@ NOISE='mesh_get_surface_count|servers/rendering/dummy|Parameter "m" is null'
 t0=$(date +%s)
 python3 -I .github/scripts/import_cache.py restore
 touch "${RUNNER_TEMP:-/tmp}/import_mark"
-timeout 900 godot --headless --path . --import > import.log 2>&1
+# Лимит — 60 мин: первый импорт крупных текстур (2048–4096, BPTC/ASTC высокого качества) идёт 15–30 мин;
+# не уложился — кэш не сохраняется (иначе точный ключ закрепил бы недоделанный импорт)
+timeout "${GODOT_IMPORT_TIMEOUT:-3600}" godot --headless --path . --import > import.log 2>&1
 code=$?
 echo "import: код $code"
 grep -vE "$NOISE" import.log | tail -n 40
@@ -26,5 +28,10 @@ t_done "импорт Godot ($n файлов заново)" "$t0"
 
 if [ -n "${GITHUB_ENV:-}" ]; then
 	echo "GODOT_IMPORTED=1" >> "$GITHUB_ENV"
+	if [ "$code" = "0" ]; then
+		echo "GODOT_IMPORT_OK=1" >> "$GITHUB_ENV"
+	else
+		echo "::warning::импорт Godot не завершился (код $code) — кэш импорта не сохраняется"
+	fi
 fi
 exit 0
