@@ -992,6 +992,32 @@ func run_step() -> void:
 			step = 834
 		834:
 			shot("97_skills_guard")
+			# Команды питомца (кадр 130): круглые кнопки «Авто», «Атака», «Защита», «За мной» под панелью питомца,
+			# у пантеры — режим «Авто» (кнопка с кольцом); окно существа с 5 ячейками умений (кадр 131)
+			if game.pets.size() > 1:
+				game.pets[1]["dead"] = false
+				main.pets.summon(1)
+			wait = 5
+			step = 960
+		960:
+			var pp: Pet = main.pets.active_pet
+			if pp != null:
+				pp._teleport_to_owner()
+				pp.set_mode("auto")
+			wait = 30
+			step = 961
+		961:
+			shot("130_pet_buttons")
+			if game.pets.size() > 1:
+				main.pets.open_creature(1, "skills")
+			wait = 10
+			step = 962
+		962:
+			shot("131_creature_slots")
+			main.hud.close_window()
+			wait = 2
+			step = 963
+		963:
 			# Цепочка заданий острова (кадры 110–114): Бродяга-человек у Старосты Ольвина
 			for z in get_tree().get_nodes_in_group("skill_zones"):
 				z.queue_free()

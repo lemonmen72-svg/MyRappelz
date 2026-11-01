@@ -1,6 +1,8 @@
 class_name PetManager
 extends Node
-## Питомцы: призыв из коллекции Game.pets, команды «Атакуй» / «За мной», опыт за убийства,
+## Питомцы: призыв из коллекции Game.pets, команды (круглые кнопки у панели питомца в HUD: «Авто» — сам нападает
+## на зверей рядом с хозяином, «Атака» — атаковать выделенную цель героя, «Защита» — бить напавших на хозяина
+## и его цель, «За мной» — следовать без боя; режим запоминается в записи питомца — Pet.set_mode), опыт за убийства,
 ## окно питомцев (формирование существ из карт с душой, подробнее — окно существа, призвать, отозвать,
 ## воскресить свитком, отпустить).
 ## Призванный питомец всегда соответствует Game.active_pet: сверка идёт каждый кадр,
@@ -11,8 +13,10 @@ signal summoned(species: String)
 
 ## Окно питомцев — для «Среднего» размера интерфейса (умножается на UiScale.k(); было 1040×600).
 const WINDOW_SIZE := Vector2(900, 540)
-## Радиус поиска цели для команды «Атакуй», если у игрока нет цели.
-const ATTACK_RANGE := 12.0
+## Кнопки команд питомца (HUD) → режим Pet ("pet_attack" — разовая атака цели героя, не режим).
+const COMMAND_ACTIONS := {"pet_auto": "auto", "pet_defend": "defend", "pet_follow": "follow"}
+## Названия режимов (окно «Питомцы»).
+const MODE_NAMES := {"auto": "Авто", "defend": "Защита", "follow": "За мной"}
 
 var main: Node
 ## Призванный питомец (узел в мире) или null. Контракт узла (используют HUD и другие модули):
@@ -43,14 +47,15 @@ func _process(_delta: float) -> void:
 		_sync()
 
 
-## Обрабатывает действия: "pet_attack", "pet_follow", "pets_window", "creature_window". true, если действие своё.
+## Обрабатывает действия: "pet_auto", "pet_attack", "pet_defend", "pet_follow", "pets_window", "creature_window".
+## true, если действие своё.
 func handle_action(id: String) -> bool:
+	if COMMAND_ACTIONS.has(id):
+		_cmd_mode(String(COMMAND_ACTIONS[id]))
+		return true
 	match id:
 		"pet_attack":
 			_cmd_attack()
-			return true
-		"pet_follow":
-			_cmd_follow()
 			return true
 		"pets_window":
 			_release_confirm = -1
@@ -110,34 +115,35 @@ func recall() -> void:
 
 # ---------- Команды ----------
 
+## «Атака»: питомец атакует выделенную цель героя (разовая команда; после её смерти — прежний режим).
 func _cmd_attack() -> void:
 	if not _has_pet():
 		_msg("Нет призванного питомца")
 		return
-	var pl: Node3D = main.player
 	var t: Mob = null
-	var ct = main.player.current_target
-	if is_instance_valid(ct) and ct is Mob and not ct.is_dead:
+	var ct: Variant = main.player.current_target
+	if is_instance_valid(ct) and ct is Mob and not (ct as Mob).is_dead:
 		t = ct as Mob
 	if t == null:
-		t = Util.nearest(pl, "mobs", ATTACK_RANGE) as Mob
-	if t == null:
-		_msg("Рядом нет цели для питомца")
+		_msg("Выберите цель для питомца: коснитесь зверя или атакуйте его")
 		return
 	active_pet.command_attack(t)
 	_msg("«%s» атакует: %s" % [active_pet.pet_name, t.mob_name])
 
 
-func _cmd_follow() -> void:
+## «Авто», «Защита», «За мной»: режим питомца (запоминается в записи).
+func _cmd_mode(m: String) -> void:
 	if not _has_pet():
 		_msg("Нет призванного питомца")
 		return
-	if active_pet.mode == "follow":
-		active_pet.set_mode("assist")
-		_msg("«%s» снова помогает в бою" % active_pet.pet_name)
-	else:
-		active_pet.set_mode("follow")
-		_msg("«%s» следует за вами и не вступает в бой" % active_pet.pet_name)
+	active_pet.set_mode(m)
+	match m:
+		"auto":
+			_msg("«%s» сам нападает на зверей рядом с вами (до %d м)" % [active_pet.pet_name, roundi(Pet.AUTO_RANGE)])
+		"defend":
+			_msg("«%s» защищает вас: бьёт напавших на вас и вашу цель" % active_pet.pet_name)
+		_:
+			_msg("«%s» следует за вами и не вступает в бой" % active_pet.pet_name)
 
 
 # ---------- Призванный питомец ----------
@@ -287,6 +293,10 @@ func _add_row(body: VBoxContainer, i: int) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	body.add_child(row)
+	var col := VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_theme_constant_override("separation", int(UiScale.px(2)))
+	row.add_child(col)
 	var info := Label.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT))
@@ -298,7 +308,8 @@ func _add_row(body: VBoxContainer, i: int) -> void:
 		info.modulate = Color(1.0, 0.55, 0.5)
 	elif active:
 		info.modulate = Color(0.6, 0.95, 1.0)
-	row.add_child(info)
+	col.add_child(info)
+	col.add_child(slot_strip(rec, UiScale.px(24)))
 
 	_add_button(row, "info_%d" % i, "Подробнее", _on_info.bind(i))
 	if dead:
@@ -309,6 +320,39 @@ func _add_row(body: VBoxContainer, i: int) -> void:
 		_add_button(row, "summon_%d" % i, "Призвать", _on_summon.bind(i))
 	var rel_text: String = "Точно отпустить?" if _release_confirm == i else "Отпустить"
 	_add_button(row, "release_%d" % i, rel_text, _on_release.bind(i))
+
+
+## Ячейки умений питомца коротко (окно «Питомцы»): режим, 3 значка «Авто» и 2 значка ауры (пустая — тёмный кружок).
+static func slot_strip(rec: Dictionary, icon_px: float) -> HBoxContainer:
+	PetSkills.ensure_record(rec)
+	var sp := String(rec.get("species", "boar"))
+	var box := HBoxContainer.new()
+	box.add_theme_constant_override("separation", int(UiScale.px(4)))
+	var head := Label.new()
+	head.text = "%s · Авто:" % String(MODE_NAMES.get(PetSkills.command(rec), ""))
+	head.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_SMALL))
+	head.add_theme_color_override("font_color", Color(0.75, 0.78, 0.88))
+	box.add_child(head)
+	for kind in ["auto", "aura"]:
+		if kind == "aura":
+			var al := Label.new()
+			al.text = " Ауры:"
+			al.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_SMALL))
+			al.add_theme_color_override("font_color", Color(0.75, 0.78, 0.88))
+			box.add_child(al)
+		for v in PetSkills.slots_of(rec, String(kind)):
+			var id := String(v)
+			var ic := IconView.new()
+			ic.custom_minimum_size = Vector2(icon_px, icon_px)
+			ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			if id != "":
+				ic.set_spec(IconView.pet_skill(sp, id))
+				if kind == "aura" and not PetSkills.toggle_on(rec, id):
+					ic.modulate = Color(1, 1, 1, 0.5)
+			else:
+				ic.set_spec(IconView.glyph("", Color(0.2, 0.22, 0.32)))
+			box.add_child(ic)
+	return box
 
 
 func _add_button(row: HBoxContainer, key: String, text: String, cb: Callable) -> void:

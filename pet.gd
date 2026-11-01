@@ -6,10 +6,16 @@ extends CharacterBody3D
 ## стадии эволюции на 1 / 15 / 30 ур. Изучаемые умения — PetSkills (окно существа, CreatureWindow).
 ## Поведение по роли: танк провоцирует зверей, напавших на хозяина; боец делает рывок;
 ## маг стреляет снарядами и бьёт по площади; лекарь лечит хозяина и слабо стреляет.
-## Поверх роли — изученные умения: активные применяет ИИ (вместо обычной атаки, когда перезарядка готова
-## и хватает MP; сильные первыми), переключаемые тратят MP каждые 10 с, пассивные — в характеристиках.
-## Режимы: "assist" (бьёт цель хозяина и защищает), "follow" (только идёт следом),
-## "attack" (атакует заданную цель, после её смерти — снова "assist").
+## Поверх роли — изученные умения из ячеек (окно существа): активные из 3 ячеек «Авто» применяет ИИ (вместо
+## обычной атаки, когда перезарядка готова и хватает MP; по порядку ячеек), переключаемые из 2 ячеек ауры включены
+## и тратят MP каждые 10 с (не хватило MP — выключаются и включаются снова, когда MP полное), пассивные —
+## в характеристиках. Умения вне ячеек ИИ не применяет.
+## Режимы (кнопки питомца в HUD; запоминаются в записи — поле cmd, кроме разовой «Атаки»):
+## "auto" — сам нападает на ближайшего зверя в AUTO_RANGE м от хозяина (не дальше поводка LEASH; сначала — на тех,
+## кто бьёт хозяина или питомца, и на цель хозяина), "defend" — защищает хозяина: бьёт зверя, ударившего хозяина
+## (Player.last_attacker), зверей, напавших на хозяина или на себя, и цель, которую атакует хозяин; сам на зверей
+## не нападает; "follow" — только идёт следом, не дерётся (и в ответ); "attack" — разовая команда: атакует
+## заданную цель, после её смерти — снова режим из записи.
 ## Контракт (HUD, модуль боя): pet_name, level, hp, max_hp, mp, max_mp, is_down, heal(amount), stats_changed.
 ## Модель из файла (CreatureAsset: пантера, черепаха, фазан): клипы по скорости, Attack — удар в момент
 ## удара клипа, Cast — умение, Hit — урон.
@@ -18,8 +24,14 @@ signal stats_changed
 ## Питомец погиб: запись уже помечена dead = true.
 signal died
 
-## Дальше этого от хозяина питомец бросает цель (режим "assist").
+## Дальше этого от хозяина питомец бросает цель (поводок режимов "auto" и "defend").
 const LEASH := 14.0
+## Режим "auto": нападает на зверей не дальше этого от хозяина.
+const AUTO_RANGE := 12.0
+## Без цели питомец ищет её не чаще раза в SCAN_TIME с.
+const SCAN_TIME := 0.15
+## Ауры из ячеек, выключенные из-за нехватки MP, включаются снова при полном MP (проверка раз в AURA_CHECK с).
+const AURA_CHECK := 1.0
 ## Радиус защиты хозяина.
 const DEFEND_RANGE := 10.0
 ## Отстал дальше — переносится к хозяину.
@@ -85,7 +97,8 @@ var skill_cds: Dictionary = {}
 var learned_uses := 0
 ## Погиб или отозван (зверям пора искать другую цель).
 var is_down := false
-var mode := "assist"
+## "auto" | "defend" | "follow" | "attack" (см. шапку).
+var mode := PetSkills.DEFAULT_COMMAND
 var target: Mob = null
 var owner_node: Player
 var attack_cd := 0.0
@@ -105,8 +118,10 @@ var _pending_left := 0.0
 var _cast_id := ""
 var _cast_target: Mob = null
 var _cast_left := 0.0
-## Активные умения по убыванию приоритета (prio).
+## Активные умения из ячеек «Авто» по порядку ячеек (ИИ берёт первое готовое).
 var _actives: Array[String] = []
+var _scan_t := 0.0
+var _aura_t := 0.0
 var _col: CollisionShape3D = null
 var _mat: Material = null
 var _label: Label3D = null
@@ -145,6 +160,7 @@ func setup(owner_p: Player, rec: Dictionary) -> void:
 	xp = maxi(0, int(rec.get("xp", 0)))
 	skills = rec["skills"]
 	toggles = rec["toggles"]
+	mode = PetSkills.command(rec)
 	_apply_stats()
 	var saved := int(rec.get("hp", -1))
 	hp = max_hp if saved < 0 else clampi(saved, 1, max_hp)
@@ -179,21 +195,31 @@ func _exit_tree() -> void:
 		PetBond.pet_gone(self)
 
 
-## Атаковать заданного зверя (команда «Атакуй»).
+## Атаковать заданного зверя (разовая команда «Атака»; после его смерти — снова режим из записи).
 func command_attack(m: Mob) -> void:
 	if is_down or not is_instance_valid(m) or m.is_dead:
 		return
 	mode = "attack"
 	target = m
+	_dash_time = 0.0
+	_dash_skill = ""
+	stats_changed.emit()
 
 
-## "assist" | "follow" | "attack".
+## Режим "auto" | "defend" | "follow" (запоминается в записи, поле cmd). Прежнее имя "assist" — это "defend".
+## Разовая атака — command_attack.
 func set_mode(m: String) -> void:
+	if m == "assist":
+		m = "defend"
+	if not PetSkills.COMMANDS.has(m):
+		return
+	record["cmd"] = m
 	mode = m
-	if m == "follow":
-		target = null
-		_dash_time = 0.0
-		_dash_skill = ""
+	target = null
+	_dash_time = 0.0
+	_dash_skill = ""
+	_scan_t = 0.0
+	stats_changed.emit()
 
 
 func _process(delta: float) -> void:
@@ -312,34 +338,75 @@ func _pick_target() -> void:
 	if not is_instance_valid(target) or target.is_dead or target.returning:
 		target = null
 		if mode == "attack":
-			mode = "assist"
+			# Разовая команда выполнена — снова режим из записи
+			mode = PetSkills.command(record)
+			_scan_t = 0.0
+			stats_changed.emit()
 	if mode == "follow":
 		target = null
 		return
-	if target != null and mode == "assist":
+	if target != null and mode != "attack":
 		if owner_node.global_position.distance_to(target.global_position) > LEASH:
 			target = null
 	if target != null:
 		return
+	# Без цели — поиск не каждый кадр
+	_scan_t -= get_physics_process_delta_time()
+	if _scan_t > 0.0:
+		return
+	_scan_t = SCAN_TIME
+	target = find_target()
 
-	# Помогаем бить цель хозяина
-	var lt = owner_node.last_target
-	if is_instance_valid(lt) and lt is Mob:
-		var lm := lt as Mob
-		if not lm.is_dead and not lm.returning and owner_node.global_position.distance_to(lm.global_position) < LEASH:
-			target = lm
-			return
 
-	# Защищаем хозяина и себя
+## Цель по режиму (без текущей): "defend" — ударивший хозяина, напавшие на хозяина или питомца, цель хозяина;
+## "auto" — то же, а если никого — ближайший к хозяину зверь в AUTO_RANGE м (кроме боссов); иначе null.
+func find_target() -> Mob:
+	if mode != "auto" and mode != "defend":
+		return null
+	var op := owner_node.global_position
+	# Ударивший хозяина и всё ещё бьющий его (или питомца)
+	var la: Variant = owner_node.last_attacker
+	if is_instance_valid(la) and la is Mob:
+		var am := la as Mob
+		if _can_engage(am) and (am.target == owner_node or am.target == self) \
+				and op.distance_to(am.global_position) < LEASH:
+			return am
+	# Напавшие на хозяина или на питомца — ближайший к хозяину
+	var best: Mob = null
+	var best_d := DEFEND_RANGE
 	for n in get_tree().get_nodes_in_group("mobs"):
 		var m := n as Mob
-		if m == null or m.is_dead:
+		if not _can_engage(m) or (m.target != owner_node and m.target != self):
 			continue
-		if m.target != owner_node and m.target != self:
+		var d := op.distance_to(m.global_position)
+		if d < best_d:
+			best = m
+			best_d = d
+	if best != null:
+		return best
+	# Цель, которую атакует хозяин
+	var lt: Variant = owner_node.last_target
+	if is_instance_valid(lt) and lt is Mob:
+		var lm := lt as Mob
+		if _can_engage(lm) and op.distance_to(lm.global_position) < LEASH:
+			return lm
+	if mode != "auto":
+		return null
+	# Сам: ближайший к хозяину зверь в AUTO_RANGE м
+	var near_d := AUTO_RANGE
+	for node in get_tree().get_nodes_in_group("mobs"):
+		var wild := node as Mob
+		if not _can_engage(wild) or wild.is_boss:
 			continue
-		if owner_node.global_position.distance_to(m.global_position) < DEFEND_RANGE:
-			target = m
-			return
+		var wd := op.distance_to(wild.global_position)
+		if wd < near_d:
+			best = wild
+			near_d = wd
+	return best
+
+
+func _can_engage(m: Mob) -> bool:
+	return m != null and not m.is_dead and not m.returning
 
 
 # ---------- Атака и умения роли ----------
@@ -567,6 +634,10 @@ func _tick_skills(delta: float) -> void:
 			_pay_upkeep()
 	else:
 		_upkeep_t = 0.0
+	_aura_t += delta
+	if _aura_t >= AURA_CHECK:
+		_aura_t = 0.0
+		_restore_auras()
 	if changed:
 		_write_record()
 		_update_label()
@@ -590,8 +661,9 @@ func _pay_upkeep() -> void:
 		_write_record()
 		stats_changed.emit()
 		return
+	# Ячейки аур остаются: ауры включатся снова, когда MP будет полным (_restore_auras)
 	toggles.clear()
-	_say("«%s»: не хватает MP — переключаемые умения выключены" % pet_name)
+	_say("«%s»: не хватает MP — ауры выключены до полного MP" % pet_name)
 	refresh_skills()
 
 
@@ -604,27 +676,79 @@ func toggle_upkeep() -> int:
 	return cost
 
 
-## Включить или выключить переключаемое умение id. Включение тратит MP. "" — получилось, иначе причина.
+## Включить или выключить переключаемое умение id. Включены только ауры из ячеек: включение ставит умение
+## в свободную ячейку ауры (если его там нет) и тратит MP; выключение убирает его из ячейки.
+## "" — получилось, иначе причина (не хватило MP — умение остаётся в ячейке и включится при полном MP).
 func set_toggle(id: String, on: bool) -> String:
 	var sk := PetSkills.get_skill(id)
 	var n := int(skills.get(id, 0))
 	if sk.is_empty() or String(sk.get("kind", "")) != "toggle" or n <= 0:
 		return "Умение не изучено"
-	if on == bool(toggles.get(id, false)):
-		return ""
-	if on:
-		var cost := PetSkills.mp_cost(id, n)
-		if mp < cost:
-			return "Не хватает MP (нужно %d)" % cost
-		mp -= cost
-		toggles[id] = true
-		_say_skill(String(sk["name"]))
-		if is_inside_tree():
-			Vfx.magic_burst(get_parent(), global_position + Vector3(0, _height * 0.5, 0), sk["color"], 1.2 * maxf(_scale, 0.8), 0.35)
-	else:
+	if not on:
+		var idx := PetSkills.slot_of(record, id)
+		if idx >= 0:
+			PetSkills.clear_slot(record, "aura", idx)
 		toggles.erase(id)
+		refresh_skills()
+		return ""
+	if PetSkills.slot_of(record, id) < 0:
+		var free := PetSkills.free_slot(record, "aura")
+		if free < 0:
+			return "Обе ячейки аур заняты — сначала уберите умение из ячейки"
+		PetSkills.assign_slot(record, id, free)
+	if bool(toggles.get(id, false)):
+		return ""
+	var err := _enable_toggle(id)
 	refresh_skills()
+	return err
+
+
+## Включить ауру id, уже стоящую в ячейке: тратит MP. "" — включена, иначе причина.
+func _enable_toggle(id: String) -> String:
+	var sk := PetSkills.get_skill(id)
+	var cost := PetSkills.mp_cost(id, int(skills.get(id, 0)))
+	if mp < cost:
+		return "Не хватает MP (нужно %d) — включится, когда MP восстановится" % cost
+	mp -= cost
+	toggles[id] = true
+	_say_skill(String(sk["name"]))
+	if is_inside_tree():
+		Vfx.magic_burst(get_parent(), global_position + Vector3(0, _height * 0.5, 0), sk["color"], 1.2 * maxf(_scale, 0.8), 0.35)
 	return ""
+
+
+## Поставить изученное умение id в ячейку idx («Авто» — активные, «Ауры» — переключаемые; PetSkills.assign_slot).
+## Аура в ячейке сразу включается (MP). "" — получилось (у ауры без MP — в ячейке, включится позже), иначе причина.
+func assign_slot(id: String, idx: int) -> String:
+	var err := PetSkills.assign_slot(record, id, idx)
+	if err != "":
+		return err
+	var warn := ""
+	if PetSkills.slot_kind(id) == "aura" and not bool(toggles.get(id, false)):
+		warn = _enable_toggle(id)
+	refresh_skills()
+	return warn
+
+
+## Убрать умение из ячейки idx типа kind ("auto" | "aura"); аура выключается. Возвращает id убранного.
+func clear_slot(kind: String, idx: int) -> String:
+	var id := PetSkills.clear_slot(record, kind, idx)
+	if id != "":
+		refresh_skills()
+	return id
+
+
+## Ауры из ячеек, выключенные из-за нехватки MP: при полном MP включаются снова.
+func _restore_auras() -> void:
+	if mp < max_mp:
+		return
+	var changed := false
+	for v in PetSkills.slots_of(record, "aura"):
+		var id := String(v)
+		if id != "" and not bool(toggles.get(id, false)) and _enable_toggle(id) == "":
+			changed = true
+	if changed:
+		refresh_skills()
 
 
 ## Пересчитать характеристики после изучения умения или переключения (окно существа).
@@ -676,7 +800,7 @@ func skill_ready(id: String) -> bool:
 	return mp >= PetSkills.mp_cost(id, n)
 
 
-## Самое сильное готовое умение против цели t (без рывков и усилений хозяина); "" — нет.
+## Первое по порядку ячеек готовое умение против цели t (без рывков и усилений хозяина); "" — нет.
 func _pick_active(t: Mob) -> String:
 	for id in _actives:
 		var sk := PetSkills.get_skill(id)
@@ -1053,14 +1177,12 @@ func _apply_stats() -> void:
 	_scale = PetData.stage_scale(species, level)
 	hp = mini(hp, max_hp)
 	mp = mini(mp, max_mp)
-	# Изученные активные умения по силе (prio): ИИ берёт первое готовое
+	# Активные умения из ячеек «Авто» по порядку ячеек: ИИ берёт первое готовое (умения вне ячеек не применяет)
 	_actives.clear()
-	for id in PetSkills.list_for(species):
-		var sid := String(id)
-		if String(PetSkills.get_skill(sid).get("kind", "")) == "active" and int(skills.get(sid, 0)) > 0:
+	for v in PetSkills.slots_of(record, "auto"):
+		var sid := String(v)
+		if sid != "" and String(PetSkills.get_skill(sid).get("kind", "")) == "active" and int(skills.get(sid, 0)) > 0:
 			_actives.append(sid)
-	_actives.sort_custom(func(a: String, b: String) -> bool:
-		return int(PetSkills.get_skill(a).get("prio", 0)) > int(PetSkills.get_skill(b).get("prio", 0)))
 
 
 ## HP, MP, уровень, опыт и имя — в запись коллекции (она же сохраняется).

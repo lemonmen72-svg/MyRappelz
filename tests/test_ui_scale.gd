@@ -264,6 +264,21 @@ func _check_hud() -> void:
 		"джойстик компактный и на экране: r %.0f, центр %s" % [joy_r, joy_home])
 	check(hud._pet_box.visible and hud._pet_btns.get_global_rect().end.y <= UiScale.px(HUD.JOY_TOP),
 		"кнопки питомца выше зоны джойстика: %s" % hud._pet_btns.get_global_rect())
+	# Круглые кнопки команд питомца («Авто», «Атака», «Защита», «За мной»): видны, под полосками питомца,
+	# выше зоны джойстика, не на значках эффектов питомца
+	var pet_ids := hud.pet_button_ids()
+	check(pet_ids.size() == 4, "4 круглые кнопки питомца: %s" % [pet_ids])
+	var bars_bottom := hud._pet_mp_bar.get_global_rect().end.y
+	var fxr := hud.status_row("pet")
+	var fx_rect := Rect2(fxr.global_position, Vector2(fxr.max_w, fxr.icon_px))
+	for pid in pet_ids:
+		var pc := button_center(pid)
+		var pr_r := float(hud._buttons[pid]["r"])
+		check(hud.is_button_visible(pid) and hud.button_icon(pid) != null, "кнопка питомца %s видна, со значком" % pid)
+		check(pc.y - pr_r >= bars_bottom and pc.y + pr_r <= UiScale.px(HUD.JOY_TOP),
+			"кнопка питомца %s под полосками и выше джойстика: центр %s, r %.0f" % [pid, pc, pr_r])
+		var near_fx := Vector2(clampf(pc.x, fx_rect.position.x, fx_rect.end.x), clampf(pc.y, fx_rect.position.y, fx_rect.end.y))
+		check(near_fx.distance_to(pc) > pr_r, "кнопка питомца %s не на значках эффектов питомца" % pid)
 	var tracker: Control = main.quests.tracker
 	check(tracker.visible, "трекер задания виден")
 	var trk := tracker.get_global_rect()
