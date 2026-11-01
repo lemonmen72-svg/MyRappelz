@@ -344,8 +344,10 @@ func _check_panels(hud: HUD) -> void:
 	var lv := hud._lvl.get_global_rect()
 	check(lv.end.x <= hud._hp_bar.get_global_rect().position.x and hud._lvl_text.text == str(game.level),
 		"кружок уровня у начала полосок: %s, «%s»" % [lv, hud._lvl_text.text])
-	check(hud._name_label.get_global_rect().end.y <= hud._hp_bar.get_global_rect().position.y + 4.0
-		and hud._name_label.text == game.char_name, "ник над полосками: «%s»" % hud._name_label.text)
+	# по центру строки: высота Label в headless завышена (метрики шрифта), край может заходить на полоску
+	var nr := hud._name_label.get_global_rect() as Rect2
+	check(nr.get_center().y <= hud._hp_bar.get_global_rect().position.y
+		and hud._name_label.text == game.char_name, "ник над полосками: «%s» %s" % [hud._name_label.text, nr])
 	print("  панель игрока: %s; %s" % [pr, hud.player_summary()])
 	for id in hud.menu_buttons():
 		var b := hud.menu_buttons()[id] as Button
