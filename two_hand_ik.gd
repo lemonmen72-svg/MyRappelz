@@ -472,7 +472,7 @@ func _curl(sk: Skeleton3D, hand: int, hand_g: Transform3D, chains: Array[PackedI
 		var pg := _parent_global(sk, ch[0], hand, hand_g)
 		var prev := (pg * sk.get_bone_pose(ch[0])).origin - hand_g.origin
 		for j in mini(FLEX.size(), ch.size() - 1):
-			var b := ch[j]
+			var b: int = ch[j]
 			var g := pg * sk.get_bone_pose(b)
 			var v := g * sk.get_bone_pose_position(ch[j + 1]) - g.origin
 			if v.length_squared() < 1e-10 or prev.length_squared() < 1e-10:
