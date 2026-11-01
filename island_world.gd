@@ -46,6 +46,11 @@ var nz := 0
 var heights := PackedFloat32Array()
 ## 1 — можно ходить.
 var walk := PackedByteArray()
+## 1 — суша под постройкой (IslandPois._mark_walk): для путей зверей и питомцев непроходима (walk = 0), но стоять у
+## стены можно — тело держит коллизия постройки, constrain эти клетки не запрещает (can_stand). Иначе узел сетки
+## 1 м под стеной повёрнутой постройки отбрасывал героя назад, хотя коллизия уже держала его у стены: дрожь и
+## «застревание» вдоль стен.
+var solid := PackedByteArray()
 ## Расстояние до оси ближайшей дороги и до воды (река, пруд), м (не больше FAR).
 var road_d := PackedFloat32Array()
 var water_d := PackedFloat32Array()
@@ -149,6 +154,8 @@ func _init_grid() -> void:
 	var n := nx * nz
 	heights.resize(n)
 	walk.resize(n)
+	solid.resize(n)
+	solid.fill(0)
 	road_d.resize(n)
 	water_d.resize(n)
 	water_level.resize(n)
@@ -726,6 +733,13 @@ func is_walkable(x: float, z: float) -> bool:
 	return walk[_idx(c.x, c.y)] == 1
 
 
+## Можно ли телу стоять здесь (constrain): проходимая суша или суша под постройкой (её держит коллизия).
+func can_stand(x: float, z: float) -> bool:
+	var c := _cell(x, z)
+	var k := _idx(c.x, c.y)
+	return walk[k] == 1 or (k < solid.size() and solid[k] == 1)
+
+
 func road_distance(x: float, z: float) -> float:
 	var c := _cell(x, z)
 	return road_d[_idx(c.x, c.y)]
@@ -876,15 +890,30 @@ func transitions() -> Array:
 
 
 ## Не даёт телу зайти в непроходимую клетку (вода, крутой склон) и провалиться под землю.
-## prev — позиция до move_and_slide.
+## prev — позиция до move_and_slide. Шаг в непроходимую клетку не отменяется целиком, а скользит вдоль края
+## по одной из осей (как тело вдоль стены), высота — от prev (раньше оставалась высота нового места: на краю
+## склона тело каждый кадр подскакивало и падало — дрожь). Клетки под постройками держит их коллизия (can_stand).
 static func constrain(body: Node3D, prev: Vector3) -> void:
 	var w := current
 	if w == null or not is_instance_valid(w):
 		return
 	var p := body.global_position
-	if not w.is_walkable(p.x, p.z) and w.is_walkable(prev.x, prev.z):
-		body.global_position = Vector3(prev.x, p.y, prev.z)
-		p = body.global_position
+	if not w.can_stand(p.x, p.z) and w.can_stand(prev.x, prev.z):
+		var q := prev
+		var xs := Vector3(p.x, prev.y, prev.z)
+		var zs := Vector3(prev.x, prev.y, p.z)
+		var order: Array[Vector3] = [xs, zs]
+		if absf(p.z - prev.z) > absf(p.x - prev.x):
+			order = [zs, xs]
+		for t in order:
+			if (t.x != prev.x or t.z != prev.z) and w.can_stand(t.x, t.z):
+				q = t
+				# Высота: по рельефу от prev (на мосту — как была: под настилом русло)
+				if not w._on_bridge(prev):
+					q.y = prev.y + w.height_at(t.x, t.z) - w.height_at(prev.x, prev.z)
+				break
+		body.global_position = q
+		p = q
 	var h := w.height_at(p.x, p.z)
 	if p.y < h - 0.6 and not w._on_bridge(p):
 		body.global_position.y = h + 0.05

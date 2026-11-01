@@ -9,7 +9,7 @@ extends RefCounted
 ## Модели — из файлов (PropAsset: модели Meshy от Максима, assets/props, материал prop.gdshader — атлас
 ## страницы), если файла нет — заглушки из примитивов (PoiModels, одна функция = один тип; материалы —
 ## toon.gdshader и crystal.gdshader). Ограды, мост, причал, пламя, флажки, колосья — всегда процедурные.
-## Постройки — StaticBody3D (слой 1) с простыми боксами/цилиндрами; клетки под
+## Постройки — StaticBody3D (слой 1) с простыми боксами/капсулами-столбами (Util.pillar); клетки под
 ## ними помечаются непроходимыми (звери и растительность туда не попадут), настил причала — проходимым.
 ## Следы построек для других модулей: world.get_meta("poi_footprints") — [{"c": Vector2, "r": float}];
 ## мелочи без коллизии (бочки, ящики, сено, камни у пещеры) — world.get_meta("poi_props") в том же виде.
@@ -316,6 +316,8 @@ func _mark_walk(c: Vector2, half: Vector2, yaw: float, value: int) -> void:
 	var ext := half.length()
 	# Копия сетки один раз (PackedByteArray копируется при записи), потом обратно в мир
 	var wk := w.walk
+	# Суша под постройкой — отдельно (IslandWorld.solid): стоять у стены можно, её держит коллизия
+	var sd := w.solid
 	var i0 := clampi(int((c.x - ext - w.origin.x) / w.step), 0, w.nx - 1)
 	var i1 := clampi(int((c.x + ext - w.origin.x) / w.step) + 1, 0, w.nx - 1)
 	var j0 := clampi(int((c.y - ext - w.origin.y) / w.step), 0, w.nz - 1)
@@ -325,8 +327,12 @@ func _mark_walk(c: Vector2, half: Vector2, yaw: float, value: int) -> void:
 			var p := Vector2(w.origin.x + float(i) * w.step, w.origin.y + float(j) * w.step)
 			var d := p - c
 			if absf(d.dot(ax)) <= half.x and absf(d.dot(az)) <= half.y:
-				wk[j * w.nx + i] = value
+				var k := j * w.nx + i
+				if value == 0 and wk[k] == 1 and k < sd.size():
+					sd[k] = 1
+				wk[k] = value
 	w.walk = wk
+	w.solid = sd
 
 
 ## Учёт постройки: место занято, след для других модулей, клетки под ней непроходимы.
@@ -360,13 +366,11 @@ func _box_shape(body: Node3D, size: Vector3, pos: Vector3, yaw: float = 0.0) -> 
 	body.add_child(col)
 
 
+## Круглая коллизия радиуса r, высоты h от основания pos: капсула-столб (Util.pillar — не CylinderShape3D,
+## у которого в физике Godot 4.3 дрожат контакты).
 func _cyl_shape(body: Node3D, r: float, h: float, pos: Vector3) -> void:
-	var col := CollisionShape3D.new()
-	var s := CylinderShape3D.new()
-	s.radius = r
-	s.height = h
-	col.shape = s
-	col.position = pos + Vector3(0, h * 0.5, 0)
+	var col := Util.pillar(r, h)
+	col.position += pos
 	body.add_child(col)
 
 

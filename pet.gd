@@ -140,6 +140,13 @@ var _upkeep_t := 0.0
 var _last_crit := false
 ## Путь в обход реки через мосты (IslandWorld.bridge_waypoint).
 var _route := IslandWorld.Route.new()
+## Плавное следование и погоня (без «шаг — стоп» каждый кадр на границе расстояния — клипы шага и покоя
+## переключались, питомец дёргался): за хозяином идёт, пока не подойдёт на FOLLOW_STOP м, скорость растёт с
+## расстоянием непрерывно; к цели подходит на CHASE_SLACK м ближе дальности удара и снова идёт, когда она дальше.
+const FOLLOW_STOP := 2.2
+const CHASE_SLACK := 0.35
+var _following := false
+var _closing := false
 ## Проверка «застрял»: сколько секунд хочет идти и откуда начал отсчёт.
 var _stuck_t := 0.0
 var _stuck_from := Vector3.ZERO
@@ -296,8 +303,10 @@ func _physics_process(delta: float) -> void:
 				else:
 					dir = to.normalized()
 					spd = speed * 3.5
-			elif dist > reach:
+			elif dist > reach - (CHASE_SLACK if _closing else 0.0):
+				_closing = true
 				dir = _route.dir_to(global_position, target.global_position, delta)
+				spd *= clampf((dist - reach + CHASE_SLACK) / 1.2, 0.35, 1.0)
 			elif attack_cd <= 0.0:
 				attack_cd = attack_time
 				var sid := _pick_active(target)
@@ -309,13 +318,17 @@ func _physics_process(delta: float) -> void:
 			_dash_time = 0.0
 			_dash_skill = ""
 			var d := to_o.length()
-			if d > FOLLOW_DIST:
+			if d > FOLLOW_DIST or (_following and d > FOLLOW_STOP):
+				_following = true
 				dir = _route.dir_to(global_position, owner_node.global_position, delta)
 				face = dir
-				if d > 8.0:
-					spd = speed * 1.5
+				# Скорость — непрерывно по расстоянию: у хозяина медленнее, с 5 м быстрее, с 8 м — ×1.5
+				spd = speed * (clampf(0.3 + (d - FOLLOW_STOP) / 2.0, 0.3, 1.0) + 0.5 * clampf((d - 5.0) / 3.0, 0.0, 1.0))
 			_regen(delta)
 
+	if dir == Vector3.ZERO:
+		_following = false
+		_closing = false
 	velocity.x = dir.x * spd
 	velocity.z = dir.z * spd
 	if is_on_floor():

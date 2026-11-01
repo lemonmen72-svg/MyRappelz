@@ -102,6 +102,11 @@ var _mat: Material
 var _label: Label3D
 ## Путь в обход реки через мосты (погоня и возврат домой).
 var _route := IslandWorld.Route.new()
+## Погоня с запасом: догнав, зверь подходит на CHASE_SLACK м ближе дальности удара (последний метр — медленнее) и
+## снова идёт, только когда цель дальше дальности. Раньше на границе дальности он каждый кадр то шёл, то стоял —
+## клипы шага и покоя переключались, зверь у героя дёргался.
+const CHASE_SLACK := 0.35
+var _closing := false
 var _model: Node3D
 ## Модель из файла (или null — модель из примитивов).
 var _asset: CreatureAsset = null
@@ -296,9 +301,11 @@ func _physics_process(delta: float) -> void:
 				var wt := create_tween()
 				wt.tween_property(_model, "scale", Vector3(0.92, 1.12, 0.92), SLAM_WINDUP * 0.8)
 				wt.tween_property(_model, "scale", Vector3.ONE, 0.1)
-		elif to.length() > _reach():
+		elif to.length() > _reach() - (CHASE_SLACK if _closing else 0.0):
 			# Цель за рекой — через мост (IslandWorld.Route)
+			_closing = true
 			dir = _route.dir_to(global_position, target.global_position, delta)
+			spd *= clampf((to.length() - _reach() + CHASE_SLACK) / 1.2, 0.35, 1.0)
 		elif attack_cd <= 0.0:
 			attack_cd = attack_every
 			var dmg := _hit_damage(target, 1.0)
@@ -330,6 +337,8 @@ func _physics_process(delta: float) -> void:
 				_wander_to = home + Vector3(cos(a), 0.0, sin(a)) * randf_range(1.0, 6.0)
 		_heal(delta, 0.1)
 
+	if dir == Vector3.ZERO:
+		_closing = false
 	velocity.x = dir.x * spd
 	velocity.z = dir.z * spd
 	if is_on_floor():

@@ -238,3 +238,32 @@ static func float_text(parent: Node, pos: Vector3, text: String, color: Color, s
 	t.tween_property(l, "modulate:a", 0.0, 0.35).set_delay(0.6)
 	t.tween_property(l, "outline_modulate:a", 0.0, 0.35).set_delay(0.6)
 	t.chain().tween_callback(l.queue_free)
+
+
+## Коллизия-«столб» круглого предмета (ствол, камень, колодец, башня, житель) радиуса r и высоты h от основания:
+## капсула вместо CylinderShape3D — у цилиндра в физике Godot 4.3 известные ошибки контактов (документация советует
+## капсулу или коробку): герой у ствола, камня или жителя дрожал и «застревал». Боковая стенка капсулы идёт от
+## PILLAR_BELOW м под основанием до max(h, PILLAR_MIN_H): контакт с героем всегда сбоку (стена, а не пол) — низкий
+## камень не «подсаживает» героя на край; скругления — под землёй и выше роста героя.
+const PILLAR_BELOW := 1.0
+const PILLAR_MIN_H := 2.4
+
+
+static func pillar_shape(r: float, h: float) -> CapsuleShape3D:
+	var s := CapsuleShape3D.new()
+	s.radius = r
+	s.height = maxf(h, PILLAR_MIN_H) + PILLAR_BELOW + 2.0 * r
+	return s
+
+
+## Высота центра капсулы pillar_shape(r, h) над основанием.
+static func pillar_y(h: float) -> float:
+	return (maxf(h, PILLAR_MIN_H) - PILLAR_BELOW) * 0.5
+
+
+## Готовый узел коллизии-столба (основание — в начале координат узла-родителя).
+static func pillar(r: float, h: float) -> CollisionShape3D:
+	var col := CollisionShape3D.new()
+	col.shape = pillar_shape(r, h)
+	col.position.y = pillar_y(h)
+	return col
