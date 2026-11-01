@@ -3,18 +3,18 @@
 	"height": 1.8,
 	"bounds": [
 		[
-			-0.6329,
+			-0.6322,
 			0.0,
-			-0.2526
+			-0.2523
 		],
 		[
-			0.6327,
+			0.6322,
 			1.8,
-			0.2526
+			0.2523
 		]
 	],
-	"tris": 29997,
-	"verts": 31346,
+	"tris": 69999,
+	"verts": 61956,
 	"bones": {
 		"root": "Bone_000",
 		"hips": "Bone_001",
@@ -146,7 +146,7 @@
 	"grip_l": {
 		"pos": [
 			0.0097,
-			0.0612,
+			0.0611,
 			-0.0136
 		],
 		"dir": [
@@ -175,12 +175,12 @@
 			"source": "ual1:Idle_Loop"
 		},
 		"Walking": {
-			"length": 1.082,
+			"length": 1.081,
 			"loop": true,
 			"source": "ual1:Walk_Loop"
 		},
 		"Running": {
-			"length": 1.481,
+			"length": 1.479,
 			"loop": true,
 			"source": "ual1:Jog_Fwd_Loop"
 		},
@@ -612,25 +612,25 @@
 			"length": 1.033,
 			"loop": true,
 			"source": "mannequin m1:Walking",
-			"speed": 1.791
+			"speed": 1.789
 		},
 		"Mq_Running": {
 			"length": 0.633,
 			"loop": true,
 			"source": "mannequin m1:Running",
-			"speed": 6.025
+			"speed": 7.0
 		},
 		"Mq_Running_B": {
 			"length": 0.733,
 			"loop": true,
 			"source": "mannequin m2:run_fast_3_inplace",
-			"speed": 3.538
+			"speed": 3.534
 		},
 		"Mq_Sprint": {
 			"length": 0.467,
 			"loop": true,
 			"source": "mannequin m2:RunFast",
-			"speed": 8.773
+			"speed": 8.764
 		}
 	}
 }

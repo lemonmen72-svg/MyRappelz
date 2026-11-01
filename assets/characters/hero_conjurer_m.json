@@ -8,13 +8,13 @@
 			-0.1813
 		],
 		[
-			0.7491,
+			0.75,
 			1.8,
-			0.1812
+			0.1813
 		]
 	],
-	"tris": 30000,
-	"verts": 29288,
+	"tris": 69999,
+	"verts": 55927,
 	"bones": {
 		"root": "Bone_000",
 		"hips": "Bone_001",
@@ -617,7 +617,7 @@
 			"length": 0.633,
 			"loop": true,
 			"source": "mannequin m1:Running",
-			"speed": 6.026
+			"speed": 6.726
 		},
 		"Mq_Running_B": {
 			"length": 0.733,

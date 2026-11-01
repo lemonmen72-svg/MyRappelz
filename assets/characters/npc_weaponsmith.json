@@ -3,18 +3,18 @@
 	"height": 1.84,
 	"bounds": [
 		[
-			-0.4027,
+			-0.4026,
 			0.0,
-			-0.3045
+			-0.3044
 		],
 		[
-			0.4035,
+			0.4034,
 			1.84,
 			0.3039
 		]
 	],
-	"tris": 29999,
-	"verts": 29736,
+	"tris": 50000,
+	"verts": 44357,
 	"bones": {
 		"root": "Bone_000",
 		"hips": "Bone_001",
@@ -148,7 +148,7 @@
 			"source": "ual1:Idle_Loop"
 		},
 		"Walking": {
-			"length": 0.937,
+			"length": 0.936,
 			"loop": true,
 			"source": "ual1:Walk_Loop"
 		},

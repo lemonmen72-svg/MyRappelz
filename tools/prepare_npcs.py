@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Жители-NPC из Meshy (авто-риг, родной скелет Bone_NNN) → игровые модели assets/characters/npc_<id>.glb.
 
-Обёртка над tools/prepare_hero.py (тот же конвейер, что у героев: меш ~30 тыс. треуг., клипы UAL Idle, Wave,
+Обёртка над tools/prepare_hero.py (тот же конвейер, что у героев: меш до NPC_TRIS = 50 тыс. треуг. — у большинства
+исходников Максима их ~31 тыс., тогда меш берётся целиком, без упрощения; клипы UAL Idle, Wave,
 Walking, Running …, <id>.json с ролями костей и хватом). Добавляет только то, чего нет в имени файла жителя:
 рост и пол каждого жителя (NPCS). Пол в prepare_hero задаётся окончанием id (_f — женская пластика шага и покоя),
 а файл жителя называется npc_<id> без пола — поэтому женщины собираются как npc_<id>_f во временную папку
@@ -42,6 +43,8 @@ NPCS = {
 	"npc_armorer": ("f", 1.74),
 	"npc_jeweler": ("f", 1.70),
 }
+## Бюджет меша жителя (у героев — prepare_hero.TRIS 70 тыс.): исходник меньше — целиком.
+NPC_TRIS = 50000
 
 
 def _load(name: str):
@@ -70,20 +73,20 @@ def main() -> None:
 			ap.error("неизвестный житель %r (есть: %s)" % (cid, ", ".join(NPCS)))
 		sex, h = NPCS[cid]
 		if sex == "m":
-			ok = ph.build(cid, path, h, args.out, args.preview)["ok"] and ok
+			ok = ph.build(cid, path, h, args.out, args.preview, NPC_TRIS)["ok"] and ok
 			continue
 		# Женщина: id с «_f» (женская пластика), затем переименование в npc_<id>
 		tmp = tempfile.mkdtemp(prefix=".tmp_npc_", dir=args.out)
 		try:
 			tid = cid + "_f"
-			ok = ph.build(tid, path, h, tmp, args.preview)["ok"] and ok
+			ok = ph.build(tid, path, h, tmp, args.preview, NPC_TRIS)["ok"] and ok
 			for ext in (".glb", ".png", ".json"):
 				src = os.path.join(tmp, tid + ext)
 				if os.path.exists(src):
 					shutil.move(src, os.path.join(args.out, cid + ext))
 			for ext, tpl in ((".png.import", ph.PNG_IMPORT), (".glb.import", ph.GLB_IMPORT)):
 				p = os.path.join(args.out, cid + ext)
-				if not os.path.exists(p):
+				if ext == ".png.import" or not os.path.exists(p):
 					with open(p, "w") as f:
 						f.write(tpl.format(name=cid))
 		finally:

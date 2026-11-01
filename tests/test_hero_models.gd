@@ -5,6 +5,10 @@ extends "res://tests/test_base.gd"
 ## шаг и бег включаются по скорости, поза покоя по костям — голова наверху, стопы у земли, кисти не выше головы.
 ## Женская пластика (tools/prepare_hero.py, FEM_STYLES): у героинь таз в шаге и беге вращается вокруг вертикали
 ## заметно сильнее, чем у героев, — по трекам анимации, без графики.
+## Плечи (_check_shoulders): плечевые суставы в покое, стойках, шаге и беге не позади шеи больше SHOULDER_BACK — как у
+## исходной модели Meshy (0…−1 см); до исправления ключиц в клипах UAL было −5…−7 см («плечи за головой»).
+## Бег (_check_loco): носок в переносе не выше RUN_LIFT_MAX роста, колено ниже таза, при 7 м/с не чаще RUN_CADENCE_MAX
+## шагов в секунду (бег спринтера манекена с темпом ×1.2–1.3 поднимал ноги «как по воде»).
 
 const HEROES := [
 	"res://assets/characters/hero_assassin_m.glb",
@@ -36,7 +40,18 @@ const HEROES := [
 const CLIPS := ["idle", "walking", "running", "wave", "sword_idle", "sword_slash", "sword_attack", "sword_combo",
 	"sword_heavy_combo", "sword_dash", "sword_block", "dodge", "hit", "death", "cast", "pickup", "sword_slash_b",
 	"sword_slash_c", "crossbow_idle", "crossbow_shoot"]
-const MAX_TRIS := 31000
+## Меш героя: 70 тыс. треугольников (tools/prepare_hero.py TRIS), дальние — LOD Godot.
+const MIN_TRIS := 50000
+const MAX_TRIS := 80000
+## Плечевой сустав (среднее левого и правого за клип) позади основания шеи не дальше, м. Клипы — покой, стойки, шаг, бег.
+const SHOULDER_BACK := 0.035
+const SHOULDER_CLIPS := ["idle", "sword_idle", "crossbow_idle", "walking", "mq_walking", "mq_running", "mq_cast_hold"]
+## Бег Mq_Running: носок в переносе над своей высотой в покое — не выше доли роста (у манекена 0.47–0.50, у героев
+## после tools/retarget_mannequin.py MQ_LIFT ≈ 0.3), колено ниже тазобедренного сустава хотя бы на долю роста (у
+## манекена — почти вровень), шагов в секунду при 7 м/с (скорость героя) не больше.
+const RUN_LIFT_MAX := 0.38
+const RUN_KNEE_MIN := 0.05
+const RUN_CADENCE_MAX := 3.6
 ## Движения манекенов Meshy (tools/retarget_mannequin.py, MQ_CLIPS): у каждого героя все, в .json — длина и удар.
 const MQ_CLIPS := ["mq_sword_a1", "mq_sword_a2", "mq_sword_a3", "mq_combo_b1", "mq_combo_b2", "mq_combo_b3",
 	"mq_dual_a1", "mq_dual_a2", "mq_left_slash", "mq_thrust", "mq_heavy_swing", "mq_axe_spin", "mq_axe_chop",
@@ -54,7 +69,7 @@ const MQ_LOOPS := ["mq_cast_hold", "mq_charge_hold", "mq_bow_aim_hold", "mq_cros
 ## Шаг и бег манекенов (CharacterModel.MQ_LOCO): [клип, ход таза по высоте за цикл до, м; длина шага от, до, м].
 ## Своя скорость — clips.<имя>.speed в .json.
 const MQ_LOCO := [["mq_walking", 0.09, 0.5, 1.1], ["mq_running_b", 0.12, 0.9, 1.5],
-	["mq_running", 0.08, 1.2, 2.1], ["mq_sprint", 0.08, 1.4, 2.6]]
+	["mq_running", 0.08, 1.7, 2.4], ["mq_sprint", 0.08, 1.4, 2.6]]
 ## Опорная стопа (носок у земли) едет назад со скоростью клипа: отклонение не больше, м.
 const MQ_LOCO_SLIDE := 0.04
 ## Повороты на месте: угол корпуса за клип (clips.<имя>.turn, °) по модулю не меньше.
@@ -378,7 +393,7 @@ func _check_model(m: CharacterModel, who: String) -> void:
 		var mat := mi.material_override as StandardMaterial3D
 		check(mat != null and mat.albedo_texture != null, "%s: toon-материал с текстурой" % who)
 	check(h > lo and h < hi, "%s: рост %.2f м (%.2f…%.2f)" % [who, h, lo, hi])
-	check(tris > 10000 and tris <= MAX_TRIS, "%s: треугольников %d (до %d)" % [who, tris, MAX_TRIS])
+	check(tris >= MIN_TRIS and tris <= MAX_TRIS, "%s: треугольников %d (%d…%d)" % [who, tris, MIN_TRIS, MAX_TRIS])
 	# Клипы на месте: корень скелета по X/Z не уходит (рывок, кувырок)
 	var root := String(bones.get("root", ""))
 	for c in ["sword_dash", "dodge", "walking"]:
@@ -399,6 +414,31 @@ func _check_model(m: CharacterModel, who: String) -> void:
 		skel.get_bone_count()])
 	_check_mq(m, who, skel, rig)
 	_check_loco(m, who, skel, rig)
+	_check_shoulders(m, who, skel, rig)
+
+
+## Плечи: в покое, стойках, шаге и беге плечевые суставы (2-я кость руки) не уходят назад от основания шеи (Z — вперёд
+## модели) дальше SHOULDER_BACK — в среднем за клип и по обеим рукам (повороты корпуса в шаге взаимно гасятся).
+func _check_shoulders(m: CharacterModel, who: String, skel: Skeleton3D, rig: Dictionary) -> void:
+	var bones: Dictionary = rig.get("bones", {})
+	var arms: Dictionary = bones.get("arms", {})
+	var neck := skel.find_bone(String(bones.get("neck", "")))
+	check(neck >= 0 and arms.has("L") and arms.has("R"), "%s: кости шеи и рук для проверки плеч" % who)
+	if neck < 0 or not arms.has("L") or not arms.has("R"):
+		return
+	var sh := [skel.find_bone(String(arms["L"][1])), skel.find_bone(String(arms["R"][1]))]
+	for c in SHOULDER_CLIPS:
+		if not m._clips.has(c):
+			continue
+		var a := m._anim.get_animation(String(m._clips[c]))
+		var pn := _bone_points(skel, a, neck, 30)
+		var pl := _bone_points(skel, a, int(sh[0]), 30)
+		var pr := _bone_points(skel, a, int(sh[1]), 30)
+		var d := 0.0
+		for k in pn.size():
+			d += 0.5 * (pl[k].z + pr[k].z) - pn[k].z
+		d /= float(maxi(pn.size(), 1))
+		check(d >= -SHOULDER_BACK, "%s: %s — плечи позади шеи на %.3f м (до %.3f)" % [who, c, -d, SHOULDER_BACK])
 
 
 ## Имя клипа k-й обычной атаки по хвату модели (MQ_ATTACKS) или "".
@@ -494,8 +534,29 @@ func _check_loco(m: CharacterModel, who: String, skel: Skeleton3D, rig: Dictiona
 			check(step_len >= float(row[2]) and step_len <= float(row[3]), "%s: %s — шаг %.2f м (%.1f…%.1f)" % [who, cn,
 				step_len, float(row[2]), float(row[3])])
 		if cn.to_lower() == "mq_running":
-			print("  %s: бег %.2f м/с, шаг %.2f м, %.2f шаг/с (при 7 м/с — %.2f), таз %.3f м, скольжение %.3f м" % [
-				who, v, step_len, 2.0 / a.length, 2.0 / a.length * 7.0 / v, hi - lo, worst])
+			# Высота ног в переносе: носок над покоем, колено относительно тазобедренного сустава (доли роста)
+			var height := float(rig.get("height", 1.8))
+			var lift := 0.0
+			var knee := INF
+			for side in ["L", "R"]:
+				var leg: Array = bones.get("legs", {}).get(side, [])
+				if leg.size() < 4:
+					continue
+				var toe := skel.find_bone(String(leg[3]))
+				var tp := _bone_points(skel, a, toe, 90)
+				var kp := _bone_points(skel, a, skel.find_bone(String(leg[1])), 90)
+				var hp2 := _bone_points(skel, a, skel.find_bone(String(leg[0])), 90)
+				for k in tp.size():
+					lift = maxf(lift, tp[k].y - skel.get_bone_global_rest(toe).origin.y)
+					knee = minf(knee, hp2[k].y - kp[k].y)
+			var cad := 2.0 / a.length * 7.0 / v
+			check(lift <= RUN_LIFT_MAX * height, "%s: бег — носок в переносе на %.2f м (до %.2f)" % [who, lift,
+				RUN_LIFT_MAX * height])
+			check(knee >= RUN_KNEE_MIN * height, "%s: бег — колено ниже таза на %.2f м (от %.2f)" % [who, knee,
+				RUN_KNEE_MIN * height])
+			check(cad <= RUN_CADENCE_MAX, "%s: бег — при 7 м/с %.2f шаг/с (до %.1f)" % [who, cad, RUN_CADENCE_MAX])
+			print("  %s: бег %.2f м/с, шаг %.2f м, %.2f шаг/с (при 7 м/с — %.2f), таз %.3f м, скольжение %.3f м, носок %.2f м, колено ниже таза %.2f м" % [
+				who, v, step_len, 2.0 / a.length, cad, hi - lo, worst, lift, knee])
 
 
 ## Позиции кости (в пространстве скелета) в n + 1 точках клипа: позы костей от корня — треки клипа, иначе поза покоя.

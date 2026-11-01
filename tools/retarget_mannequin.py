@@ -192,16 +192,34 @@ MQ_LOCO = {"Mq_Walking": ("walk", "m1:Walking", 1),
 	"Mq_Running": ("run", "m1:Running", 1), "Mq_Running_B": ("jog", "m2:run_fast_3_inplace", 1),
 	"Mq_Sprint": ("sprint", "m2:RunFast", 1)}
 MQ_STRIDE = {"walk": 1.0, "jog": 1.0, "run": 1.0, "sprint": 0.6}
+## Бег под скорость героя (жалоба Максима после 0.25: «очень сильно поднимает ноги, как будто перешагивает или
+## быстро бежит по воде»). Бег манекена m1 Running — бег спринтера: бедро вперёд до 67–86° (колено почти на высоте
+## таза), пятка до ягодицы (колено сгибается на 155–158°), 3.16 шаг/с, шаг 1.8 м; на герое своя скорость
+## 5.7–6.0 м/с, а в игре герой бежит 6.8–7.2 м/с — темп ×1.2–1.3, 3.8–4.1 шаг/с: высокие колени ещё и мельтешили.
+## Теперь (stride_scale в make_loco):
+##   * MQ_LOCO_TARGET — длина шага такая, чтобы своя скорость клипа была скоростью героя (м/с): в игре темп ≈ ×1,
+##     частота — как у манекена (≈ 3.2 шаг/с), шаг ≈ 2.1–2.2 м (как у человека на 7 м/с); множитель длины шага не
+##     больше MQ_STRIDE_MAX;
+##   * MQ_LIFT — высота стопы над землёй в переносе (выше LOCO_LOW): доля исходной; нога в переносе разгибается
+##     (IK), колено ниже, пятка не к ягодице — как у бега трусцой манекена (run_fast_3_inplace: бедро 40–46°,
+##     колено 124–131°), но с темпом и шагом бега.
+MQ_LOCO_TARGET = {"run": 7.0}
+MQ_STRIDE_MAX = 1.3
+MQ_LIFT = {"walk": 1.0, "jog": 1.0, "run": 0.62, "sprint": 1.0}
 MQ_FEM = {"walk": "walk", "jog": "mq_run", "run": "mq_run", "sprint": "mq_run"}
-## Бег героини: тот же стиль, что у бега UAL, но вынос стопы короче не на 18 %, а на MQ_FEM_RUN_STRIDE (частота
-## и так выше, чем у бега UAL: при 7 м/с больше 4 шагов в секунду — уже семенит).
-MQ_FEM_RUN_STRIDE = 0.9
+## Бег героини: стиль бега UAL (колея уже, таз вращается, руки ближе, наклон меньше), длина выноса — своя
+## (MQ_FEM_RUN_STRIDE = 1: раньше 0.9, при 7 м/с выходило больше 4 шагов в секунду — семенила; длину шага задаёт
+## MQ_LOCO_TARGET).
+MQ_FEM_RUN_STRIDE = 1.0
 ph.FEM_STYLES["mq_run"] = dict(ph.FEM_STYLES["run"], stride=MQ_FEM_RUN_STRIDE)
 ## Проверка шага и бега: опорная стопа (носок у земли) едет назад со скоростью клипа с ошибкой не больше LOCO_SLIDE,
 ## м; вертикальный ход таза за цикл не больше LOCO_BOB, м; длина шага (скорость × полцикла) в пределах LOCO_STEP, м.
 LOCO_SLIDE = 0.03
 LOCO_BOB = {"walk": 0.09, "jog": 0.12, "run": 0.08, "sprint": 0.08}
-LOCO_STEP = {"walk": (0.5, 1.1), "jog": (0.9, 1.5), "run": (1.2, 2.1), "sprint": (1.4, 2.6)}
+LOCO_STEP = {"walk": (0.5, 1.1), "jog": (0.9, 1.5), "run": (1.7, 2.4), "sprint": (1.4, 2.6)}
+## Перенос стопы: наибольший подъём носка над покоем не больше LOCO_LIFT_MAX × рост (у манекена m1 Running —
+## 0.47–0.50 роста, после MQ_LIFT 0.62 — 0.28–0.32; трусца m2 как есть — 0.34–0.39, быстрый бег — 0.32–0.42, шаг — 0.10).
+LOCO_LIFT_MAX = {"walk": 0.14, "jog": 0.42, "run": 0.36, "sprint": 0.45}
 ## Опору, до которой прямая нога не достаёт дальше LOCO_REACH (м), достаёт таз ниже (не больше LOCO_DROP_MAX, м).
 LOCO_REACH = 0.004
 LOCO_DROP_MAX = 0.08
@@ -600,21 +618,28 @@ def loop_close(times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray) -> None:
 		Lt[f] = Lt[f] + (Lt[0] - Lt[f]) * w
 
 
-def stride_scale(rt, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, k: float) -> float:
-	"""Вынос стоп вперёд-назад × k вокруг средней точки (IK бедро + голень, мировой поворот стоп и высота — как были).
-	Возвращает недостачу IK, м."""
+def stride_scale(rt, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, k: float, lift: float = 1.0) -> float:
+	"""Вынос стоп вперёд-назад × k вокруг средней точки; высота носка над покоем выше LOCO_LOW — × lift (перенос
+	ниже, у земли — как было). IK бедро + голень, мировой поворот стоп — как был. Возвращает недостачу IK, м."""
 	_Gq, Gp = rt.fk(Lq, Lt)
 	want = {}
 	for s, b in rt.contact.items():
 		p = Gp[:, b].copy()
 		zc = float(p[:-1, 2].mean())
 		p[:, 2] = zc + (p[:, 2] - zc) * k
+		if lift != 1.0:
+			h = p[:, 1] - float(rt.rig.gpos[b, 1]) - LOCO_LOW
+			p[:, 1] -= np.maximum(h, 0.0) * (1.0 - lift)
 		want[s] = p
 	short = 0.0
 	for f in range(len(times)):
 		for s in sorted(rt.contact):
 			Gq1, Gp1 = rt.fk(Lq[f:f + 1], Lt[f:f + 1])
-			short = max(short, rt.two_bone(Gq1[0], Gp1[0], Lq[f], s, want[s][f]))
+			miss = rt.two_bone(Gq1[0], Gp1[0], Lq[f], s, want[s][f])
+			# В воздухе (вынос вперёд дальше длины ноги) недостача не страшна — стопа чуть ближе; у земли опору потом
+			# ставит plant_loco (таз ниже, если нужно), её недостача и проверяется
+			if want[s][f, 1] < float(rt.rig.gpos[rt.contact[s], 1]) + LOCO_LOW:
+				short = max(short, miss)
 	Lq[:] = ra.continuous(Lq)
 	return short
 
@@ -715,8 +740,29 @@ def make_loco(rts: dict, hero: Hero, name: str, kind: str, src_clip: str, female
 	fem = 0.0
 	if female:
 		fem = ph.feminize(rt, MQ_FEM[kind], times, Lq, Lt)
-	if MQ_STRIDE[kind] != 1.0:
-		fem = max(fem, stride_scale(rt, times, Lq, Lt, MQ_STRIDE[kind]))
+	k = MQ_STRIDE[kind]
+	shape = 0.0
+	if kind in MQ_LOCO_TARGET:
+		# Длина шага — под скорость героя: темп в игре ≈ ×1 (частота шагов — как у манекена). Скорость опоры — по
+		# циклу 90 к/с, как её потом пишет make_loco (по 30 к/с в опоре 4–6 кадров, медиана скачет на ±10 %); от
+		# формы зависит и то, какие кадры у земли, — k уточняется по замеру (3 раза хватает до ±1 %)
+		target = MQ_LOCO_TARGET[kind]
+		q0, l0 = Lq.copy(), Lt.copy()
+		t9, q9, l9 = loco_upsample(times, Lq, Lt, UPSAMPLE)
+		k = float(np.clip(target / max(ph.stance_speed(rt, t9, q9, l9), 1e-3), 1.0, MQ_STRIDE_MAX))
+		for it in range(4):
+			Lq, Lt = q0.copy(), l0.copy()
+			shape = stride_scale(rt, times, Lq, Lt, k, MQ_LIFT[kind])
+			if it == 3:
+				break
+			t9, q9, l9 = loco_upsample(times, Lq, Lt, UPSAMPLE)
+			v1 = ph.stance_speed(rt, t9, q9, l9)
+			k1 = float(np.clip(k * target / max(v1, 1e-3), 1.0, MQ_STRIDE_MAX))
+			if abs(k1 - k) < 0.003:
+				break
+			k = k1
+	elif k != 1.0 or MQ_LIFT[kind] != 1.0:
+		shape = stride_scale(rt, times, Lq, Lt, k, MQ_LIFT[kind])
 	# Стопы, что весь цикл не касаются земли (носок выше покоя), — таз ниже, пока нижняя точка носка не встанет на
 	# землю; если одна стопа висит выше другой — её путь опускается на остаток (IK весь цикл)
 	_Gq, Gp = rt.fk(Lq, Lt)
@@ -756,8 +802,9 @@ def make_loco(rts: dict, hero: Hero, name: str, kind: str, src_clip: str, female
 	lift = pc.biped_ground(rt, hero.mesh, Lq, Lt, False)
 	src = "%s%s" % (src_clip, " + женская пластика" if female else "")
 	return {"name": name, "src": src, "kind": kind, "times": times, "src_times": times, "rot": ra.continuous(Lq),
-		"trans": Lt, "hit": 0.0, "T": float(times[-1]), "travel": 0.0, "short": max(short, fem), "lift": lift,
-		"stance": {}, "speed": float(v), "drop": drop + max(0.0, ground), "cycles": cycles}
+		"trans": Lt, "hit": 0.0, "T": float(times[-1]), "travel": 0.0, "short": short, "lift": lift,
+		"stance": {}, "speed": float(v), "drop": drop + max(0.0, ground), "cycles": cycles, "stride": k,
+		"shape_short": max(fem, shape)}
 
 
 def loco_stats(hero: Hero, cl: dict, n: int = 96) -> dict:
@@ -792,8 +839,13 @@ def loco_stats(hero: Hero, cl: dict, n: int = 96) -> dict:
 				worst = max(worst, float(np.hypot(dz, p[i, 0] - p[start, 0])))
 	hy = Gp[:, hero.roles["hips"], 1]
 	cyc = float(cl.get("cycles", 1))
+	# Подъём стопы в переносе: носок над своей высотой в покое (доля роста); колено — насколько ниже тазобедренного
+	# сустава поднимается (доля роста, меньше — выше колено)
+	lift = max(float(Gp[:, c[min(3, len(c) - 1)], 1].max() - hero.rig.gpos[c[min(3, len(c) - 1)], 1])
+		for c in hero.roles["legs"].values()) / hero.height
+	knee = min(float((Gp[:, c[0], 1] - Gp[:, c[1], 1]).min()) for c in hero.roles["legs"].values()) / hero.height
 	return {"slide": worst, "bob": float(hy.max() - hy.min()), "step": v * cl["T"] * 0.5 / cyc, "cadence": 2.0 * cyc / cl["T"],
-		"flight": float(1.0 - ground.mean())}
+		"flight": float(1.0 - ground.mean()), "lift": lift, "knee": knee}
 
 
 # ---------- Прореживание ключей и запись ----------
@@ -905,6 +957,8 @@ def verify(rt, hero: Hero, cl: dict) -> list:
 		lo, hi = LOCO_STEP[cl["kind"]]
 		if ls["slide"] > LOCO_SLIDE:
 			bad.append("опорная стопа скользит на %.3f м" % ls["slide"])
+		if ls["lift"] > LOCO_LIFT_MAX[cl["kind"]]:
+			bad.append("стопа в переносе поднимается на %.2f роста (до %.2f)" % (ls["lift"], LOCO_LIFT_MAX[cl["kind"]]))
 		if ls["bob"] > LOCO_BOB[cl["kind"]]:
 			bad.append("таз ходит по высоте на %.3f м" % ls["bob"])
 		if not lo <= ls["step"] <= hi:
@@ -1100,10 +1154,12 @@ def process(path: str, srcs: dict, check: bool, prev: str, only: list = None) ->
 		bad = verify(rts["m1"], hero, cl)
 		ok = ok and not bad
 		ls = cl["loco"]
-		print("   %-18s %5.2f с, своя скорость %.2f м/с: шаг %.2f м, %.2f шаг/с (при 7 м/с — темп ×%.2f, %.2f шаг/с), "
+		print("   %-18s %5.2f с, своя скорость %.2f м/с: шаг %.2f м (×%.2f), %.2f шаг/с (при 7 м/с — темп ×%.2f, %.2f шаг/с), "
+			"носок в переносе до %.2f роста, колено ниже таза на %.2f роста, "
 			"таз ниже на %.3f, по высоте %.3f м, полёт %.0f %%, скольжение опоры %.3f, IK не достал %.3f, подъём %.3f%s" % (
-			name, cl["T"], cl["speed"], ls["step"], ls["cadence"], 7.0 / cl["speed"], ls["cadence"] * 7.0 / cl["speed"],
-			cl["drop"], ls["bob"], 100.0 * ls["flight"], ls["slide"], cl["short"], cl["lift"], ("  ПЛОХО: " + "; ".join(bad)) if bad else ""))
+			name, cl["T"], cl["speed"], ls["step"], cl["stride"], ls["cadence"], 7.0 / cl["speed"], ls["cadence"] * 7.0 / cl["speed"],
+			ls["lift"], ls["knee"], cl["drop"], ls["bob"], 100.0 * ls["flight"], ls["slide"], cl["short"], cl["lift"],
+			("  ПЛОХО: " + "; ".join(bad)) if bad else ""))
 		clips.append(cl)
 	size0 = os.path.getsize(path)
 	if not check:

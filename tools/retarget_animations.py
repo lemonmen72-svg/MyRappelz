@@ -75,16 +75,17 @@ BONE_MAP = {
 ## Направление кости для выравнивания поз покоя: кость героя → ([дочерние кости героя по
 ## приоритету], дочерняя кость библиотеки). Кости не из списка (бёдра, голова, стопы, носки)
 ## в опорной позе сохраняют свой мировой поворот покоя: «смотрит вперёд», «стоит на земле».
+## Ключицы (LeftShoulder/RightShoulder) — тоже свой поворот покоя: у UAL ключица идёт от передней стороны груди
+## назад к плечу (≈ 38° назад), довёрнутая по ней ключица героя уводила плечевой сустав на 5–7 см назад (плечи
+## «за головой»); поверх покоя — повороты ключицы библиотеки (как у prepare_hero.HeroRetarget).
 ALIGN = {
 	"Spine": (["Spine1"], "spine_02"),
 	"Spine1": (["Spine2"], "spine_03"),
 	"Spine2": (["Neck"], "neck_01"),
 	"Neck": (["Head"], "Head"),
-	"LeftShoulder": (["LeftArm"], "upperarm_l"),
 	"LeftArm": (["LeftForeArm"], "lowerarm_l"),
 	"LeftForeArm": (["LeftHand"], "hand_l"),
 	"LeftHand": (["LeftHandMiddle1", "LeftHandMiddle4"], "middle_01_l"),
-	"RightShoulder": (["RightArm"], "upperarm_r"),
 	"RightArm": (["RightForeArm"], "lowerarm_r"),
 	"RightForeArm": (["RightHand"], "hand_r"),
 	"RightHand": (["RightHandMiddle1", "RightHandMiddle4"], "middle_01_r"),

@@ -10,6 +10,6 @@ source_file="res://assets/characters/npc_weaponsmith.png"
 [params]
 
 compress/mode=2
-compress/high_quality=false
+compress/high_quality=true
 mipmaps/generate=true
 detect_3d/compress_to=0

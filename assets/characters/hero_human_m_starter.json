@@ -5,7 +5,7 @@
 		[
 			-0.6401,
 			0.0,
-			-0.1641
+			-0.1643
 		],
 		[
 			0.6401,
@@ -13,8 +13,8 @@
 			0.1643
 		]
 	],
-	"tris": 29999,
-	"verts": 27122,
+	"tris": 70000,
+	"verts": 52332,
 	"bones": {
 		"root": "Bone_000",
 		"hips": "Bone_000",
@@ -583,7 +583,7 @@
 			"loop": false,
 			"source": "mannequin m2:Walk_Turn_Left_with_Weapon [0.35–1.05]",
 			"turn": 74.9,
-			"hit": 0.556
+			"hit": 0.567
 		},
 		"Mq_Turn_R90": {
 			"length": 0.667,
@@ -609,7 +609,7 @@
 			"length": 0.633,
 			"loop": true,
 			"source": "mannequin m1:Running",
-			"speed": 5.282
+			"speed": 6.904
 		},
 		"Mq_Running_B": {
 			"length": 0.733,

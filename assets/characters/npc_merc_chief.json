@@ -13,8 +13,8 @@
 			0.1959
 		]
 	],
-	"tris": 29997,
-	"verts": 20848,
+	"tris": 31127,
+	"verts": 21468,
 	"bones": {
 		"root": "Bone_000",
 		"hips": "Bone_001",

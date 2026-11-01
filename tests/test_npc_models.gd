@@ -16,7 +16,8 @@ const NPCS := {
 }
 ## Клипы жителя (нижний регистр): покой и приветствие обязательны, остальные — общий набор героя.
 const CLIPS := ["idle", "wave", "walking", "running", "hit", "cast", "pickup"]
-const MAX_TRIS := 31000
+## Меш жителя: до 50 тыс. (tools/prepare_npcs.py NPC_TRIS), у большинства исходник целиком (~31 тыс.).
+const MAX_TRIS := 52000
 
 var ids: Array = []
 var models: Array[CharacterModel] = []

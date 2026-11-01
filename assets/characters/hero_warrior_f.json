@@ -13,8 +13,8 @@
 			0.193
 		]
 	],
-	"tris": 29999,
-	"verts": 26729,
+	"tris": 70000,
+	"verts": 52094,
 	"bones": {
 		"root": "Bone_000",
 		"hips": "Bone_001",
@@ -593,19 +593,19 @@
 			"length": 0.633,
 			"loop": true,
 			"source": "mannequin m1:Running + женская пластика",
-			"speed": 5.24
+			"speed": 6.998
 		},
 		"Mq_Running_B": {
 			"length": 0.733,
 			"loop": true,
 			"source": "mannequin m2:run_fast_3_inplace + женская пластика",
-			"speed": 2.968
+			"speed": 3.298
 		},
 		"Mq_Sprint": {
 			"length": 0.467,
 			"loop": true,
 			"source": "mannequin m2:RunFast + женская пластика",
-			"speed": 7.201
+			"speed": 8.016
 		}
 	}
 }

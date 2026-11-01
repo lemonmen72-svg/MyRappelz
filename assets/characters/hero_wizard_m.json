@@ -3,18 +3,18 @@
 	"height": 1.8,
 	"bounds": [
 		[
-			-0.6549,
+			-0.6548,
 			0.0,
 			-0.167
 		],
 		[
-			0.6549,
+			0.6548,
 			1.8,
 			0.167
 		]
 	],
-	"tris": 30000,
-	"verts": 27158,
+	"tris": 69999,
+	"verts": 53313,
 	"bones": {
 		"root": "Bone_000",
 		"hips": "Bone_001",
@@ -593,7 +593,7 @@
 			"length": 0.633,
 			"loop": true,
 			"source": "mannequin m1:Running",
-			"speed": 6.004
+			"speed": 6.695
 		},
 		"Mq_Running_B": {
 			"length": 0.733,
@@ -605,7 +605,7 @@
 			"length": 0.467,
 			"loop": true,
 			"source": "mannequin m2:RunFast",
-			"speed": 8.51
+			"speed": 8.509
 		}
 	}
 }

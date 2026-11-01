@@ -5,16 +5,16 @@
 		[
 			-0.6343,
 			0.0,
-			-0.191
+			-0.1919
 		],
 		[
-			0.6334,
+			0.6343,
 			1.7,
 			0.1921
 		]
 	],
-	"tris": 30000,
-	"verts": 25912,
+	"tris": 69999,
+	"verts": 51028,
 	"bones": {
 		"root": "Bone_000",
 		"hips": "Bone_001",
@@ -94,10 +94,10 @@
 		]
 	},
 	"crossbow_rot": [
-		-0.4374,
-		0.5661,
-		-0.4431,
-		-0.5402
+		-0.3974,
+		0.6108,
+		-0.4794,
+		-0.4891
 	],
 	"face": [
 		0.0,
@@ -556,19 +556,19 @@
 			"length": 0.633,
 			"loop": true,
 			"source": "mannequin m1:Running + женская пластика",
-			"speed": 5.643
+			"speed": 7.0
 		},
 		"Mq_Running_B": {
 			"length": 0.733,
 			"loop": true,
 			"source": "mannequin m2:run_fast_3_inplace + женская пластика",
-			"speed": 3.205
+			"speed": 3.553
 		},
 		"Mq_Sprint": {
 			"length": 0.467,
 			"loop": true,
 			"source": "mannequin m2:RunFast + женская пластика",
-			"speed": 7.783
+			"speed": 8.645
 		}
 	}
 }

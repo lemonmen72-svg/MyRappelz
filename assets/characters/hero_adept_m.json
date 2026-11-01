@@ -3,18 +3,18 @@
 	"height": 1.8,
 	"bounds": [
 		[
-			-0.6541,
+			-0.6539,
 			0.0,
-			-0.1813
+			-0.1815
 		],
 		[
-			0.6541,
+			0.6539,
 			1.8,
-			0.181
+			0.1815
 		]
 	],
-	"tris": 30000,
-	"verts": 30193,
+	"tris": 70000,
+	"verts": 58456,
 	"bones": {
 		"root": "Bone_000",
 		"hips": "Bone_001",
@@ -94,10 +94,10 @@
 		]
 	},
 	"crossbow_rot": [
-		0.4443,
-		-0.5572,
-		0.4347,
-		0.5506
+		0.4581,
+		-0.5391,
+		0.4201,
+		0.5683
 	],
 	"face": [
 		-0.0017,
@@ -556,19 +556,19 @@
 			"length": 0.633,
 			"loop": true,
 			"source": "mannequin m1:Running",
-			"speed": 5.382
+			"speed": 6.999
 		},
 		"Mq_Running_B": {
 			"length": 0.733,
 			"loop": true,
 			"source": "mannequin m2:run_fast_3_inplace",
-			"speed": 2.931
+			"speed": 2.93
 		},
 		"Mq_Sprint": {
 			"length": 0.467,
 			"loop": true,
 			"source": "mannequin m2:RunFast",
-			"speed": 7.076
+			"speed": 7.074
 		}
 	}
 }

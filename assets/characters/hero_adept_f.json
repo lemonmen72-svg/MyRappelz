@@ -3,18 +3,18 @@
 	"height": 1.7,
 	"bounds": [
 		[
-			-0.6169,
+			-0.6167,
 			0.0,
-			-0.1808
+			-0.1809
 		],
 		[
-			0.6169,
+			0.6167,
 			1.7,
-			0.181
+			0.1809
 		]
 	],
-	"tris": 29999,
-	"verts": 29792,
+	"tris": 69999,
+	"verts": 57412,
 	"bones": {
 		"root": "Bone_000",
 		"hips": "Bone_001",
@@ -132,7 +132,7 @@
 	"grip_r": {
 		"pos": [
 			0.0026,
-			0.0681,
+			0.068,
 			-0.014
 		],
 		"dir": [
@@ -173,7 +173,7 @@
 			"source": "ual1:Idle_Loop + женская пластика (idle)"
 		},
 		"Walking": {
-			"length": 1.072,
+			"length": 1.071,
 			"loop": true,
 			"source": "ual1:Walk_Loop + женская пластика (walk)"
 		},
@@ -590,7 +590,7 @@
 			"loop": false,
 			"source": "mannequin m2:Walk_Turn_Left_with_Weapon [0.35–1.05]",
 			"turn": 74.9,
-			"hit": 0.056
+			"hit": 0.567
 		},
 		"Mq_Turn_R90": {
 			"length": 0.667,
@@ -610,25 +610,25 @@
 			"length": 1.033,
 			"loop": true,
 			"source": "mannequin m1:Walking + женская пластика",
-			"speed": 1.783
+			"speed": 1.782
 		},
 		"Mq_Running": {
 			"length": 0.633,
 			"loop": true,
 			"source": "mannequin m1:Running + женская пластика",
-			"speed": 5.312
+			"speed": 7.002
 		},
 		"Mq_Running_B": {
 			"length": 0.733,
 			"loop": true,
 			"source": "mannequin m2:run_fast_3_inplace + женская пластика",
-			"speed": 3.04
+			"speed": 3.377
 		},
 		"Mq_Sprint": {
 			"length": 0.467,
 			"loop": true,
 			"source": "mannequin m2:RunFast + женская пластика",
-			"speed": 7.262
+			"speed": 8.101
 		}
 	}
 }

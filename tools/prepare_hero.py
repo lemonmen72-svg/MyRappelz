@@ -5,10 +5,12 @@
 обычно 20–25 МБ и 150–200 тыс. треугольников. Скелет НЕ перестраивается и не переименовывается: кости,
 иерархия и их повороты покоя остаются родными (меняется только масштаб под рост), клипы пишутся прямо на них.
 Для каждого героя пишет в assets/characters/:
-  <id>.glb         — меш ~30 тыс. треугольников (meshoptimizer, как tools/decimate_glb.py: вершины не двигаются,
-                     швы UV не рвутся), рост по полу (мужчины 1.8 м, женщины 1.7 м; --height), ноги на y = 0,
+  <id>.glb         — меш ~70 тыс. треугольников у героев (TRIS; жители — tools/prepare_npcs.py, 50 тыс. или весь
+                     исходник, если он меньше; meshoptimizer, как tools/decimate_glb.py: вершины не двигаются,
+                     швы UV не рвутся; дальние — LOD Godot), рост по полу (мужчины 1.8 м, женщины 1.7 м; --height), ноги на y = 0,
                      лицом в +Z, родной скелет Meshy, клипы героя (список HERO_CLIPS), материал без картинок.
-  <id>.png         — цветовая текстура 2048×2048 (+ .png.import: VRAM-сжатие, мипмапы).
+  <id>.png         — цветовая текстура исходника без уменьшения (у Meshy 2048×2048; + .png.import: VRAM-сжатие
+                     высокого качества — на телефоне ASTC 4×4 вместо ETC2, мипмапы; пишется всегда).
   <id>.json        — роли костей (голова, кисти, таз, …), хват оружия в пространстве кисти (grip_r/grip_l: центр
                      кулака и направление клинка), поворот арбалета в правой кисти (crossbow_rot), метка лица в
                      пространстве головы, клипы и их длины. CharacterModel берёт по нему кости для оружия и эффектов.
@@ -82,8 +84,13 @@ WALK_NATIVE = 1.4
 RUN_NATIVE = 4.2
 ## Рост по полу (м): весь меш, с волосами и ушами.
 HEIGHT = {"m": 1.8, "f": 1.7}
-TRIS = 30000
-TEX = 2048
+## Бюджет меша героя (LOD0; дальние уровни — meshes/generate_lods Godot). Было 30 тыс.: слова Максима «все модельки
+## сделать максимально к исходному качеству» — у исходников Meshy 150–230 тыс., 70 тыс. держат лицо, пальцы и
+## складки одежды; жители — tools/prepare_npcs.py (NPC_TRIS).
+TRIS = 70000
+## Сторона текстуры: 0 — как у исходника (Meshy — 2048), больше TEX_MAX — уменьшается.
+TEX = 0
+TEX_MAX = 4096
 FPS = 30.0
 ## Действия, в которых таз библиотеки уходит дальше (кувырок, тяжёлое комбо, смерть), идут без закрепления опор
 ## (как у прежней героини); у остальных опоры закрепляются до того, как корень ставится на место.
@@ -199,7 +206,12 @@ class HeroRetarget(pc.BipedRetarget):
 		for s, c in roles["arms"].items():
 			sl = s.lower()
 			fs = self.fingers.get(s, {})
-			for k, (sa, sb) in enumerate([("clavicle_", "upperarm_"), ("upperarm_", "lowerarm_"), ("lowerarm_", "hand_")]):
+			# Ключица — НЕ по направлению библиотеки: у UAL она идёт от передней стороны груди назад к плечу (≈ 38°
+			# назад, плечевой сустав на 6 см позади шеи), у манекена Mixamo — на 7° назад, а у Meshy ключица идёт
+			# вбок. Довёрнутая по библиотеке, она уводила плечевой сустав героя на 5–7 см назад (плечи «за головой»
+			# в Idle, Sword_Idle, Crossbow_Idle и всех клипах UAL). Опорная поза ключицы — своя поза покоя Meshy
+			# (как у позвоночника), поверх — повороты ключицы библиотеки от её покоя (пожимание, сведение лопаток).
+			for k, (sa, sb) in enumerate([("upperarm_", "lowerarm_"), ("lowerarm_", "hand_")], 1):
 				align[c[k]] = (rig.lpos[c[k + 1]], sa + sl, sb + sl)
 			hand = c[3]
 			if "middle" in fs:
@@ -617,7 +629,7 @@ source_file="res://assets/characters/{name}.png"
 [params]
 
 compress/mode=2
-compress/high_quality=false
+compress/high_quality=true
 mipmaps/generate=true
 detect_3d/compress_to=0
 """
@@ -636,6 +648,7 @@ source_file="res://assets/characters/{name}.glb"
 
 gltf/embedded_image_handling=0
 meshes/generate_lods=true
+animation/fps=90
 """
 
 
@@ -643,7 +656,7 @@ def r3(v) -> list:
 	return [round(float(x), 4) for x in v]
 
 
-def build(cid: str, src_path: str, height: float, out_dir: str, preview: str = "") -> dict:
+def build(cid: str, src_path: str, height: float, out_dir: str, preview: str = "", tris: int = 0) -> dict:
 	from PIL import Image
 	libs = {k: ra.Skeleton(ra.Glb(p)) for k, p in UAL.items()}
 	print("== %s: %s" % (cid, src_path))
@@ -658,7 +671,11 @@ def build(cid: str, src_path: str, height: float, out_dir: str, preview: str = "
 	roles = pc.biped_roles(g["names"], g["parent"], g["gpos"], height)
 	print("   поворот %d°, масштаб %.4f, исходный меш %d треуг., костей %d" % (
 		g["yaw_deg"], g["scale"], len(g["tris"]), len(g["names"])))
-	mesh = pc.simplify_mesh(g, TRIS)
+	tris = tris or TRIS
+	if tris >= len(g["tris"]):
+		# Исходник меньше бюджета (жители Meshy ~31 тыс.) — весь, без упрощения
+		tris = len(g["tris"])
+	mesh = pc.simplify_mesh(g, tris)
 	st = pc.mesh_stats(mesh["pos"], mesh["tris"])
 	print("   упрощено: %d треуг., %d вершин, открытых рёбер %d (было %d), ошибка %.4f" % (
 		st["tris"], st["verts"], st["open_edges"], pc.mesh_stats(g["pos"], g["tris"])["open_edges"], mesh["simplify_error"]))
@@ -709,13 +726,16 @@ def build(cid: str, src_path: str, height: float, out_dir: str, preview: str = "
 	tex = None
 	if src["image"] is not None:
 		im = Image.open(io.BytesIO(src["image"])).convert("RGB")
-		if im.size != (TEX, TEX):
-			im = im.resize((TEX, TEX), Image.LANCZOS)
+		side = TEX or min(max(im.size), TEX_MAX)
+		if im.size != (side, side):
+			im = im.resize((side, side), Image.LANCZOS)
 		im.save(os.path.join(out_dir, cid + ".png"), optimize=True)
 		tex = np.asarray(im.resize((1024, 1024), Image.LANCZOS))
+	# .png.import — всегда (качество сжатия — из шаблона), .glb.import — только если файла нет (у героев там
+	# animation/fps=90, у жителей — без него)
 	for ext, tpl in ((".png.import", PNG_IMPORT), (".glb.import", GLB_IMPORT)):
 		p = os.path.join(out_dir, cid + ext)
-		if not os.path.exists(p):
+		if ext == ".png.import" or not os.path.exists(p):
 			with open(p, "w") as f:
 				f.write(tpl.format(name=cid))
 	lo, hi = mesh["pos"].min(0), mesh["pos"].max(0)
