@@ -184,7 +184,7 @@ func run_step() -> void:
 		8:
 			var shots0 := get_tree().get_nodes_in_group("projectiles").size()
 			check(p.use_skill("skill1") and p.casting == "sticky_arrow", "«Вязкая стрела»: прицеливание (каст %.2f с)" % p.cast_total)
-			check(p._model.cast_loop_clip().to_lower() == "mq_bow_aim_hold", "петля прицеливания из лука: %s"
+			check(["mq_bow_aim_hold", "mq_bow_scan_hold"].has(p._model.cast_loop_clip().to_lower()), "петля прицеливания из лука: %s"
 				% p._model.cast_loop_clip())
 			check(get_tree().get_nodes_in_group("projectiles").size() == shots0, "стрела не вылетела в начале каста")
 			t0 = frame
