@@ -100,8 +100,11 @@ func run_step() -> void:
 			step = 51
 		51:
 			var slash := hero._anim.current_animation
-			check(slash == hero._pick(CharacterModel.ASSET_ACTIONS["slash"])[0],
-				"герой: удар играет клип атаки (%s)" % slash)
+			# Есть движения манекенов Meshy (tools/retarget_mannequin.py) — первая часть комбо по хвату, иначе — удар UAL
+			var grip_list: Array = CharacterModel.MQ_ATTACKS.get(hero.mq_grip(), [])
+			var mq_first := String(hero._clips.get(String(grip_list[0]), "")) if not grip_list.is_empty() else ""
+			var want_slash: String = mq_first if mq_first != "" else String(hero._pick(CharacterModel.ASSET_ACTIONS["slash"])[0])
+			check(slash == want_slash, "герой: удар играет клип атаки (%s, ждём %s)" % [slash, want_slash])
 			hero.set_move_speed(0.0)
 			wait = 70
 			step = 52

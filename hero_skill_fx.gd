@@ -76,7 +76,7 @@ func cast(sid: String, n: int, sk: Dictionary) -> bool:
 		return false
 	if t != null:
 		p._engage(t)
-	anim(String(sk.get("anim", "attack")))
+	anim(String(sk.get("anim", "attack")), sid, use)
 	var fx: Array = sk.get("fx", [])
 	var col: Color = sk.get("color", Color.WHITE)
 	if use == "ranged" or (use == "magic" and bool(sk.get("proj", false))):
@@ -229,20 +229,10 @@ func status(m: Mob, st: String, sec: float, value: float, src: Dictionary) -> vo
 				JobFxNeophyte.apply_mod(m, st, value, sec, src)
 
 
-func anim(kind: String) -> void:
-	match kind:
-		"cast":
-			p._anim_cast()
-		"bash":
-			p._anim_bash()
-		"spin":
-			p._anim_spin()
-		"buff":
-			p._anim_buff()
-		"dash":
-			p._anim_dash()
-		_:
-			p._anim_attack()
+## Анимация умения: движение манекенов Meshy по виду анимации, id умения и способу применения
+## (CharacterModel.play_skill), если модель его умеет; иначе — прежние жесты.
+func anim(kind: String, sid: String = "", use: String = "") -> void:
+	p._anim_by_kind(kind, sid, use)
 
 
 ## Сколько лечит эффект: pct — доля макс. HP того, кого лечим, mult — доля маг. атаки героя.

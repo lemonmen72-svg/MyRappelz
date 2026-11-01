@@ -37,6 +37,19 @@ const CLIPS := ["idle", "walking", "running", "wave", "sword_idle", "sword_slash
 	"sword_heavy_combo", "sword_dash", "sword_block", "dodge", "hit", "death", "cast", "pickup", "sword_slash_b",
 	"sword_slash_c", "crossbow_idle", "crossbow_shoot"]
 const MAX_TRIS := 31000
+## Движения манекенов Meshy (tools/retarget_mannequin.py, MQ_CLIPS): у каждого героя все, в .json — длина и удар.
+const MQ_CLIPS := ["mq_sword_a1", "mq_sword_a2", "mq_sword_a3", "mq_combo_b1", "mq_combo_b2", "mq_combo_b3",
+	"mq_dual_a1", "mq_dual_a2", "mq_left_slash", "mq_thrust", "mq_heavy_swing", "mq_axe_spin", "mq_axe_chop",
+	"mq_charged_slash", "mq_judgment", "mq_leap_slam", "mq_blade_spin", "mq_reap", "mq_ground_slam", "mq_kick",
+	"mq_jump", "mq_bow_shot", "mq_bow_draw", "mq_reload", "mq_cast_a", "mq_cast_b", "mq_cast_c", "mq_cast_wide",
+	"mq_cast_slam", "mq_cast_beam", "mq_cast_up", "mq_cast_pray", "mq_charged_cast", "mq_charged_cast1", "mq_taunt",
+	"mq_hit", "mq_death", "mq_pickup", "mq_walking", "mq_running"]
+## Длина клипа обычной атаки при темпе 1 (игра ускоряет до MQ_SPEED_MAX под интервал атаки), умений и прочих, с.
+const MQ_ATTACK_MAX := 1.25
+const MQ_ACT_MAX := 2.8
+## Опора стопы (носок, 4-я кость ноги) у земли (не выше своей высоты в покое + 4 см) едет по земле не дальше, м
+## (как ground_slide в tools/retarget_mannequin.py; поворот на носке — не скольжение).
+const MQ_GROUND_SLIDE := 0.12
 
 var models: Array[CharacterModel] = []
 var heroine: CharacterModel = null
@@ -106,12 +119,30 @@ func run_step() -> void:
 			wait = 4
 			step = 4
 		4:
+			# Обычная атака — движение манекена Meshy по хвату (первая часть комбо), арбалет — выстрел UAL
 			for i in models.size():
 				var m := models[i]
-				var kind: String = "shoot" if m.weapon_kind == "crossbow" else ["slash", "slash_b", "slash_c"][m._swing]
-				var want: String = m._pick(CharacterModel.ASSET_ACTIONS[kind])[0]
-				check(m._anim.current_animation == want, "%s: удар играет свой клип (%s)" % [HEROES[i],
-					m._anim.current_animation])
+				var want := _mq_attack_clip(m, 0)
+				if m.weapon_kind == "crossbow":
+					want = String(m._pick(CharacterModel.ASSET_ACTIONS["shoot"])[0])
+				check(want != "" and m._anim.current_animation == want, "%s: удар играет свой клип (%s, ждём %s)" % [
+					HEROES[i], m._anim.current_animation, want])
+				if m.weapon_kind != "crossbow":
+					# Следующая атака — следующая часть комбо, темп под интервал 0.8 с
+					m.play_attack(0.8)
+			wait = 3
+			step = 40
+		40:
+			for i in models.size():
+				var m := models[i]
+				if m.weapon_kind == "crossbow":
+					continue
+				var want := _mq_attack_clip(m, 1)
+				check(m._anim.current_animation == want, "%s: вторая атака — следующая часть комбо (%s, ждём %s)" % [
+					HEROES[i], m._anim.current_animation, want])
+				var sp := m._anim.get_playing_speed()
+				check(sp >= CharacterModel.MQ_SPEED_MIN - 0.01 and sp <= CharacterModel.MQ_SPEED_MAX + 0.01,
+					"%s: темп атаки %.2f под интервал" % [HEROES[i], sp])
 			wait = 80
 			step = 5
 		5:
@@ -124,6 +155,25 @@ func run_step() -> void:
 				var m := models[i]
 				check(m._anim.current_animation == m._clip("wave"), "%s: машет рукой — клип Wave (%s)" % [HEROES[i],
 					m._anim.current_animation])
+				# Умение «Вызов» — своё движение (удар в грудь)
+				check(m.play_skill("buff", "challenge", "near"), "%s: умение играет движение манекена" % HEROES[i])
+			wait = 3
+			step = 7
+		7:
+			for i in models.size():
+				var m := models[i]
+				var taunt := String(m._clips.get(String(CharacterModel.MQ_SKILL_BY_ID["challenge"]), ""))
+				check(taunt != "" and m._anim.current_animation == taunt, "%s: «Вызов» — клип %s (%s)" % [HEROES[i],
+					taunt, m._anim.current_animation])
+				# Заклинание на цель — один из клипов MQ_CASTS
+				m.play_skill("cast", "fire_spark", "magic")
+			wait = 3
+			step = 8
+		8:
+			for i in models.size():
+				var m := models[i]
+				var cur := m._anim.current_animation.to_lower()
+				check(CharacterModel.MQ_CASTS.has(cur), "%s: заклинание — клип манекена (%s)" % [HEROES[i], cur])
 				m.queue_free()
 			heroine.queue_free()
 			ok_done()
@@ -215,6 +265,108 @@ func _check_model(m: CharacterModel, who: String) -> void:
 		check(ok, "%s: клип %s на месте (корень по X/Z не уходит)" % [who, c])
 	print("  %s: рост %.2f м, треугольников %d, клипов %d, костей %d" % [who, h, tris, m._clips.size(),
 		skel.get_bone_count()])
+	_check_mq(m, who, skel, rig)
+
+
+## Имя клипа k-й обычной атаки по хвату модели (MQ_ATTACKS) или "".
+func _mq_attack_clip(m: CharacterModel, k: int) -> String:
+	var list: Array = CharacterModel.MQ_ATTACKS.get(m.mq_grip(), [])
+	if list.is_empty():
+		return ""
+	return String(m._clips.get(String(list[k % list.size()]), ""))
+
+
+## Движения манекенов Meshy: все клипы есть, в .json длина и момент удара (в пределах клипа), обычные атаки короткие,
+## действия на месте (корень по X/Z не уходит), носок у земли не едет по ней (опоры закреплены, переступание дугой).
+func _check_mq(m: CharacterModel, who: String, skel: Skeleton3D, rig: Dictionary) -> void:
+	var info: Dictionary = rig.get("clips", {})
+	var bones: Dictionary = rig.get("bones", {})
+	var attacks: Array = []
+	for list in CharacterModel.MQ_ATTACKS.values():
+		attacks.append_array(list)
+	for c in MQ_CLIPS:
+		check(m._clips.has(c), "%s: есть клип манекена «%s»" % [who, c])
+		if not m._clips.has(c):
+			continue
+		var cn := String(m._clips[c])
+		var a := m._anim.get_animation(cn)
+		var ci: Dictionary = info.get(cn, {})
+		check(not ci.is_empty() and absf(float(ci.get("length", 0.0)) - a.length) < 0.05,
+			"%s: %s — длина в .json (%.2f / %.2f с)" % [who, cn, float(ci.get("length", 0.0)), a.length])
+		var loop := c == "mq_walking" or c == "mq_running"
+		if not loop:
+			var hit := float(ci.get("hit", -1.0))
+			check(hit > 0.0 and hit < a.length, "%s: %s — момент удара %.2f с в клипе %.2f с" % [who, cn, hit, a.length])
+			var lim := MQ_ATTACK_MAX if attacks.has(c) else MQ_ACT_MAX
+			check(a.length <= lim, "%s: %s — длина %.2f с (до %.2f)" % [who, cn, a.length, lim])
+		check(_root_still(a, String(bones.get("root", ""))), "%s: %s на месте (корень по X/Z не уходит)" % [who, cn])
+		if attacks.has(c) or c == "mq_charged_slash" or c == "mq_axe_chop":
+			for side in ["L", "R"]:
+				var leg: Array = bones.get("legs", {}).get(side, [])
+				var toe := String(leg[mini(3, leg.size() - 1)]) if not leg.is_empty() else ""
+				var s := _ground_slide(skel, a, skel.find_bone(toe))
+				check(s <= MQ_GROUND_SLIDE, "%s: %s — стопа %s не едет по земле (%.3f м)" % [who, cn, side, s])
+
+
+## Корень по X/Z во всех ключах как в первом.
+func _root_still(a: Animation, root: String) -> bool:
+	for t in a.get_track_count():
+		if a.track_get_type(t) != Animation.TYPE_POSITION_3D:
+			continue
+		if String(a.track_get_path(t).get_concatenated_subnames()) != root:
+			continue
+		var k0: Vector3 = a.track_get_key_value(t, 0)
+		for k in a.track_get_key_count(t):
+			var v: Vector3 = a.track_get_key_value(t, k)
+			if absf(v.x - k0.x) > 0.001 or absf(v.z - k0.z) > 0.001:
+				return false
+	return true
+
+
+## Наибольший сдвиг кости по земле (X/Z), пока она у земли (не выше своей высоты в покое + 4 см): 61 точка клипа, позы
+## костей от корня — треки клипа, иначе поза покоя.
+func _ground_slide(skel: Skeleton3D, a: Animation, bone: int) -> float:
+	if bone < 0:
+		return 0.0
+	var chain: Array[int] = []
+	var b := bone
+	while b >= 0:
+		chain.push_front(b)
+		b = skel.get_bone_parent(b)
+	var rot := {}
+	var pos := {}
+	for t in a.get_track_count():
+		var nm := String(a.track_get_path(t).get_concatenated_subnames())
+		if a.track_get_type(t) == Animation.TYPE_ROTATION_3D:
+			rot[nm] = t
+		elif a.track_get_type(t) == Animation.TYPE_POSITION_3D:
+			pos[nm] = t
+	var pts: Array[Vector3] = []
+	var near := skel.get_bone_global_rest(bone).origin.y + 0.04
+	for k in 61:
+		var tm := a.length * float(k) / 60.0
+		var xf := Transform3D.IDENTITY
+		for c in chain:
+			var bn := skel.get_bone_name(c)
+			var rest := skel.get_bone_rest(c)
+			var q := rest.basis.get_rotation_quaternion()
+			var o := rest.origin
+			if rot.has(bn):
+				q = a.rotation_track_interpolate(int(rot[bn]), tm)
+			if pos.has(bn):
+				o = a.position_track_interpolate(int(pos[bn]), tm)
+			xf = xf * Transform3D(Basis(q), o)
+		pts.append(xf.origin)
+	var worst := 0.0
+	var start := -1
+	for k in pts.size():
+		if pts[k].y >= near:
+			start = -1
+		elif start < 0:
+			start = k
+		else:
+			worst = maxf(worst, Vector2(pts[k].x - pts[start].x, pts[k].z - pts[start].z).length())
+	return worst
 
 
 ## Поза покоя по костям: голова на высоте человека, стопы у земли, кисти ниже головы.
@@ -275,7 +427,7 @@ func _hips_swing(m: CharacterModel, who: String, clip: String) -> Vector2:
 		var tm := a.length * float(k) / 48.0
 		var q := Quaternion.IDENTITY
 		for c in chain:
-			var nm := skel.get_bone_name(c)
+			var bn := skel.get_bone_name(c)
 			if tracks.has(nm):
 				q = q * a.rotation_track_interpolate(int(tracks[nm]), tm)
 			else:
