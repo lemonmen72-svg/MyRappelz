@@ -18,6 +18,9 @@ extends Node
 ## Зелья (ItemData.POTION_KINDS, ранги 1–15): здоровье — кнопка «Зелье» (лучшее, что можно пить по уровню) и сумка,
 ## мана и ускорения — «Использовать» в сумке (drink); пить — с нижнего уровня ранга.
 ## Золото на складе — Game.storage_gold (deposit_gold / withdraw_gold).
+## Чарование и закалка (этап 3, Enchant): крафт в сумке (craft — вещь + куб, шанс, неудача ломает вещь) и кузница
+## у Кузнеца Гуннара (пункт «Закалка» в его диалоге — open_forge, окно InventoryWindow "forge"; temper — 100 % за
+## золото до +10). Отошёл от кузнеца — окно закрывается.
 
 ## Куплено n штук предмета id у NPC seller (слушают задания — Quests).
 signal bought(id: String, n: int, seller: String)
@@ -29,6 +32,10 @@ signal used(id: String)
 signal storage_gold_changed
 ## На склад положено n штук предмета id.
 signal stored(id: String, n: int)
+## Чарование кубом: вещь id (до попытки), ok — удалось, result — что стало (заточенная или сломанная).
+signal enchanted(id: String, ok: bool, result: String)
+## Закалка у кузнеца: вещь стала result за price золота.
+signal tempered(result: String, price: int)
 
 ## Где стоит торговец (внутри безопасной зоны MobData.SAFE_RADIUS).
 const MERCHANT_POS := Vector3(0, 0, -4)
@@ -47,6 +54,8 @@ var window: InventoryWindow
 
 ## В подземелье добыча богаче (LootTable.DUNGEON_BONUS); подземелья пока нет.
 var dungeon := false
+## Генератор для чарования (тесты ставят свой; null — общий randf).
+var craft_rng: RandomNumberGenerator = null
 
 var _potion_cd := 0.0
 var _mana_cd := 0.0
@@ -368,6 +377,48 @@ func sell_cell(i: int, n: int = 1) -> int:
 	return cnt
 
 
+# ---------- Чарование и кузница ----------
+
+## Чаровать вещь item кубом cube (where — где вещь: "" сумка или ячейка экипировки). Enchant.use_cube + сообщение.
+func craft(item: String, cube: String, where: String = "") -> Dictionary:
+	var r := Enchant.use_cube(item, cube, where, craft_rng, main.player if main != null else null)
+	if main != null and main.hud != null:
+		_msg(String(r["text"]))
+	if String(r["error"]) == "":
+		enchanted.emit(item, bool(r["ok"]), String(r["item"]))
+	return r
+
+
+## Закалить вещь item у кузнеца (Enchant.temper) + сообщение.
+func temper(item: String, where: String = "") -> Dictionary:
+	var r := Enchant.temper(item, where, main.player if main != null else null)
+	if main != null and main.hud != null:
+		_msg(String(r["text"]))
+	if bool(r["ok"]):
+		tempered.emit(String(r["item"]), int(r["price"]))
+		Game.changed.emit()
+	return r
+
+
+## Окно кузницы: наковальня, сумка и карточка (InventoryWindow, режим "forge").
+func open_forge() -> void:
+	window.open("forge")
+
+
+func is_forge_open() -> bool:
+	return window != null and window.mode == "forge" and window.is_open()
+
+
+## Игрок рядом с кузнецом (дальше — окно кузницы закрывается).
+func is_near_smith() -> bool:
+	if main == null:
+		return false
+	var npcs := main.get("npcs") as Npcs
+	if npcs == null:
+		return false
+	return npcs.distance_to(Enchant.SMITH_NPC) <= Npcs.TALK_RANGE + 1.0
+
+
 # ---------- Склад ----------
 
 ## Окно склада: ячейки склада, сумка и карточка (InventoryWindow, режим "storage").
@@ -545,5 +596,8 @@ func _process(delta: float) -> void:
 	elif is_storage_open() and not is_near_storage():
 		_close_window()
 		_msg("Вы отошли от %s" % NpcData.name_gen(STORAGE_NPC))
+	elif is_forge_open() and not is_near_smith():
+		_close_window()
+		_msg("Вы отошли от %s" % NpcData.name_gen(Enchant.SMITH_NPC))
 	elif window.is_open() and (window.dirty or Game.gold != window.seen_gold):
 		window.refresh()

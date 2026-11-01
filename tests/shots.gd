@@ -148,6 +148,7 @@ const PART_ENTRIES := [
 	[940, 33, 9], [943, 63, 47], [946, 95, 46], [980, 40, 46], [1000, 42, 18], [1002, 95, 83],
 	[1025, 102, 102], [1021, 126, 144], [1040, 141, 181], [1060, 66, 67], [1160, 124, 148], [1120, 98, 101],
 	[1080, 60, 58], [1200, 181, 224], [1260, 224, 112], [1220, 103, 52], [1240, 76, 40], [1300, 55, 29],
+	[1320, 63, 32],
 ]
 ## Сколько кадров до точки входа часть уже рисует (компиляция шейдеров, тени, окна интерфейса).
 const PART_WARMUP := 10
@@ -2074,7 +2075,92 @@ func run_step() -> void:
 			if _thermal_level >= Quality.LOW and _thermal_level <= Quality.ULTRA:
 				Quality.set_level(_thermal_level, false)
 			Quality.apply(get_tree())
+			wait = 3
+			step = 1320
+		# ---------- Кадры 300–307: чарование и закалка (этап 3) — панель «Крафт» в сумке, подтверждение, удача и
+		# поломка, заточенная вещь в сумке, кузница (цена, без золота), «Закалка» в диалоге кузнеца ----------
+		1320:
+			main.hud.close_window()
+			_talk_view(Enchant.SMITH_NPC)
+			var inv: Inventory = game.inventory
+			inv.add("cube_attack_r1", 6)
+			inv.add("cube_defense_r1", 4)
+			inv.add("cube_attack_r2", 2)
+			inv.add("weapon_staff_1h_r1+7")
+			inv.add("armor_boots_r1+4")
+			inv.add(ItemData.broken_id("weapon_sword_1h_r1"), 2)
+			if game.weapon != "":
+				Enchant.admin_set("weapon", 3, main.player)
+			var win: InventoryWindow = main.economy.window
+			win.open_craft()
+			win.put_craft(game.weapon, "weapon")
+			wait = 10
+			step = 1321
+		1321:
+			check(main.economy.window.craft_open and main.economy.window.craft_item != "", "кадр 300: панель «Крафт» с вещью")
+			shot("300_craft_panel")
+			main.economy.window.craft_confirm = true
+			main.economy.window.refresh()
+			wait = 4
+			step = 1322
+		1322:
+			shot("301_craft_confirm")
+			main.economy.window.craft_confirm = false
+			check(_craft_until(true), "кадр 302: чарование удалось")
+			wait = 6
+			step = 1323
+		1323:
+			shot("302_craft_success")
+			check(_craft_until(false), "кадр 303: вещь сломалась")
+			wait = 6
+			step = 1324
+		1324:
+			shot("303_craft_broken")
+			main.economy.open_bag()
+			main.economy.window.select_cell(game.inventory.find_cell("weapon_staff_1h_r1+7"))
+			wait = 8
+			step = 1325
+		1325:
+			shot("304_bag_enchanted_card")
+			main.hud.close_window()
+			game.gold = 5000
+			main.economy.open_forge()
+			main.economy.window.put_forge(game.weapon, "weapon")
+			wait = 8
+			step = 1326
+		1326:
+			check(main.economy.is_forge_open(), "кадр 305: окно кузницы открыто")
+			shot("305_forge_window")
+			game.gold = 0
+			main.economy.window.refresh()
+			wait = 4
+			step = 1327
+		1327:
+			shot("306_forge_no_gold")
+			main.hud.close_window()
+			game.gold = 5000
+			main.npcs.open_dialog(Enchant.SMITH_NPC)
+			wait = 8
+			step = 1328
+		1328:
+			shot("307_smith_dialog")
+			main.npcs.close_dialog()
 			ok_done()
+
+
+## Кадры 302–303: чаровать перчатки (новые, с кубом защиты) на панели «Крафт», пока не выйдет want (true — удача,
+## false — поломка); до 40 попыток. Итог остаётся на панели. true — вышло.
+func _craft_until(want: bool) -> bool:
+	var win: InventoryWindow = main.economy.window
+	for i in 40:
+		game.inventory.add("armor_gloves_r1")
+		game.inventory.add("cube_defense_r1")
+		win.put_craft("armor_gloves_r1")
+		win.put_cube("cube_defense_r1")
+		win._on_craft_yes()
+		if win.craft_ok == want and win.craft_result != "":
+			return true
+	return false
 
 
 ## Кадры 291–292: ThermalGuard с подставным статусом температуры status, n шагов логики по dt с (кадры в бюджете).

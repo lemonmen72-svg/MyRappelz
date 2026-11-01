@@ -5,7 +5,7 @@ extends "res://tests/test_base.gd"
 ## не ближе 3 м друг к другу и к торговцу / Кирку, вдали от точек старта; своя внешность у каждого (модель из
 ## файла npc_<id>.glb с клипами Idle и Wave и предметами NpcProps или из примитивов, лёгкая); рядом — кнопка «Говорить» выбирает ближайшего, диалог
 ## открывается у каждого, пункты «скоро» и справочник мудреца показывают текст, «Склад» у кладовщика открывает
-## окно склада; реплики по положению героя; задания мудреца после старосты (четыре сразу, «Взять все»), задание
+## окно склада, «Закалка» у кузнеца — окно кузницы (без «скоро»); реплики по положению героя; задания мудреца после старосты (четыре сразу, «Взять все»), задание
 ## «Городской склад» (поговорить с кладовщиком, положить вещь на склад) берётся и сдаётся. Три лавки города
 ## (оружейник, бронница, ювелир): «Торговля» в диалоге открывает окно со своим ассортиментом 1-го ранга
 ## (предметы, которых ещё нет в ItemData, пропускаются), у торговца Гордея — только зелья и свиток.
@@ -97,10 +97,11 @@ func run_step() -> void:
 				var label := (npcs.buttons[key] as Button).text
 				check(label.contains("скоро") == bool(d.get("soon", false)), "%s: подпись «%s»" % [id, label])
 				if d.has("action"):
-					# Пункт-окно: «Склад» у кладовщика
+					# Пункт-окно: «Склад» у кладовщика, «Закалка» у кузнеца
 					_press(key)
-					check(main.economy.is_storage_open() and not npcs.is_dialog_open(), "%s: «%s» открывает окно склада"
-						% [id, d["label"]])
+					var opened: bool = main.economy.is_forge_open() if String(d["action"]) == "forge" \
+						else main.economy.is_storage_open()
+					check(opened and not npcs.is_dialog_open(), "%s: «%s» открывает окно (%s)" % [id, d["label"], d["action"]])
 					hud.close_window()
 					npcs.open_dialog(id)
 					continue
@@ -225,7 +226,7 @@ func _unit_data() -> void:
 				soon += 1
 		# Дела, которых ещё нет, — с пометкой «скоро» (кузница, подземелье); у мудреца, кладовщика (склад), старост
 		# и охотницы (задания) пункты рабочие
-		check(soon >= 1 or ["sage", "storekeeper", "elder_human", "elder_light", "elder_dark", "hunter"].has(id)
+		check(soon >= 1 or ["sage", "storekeeper", "smith", "elder_human", "elder_light", "elder_dark", "hunter"].has(id)
 			or SHOPS.has(id), "%s: будущее дело с пометкой «скоро»" % id)
 		check(NpcData.is_trader(id) == SHOPS.has(id), "%s: торгует — только лавка" % id)
 	check(String(NpcData.talk_entry("sage", "profession").get("text", "")).contains("десятого уровня")
@@ -239,8 +240,10 @@ func _unit_data() -> void:
 		"неизвестный пункт — пусто")
 	check(not QuestData.has_quest("sage_town_tour"), "«Знакомство с городом» заменено заданиями мудреца")
 	check(String(NpcData.talk_entry("storekeeper", "storage").get("action", "")) == "storage", "у кладовщика — «Склад»")
-	check(NpcData.talk_entry("smith", "forge").get("soon", false) and NpcData.talk_entry("merc_chief", "dungeon").get("soon", false),
-		"кузница и подземелье — «скоро»")
+	check(not bool(NpcData.talk_entry("smith", "forge").get("soon", false))
+		and String(NpcData.talk_entry("smith", "forge").get("action", "")) == "forge"
+		and String(NpcData.talk_entry("smith", "forge").get("label", "")) == "Закалка", "у кузнеца «Закалка» — рабочий пункт (без «скоро»)")
+	check(NpcData.talk_entry("merc_chief", "dungeon").get("soon", false), "подземелье — «скоро»")
 
 
 ## Ассортимент: оружие ушло от Гордея к оружейнику, у бронницы — доспехи, у ювелира — украшения; всё 1-го ранга.

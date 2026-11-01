@@ -3,7 +3,8 @@ extends "res://tests/test_base.gd"
 ## «Крупный» — круглые кнопки HUD не перекрываются, помещаются на экран, не мельче 56 px и не на панелях,
 ## меню и панель цели на месте, трекер не на кнопках, касание по кнопке работает; все окна (герой, древо,
 ## существо, питомцы, сумка, лавка, журнал, диалог, настройки — каждая вкладка, выбор профессии, админ-панель, склад,
-## сумка с надетой бронёй и украшениями — карточка доспеха со сравнением и надетого кольца)
+## сумка с надетой бронёй и украшениями — карточка доспеха со сравнением и надетого кольца, сумка с панелью «Крафт»
+## в подтверждении, кузница с вещью на наковальне)
 ## и экраны до мира (вход в аккаунт, выбор персонажа с 4 занятыми слотами и подтверждением удаления, 4 шага создания)
 ## помещаются в экран,
 ## заголовки и обрезаемые подписи не обрезаны. Кнопки «Размер интерфейса» в настройках применяют размер сразу
@@ -20,6 +21,7 @@ const WINDOWS := [
 	["настройки: интерфейс", "_w_settings_ui"], ["настройки: прочее", "_w_settings_other"],
 	["выбор профессии", "_w_job"], ["админ-панель", "_w_admin"], ["склад", "_w_storage"],
 	["сумка: доспех со сравнением", "_w_bag_armor"], ["сумка: надетое кольцо", "_w_bag_ring"],
+	["сумка: крафт", "_w_bag_craft"], ["кузница", "_w_forge"],
 ]
 ## Экраны до мира: [что, ключ] — "login", "select", "create_<шаг 0..3>".
 const SCREENS := [
@@ -56,6 +58,10 @@ func before_start() -> void:
 	game.inventory.add("card_panther_soul", 1)
 	game.inventory.add("card_wolf", 3)
 	game.inventory.add("boar_tusk", 12)
+	# Крафт: кубы атаки и защиты, сломанная вещь в сумке
+	game.inventory.add("cube_attack_r1", 3)
+	game.inventory.add("cube_defense_r2", 2)
+	game.inventory.add(ItemData.broken_id("weapon_sword_1h_r1"), 2)
 	# Экипировка: окно героя и сумка с надетыми бронёй и украшениями, карточка доспеха со сравнением
 	for id in ["armor_body_warrior_r1", "armor_body_warrior_r2", "armor_helmet_r1", "armor_boots_r1", "ring_critdmg_r1",
 			"ring_hp_r1", "pendant_mdef_r1", "belt_speed_r1"]:
@@ -216,6 +222,34 @@ func _w_bag_armor() -> void:
 func _w_bag_ring() -> void:
 	main.economy.open_bag()
 	main.economy.window.select_equip("ring1")
+
+
+## Сумка с панелью «Крафт»: надетое оружие и куб в ячейках, подтверждение и итог прошлой попытки (самая высокая
+## панель), выбран куб.
+func _w_bag_craft() -> void:
+	main.player.global_position = _kirk_pos
+	var win: InventoryWindow = main.economy.window
+	win.open_craft()
+	win.put_craft(game.weapon, "weapon")
+	win.craft_confirm = true
+	win.craft_ok = false
+	win.craft_result = "Чарование не удалось — «Длинное название вещи» сломано. Куб потрачен."
+	win.select_cell(game.inventory.find_cell("cube_attack_r1"))
+
+
+## Кузница: игрок у кузнеца, надетое оружие на наковальне, выбрана вещь в сумке.
+func _w_forge() -> void:
+	var n: Npc = main.npcs.npc(Enchant.SMITH_NPC)
+	if n != null:
+		var to_c := Vector3(-n.global_position.x, 0, -n.global_position.z).normalized()
+		var pos := n.global_position + to_c * 2.0
+		if IslandWorld.current != null:
+			pos.y = IslandWorld.current.height_at(pos.x, pos.z) + 0.1
+		main.player.global_position = pos
+	var win: InventoryWindow = main.economy.window
+	main.economy.open_forge()
+	win.put_forge(game.weapon, "weapon")
+	win.select_cell(game.inventory.find_cell("armor_body_warrior_r2"))
 
 
 ## Склад у кладовщика: игрок рядом с ним (иначе окно закроется), на складе стопки, выбрана вещь из сумки.

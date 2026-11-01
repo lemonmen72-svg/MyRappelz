@@ -15,9 +15,10 @@ extends RefCounted
 ##   «Опыт»: множитель опыта за зверей ×1/×2/×5/×10/×20/×50 (Game.xp_mult — в сохранении; герою и призванному
 ##     питомцу, main._on_mob_gone и PetManager.on_mob_killed; награды заданий не умножаются), опыт до следующего
 ##     уровня герою и питомцу.
-##   «Предметы»: любой предмет ItemData +1/+10 (по группам: оружие, броня, украшения, расходники, карты существ, трофеи;
-##     кладётся столько, сколько поместится), «Очистить сумку» с подтверждением (надетое оружие, щит, броня и украшения
-##     остаются).
+##   «Предметы»: любой предмет ItemData +1/+10 (по группам: оружие, броня, украшения, расходники, кубы чарования,
+##     карты существ, трофеи; кладётся столько, сколько поместится), заточка надетого оружия и брони −1/+1/до предела
+##     кубами/сброс (Enchant.admin_set, этап 3), «Очистить сумку» с подтверждением (надетое оружие, щит, броня
+##     и украшения остаются).
 ##   «Питомцы»: питомец любого вида (PetData, кроме ушедших с острова Game.RETIRED_PETS) 1, 15 или 30 ур. (1–3 стадия,
 ##     сразу призывается), уровень призванного −5/−1/+1/+5 (стадия и модель меняются), полное HP/MP питомца,
 ##     воскресить погибших (без свитка), «Отпустить всех» с подтверждением.
@@ -35,7 +36,8 @@ extends RefCounted
 ##     "lvl_set_<N>", "xp_next", "jp_plus10", "jp_plus100", "jp_zero", "gold_plus100", "gold_plus1000",
 ##     "gold_plus10000", "gold_zero", "full", "god", "learn_all", "forget_all", "reset_job";
 ##   «Опыт»: "xp_<N>", "xp_next", "pet_xp_next";
-##   «Предметы»: "item_<id>_1", "item_<id>_10", "clear_bag", "clear_bag_yes", "clear_bag_no";
+##   «Предметы»: "item_<id>_1", "item_<id>_10", "ench_<слот>_minus", "ench_<слот>_plus", "ench_<слот>_max",
+##     "ench_<слот>_zero" (слот — InventoryWindow.WORN_SLOTS), "clear_bag", "clear_bag_yes", "clear_bag_no";
 ##   «Питомцы»: "pet_<вид>_<ур.>", "pet_lvl_minus5", "pet_lvl_minus", "pet_lvl_plus", "pet_lvl_plus5", "pet_full",
 ##     "pet_revive", "pets_clear", "pets_clear_yes", "pets_clear_no";
 ##   «Мир»: "kill_target", "kill_around", "respawn_all", "mob_lvl_minus5", "mob_lvl_minus", "mob_lvl_plus",
@@ -59,7 +61,7 @@ const LEVEL_PRESETS := [1, 10, 15, 20, 30, 40]
 const PET_LEVELS := [1, 15, 30]
 ## Группы предметов на вкладке «Предметы»: [тип ItemData, подпись]; прочие типы — «Прочее».
 const ITEM_GROUPS := [["weapon", "Оружие"], ["armor", "Броня"], ["jewelry", "Украшения"], ["consumable", "Расходники"],
-	["card", "Карты существ"], ["trophy", "Трофеи"]]
+	["cube", "Кубы"], ["card", "Карты существ"], ["trophy", "Трофеи"]]
 const KILL_RADIUS := 30.0
 const MOB_MAX_LEVEL := 50
 ## Зверь админ-панели ставится в SPAWN_DIST м перед героем.
@@ -415,6 +417,7 @@ static func _build_items(main: Node, body: VBoxContainer) -> void:
 			grid.add_child(l)
 			_btn(grid, "item_%s_1" % iid, "+1", func() -> void: AdminPanel.give_item(main, iid, 1), 64.0)
 			_btn(grid, "item_%s_10" % iid, "+10", func() -> void: AdminPanel.give_item(main, iid, 10), 64.0)
+	_build_enchant(main, body)
 	_head(body, "Очистить сумку")
 	if _confirm == "clear_bag":
 		body.add_child(_text("Удалить из сумки всё, кроме надетого (оружие, щит, броня, украшения)?", UiScale.FONT_TEXT, Color(1.0, 0.6, 0.55)))
@@ -453,6 +456,47 @@ static func give_item(main: Node, id: String, n: int) -> void:
 		_done(main, "Сумка полна")
 	else:
 		_done(main, "+%d: %s" % [k, ItemData.item_name(id)])
+
+
+# ---------- «Предметы»: заточка надетого (этап 3; отдельный блок — Enchant) ----------
+
+## Заточка надетого оружия и брони: по ячейке — вещь и «+N», −1 / +1 / до предела кубами / сброс.
+static func _build_enchant(main: Node, body: VBoxContainer) -> void:
+	_head(body, "Заточка надетого (чарование и закалка — одна шкала «+N»; предел — как у кубов)")
+	var grid := _grid(body, 5)
+	for s in InventoryWindow.WORN_SLOTS:
+		var slot := String(s)
+		var id := Enchant.equipped_in(slot)
+		var cap := Enchant.cube_cap(id) if id != "" else 0
+		var what := ItemData.item_name(id) if id != "" else "—"
+		var l := _text("%s: %s" % [String(InventoryWindow.EQUIP_SLOTS[InventoryWindow.equip_index(slot)][1]), what],
+			UiScale.FONT_BODY, ItemData.frame_color(id) if id != "" else MUTED)
+		l.custom_minimum_size = Vector2(UiScale.px(220), 0)
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(l)
+		_btn(grid, "ench_%s_minus" % slot, "−1", func() -> void: AdminPanel.enchant_step(main, slot, -1), 56.0)
+		_btn(grid, "ench_%s_plus" % slot, "+1", func() -> void: AdminPanel.enchant_step(main, slot, 1), 56.0)
+		_btn(grid, "ench_%s_max" % slot, "+%d" % cap if cap > 0 else "Макс.", func() -> void: AdminPanel.enchant_set(main, slot, 99), 64.0)
+		_btn(grid, "ench_%s_zero" % slot, "0", func() -> void: AdminPanel.enchant_set(main, slot, 0), 56.0)
+
+
+## Заточка надетой вещи в ячейке slot на d (−1 / +1).
+static func enchant_step(main: Node, slot: String, d: int) -> void:
+	var id := Enchant.equipped_in(slot)
+	if id == "" or not ItemData.is_enchantable(id):
+		_done(main, "В ячейке нет оружия или брони")
+		return
+	enchant_set(main, slot, ItemData.enchant_level(id) + d)
+
+
+## Заточка надетой вещи в ячейке slot — n (0…предел кубами: оружие 1-го ранга и броня +10, оружие 2-го ранга +20).
+static func enchant_set(main: Node, slot: String, n: int) -> void:
+	var id := Enchant.equipped_in(slot)
+	if id == "" or not ItemData.is_enchantable(id):
+		_done(main, "В ячейке нет оружия или брони")
+		return
+	var res := Enchant.admin_set(slot, n, main.get("player") as Node)
+	_done(main, "Заточка: %s" % ItemData.item_name(res))
 
 
 ## Подтверждение опасного действия ("clear_bag" | "pets_clear"; "" — отмена).

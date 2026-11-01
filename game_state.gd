@@ -90,6 +90,8 @@ var storage_gold := 0
 ## Множитель опыта за зверей (админ-панель, вкладка «Опыт»: 1, 2, 5, 10, 20, 50): герою и питомцу
 ## (main._on_mob_gone, PetManager.on_mob_killed). Хранится в сохранении; без админ-панели — всегда 1.
 var xp_mult := 1
+## Сломанную при чаровании вещь (ItemData «<id>!broken», Enchant) надеть нельзя.
+const BROKEN_EQUIP := "Сломанную вещь не надеть — торговец купит её как лом"
 
 
 func _ready() -> void:
@@ -245,6 +247,8 @@ func offhand_block(id: String) -> String:
 ## новое оружие не подходит, выключаются (их id — в last_dropped_toggles).
 func equip_weapon(id: String) -> String:
 	last_dropped_toggles = []
+	if ItemData.is_broken(id):
+		return BROKEN_EQUIP
 	if not ItemData.is_weapon(id):
 		return "Это не оружие"
 	if ItemData.is_shield(id):
@@ -269,6 +273,8 @@ func equip_weapon(id: String) -> String:
 ## Взять id во вторую руку: щит или второе такое же одноручное (пара). "" — получилось, иначе причина.
 func equip_offhand(id: String) -> String:
 	last_dropped_toggles = []
+	if ItemData.is_broken(id):
+		return BROKEN_EQUIP
 	if not ItemData.is_weapon(id):
 		return "Это не оружие"
 	if not ItemData.weapon_fits(id, class_id):
@@ -305,6 +311,8 @@ func unequip_shield() -> void:
 ## профессии (доспех — свой вариант, ItemData.armor_fits), уровень (ранг, ItemData.level_block), есть в сумке
 ## свободная штука (не надетая в другую ячейку).
 func gear_block(id: String, gslot: String) -> String:
+	if ItemData.is_broken(id):
+		return BROKEN_EQUIP
 	if not ItemData.is_gear(id):
 		return "Это не броня и не украшение"
 	if not ItemData.gear_slots_for(id).has(gslot):
