@@ -125,7 +125,7 @@ func _fight(dt: float) -> void:
 		if t == null or m.global_position.distance_to(p.global_position) < t.global_position.distance_to(p.global_position):
 			t = m
 	if t == null:
-		bot.tick(Callable())
+		bot.set_tick(Callable())
 		return
 	if _fight_t > FIGHT:
 		kill(t)
@@ -142,7 +142,7 @@ func _fight(dt: float) -> void:
 
 ## К NPC, которому сдавать: значок «=», разговор.
 func _talk_ready(qid: String) -> void:
-	bot.tick(Callable())
+	bot.set_tick(Callable())
 	close_window()
 	var to := QuestData.turn_in(qid)
 	check(quests().is_ready(qid), "«%s» выполнено: %s" % [QuestData.quest_name(qid), str(quests().progress(qid))])
@@ -182,4 +182,4 @@ func _journal_check() -> void:
 
 func _fight_start() -> void:
 	_fight_t = 0.0
-	bot.tick(_fight)
+	bot.set_tick(_fight)

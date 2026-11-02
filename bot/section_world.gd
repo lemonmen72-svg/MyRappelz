@@ -152,7 +152,7 @@ func _walk_start(road: String) -> void:
 	_last = p.global_position
 	bot.reset_camera()
 	shot("Doroga %s" % road)
-	bot.tick(_drive)
+	bot.set_tick(_drive)
 
 
 ## Каждый кадр: джойстик к следующей точке (через мост, если по прямой вода), застревание, провал.
@@ -218,7 +218,7 @@ func _walk_done() -> bool:
 
 
 func _walk_end() -> void:
-	bot.tick(Callable())
+	bot.set_tick(Callable())
 	var h := hud()
 	if h != null:
 		h.move_vec = Vector2.ZERO

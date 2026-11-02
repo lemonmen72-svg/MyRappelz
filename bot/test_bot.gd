@@ -789,7 +789,12 @@ func wait_until(step_title: String, cond: Callable, timeout: float) -> void:
 	_steps.append({"kind": "until", "name": step_title, "fn": cond, "sec": timeout})
 
 
-## Вызывать fn(dt) каждый кадр (до следующего tick); Callable() — перестать.
+## Сразу (из действия шага, не очередью): вызывать fn(dt) каждый кадр; Callable() — перестать.
+func set_tick(fn: Callable) -> void:
+	_tick_fn = fn
+
+
+## Шаг очереди: вызывать fn(dt) каждый кадр (до следующего tick); Callable() — перестать.
 func tick(fn: Callable) -> void:
 	_steps.append({"kind": "tick", "name": "каждый кадр", "fn": fn})
 

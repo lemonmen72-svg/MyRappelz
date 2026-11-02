@@ -212,7 +212,7 @@ func _zones_clear() -> void:
 func _basic_start() -> void:
 	_arrange()
 	_hp0 = mob.hp if alive(mob) else 0
-	bot.tick(_attack_tick)
+	bot.set_tick(_attack_tick)
 
 
 func _attack_tick(_dt: float) -> void:
@@ -224,7 +224,7 @@ func _attack_tick(_dt: float) -> void:
 
 
 func _basic_check(job: String) -> void:
-	bot.tick(Callable())
+	bot.set_tick(Callable())
 	var p := player()
 	var w := "%s%s" % [ItemData.item_name(Game.weapon), " + " + ItemData.item_name(Game.offhand) if Game.offhand != "" else ""]
 	check(alive(mob) and mob.hp < _hp0, "%s: обычные атаки (%s) наносят урон: %d" % [ClassData.job_name(job), w,

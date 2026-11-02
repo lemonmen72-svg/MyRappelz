@@ -75,7 +75,7 @@ func _mark(card: String) -> void:
 	_attempts0 = tm.attempts
 	press("tame")
 	check(tm.marked == _mob and _mob.tame_marked, "«Приручить»: метка на звере (%s)" % last_msg())
-	bot.tick(_fight)
+	bot.set_tick(_fight)
 
 
 func _fight(dt: float) -> void:
@@ -98,7 +98,7 @@ func _fight(dt: float) -> void:
 
 func _won() -> bool:
 	if not alive(_mob):
-		bot.tick(Callable())
+		bot.set_tick(Callable())
 		_fight_t = 0.0
 		return true
 	return false
@@ -142,7 +142,7 @@ func _fail_mark(card: String) -> void:
 	tm.force_roll = 0.99
 	press("tame")
 	check(tm.marked == _mob, "метка на втором звере")
-	bot.tick(_fight)
+	bot.set_tick(_fight)
 
 
 func _fail_check(card: String) -> void:
@@ -151,7 +151,7 @@ func _fail_check(card: String) -> void:
 
 
 func _end() -> void:
-	bot.tick(Callable())
+	bot.set_tick(Callable())
 	var tm := bot.main.get("taming") as Taming
 	if tm != null:
 		tm.force_roll = -1.0

@@ -8,7 +8,8 @@ extends RefCounted
 ##   bot.measure(сцена, настройка, сек, {preset, option: [ключ, значение], shot, base, tick: Callable(dt)})
 ##                                                   — прогрев bot.warmup с, затем замер (метрики, температура
 ##                                                     до/после, снимок) — строка таблицы отчёта;
-##   bot.tick(Callable(dt))                          — вызывать каждый кадр до следующего шага bot.tick(Callable()).
+##   bot.tick(Callable(dt))                          — вызывать каждый кадр до следующего шага bot.tick(Callable());
+##                                                     из действия шага (не очередью) — bot.set_tick(Callable(dt)).
 ## Внутри действий — API бота (TestBot, раздел «API для сценариев»): teleport, set_camera, reset_camera, set_preset,
 ## set_option, spawn, clear_spawned, set_job, set_level, set_look, learn_all, add_pet, player(), check(cond, текст),
 ## note(текст), shot(имя), main. Бот сам следит за температурой (паузы на остывание, остановка) и за лимитом времени.

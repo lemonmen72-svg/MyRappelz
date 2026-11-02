@@ -63,8 +63,6 @@ func _setup() -> void:
 	for k in Game.equip.keys():
 		player().unequip_gear(String(k))
 	_stats.clear()
-	var p := player()
-	_base = {"def": p.defense, "hp": p.max_hp, "crit": p.crit, "speed": p.cur_speed()}
 
 
 ## Надеть набор: вторая рука освобождается, основное оружие, вторая рука; вид хвата и показатели.
@@ -121,6 +119,8 @@ func _gear() -> void:
 	# Основное оружие — одноручный меч (щит снят: защита — только от брони)
 	if Game.offhand != "":
 		p.unequip_offhand()
+	p.recalc_stats()
+	_base = {"def": p.defense, "hp": p.max_hp, "crit": p.crit, "speed": p.cur_speed()}
 	for g in GEAR:
 		Game.inventory.add(String(g), 1)
 	for g in GEAR:

@@ -51,7 +51,7 @@ func _build() -> void:
 
 
 func _end() -> void:
-	bot.tick(Callable())
+	bot.set_tick(Callable())
 	bot.clear_spawned()
 	no_pets()
 
@@ -65,7 +65,7 @@ func _setup() -> void:
 
 ## Новый питомец вида sp: умения изучены до призыва (ячейки «Авто» заполняются сами), затем призыв.
 func _add(sp: String) -> void:
-	bot.tick(Callable())
+	bot.set_tick(Callable())
 	bot.clear_spawned()
 	_mob = null
 	_sp = sp
@@ -115,7 +115,7 @@ func _auto_start() -> void:
 	if _mob != null:
 		_mob.max_hp = BIG_HP
 		_mob.hp = BIG_HP
-	bot.tick(_keep_alive)
+	bot.set_tick(_keep_alive)
 
 
 func _keep_alive(dt: float) -> void:
@@ -190,7 +190,7 @@ func _skills_done() -> void:
 	var pt := pet()
 	if pt != null:
 		note("Питомец «%s»: умений применено %d" % [_sp, pt.learned_uses - _uses0])
-	bot.tick(Callable())
+	bot.set_tick(Callable())
 	bot.clear_spawned()
 	_mob = null
 	press("pet_follow")

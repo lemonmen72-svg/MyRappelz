@@ -938,7 +938,7 @@
   посреди теста — при запуске всё как обычно: хранилище по умолчанию, герой игрока сохранён до переключения.
 - **Каркас** (`bot/test_bot.gd`, `TestBot`): сценарий (`BotScenario`, шапка `bot/bot_scenario.gd`) в `build(bot)` ставит
   шаги в очередь: `do(что, Callable)`, `wait(с)`, `wait_until(чего жду, Callable → bool, с)` (не дождался — ошибка
-  проверки), `tick(Callable(dt))` — каждый кадр, `measure(сцена, настройка, с, {preset, option: [ключ, значение],
+  проверки), `tick(Callable(dt))` — каждый кадр (шаг очереди; из действия шага — сразу `set_tick`), `measure(сцена, настройка, с, {preset, option: [ключ, значение],
   kind "preset"/"setting", base, shot, tick})` — графика, прогрев `warmup` 3 с, замер (`BotMetrics`: настоящее время
   кадров — к/с среднее и худшей секунды, кадр мс среднее/p50/p95/p99/макс, заминки > 100 мс, вызовы, треугольники,
   объекты — `Performance`, время видеочипа и процессора — `RenderingServer.viewport_get_measured_render_time_*` (у GL
