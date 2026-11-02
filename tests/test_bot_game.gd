@@ -90,7 +90,8 @@ func _check_build() -> void:
 			var tb := TestBot.new()
 			tb.main = main
 			var sec := BotSection.create(sid)
-			if not check(sec != null, "раздел «%s» создаётся" % sid):
+			check(sec != null, "раздел «%s» создаётся" % sid)
+			if sec == null:
 				tb.free()
 				continue
 			sec.build(tb, q)
