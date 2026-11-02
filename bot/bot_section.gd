@@ -11,15 +11,15 @@ extends RefCounted
 
 ## Разделы по порядку: id, название, файл, оценка времени быстрого и полного прохода, с.
 const SECTIONS := [
-	{"id": "combat", "name": "Бой и умения", "script": "res://bot/section_combat.gd", "quick": 80, "full": 240},
-	{"id": "pets", "name": "Питомцы", "script": "res://bot/section_pets.gd", "quick": 45, "full": 100},
-	{"id": "taming", "name": "Приручение", "script": "res://bot/section_taming.gd", "quick": 20, "full": 30},
-	{"id": "trade", "name": "Торговля", "script": "res://bot/section_trade.gd", "quick": 8, "full": 15},
-	{"id": "storage", "name": "Склад", "script": "res://bot/section_storage.gd", "quick": 6, "full": 8},
-	{"id": "quests", "name": "Задания", "script": "res://bot/section_quests.gd", "quick": 25, "full": 35},
-	{"id": "equipment", "name": "Экипировка", "script": "res://bot/section_equipment.gd", "quick": 12, "full": 25},
-	{"id": "world", "name": "Мир", "script": "res://bot/section_world.gd", "quick": 35, "full": 110},
-	{"id": "ui", "name": "Интерфейс", "script": "res://bot/section_ui.gd", "quick": 15, "full": 35},
+	{"id": "combat", "name": "Бой и умения", "script": "res://bot/section_combat.gd", "quick": 110, "full": 210},
+	{"id": "pets", "name": "Питомцы", "script": "res://bot/section_pets.gd", "quick": 30, "full": 60},
+	{"id": "taming", "name": "Приручение", "script": "res://bot/section_taming.gd", "quick": 10, "full": 20},
+	{"id": "trade", "name": "Торговля", "script": "res://bot/section_trade.gd", "quick": 6, "full": 10},
+	{"id": "storage", "name": "Склад", "script": "res://bot/section_storage.gd", "quick": 5, "full": 5},
+	{"id": "quests", "name": "Задания", "script": "res://bot/section_quests.gd", "quick": 15, "full": 20},
+	{"id": "equipment", "name": "Экипировка", "script": "res://bot/section_equipment.gd", "quick": 8, "full": 12},
+	{"id": "world", "name": "Мир", "script": "res://bot/section_world.gd", "quick": 40, "full": 200},
+	{"id": "ui", "name": "Интерфейс", "script": "res://bot/section_ui.gd", "quick": 15, "full": 40},
 ]
 ## Место для боя (поле восточнее города, вне безопасных зон; как сцена «Бой» режима «Производительность»).
 const ARENA := Vector2(34, 24)

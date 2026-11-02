@@ -4,7 +4,7 @@ extends BotSection
 ## зверя рядом), «Атака» (бьёт цель героя); умения питомца срабатывают в бою (ИИ, ячейки «Авто»); опыт поднимает
 ## уровень; эволюция (15 и 30 ур.) меняет стадию и модель стадии (если файл модели есть).
 
-const QUICK_SPECIES := ["wolf", "panther"]
+const QUICK_SPECIES := ["wolf", "panther", "pheasant"]
 const PET_LEVEL := 12
 const MOB := "pheasant"
 const BIG_HP := 2000000

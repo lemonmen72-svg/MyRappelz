@@ -6,9 +6,10 @@ extends BotSection
 ## и снимок, героя переносит к следующей точке, ходьба продолжается.
 
 ## Дороги острова (world/training_island.json roads.paths): быстрый и полный проход.
-const QUICK_ROADS := ["town_human"]
-const FULL_ROADS := ["town_human", "town_elf", "town_dark", "town_port", "town_west", "west_tents"]
-const QUICK_EVERY := 4
+const QUICK_ROADS := ["town_human", "town_port"]
+const FULL_ROADS := ["town_human", "human_tent", "town_elf", "town_dark", "town_port", "town_west", "west_tents",
+	"tents_south", "town_ring"]
+const QUICK_EVERY := 3
 ## Точка маршрута достигнута ближе, м.
 const REACH := 1.6
 ## Застревание: за STUCK_TIME с сдвинулся меньше STUCK_MOVE м.
