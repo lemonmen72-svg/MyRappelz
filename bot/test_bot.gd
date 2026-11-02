@@ -34,6 +34,11 @@ extends Node
 ## Отчёт — BotReport: DarkPact_test_<версия>_<ГГГГ-ММ-ДД_ЧЧ-ММ>.txt и .zip (отчёт + снимки) в REPORT_DIR, на Android —
 ## копия в «Загрузки/DarkPact_test» (MediaStore через плагин), «Открыть отчёт» и «Поделиться» (плагин), на ПК —
 ## папка user://bot_reports. Итог последнего запуска — last (и LAST_FILE): вкладка «Тест-бот».
+##
+## Сценарий без мира (BotScenario.needs_world false — «Автотесты на телефоне»): главная сцена убирается до build,
+## сценарий сам ставит сцены (owns_scene), в конце бот создаёт главную сцену заново. on_finish сценария — уборка при
+## любом конце. Настройки игрока (settings.cfg) такой сценарий может убрать на время (backup_settings — копия в папке
+## отчётов, путь — в метке RUNNING); игра упала посреди — recover_after_crash при следующем запуске (main._ready).
 
 signal main_changed(new_main: Node)
 signal finished(result: Dictionary)
@@ -44,6 +49,8 @@ const PUBLIC_DIR := "Download/DarkPact_test/"
 const BOT_LOGIN := "Dedok_max"
 const BOT_NICK := "ТестБот"
 const RUNNING := "running.json"
+## Копия user://settings.cfg игрока на время сценария (backup_settings / restore_settings).
+const SETTINGS_BACKUP := "settings_backup.cfg"
 const LAST_FILE := "last.json"
 ## Статусы PowerManager.THERMAL_STATUS_* (как ThermalGuard).
 const STATUS_COOL := 1
@@ -152,6 +159,10 @@ var _retries: Dictionary = {}
 var _no_plugin: Dictionary = {}
 var _headless := false
 var _app_away := false
+## Доп. поля метки RUNNING (mark): шаг сценария, копия настроек.
+var _marker_extra: Dictionary = {}
+## Главная сцена была текущей (до того, как сценарий без мира её убрал).
+var _main_was_current := true
 
 
 func _init() -> void:
@@ -313,14 +324,41 @@ func _begin() -> void:
 	overlay.stop_pressed.connect(func() -> void: stop("Остановлен кнопкой «Стоп»", "stopped"))
 	state = "prepare"
 	_wait_t = 0.0
-	_swap_scene()
+	if scenario.needs_world():
+		_swap_scene()
+	else:
+		_drop_scene()
 
 
-## Главная сцена заново (с тем, что сейчас в Game и Accounts).
+## Главная сцена заново (с тем, что сейчас в Game и Accounts); её нет (сценарий без мира убрал) — новая.
 func _swap_scene() -> void:
-	var fresh: Node = main.call("restart_scene")
+	var fresh: Node
+	if main != null and is_instance_valid(main) and not main.is_queued_for_deletion() and main.is_inside_tree():
+		fresh = main.call("restart_scene")
+	else:
+		fresh = load("res://main.tscn").instantiate()
+		var tree := get_tree()
+		tree.root.add_child.call_deferred(fresh)
+		if _main_was_current:
+			var set_current := func() -> void:
+				if is_instance_valid(fresh) and fresh.is_inside_tree():
+					tree.current_scene = fresh
+			set_current.call_deferred()
 	main = fresh
 	main_changed.emit(fresh)
+
+
+## Убрать главную сцену (сценарий без мира сам ставит свои сцены).
+func _drop_scene() -> void:
+	if main != null and is_instance_valid(main):
+		_main_was_current = get_tree().current_scene == main
+		main.process_mode = Node.PROCESS_MODE_DISABLED
+		var hud: Variant = main.get("hud")
+		if is_instance_valid(hud) and hud is CanvasLayer:
+			(hud as CanvasLayer).visible = false
+		main.queue_free()
+	main = null
+	main_changed.emit(null)
 
 
 func _world_ready() -> bool:
@@ -343,6 +381,7 @@ func _return_home() -> void:
 			note("Не удалось загрузить героя игрока (слот %d) — откроется выбор персонажа" % (sl + 1))
 	ThermalGuard.suspended = false
 	Quality.reload()
+	UiScale.reload()
 	Quality.set_throttle(0)
 	_remove_marker()
 	state = "home"
@@ -376,14 +415,15 @@ func _tick_prepare(dt: float) -> void:
 	if _wait_t > WORLD_TIMEOUT:
 		stop("Мир тестового героя не загрузился за %s" % clock(WORLD_TIMEOUT), "error")
 		return
-	if not _world_ready():
+	if scenario.needs_world() and not _world_ready():
 		return
 	if _wait_t < SETTLE:
 		return
 	_wait_t = 0.0
 	# Не первый кадр готовности: SETTLE с после постройки мира
 	state = "running"
-	note("Мир тестового героя готов (%s)" % clock(total_time))
+	if scenario.needs_world():
+		note("Мир тестового героя готов (%s)" % clock(total_time))
 	scenario.build(self)
 	steps_total = _steps.size()
 	for s in _steps:
@@ -394,14 +434,15 @@ func _tick_prepare(dt: float) -> void:
 func _tick_running(dt: float, fdt: float) -> void:
 	total_time += dt
 	active_time += dt
-	if not _world_ready():
+	if not scenario.owns_scene() and not _world_ready():
 		stop("Главная сцена пропала", "error")
 		return
 	_watch(dt, fdt)
 	if state != "running":
 		return
 	if active_time >= limit:
-		stop("Лимит времени режима (%s): сделано замеров %d из %d" % [clock(limit), rows.size(), measures_total], "limit")
+		stop("Лимит времени режима (%s): %s" % [clock(limit), "сделано замеров %d из %d" % [rows.size(), measures_total]
+			if measures_total > 0 else "сделано шагов %d из %d" % [_si, _steps.size()]], "limit")
 		return
 	if total_time >= limit + HARD_EXTRA:
 		stop("Общий лимит времени (%s)" % clock(limit + HARD_EXTRA), "limit")
@@ -452,7 +493,8 @@ func step_name() -> String:
 
 func _run_step(dt: float, fdt: float) -> void:
 	if _si >= _steps.size():
-		_finish("done", "готово: замеров %d из %d" % [rows.size(), measures_total])
+		var sm := scenario.summary(self)
+		_finish("done", "готово: " + (sm if sm != "" else "замеров %d из %d" % [rows.size(), measures_total]))
 		return
 	var s: Dictionary = _steps[_si]
 	_t += dt
@@ -684,6 +726,7 @@ func _finish(kind: String, text: String) -> void:
 	get_tree().paused = false
 	get_tree().root.disable_3d = false
 	clear_spawned()
+	scenario.on_finish(self)
 	temp_end = read_temps(true)
 	var errors := 0
 	for c in checks:
@@ -901,9 +944,72 @@ func _write_marker() -> void:
 	var f := FileAccess.open(report_dir + RUNNING, FileAccess.WRITE)
 	if f == null:
 		return
-	f.store_string(JSON.stringify({"time": started_text, "mode": mode, "login": String(_home.get("login", "")),
-		"slot": int(_home.get("slot", -1))}))
+	var d := {"time": started_text, "mode": mode, "login": String(_home.get("login", "")), "slot": int(_home.get("slot", -1))}
+	d.merge(_marker_extra, true)
+	f.store_string(JSON.stringify(d))
 	f.close()
+
+
+## Дописать в метку RUNNING (шаг сценария: игра упала — следующий отчёт скажет, на чём).
+func mark(extra: Dictionary) -> void:
+	_marker_extra.merge(extra, true)
+	_write_marker()
+
+
+# ---------- Настройки игрока на время сценария ----------
+
+## Убрать user://settings.cfg игрока на время сценария (автотесты ждут настройки по умолчанию, как в CI): копия —
+## в папке отчётов, путь — в метке (игра упала — recover_after_crash). Возвращает false, если копию не записать.
+func backup_settings() -> bool:
+	var backup := report_dir + SETTINGS_BACKUP
+	if FileAccess.file_exists(Quality.PATH):
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(report_dir))
+		if DirAccess.copy_absolute(ProjectSettings.globalize_path(Quality.PATH), ProjectSettings.globalize_path(backup)) != OK:
+			return false
+		mark({"settings_backup": backup})
+	else:
+		mark({"settings_backup": ""})
+	return true
+
+
+## Вернуть настройки игрока (после backup_settings). Удаляет копию.
+func restore_settings() -> void:
+	if not _marker_extra.has("settings_backup"):
+		return
+	_restore_settings_from(String(_marker_extra["settings_backup"]))
+	_marker_extra.erase("settings_backup")
+	_write_marker()
+
+
+static func _restore_settings_from(backup: String) -> void:
+	if backup == "":
+		if FileAccess.file_exists(Quality.PATH):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(Quality.PATH))
+	elif FileAccess.file_exists(backup):
+		DirAccess.copy_absolute(ProjectSettings.globalize_path(backup), ProjectSettings.globalize_path(Quality.PATH))
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(backup))
+	Quality.reload()
+	UiScale.reload()
+
+
+## Запуск игры (main._ready): прошлый тест-бот не закончился (метка RUNNING) и убирал настройки игрока — вернуть их.
+## Пока бот идёт — ничего. true — вернули.
+static func recover_after_crash(dir: String = REPORT_DIR) -> bool:
+	if is_running() or not FileAccess.file_exists(dir + RUNNING):
+		return false
+	var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(dir + RUNNING))
+	if not (v is Dictionary) or not (v as Dictionary).has("settings_backup"):
+		return false
+	var d: Dictionary = v
+	_restore_settings_from(String(d["settings_backup"]))
+	d.erase("settings_backup")
+	d["settings_recovered"] = true
+	var f := FileAccess.open(dir + RUNNING, FileAccess.WRITE)
+	if f != null:
+		f.store_string(JSON.stringify(d))
+		f.close()
+	print("TestBot: прошлый запуск бота не закончился — настройки игрока возвращены из копии")
+	return true
 
 
 func _remove_marker() -> void:

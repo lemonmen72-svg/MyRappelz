@@ -116,6 +116,8 @@ var _transition_cd := 0.0
 
 
 func _ready() -> void:
+	# Тест-бот не закончился в прошлый раз (игру закрыли или она упала) — вернуть настройки игрока, если он их убирал
+	TestBot.recover_after_crash()
 	_rng.seed = 1234
 	Quality.apply_resolution(get_tree())
 	Quality.apply_fps()

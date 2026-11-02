@@ -14,10 +14,25 @@ extends RefCounted
 ## настройки по одной против базы «Среднее», рекомендации (простые правила — recommendations), раздел сценария
 ## (BotScenario.report_lines), журнал, проверки, хвост лога Godot (user://logs/godot.log с отметки старта бота;
 ## файловый лог включён и на телефоне — project.godot debug/file_logging/enable_file_logging).
+## Прошлый запуск бота не закончился (метка RUNNING) — предупреждение в самом начале, с причиной конца процесса по
+## данным Android и шагом, на котором шёл бот. Раздел «Прошлые завершения игры» — последние EXITS завершений
+## процесса игры (плагин exitHistory: Android 11+ — причина, описание, время, важность, память; у сбоев — первые
+## TRACE_LINES строк следа: ANR — стеки, crash_native — строки tombstone). Сценарий без замеров («Автотесты») —
+## без таблиц замеров и рекомендаций, итог сценария (BotScenario.summary) — в сводке.
 
 const TITLE := "Dark Pact — отчёт тест-бота"
 const LOG_FILE := "user://logs/godot.log"
 const LOG_LINES := 150
+## Прошлые завершения игры: сколько записей и строк следа сбоя.
+const EXITS := 6
+const TRACE_LINES := 200
+## Причины завершения, которые считаются сбоем (ApplicationExitInfo).
+const EXIT_FAILURES := ["crash", "crash_native", "anr", "initialization_failure"]
+const EXIT_NAMES := {"exit_self": "игра вышла сама", "signaled": "сигнал системы", "low_memory": "не хватило памяти",
+	"crash": "сбой Java", "crash_native": "сбой движка (native)", "anr": "зависание (ANR)",
+	"initialization_failure": "сбой запуска", "permission_change": "смена разрешений",
+	"excessive_resource_usage": "слишком много ресурсов", "user_requested": "закрыта игроком или системой",
+	"user_stopped": "остановлена в настройках", "dependency_died": "умер зависимый процесс", "other": "другое"}
 const ZIP_MIME := "application/zip"
 const TXT_MIME := "text/plain"
 const KIND_TEXT := {"done": "готово", "limit": "остановлен по лимиту времени", "stopped": "остановлен вручную",
@@ -123,6 +138,7 @@ static func device_info() -> Dictionary:
 	d["renderer_diag"] = Array(RendererGuard.diagnostics())
 	if String(info_d.get("last_exit", "")) != "":
 		d["last_exit"] = String(info_d["last_exit"])
+	d["exits"] = exit_history()
 	if Assets.embedded():
 		d["pack"] = "встроен (редактор, автотесты)"
 	elif Assets.available():
@@ -131,6 +147,56 @@ static func device_info() -> Dictionary:
 		d["pack"] = "частей %d из %d — у остальных моделей запасные" % [Assets.ready_count(), Assets.PACKS.size()]
 	d["plugin"] = "есть" if Assets.download_plugin() != null else "нет (ПК или APK без плагина)"
 	return d
+
+
+## Прошлые завершения процесса игры (плагин exitHistory): {ok, sdk, exits: [{reason, code, status, description, time,
+## importance, process, pid, pss_mb, rss_mb, trace}], error, why} — why: почему данных нет ("" — есть).
+static func exit_history() -> Dictionary:
+	var res := {"ok": false, "sdk": 0, "exits": [], "error": "", "why": ""}
+	if Assets.download_plugin() == null:
+		res["why"] = "нет данных: ПК или APK без плагина Android"
+		return res
+	var v: Variant = plugin_call("exitHistory", [EXITS, TRACE_LINES])
+	if not (v is String) or String(v) == "":
+		res["why"] = "нет данных: плагин старой версии или ошибка (%s)" % str(plugin_call("lastError", []))
+		return res
+	var p: Variant = JSON.parse_string(String(v))
+	if not (p is Dictionary):
+		res["why"] = "нет данных: ответ плагина не разобран"
+		return res
+	var d: Dictionary = p
+	res["ok"] = true
+	res["sdk"] = int(d.get("sdk", 0))
+	res["exits"] = d.get("exits", []) if d.get("exits", []) is Array else []
+	res["error"] = String(d.get("error", ""))
+	if int(res["sdk"]) > 0 and int(res["sdk"]) < 30:
+		res["why"] = "Android ниже 11 — система не хранит причины завершения"
+	return res
+
+
+## «2026-11-01 18:40:12 · сбой движка (native) [crash_native], статус 6 · на экране · память 812 МБ — описание».
+static func exit_line(e: Dictionary) -> String:
+	var r := String(e.get("reason", "?"))
+	var t := "%s · %s [%s], статус %d · %s" % [String(e.get("time", "?")), String(EXIT_NAMES.get(r, r)), r,
+		int(e.get("status", 0)), String(e.get("importance", ""))]
+	if int(e.get("pss_mb", 0)) > 0:
+		t += " · память %d МБ" % int(e["pss_mb"])
+	var desc := String(e.get("description", "")).strip_edges()
+	if desc != "":
+		t += " — " + desc.replace("\n", " ").left(200)
+	return t
+
+
+## Первое завершение игры не раньше времени since («ГГГГ-ММ-ДД ЧЧ:ММ»): то, которым закончился прошлый запуск бота.
+static func exit_after(exits: Array, since: String) -> Dictionary:
+	var found: Dictionary = {}
+	for e in exits:
+		if not (e is Dictionary):
+			continue
+		var ed: Dictionary = e
+		if since != "" and String(ed.get("time", "")) >= since:
+			found = ed  # список — свежие первыми: последнее подходящее — самое раннее после начала
+	return found
 
 
 ## Память: ОЗУ телефона из плагина (ActivityManager.MemoryInfo, МБ), иначе OS.get_memory_info() (на Android
@@ -276,12 +342,19 @@ static func build_text(bot: TestBot) -> String:
 	var L := PackedStringArray()
 	L.append(TITLE)
 	L.append("=".repeat(TITLE.length()))
+	_interrupted_block(bot, L)
 	L.append("Режим: %s" % BotScenario.mode_name(bot.mode))
 	var kind_text := String(KIND_TEXT.get(bot.result_kind, bot.result_kind))
 	var reason := bot.stop_reason
 	L.append("Итог: %s%s" % [kind_text, "" if reason == "" or reason.begins_with("готово") else " — " + reason])
-	L.append("Замеров: %d из %d · проверок: %d, ошибок: %d" % [bot.rows.size(), bot.measures_total, bot.checks.size(),
-		_errors(bot)])
+	var sm := bot.scenario.summary(bot) if bot.scenario != null else ""
+	if sm != "":
+		L.append(sm)
+	if bot.measures_total > 0:
+		L.append("Замеров: %d из %d · проверок: %d, ошибок: %d" % [bot.rows.size(), bot.measures_total, bot.checks.size(),
+			_errors(bot)])
+	else:
+		L.append("Проверок бота: %d, ошибок: %d" % [bot.checks.size(), _errors(bot)])
 	L.append("Версия игры: %s · дата: %s" % [version(), bot.started_text])
 	L.append("Длительность: %s (сценарий %s, загрузка мира и паузы — остальное)" % [TestBot.clock(bot.total_time),
 		TestBot.clock(bot.active_time)])
@@ -315,13 +388,15 @@ static func build_text(bot: TestBot) -> String:
 	L.append("  Температура в начале: %s" % temps_text(bot.temp_start))
 	L.append("  Температура в конце: %s" % temps_text(bot.temp_end))
 	L.append("")
-	_presets_block(bot, L)
-	_rows_block(bot, L)
-	_settings_block(bot, L)
-	L.append("Рекомендации")
-	for r in recommendations(bot):
-		L.append("  - " + r)
-	L.append("")
+	_exits_block(bot, L)
+	if bot.measures_total > 0 or not bot.rows.is_empty():
+		_presets_block(bot, L)
+		_rows_block(bot, L)
+		_settings_block(bot, L)
+		L.append("Рекомендации")
+		for r in recommendations(bot):
+			L.append("  - " + r)
+		L.append("")
 	var extra := bot.scenario.report_lines(bot) if bot.scenario != null else PackedStringArray()
 	if not extra.is_empty():
 		L.append_array(extra)
@@ -340,6 +415,60 @@ static func build_text(bot: TestBot) -> String:
 	L.append_array(tail)
 	L.append("")
 	return "\n".join(L)
+
+
+## Прошлый запуск бота не закончился (метка RUNNING): игра закрылась или упала посреди теста — первым делом.
+static func _interrupted_block(bot: TestBot, L: PackedStringArray) -> void:
+	var ib := bot.interrupted_before
+	if ib.is_empty():
+		return
+	L.append("")
+	L.append("!!! ВНИМАНИЕ: прошлый запуск тест-бота (%s, режим «%s») не завершился — игра закрылась или упала посреди теста."
+		% [String(ib.get("time", "?")), BotScenario.mode_name(String(ib.get("mode", "?")))])
+	if String(ib.get("step", "")) != "":
+		L.append("!!! Бот был на шаге: %s" % String(ib["step"]))
+	var ex: Dictionary = bot.device.get("exits", {})
+	var e := exit_after(ex.get("exits", []), String(ib.get("time", "")))
+	if not e.is_empty():
+		var bad := EXIT_FAILURES.has(String(e.get("reason", "")))
+		L.append("!!! %s по данным Android: %s" % ["СБОЙ —" if bad else "Конец процесса", exit_line(e)])
+		if bad:
+			L.append("!!! След сбоя — в разделе «Прошлые завершения игры».")
+	elif String(ex.get("why", "")) != "":
+		L.append("!!! Причину конца процесса узнать нельзя (%s)." % String(ex["why"]))
+	if bool(ib.get("settings_recovered", false)):
+		L.append("!!! Настройки графики игрока были возвращены из копии при следующем запуске игры.")
+	L.append("")
+
+
+## Последние завершения процесса игры (Android 11+): у сбоев — след.
+static func _exits_block(bot: TestBot, L: PackedStringArray) -> void:
+	var ex: Dictionary = bot.device.get("exits", {})
+	var list: Array = ex.get("exits", [])
+	L.append("Прошлые завершения игры (свежие первыми; данные Android, до %d)" % EXITS)
+	if String(ex.get("why", "")) != "":
+		L.append("  " + String(ex["why"]))
+	elif list.is_empty():
+		L.append("  записей нет%s" % (" (ошибка: %s)" % String(ex["error"]) if String(ex.get("error", "")) != "" else ""))
+	var fails := 0
+	for i in list.size():
+		if not (list[i] is Dictionary):
+			continue
+		var e: Dictionary = list[i]
+		var bad := EXIT_FAILURES.has(String(e.get("reason", "")))
+		if bad:
+			fails += 1
+		L.append("  %d. %s%s" % [i + 1, "СБОЙ · " if bad else "", exit_line(e)])
+		var tr: Array = e.get("trace", []) if e.get("trace", []) is Array else []
+		if bad and not tr.is_empty():
+			L.append("     след (первые %d строк):" % tr.size())
+			for line in tr:
+				L.append("       " + String(line))
+		elif bad:
+			L.append("     следа нет (у сбоя Java система его не хранит; ANR — Android 11+, native — 12+)")
+	if not list.is_empty():
+		L.append("  Сбоев среди них: %d" % fails)
+	L.append("")
 
 
 static func _errors(bot: TestBot) -> int:
@@ -625,14 +754,17 @@ static func recommendations(bot: TestBot) -> PackedStringArray:
 
 # ---------- Лог Godot ----------
 
+## Файл лога Godot (настройка проекта debug/file_logging/log_path, иначе LOG_FILE).
+static func log_file() -> String:
+	var lp := String(ProjectSettings.get_setting("debug/file_logging/log_path", ""))
+	return lp if lp != "" else LOG_FILE
+
+
 ## Хвост лога Godot с отметки mark (нет отметки — конец файла): {lines, errors, warnings, from}.
 static func log_tail(mark: String, max_lines: int) -> Dictionary:
 	var res := {"lines": PackedStringArray(["  (файла лога нет — файловое логирование выключено)"]), "errors": 0,
 		"warnings": 0, "from": "нет файла"}
-	var path := LOG_FILE
-	var lp := String(ProjectSettings.get_setting("debug/file_logging/log_path", ""))
-	if lp != "":
-		path = lp
+	var path := log_file()
 	if not FileAccess.file_exists(path):
 		return res
 	var all := FileAccess.get_file_as_string(path).split("\n")

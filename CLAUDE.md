@@ -770,7 +770,10 @@
   **не менять**: иначе APK не встанет поверх старого; иконки лаунчера, armeabi-v7a + arm64-v8a, в репозитории без
   Gradle — сборка APK включает Gradle ради плагина фоновой загрузки, разрешение INTERNET — для пакета ресурсов,
   `addons/*` не в APK) и пресеты «Assets <часть>» (части пакета ресурсов `.pck`, см. ниже).
-- `tests/test_base.gd`: основа автотестов; `tests/smoke_test.gd` и `tests/test_*.gd`: сценарии.
+- `tests/test_base.gd`: основа автотестов; `tests/smoke_test.gd` и `tests/test_*.gd`: сценарии. **Папка `tests/` —
+  в APK** (скрипты ≈ 1.3 МБ текста, в APK сжатые токены — сотни КБ): их запускает тест-бот на телефоне (режим
+  «Автотесты»). Тест кончается через `_finish_run`: в CI — `get_tree().quit`, на телефоне — `device_hook` раннера;
+  хранилище аккаунтов — `accounts_dir` (по умолчанию `TEST_ACCOUNTS`, у бота — своё).
 - `android/dev.keystore`: ключ разработчика (alias `myrappelz`, пароль `myrappelz-dev`). Для Google Play нужен свой ключ в секретах.
 - `.github/workflows/check.yml`: «Проверка кода» — автотесты на каждый пуш частями параллельно, скриншоты и замер
   нагрузки — когда изменилось то, что влияет на картинку (APK не собирает; подробно — «Проверка и сборка»).
@@ -878,8 +881,8 @@
   DownloadManager через плагин Godot v2 `MyRappelzDownload` (JavaClassWrapper в 4.3 не создаёт объекты Java —
   нужен плагин). Исходники — `android/plugins/myrappelz_download/` (Java `DownloadPlugin`: `externalPath`, `start`,
   `query`, `remove`, `requestNotifications`, `notificationsAllowed`, `lastError`; температура для `ThermalGuard` —
-  `thermalStatus`, `thermalHeadroom` (int); для тест-бота — `batteryTemp`, `deviceInfo`, `saveToDownloads`, `share`,
-  `openFile` и свой провайдер `ReportProvider` (раздел «Тест-бот»); рендерер — `vulkanSupported`,
+  `thermalStatus`, `thermalHeadroom` (int); для тест-бота — `batteryTemp`, `deviceInfo`, `exitHistory` (прошлые
+  завершения игры JSON-строкой, `ExitHistory.java`), `saveToDownloads`, `share`, `openFile` и свой провайдер `ReportProvider` (раздел «Тест-бот»); рендерер — `vulkanSupported`,
   `rememberRendererFiles`, `restartApp`, проверка до движка `RendererPreflight` (раздел «Рендерер»); только String/bool/int/Dictionary — JNI
   4.3 не умеет long-параметры и результаты; манифест AAR — meta-data `org.godotengine.plugin.v2.MyRappelzDownload`,
   POST_NOTIFICATIONS), плагин редактора `addons/myrappelz_download/` (включён в `project.godot`; отдаёт экспорту
@@ -945,7 +948,29 @@
   `note(текст)` → журнал. Свой раздел отчёта — `BotScenario.report_lines`.
 - **Новый режим (этап 4)**: файл `bot/bot_scenario_<id>.gd` (`extends BotScenario`: `id`, `title`, `hero`, `limit`,
   `build`, при нужде `report_lines`), строка в `BotScenario.MODES` с `"ready": true` и `"script"`; проверки — через
-  `bot.check`, ожидания — `wait_until`. Вкладка подхватит режим сама.
+  `bot.check`, ожидания — `wait_until`. Вкладка подхватит режим сама. Один сценарий на несколько строк MODES —
+  `mode_key` (id строки). Сценарий без мира тестового героя — `needs_world()` false: бот убирает главную сцену
+  (`_drop_scene`), не следит за ней (`owns_scene`), в конце создаёт её заново (`_swap_scene`); `on_finish(bot)` —
+  уборка при любом конце, `summary(bot)` — строка итога в сводке. `bot.mark({...})` — поля метки RUNNING (шаг: игра
+  упала — следующий отчёт скажет, где), `backup_settings` / `restore_settings` — убрать `settings.cfg` игрока на
+  время (копия `settings_backup.cfg` в папке отчётов; упала игра — `TestBot.recover_after_crash` в `main._ready`).
+- **Режим «Автотесты на телефоне»** (`bot/bot_scenario_autotests.gd`; MODES `autotests` — все, до 75 мин,
+  `autotests_quick` — быстрые `QUICK`, 18 тестов логики, до 15 мин): наши `tests/smoke_test.gd` и `tests/test_*.gd`
+  (список — `DirAccess` по `res://tests/`, в APK — `.gdc`/`.gd.remap`; новый тест попадает сам) по одному в той же
+  игре. Мир тестового героя не грузится; `settings.cfg` игрока убран на время (тесты видят умолчания, как в CI).
+  Тест — узел у корня дерева (как `tests/runner.gd`), `accounts_dir` = `user://bot_test_accounts/`, конец —
+  `device_hook`; потом всё, что тест добавил к корню, удаляется, статические поля, которые тесты меняют (AdminPanel,
+  Quality, Assets, подмены моделей, RendererGuard, HeroSkills.job, QuestData.extra), — к умолчаниям (`reset_env`).
+  Таймаут теста — 300 с активного времени (паузы на остывание не в счёт: тест на паузе вместе с деревом). Ошибки
+  Godot за тест — из файла лога с места старта теста: ошибки GDScript (как `smoke_test.sh`) — тест не прошёл,
+  прочие ERROR и WARNING — счёт и первые строки. Пропуски: `CI_ONLY` с причиной («пропущен (только CI)»: test_bot,
+  test_asset_pack, test_asset_fallback, test_renderer, test_branding, test_texture_quality, test_movement_smooth),
+  `NEED_PACK` без всех частей пакета, тест, на котором в прошлый раз игра закрылась (шаг в метке), — один раз. В
+  конце (и при «Стоп», перегреве, лимите): аккаунты тестов стёрты, настройки и файлы рендерера игрока — как были, герой
+  игрока возвращён. Раздел отчёта «Автотесты»: прошло / не прошло / пропущено / не успели, таблица (итог, время, кадры,
+  к/с, ошибок Godot), подробности неудач (текст `fail`, ошибки лога), пропуски с причинами; таблиц замеров нет. На
+  телефоне нет `--fixed-fps 60` и headless — тесты на точное время могут вести себя иначе (в отчёте — к/с каждого).
+  Тест — `tests/test_bot.gd` (запуск 3: test_combat, test_bot и подставные fail / зависание / не test_base).
 - **Режим «Производительность»** (`bot/bot_scenario_perf.gd`; заменяет отдельный тест производительности третьей
   сборки): Неофит 40 ур. (тёмная эльфийка), все доступные умения, четыре атакующих — на кнопки, волк 30 ур.,
   бессмертие. Сцены `SCENES`: «Город» (у жителей и лавок), «Поле» (трава, звери), «Толпа зверей» (14 зверей кольцом
@@ -980,7 +1005,14 @@
   самый высокий пресет, что держит свой предел кадров во всех сценах; самая тяжёлая сцена; самые дорогие и самые
   экономные настройки; что грело сильнее всего; паузы; заминки), раздел сценария, журнал, проверки, хвост лога Godot
   `user://logs/godot.log` с отметки старта бота (файловый лог включён и на телефоне: `project.godot`
-  `debug/file_logging/enable_file_logging=true`; ошибок и предупреждений — счёт). Начало сводки:
+  `debug/file_logging/enable_file_logging=true`; ошибок и предупреждений — счёт). **Прошлые завершения игры**
+  (раздел после «Устройства»): плагин `exitHistory(6, 200)` — `ActivityManager.getHistoricalProcessExitReasons`
+  (Android 11+; процесс `:phoenix` и текущий — мимо): причина (`crash`, `crash_native`, `anr`, … — по-русски и
+  ключом), статус, описание, время, важность процесса, память; у сбоев — первые 200 строк следа
+  `getTraceInputStream` (ANR — стеки потоков, crash_native на Android 12+ — читаемые строки tombstone: abort, функции
+  и библиотеки стека; у сбоя Java следа нет). **Прошлый запуск бота не закончился** (метка `running.json`) — отчёт
+  начинается с «!!! ВНИМАНИЕ…»: когда и в каком режиме, на каком шаге, причина конца процесса по данным Android
+  (первое завершение после старта того запуска, `BotReport.exit_after`). Начало сводки:
   ```
   Dark Pact — отчёт тест-бота
   Режим: Производительность

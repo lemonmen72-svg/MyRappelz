@@ -393,6 +393,21 @@ public class DownloadPlugin extends GodotPlugin {
 	}
 
 	/**
+	 * Прошлые завершения игры (Android 11+, getHistoricalProcessExitReasons) для отчёта тест-бота: JSON-строка
+	 * {sdk, exits: [{reason, code, status, description, time, importance, process, pid, pss_mb, rss_mb, trace}], error}
+	 * — не больше maxCount записей, у сбоев след — не больше traceLines строк (ExitHistory). "" — ошибка (lastError).
+	 */
+	@UsedByGodot
+	public String exitHistory(int maxCount, int traceLines) {
+		try {
+			return ExitHistory.json(context(), maxCount, traceLines);
+		} catch (Throwable t) {
+			lastError = t.toString();
+			return "";
+		}
+	}
+
+	/**
 	 * Скопировать файл srcPath (внутренняя память игры) в общую папку: Android 10+ — MediaStore.Downloads с
 	 * RELATIVE_PATH relDir (например «Download/DarkPact_test/»), без разрешений; результат — content://-адрес.
 	 * Android 9 и ниже (общая папка требует разрешения на память) — внешняя папка приложения

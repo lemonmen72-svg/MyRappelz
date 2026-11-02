@@ -13,10 +13,17 @@ extends RefCounted
 ## set_option, spawn, clear_spawned, set_job, set_level, set_look, learn_all, add_pet, player(), check(cond, текст),
 ## note(текст), shot(имя), main. Бот сам следит за температурой (паузы на остывание, остановка) и за лимитом времени.
 ## Новый режим: файл bot/bot_scenario_<id>.gd (extends BotScenario) и строка в MODES с "ready": true.
+## Один сценарий — несколько режимов: в mode_key — id строки MODES, по которой он создан (create).
+## Сценарий без мира тестового героя (needs_world false — «Автотесты») сам ставит и убирает сцены (owns_scene):
+## бот не следит за главной сценой, в конце создаёт её заново; on_finish — уборка при любом конце (стоп, перегрев).
 
 ## Режимы вкладки «Тест-бот»: id, название, готов ли, сценарий, лимит активного времени (мин).
 const MODES := [
 	{"id": "perf", "name": "Производительность", "ready": true, "script": "res://bot/bot_scenario_perf.gd", "minutes": 12},
+	{"id": "autotests", "name": "Автотесты на телефоне (все)", "ready": true,
+		"script": "res://bot/bot_scenario_autotests.gd", "minutes": 75},
+	{"id": "autotests_quick", "name": "Автотесты: быстрые", "ready": true,
+		"script": "res://bot/bot_scenario_autotests.gd", "minutes": 15},
 	{"id": "quick", "name": "Быстрый (5 мин)", "ready": false, "script": "", "minutes": 5},
 	{"id": "full", "name": "Полный (10 мин)", "ready": false, "script": "", "minutes": 10},
 	{"id": "sections", "name": "По разделам", "ready": false, "script": "", "minutes": 10},
@@ -34,7 +41,10 @@ static func create(mode_id: String) -> BotScenario:
 	var scr := load(path) as GDScript
 	if scr == null:
 		return null
-	return scr.new() as BotScenario
+	var sc := scr.new() as BotScenario
+	if sc != null:
+		sc.mode_key = mode_id
+	return sc
 
 
 static func mode(mode_id: String) -> Dictionary:
@@ -48,6 +58,10 @@ static func mode(mode_id: String) -> Dictionary:
 static func mode_name(mode_id: String) -> String:
 	var m := mode(mode_id)
 	return String(m.get("name", mode_id)) if not m.is_empty() else mode_id
+
+
+## Режим из MODES, по которому создан сценарий ("" — создан напрямую, как в тестах).
+var mode_key := ""
 
 
 func id() -> String:
@@ -77,3 +91,23 @@ func build(_bot: TestBot) -> void:
 ## Строки своего раздела отчёта (этап 4: итоги проверок по разделам); [] — нет.
 func report_lines(_bot: TestBot) -> PackedStringArray:
 	return PackedStringArray()
+
+
+## Строка итога в сводке отчёта (под «Итог»); "" — нет.
+func summary(_bot: TestBot) -> String:
+	return ""
+
+
+## Нужен ли мир тестового героя (false — бот не грузит его, главная сцена убирается до build).
+func needs_world() -> bool:
+	return true
+
+
+## Сценарий сам ставит и убирает сцены (бот не проверяет, что главная сцена на месте).
+func owns_scene() -> bool:
+	return not needs_world()
+
+
+## Конец режима при любом исходе (готово, стоп, перегрев, лимит) — до отчёта и возврата игрока.
+func on_finish(_bot: TestBot) -> void:
+	pass
