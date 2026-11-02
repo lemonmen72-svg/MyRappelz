@@ -124,7 +124,7 @@ func run_step() -> void:
 
 ## Хранилище аккаунтов: правила, вход, слоты, ник, перенос старого сохранения.
 func _check_storage() -> void:
-	check(Accounts.current == "Dedok_max" and Accounts.dir == TEST_ACCOUNTS, "тестовый аккаунт в своём хранилище")
+	check(Accounts.current == "Dedok_max" and Accounts.dir == accounts_dir, "тестовый аккаунт в своём хранилище")
 	check(game.slot == 0 and game.save_path == Accounts.slot_path(0)
 		and game.save_path.ends_with("accounts/dedok_max/slot1.json"), "герой — в слоте 1: %s" % game.save_path)
 	check(Accounts.load_slot(0).get("name", "") == "Тест", "слот 1 сохранён при входе в мир")

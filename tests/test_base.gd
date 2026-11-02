@@ -9,6 +9,8 @@ extends Node
 ## Помощники профессий: become_job(job) — сменить профессию сразу (как админ-панель), learn_skills(ids) — изучить
 ## умения (JP добавляются). Запуск:
 ## godot --headless --fixed-fps 60 --path . res://tests/runner.tscn -- res://tests/<файл>.gd
+## На телефоне тесты запускает тест-бот (режим «Автотесты», bot/bot_scenario_autotests.gd): он ставит device_hook
+## и accounts_dir до добавления теста в дерево — конец теста вместо выхода из игры зовёт device_hook.
 
 const MAX_FRAMES := 60 * 300
 ## Хранилище аккаунтов автотестов (Accounts.use_storage): настоящие аккаунты и user://save.json не трогаются.
@@ -21,6 +23,10 @@ var step := 0
 var wait := 0
 var done := false
 var last_msg := ""
+## Хранилище аккаунтов этого запуска (тест-бот на телефоне ставит своё — не пересекается с CI и игроком).
+var accounts_dir := TEST_ACCOUNTS
+## Тест-бот на телефоне: device_hook.call(ok: bool, текст) вместо get_tree().quit() (выход закрыл бы игру).
+var device_hook: Callable
 
 
 ## [раса, профессия] персонажа для теста (профессия — уже получена; "wanderer" — Бродяга).
@@ -50,7 +56,7 @@ func run_step() -> void:
 
 func _ready() -> void:
 	game = Game
-	Accounts.use_storage(TEST_ACCOUNTS, true)
+	Accounts.use_storage(accounts_dir, true)
 	var err := Accounts.create(test_login())
 	if err != "":
 		printerr("[FAIL] тестовый аккаунт: " + err)
@@ -87,7 +93,7 @@ func ok_done() -> void:
 	print("TEST OK (кадров: %d)" % frame)
 	done = true
 	game.delete_save()
-	get_tree().quit(0)
+	_finish_run(true, "")
 
 
 func check(ok: bool, what: String) -> void:
@@ -102,7 +108,15 @@ func fail(what: String) -> void:
 		return
 	printerr("[FAIL] " + what)
 	done = true
-	get_tree().quit(1)
+	_finish_run(false, what)
+
+
+## Конец теста: в CI — выход с кодом, на телефоне (тест-бот) — device_hook.
+func _finish_run(ok: bool, what: String) -> void:
+	if device_hook.is_valid():
+		device_hook.call(ok, what)
+	else:
+		get_tree().quit(0 if ok else 1)
 
 
 ## Печатает новые сообщения HUD в лог теста.

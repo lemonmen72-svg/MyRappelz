@@ -9,9 +9,29 @@ extends "res://tests/test_base.gd"
 ##   .zip с отчётом и снимками, копии в «Загрузки/DarkPact_test» через подставной плагин; тестовое хранилище
 ##   стёрто, игрок снова в своём аккаунте и слоте, в своём мире; settings.cfg не тронут, авто-снижение снова работает;
 ##   «Открыть отчёт» и «Поделиться» вкладки — через плагин;
-## - запуск 2: статус 3 — «Тест остановлен: телефон перегрелся», отчёт, возврат игрока.
+## - запуск 2: статус 3 — «Тест остановлен: телефон перегрелся», отчёт, возврат игрока; перед ним — метка RUNNING
+##   «прошлого незаконченного запуска» (шаг test_combat): отчёт начинается с предупреждения и причины конца процесса
+##   по данным Android (подставной exitHistory: crash_native со следом), раздел «Прошлые завершения игры»;
+## - запуск 3: режим «Автотесты на телефоне» (bot_scenario_autotests.gd) на своём списке — настоящий test_combat
+##   (прошёл), test_bot (пропущен — только CI), подставные тесты: не прошёл (fail), завис (таймаут), не наследует
+##   test_base (ошибка); главная сцена убрана на время тестов, настройки игрока убраны и возвращены, аккаунты тестов
+##   стёрты, игрок снова в своём мире; раздел «Автотесты» отчёта; список тестов и «быстрые»; recover_after_crash.
 
 const BOT_REPORTS := "user://test_bot_reports/"
+const AutoScenario := preload("res://bot/bot_scenario_autotests.gd")
+const RECOVER_DIR := "user://test_bot_recover/"
+## Подставные тесты раннера автотестов.
+const FAKE_FAIL := """extends "res://tests/test_base.gd"
+func run_step() -> void:
+	if main._started:
+		fail("нарочно не прошёл (проверка раннера автотестов), settings.cfg есть: %s" % FileAccess.file_exists("user://settings.cfg"))
+"""
+const FAKE_HANG := """extends "res://tests/test_base.gd"
+func run_step() -> void:
+	pass
+"""
+const FAKE_PLAIN := """extends Node
+"""
 
 
 ## Короткий сценарий: город, три замера по 1 с (пресет, база, настройка), зверь, ожидание условия.
@@ -72,6 +92,20 @@ class FakePlugin extends RefCounted:
 	func lastError() -> String:
 		return ""
 
+	## Прошлые завершения (свежие первыми): выход игрока, сбой движка со следом (после метки прошлого запуска), ANR.
+	func exitHistory(max_count: int, trace_lines: int) -> String:
+		var exits := [
+			{"reason": "user_requested", "code": 10, "status": 0, "description": "remove task", "time": "2026-11-01 18:30:00",
+				"importance": "в фоне", "process": "com.lemonmen.myrappelz", "pid": 300, "pss_mb": 400, "rss_mb": 500, "trace": []},
+			{"reason": "crash_native", "code": 5, "status": 6, "description": "crash", "time": "2026-11-01 18:05:00",
+				"importance": "на экране", "process": "com.lemonmen.myrappelz", "pid": 200, "pss_mb": 812, "rss_mb": 900,
+				"trace": ["Abort message: 'test abort'", "libgodot_android.so (Node::_propagate+40)"]},
+			{"reason": "anr", "code": 6, "status": 0, "description": "Input dispatching timed out", "time": "2026-11-01 17:00:00",
+				"importance": "на экране", "process": "com.lemonmen.myrappelz", "pid": 100, "pss_mb": 700, "rss_mb": 800,
+				"trace": ["----- pid 100 at 2026-11-01 17:00:00 -----", "\"main\" prio=5 tid=1 Native"]},
+		]
+		return JSON.stringify({"sdk": 34, "exits": exits.slice(0, max_count), "error": "", "lines": trace_lines})
+
 
 var _fake := FakePlugin.new()
 var _status := 0
@@ -81,6 +115,10 @@ var _result: Dictionary = {}
 var _run := 0
 var _settings_before := ""
 var _home_slot := ""
+var _auto: AutoScenario = null
+## settings.cfg до теста (вернуть в конце: user:// общий у тестов одной задачи CI).
+var _had_settings := false
+var _settings_orig := ""
 
 
 func before_start() -> void:
@@ -96,6 +134,8 @@ func run_step() -> void:
 			_check_admin_only()
 			_check_units()
 			_settings_before = FileAccess.get_file_as_string(Quality.PATH) if FileAccess.file_exists(Quality.PATH) else ""
+			_had_settings = FileAccess.file_exists(Quality.PATH)
+			_settings_orig = _settings_before
 			_home_slot = FileAccess.get_file_as_string(Accounts.slot_path(0))
 			check(_slot_key(_home_slot).begins_with("Тест|"), "слот 1 игрока — «Тест»")
 			Assets.plugin_override = _fake
@@ -130,7 +170,12 @@ func run_step() -> void:
 				return
 			_check_home("запуск 1")
 			_check_tab_buttons()
+			_check_recover()
 			_status = 0
+			# «Прошлый запуск не закончился»: метка RUNNING автотестов на шаге test_combat
+			var f := FileAccess.open(BOT_REPORTS + TestBot.RUNNING, FileAccess.WRITE)
+			f.store_string(JSON.stringify({"time": "2026-11-01 18:00", "mode": "autotests", "step": "test_combat"}))
+			f.close()
 			_start_run()
 			step = 6
 		6:
@@ -145,12 +190,30 @@ func run_step() -> void:
 			check(text.contains("Тест остановлен: телефон перегрелся"), "отчёт: «Тест остановлен: телефон перегрелся»")
 			check(text.contains("Итог: остановлен: телефон перегрелся"), "отчёт: итог — перегрев")
 			check(text.contains("повторите на остывшем телефоне"), "рекомендация после перегрева")
+			_check_interrupted(text)
 			step = 8
 		8:
 			if not _home_ready():
 				return
 			_check_home("запуск 2")
+			_start_autotests()
+			step = 9
+		9:
+			if _result.is_empty():
+				return
+			_check_autotests_report()
+			step = 10
+		10:
+			if not _home_ready():
+				return
+			_check_home("запуск 3 (автотесты)")
+			check(not FileAccess.file_exists(BOT_REPORTS + TestBot.SETTINGS_BACKUP), "копия настроек убрана")
+			check(not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(AutoScenario.ACCOUNTS + "accounts"))
+				and not FileAccess.file_exists(AutoScenario.ACCOUNTS + "accounts.json"), "аккаунты автотестов стёрты")
+			check(not Handheld.force_missing and CreatureAsset.use_assets and not Assets.force_missing,
+				"подмены тестов сняты")
 			Assets.plugin_override = null
+			_restore_settings_file()
 			ok_done()
 
 
@@ -230,6 +293,8 @@ func _check_admin_only() -> void:
 	check(not (AdminPanel.buttons["bot_mode_quick"] as Button).disabled
 		and not (AdminPanel.buttons["bot_mode_full"] as Button).disabled
 		and not (AdminPanel.buttons["bot_mode_sections"] as Button).disabled, "«Быстрый», «Полный», «По разделам» доступны")
+	check(AdminPanel.buttons.has("bot_mode_autotests") and not (AdminPanel.buttons["bot_mode_autotests"] as Button).disabled
+		and not (AdminPanel.buttons["bot_mode_autotests_quick"] as Button).disabled, "режимы «Автотесты» доступны")
 	check((AdminPanel.buttons["bot_stop"] as Button).disabled, "«Стоп» недоступна, пока бот не идёт")
 	main.hud.close_window()
 	# Другой логин: ни панели, ни запуска
@@ -332,3 +397,118 @@ func _check_tab_buttons() -> void:
 	(AdminPanel.buttons["bot_open"] as Button).pressed.emit()
 	check(_fake.opened.size() == 1 and String(_fake.opened[0][0]).ends_with(".txt"), "«Открыть отчёт» — .txt через плагин")
 	main.hud.close_window()
+
+
+## Прошлый запуск не закончился: предупреждение в начале отчёта, причина по данным Android, раздел завершений.
+func _check_interrupted(text: String) -> void:
+	var head := text.substr(0, 1200)
+	check(head.contains("!!! ВНИМАНИЕ: прошлый запуск тест-бота (2026-11-01 18:00, режим «Автотесты на телефоне (все)»)"),
+		"отчёт начинается с предупреждения о незаконченном запуске")
+	check(head.contains("!!! Бот был на шаге: test_combat"), "предупреждение: шаг бота")
+	check(head.contains("!!! СБОЙ — по данным Android: 2026-11-01 18:05:00 · сбой движка (native) [crash_native], статус 6"),
+		"предупреждение: причина — crash_native после начала прошлого запуска")
+	check(text.find("!!! ВНИМАНИЕ") < text.find("Режим:"), "предупреждение — до сводки")
+	for part in ["Прошлые завершения игры", "1. 2026-11-01 18:30:00 · закрыта игроком или системой [user_requested]",
+			"2. СБОЙ · 2026-11-01 18:05:00", "след (первые 2 строк):", "Abort message: 'test abort'",
+			"3. СБОЙ · 2026-11-01 17:00:00 · зависание (ANR) [anr]", "\"main\" prio=5 tid=1 Native", "Сбоев среди них: 2"]:
+		check(text.contains(part), "раздел завершений: «%s»" % part)
+	var ex := BotReport.exit_history()
+	check(bool(ex["ok"]) and (ex["exits"] as Array).size() == 3, "exit_history: 3 записи")
+	check(String(BotReport.exit_after(ex["exits"], "2026-11-01 18:00").get("reason", "")) == "crash_native"
+		and BotReport.exit_after(ex["exits"], "2026-11-02 00:00").is_empty(), "exit_after: первое завершение после метки")
+
+
+## Игра упала посреди сценария, убравшего настройки: при запуске копия возвращается, метка помнит это.
+func _check_recover() -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(RECOVER_DIR))
+	var had := FileAccess.file_exists(Quality.PATH)
+	var backup := ""
+	if had:
+		backup = RECOVER_DIR + TestBot.SETTINGS_BACKUP
+		DirAccess.copy_absolute(ProjectSettings.globalize_path(Quality.PATH), ProjectSettings.globalize_path(backup))
+	var f := FileAccess.open(RECOVER_DIR + TestBot.RUNNING, FileAccess.WRITE)
+	f.store_string(JSON.stringify({"time": "2026-11-01 18:00", "mode": "autotests", "settings_backup": backup}))
+	f.close()
+	check(TestBot.recover_after_crash(RECOVER_DIR), "recover_after_crash: настройки возвращены из копии")
+	check(FileAccess.file_exists(Quality.PATH) == had and (not had or FileAccess.get_file_as_string(Quality.PATH) == _settings_before)
+		and not FileAccess.file_exists(RECOVER_DIR + TestBot.SETTINGS_BACKUP), "recover_after_crash: settings.cfg как был")
+	var m: Variant = JSON.parse_string(FileAccess.get_file_as_string(RECOVER_DIR + TestBot.RUNNING))
+	check(m is Dictionary and bool((m as Dictionary).get("settings_recovered", false))
+		and not (m as Dictionary).has("settings_backup"), "метка: настройки возвращены")
+	check(not TestBot.recover_after_crash(RECOVER_DIR), "второй раз — нечего возвращать")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(RECOVER_DIR + TestBot.RUNNING))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(RECOVER_DIR).trim_suffix("/"))
+
+
+func _script(src: String) -> GDScript:
+	var g := GDScript.new()
+	g.source_code = src
+	g.reload()
+	return g
+
+
+## Запуск 3: «Автотесты на телефоне» на своём списке.
+func _start_autotests() -> void:
+	_result = {}
+	# Список тестов и «быстрые»
+	var all := AutoScenario.list_tests()
+	check(all.size() >= 50 and all[0] == "smoke_test" and all.has("test_combat") and all.has("test_bot")
+		and not all.has("test_base"), "список автотестов: %d, первый %s" % [all.size(), all[0] if all.size() > 0 else "—"])
+	var quick := BotScenario.create("autotests_quick")
+	check(quick != null and quick.mode_key == "autotests_quick" and quick.limit() == 15.0 * 60.0
+		and BotScenario.create("autotests").limit() == 75.0 * 60.0, "режимы автотестов: лимиты 75 и 15 мин")
+	var qn := (quick as AutoScenario).test_names()
+	check(qn.size() == AutoScenario.QUICK.size() and qn[0] == "smoke_test", "быстрые: все %d есть в tests/" % qn.size())
+	# Настройки игрока: есть файл (UiScale «Крупный») — на время тестов его нет, потом он тот же
+	UiScale.set_level(UiScale.LARGE)
+	_settings_before = FileAccess.get_file_as_string(Quality.PATH)
+	_auto = AutoScenario.new()
+	_auto.only = PackedStringArray(["test_combat", "test_bot", "fake_fail", "fake_hang", "fake_plain"])
+	_auto.scripts = {"fake_fail": _script(FAKE_FAIL), "fake_hang": _script(FAKE_HANG), "fake_plain": _script(FAKE_PLAIN)}
+	_auto.timeouts = {"fake_hang": 3.0}
+	var err := TestBot.start(main, "autotests", {"scenario": _auto, "report_dir": BOT_REPORTS, "poll": 0.25,
+		"status_source": func() -> int: return 0, "headroom_source": func() -> int: return 400})
+	check(err == "", "запуск 3: автотесты запущены %s" % err)
+	_bot = TestBot.current
+	main = _bot.main
+	_bot.main_changed.connect(_on_main_changed)
+	_bot.finished.connect(_on_finished)
+	check(main == null, "главная сцена убрана на время автотестов")
+
+
+func _check_autotests_report() -> void:
+	check(String(_result["kind"]) == "done", "итог автотестов — «готово» (%s: %s)" % [String(_result["kind"]),
+		String(_result.get("reason", ""))])
+	var res: Array = _auto.results
+	var got := PackedStringArray()
+	for r in res:
+		got.append("%s:%s" % [String(r["name"]), String(r["status"])])
+	check(" ".join(got) == "test_combat:ok test_bot:skip fake_fail:fail fake_hang:timeout fake_plain:error",
+		"итоги тестов: %s" % " ".join(got))
+	var ff: Dictionary = res[2]
+	check(String(ff["text"]).contains("нарочно не прошёл") and String(ff["text"]).ends_with("false"),
+		"текст неудачи; settings.cfg на время тестов убран: %s" % String(ff["text"]))
+	check(float(res[0]["sec"]) > 0.0 and int(res[0]["frames"]) > 10, "время и кадры теста: %.1f с, %d" % [float(res[0]["sec"]),
+		int(res[0]["frames"])])
+	var text := FileAccess.get_file_as_string(String(_result["txt"]))
+	for part in ["Режим: Автотесты на телефоне (все)", "Автотесты: прошло 1, не прошло 3, пропущено 1 — из 5",
+			"Проверок бота:", "Прошлые завершения игры", "\nАвтотесты\n", "test_combat", "прошёл", "НЕ ПРОШЁЛ", "ТАЙМАУТ",
+			"ОШИБКА", "Автотесты: не прошли — подробно (3)", "fake_fail — НЕ ПРОШЁЛ: нарочно не прошёл",
+			"fake_plain — ОШИБКА: тест не наследует tests/test_base.gd", "Автотесты: пропущены (1)",
+			"test_bot — только CI: сам запускает тест-бота", "Автотест test_combat — прошёл"]:
+		check(text.contains(part), "отчёт автотестов содержит «%s»" % part.strip_edges())
+	check(not text.contains("Замеры (прогрев") and not text.contains("Рекомендации"), "без таблиц замеров")
+	check(UiScale.level() == UiScale.LARGE, "размер интерфейса игрока вернулся")
+
+
+## settings.cfg — как до теста (user:// общий у тестов одной задачи CI).
+func _restore_settings_file() -> void:
+	if _had_settings:
+		var f := FileAccess.open(Quality.PATH, FileAccess.WRITE)
+		f.store_string(_settings_orig)
+		f.close()
+	elif FileAccess.file_exists(Quality.PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(Quality.PATH))
+	Quality.reload()
+	UiScale.reload()
+	Util.refresh_theme()
