@@ -13,13 +13,16 @@ extends RefCounted
 ## set_option, spawn, clear_spawned, set_job, set_level, set_look, learn_all, add_pet, player(), check(cond, текст),
 ## note(текст), shot(имя), main. Бот сам следит за температурой (паузы на остывание, остановка) и за лимитом времени.
 ## Новый режим: файл bot/bot_scenario_<id>.gd (extends BotScenario) и строка в MODES с "ready": true.
+## Игровые режимы «Быстрый», «Полный», «По разделам» — BotScenarioGame (bot/bot_scenario_game.gd) из разделов
+## BotSection (bot/bot_section.gd, bot/section_<id>.gd); minutes — лимит активного времени (у «По разделам» — по
+## оценке выбранных разделов, BotScenarioGame.estimate).
 
 ## Режимы вкладки «Тест-бот»: id, название, готов ли, сценарий, лимит активного времени (мин).
 const MODES := [
 	{"id": "perf", "name": "Производительность", "ready": true, "script": "res://bot/bot_scenario_perf.gd", "minutes": 12},
-	{"id": "quick", "name": "Быстрый (5 мин)", "ready": false, "script": "", "minutes": 5},
-	{"id": "full", "name": "Полный (10 мин)", "ready": false, "script": "", "minutes": 10},
-	{"id": "sections", "name": "По разделам", "ready": false, "script": "", "minutes": 10},
+	{"id": "quick", "name": "Быстрый (5 мин)", "ready": true, "script": "res://bot/bot_scenario_quick.gd", "minutes": 6},
+	{"id": "full", "name": "Полный (10 мин)", "ready": true, "script": "res://bot/bot_scenario_full.gd", "minutes": 12},
+	{"id": "sections", "name": "По разделам", "ready": true, "script": "res://bot/bot_scenario_sections.gd", "minutes": 10},
 ]
 
 

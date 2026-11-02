@@ -18,6 +18,11 @@ extends Node
 ## шаги идут по порядку со своим временем (время игры, паузы не в счёт); «measure» — прогрев warmup с, затем замер
 ## (BotMetrics: к/с, кадр, процентили, вызовы, треугольники, память; температура до и после; снимок экрана JPG).
 ## Проверки check(cond, текст) и журнал note(текст) — в отчёт.
+## Разделы (этап 4, игровые сценарии — BotSection): шаг section(id, название) открывает раздел — прежний закрывается
+## (время), состояние между разделами возвращается (_reset_between_sections: окна закрыты, звери бота убраны, цель,
+## джойстик, каст, бессмертие, HP/MP, камера), в лог Godot — строка-метка «===== Раздел «…» — начало» (ошибки лога
+## в отчёте разносятся по разделам), проверки и снимки считаются по разделу (sections). Остановка посреди раздела —
+## раздел «прерван», следующие — «не начат».
 ##
 ## Перегрев (условие Максима «бот не должен перегреть телефон»): авто-снижение ThermalGuard на время теста
 ## выключено (ThermalGuard.suspended — иначе оно испортит замер), бот сам раз в poll с читает статус температуры
@@ -103,6 +108,8 @@ var battery_source: Callable
 var frame_guard := true
 ## Нет картинки кадра (headless) — снимок-заглушка (тест: zip со снимками).
 var placeholder_shots := false
+## Множитель пауз wait() (тест: короче), 1 — как в сценарии.
+var time_scale := 1.0
 
 ## Отчёт: строки замеров, журнал, проверки, паузы, снимки, устройство, температура в начале и в конце.
 var rows: Array[Dictionary] = []
@@ -127,6 +134,10 @@ var steps_total := 0
 var measures_total := 0
 ## Отметка в логе Godot (хвост лога в отчёте — с неё).
 var log_mark := ""
+## Разделы: {id, title, start (активное время), sec, checks, errors, shots, state "идёт" / "готово" / "прерван" /
+## "не начат"}; cur_section — индекс открытого (−1 — нет).
+var sections: Array[Dictionary] = []
+var cur_section := -1
 
 var overlay: BotOverlay
 var _home: Dictionary = {}
@@ -166,7 +177,7 @@ func _init() -> void:
 
 ## Запустить режим mode_id (BotScenario.MODES) из мира main_node. "" — запущен, иначе причина.
 ## opts (тесты): scenario (свой BotScenario), storage, report_dir, warmup, poll, cool_min, cool_max, cool_total, limit,
-## status_source, headroom_source, battery_source, frame_guard.
+## status_source, headroom_source, battery_source, frame_guard, time_scale.
 static func start(main_node: Node, mode_id: String, opts: Dictionary = {}) -> String:
 	if not AdminPanel.enabled():
 		return "Тест-бот доступен только администратору"
@@ -205,6 +216,7 @@ static func start(main_node: Node, mode_id: String, opts: Dictionary = {}) -> St
 	bot.battery_source = opts.get("battery_source", Callable())
 	if opts.has("frame_guard"):
 		bot.frame_guard = bool(opts["frame_guard"])
+	bot.time_scale = float(opts.get("time_scale", 1.0))
 	bot.main = main_node
 	main_node.get_tree().root.add_child(bot)
 	bot._begin()
@@ -344,6 +356,9 @@ func _return_home() -> void:
 	ThermalGuard.suspended = false
 	Quality.reload()
 	Quality.set_throttle(0)
+	# Размер интерфейса — как у игрока (раздел «Интерфейс» меняет его без записи)
+	UiScale.reload()
+	UiScale.set_level(UiScale.level(), false)
 	_remove_marker()
 	state = "home"
 	_wait_t = 0.0
@@ -401,7 +416,7 @@ func _tick_running(dt: float, fdt: float) -> void:
 	if state != "running":
 		return
 	if active_time >= limit:
-		stop("Лимит времени режима (%s): сделано замеров %d из %d" % [clock(limit), rows.size(), measures_total], "limit")
+		stop("Лимит времени режима (%s): %s" % [clock(limit), progress_text()], "limit")
 		return
 	if total_time >= limit + HARD_EXTRA:
 		stop("Общий лимит времени (%s)" % clock(limit + HARD_EXTRA), "limit")
@@ -452,7 +467,7 @@ func step_name() -> String:
 
 func _run_step(dt: float, fdt: float) -> void:
 	if _si >= _steps.size():
-		_finish("done", "готово: замеров %d из %d" % [rows.size(), measures_total])
+		_finish("done", "готово: " + progress_text())
 		return
 	var s: Dictionary = _steps[_si]
 	_t += dt
@@ -477,6 +492,24 @@ func _run_step(dt: float, fdt: float) -> void:
 			_next()
 		"measure":
 			_measure(s, fdt)
+		"section":
+			_open_section(String(s["id"]), String(s["name"]))
+			_next()
+
+
+## Что сделано: замеры (режим «Производительность») или разделы и проверки (игровые сценарии).
+func progress_text() -> String:
+	if measures_total > 0 or sections.is_empty():
+		return "замеров %d из %d" % [rows.size(), measures_total]
+	var done := 0
+	for sd in sections:
+		if String(sd["state"]) == "готово":
+			done += 1
+	var errs := 0
+	for c in checks:
+		if not bool(c["ok"]):
+			errs += 1
+	return "разделов %d из %d, проверок %d, ошибок %d" % [done, sections.size(), checks.size(), errs]
 
 
 func _next() -> void:
@@ -683,6 +716,7 @@ func _finish(kind: String, text: String) -> void:
 		_end_cooling()
 	get_tree().paused = false
 	get_tree().root.disable_3d = false
+	_close_section("готово" if kind == "done" else "прерван")
 	clear_spawned()
 	temp_end = read_temps(true)
 	var errors := 0
@@ -704,7 +738,7 @@ func do(step_title: String, fn: Callable) -> void:
 
 
 func wait(sec: float) -> void:
-	_steps.append({"kind": "wait", "name": "пауза %.0f с" % sec, "sec": sec})
+	_steps.append({"kind": "wait", "name": "пауза %.1f с" % sec, "sec": sec * time_scale})
 
 
 func wait_until(step_title: String, cond: Callable, timeout: float) -> void:
@@ -714,6 +748,13 @@ func wait_until(step_title: String, cond: Callable, timeout: float) -> void:
 ## Вызывать fn(dt) каждый кадр (до следующего tick); Callable() — перестать.
 func tick(fn: Callable) -> void:
 	_steps.append({"kind": "tick", "name": "каждый кадр", "fn": fn})
+
+
+## Начало раздела sec_id (BotSection): прежний раздел закрывается, состояние между разделами возвращается.
+func section(sec_id: String, sec_title: String) -> void:
+	_steps.append({"kind": "section", "name": sec_title, "id": sec_id})
+	sections.append({"id": sec_id, "title": sec_title, "start": 0.0, "sec": 0.0, "checks": 0, "errors": 0, "shots": 0,
+		"state": "не начат"})
 
 
 ## Замер sec с после прогрева warmup. opts: preset (Quality.LOW…ULTRA), option [ключ, значение] — графика перед
@@ -735,10 +776,86 @@ func player() -> Player:
 
 
 func check(ok: bool, text: String) -> bool:
-	checks.append({"ok": ok, "text": text, "at": active_time})
+	var sec := ""
+	if cur_section >= 0:
+		var sd: Dictionary = sections[cur_section]
+		sec = String(sd["title"])
+		sd["checks"] = int(sd["checks"]) + 1
+		if not ok:
+			sd["errors"] = int(sd["errors"]) + 1
+	checks.append({"ok": ok, "text": text, "at": active_time, "section": sec})
 	if not ok:
-		note("ОШИБКА: " + text)
+		note("ОШИБКА%s: %s" % [" [%s]" % sec if sec != "" else "", text])
 	return ok
+
+
+## Открытый раздел (пусто — нет).
+func section_title() -> String:
+	return String(sections[cur_section]["title"]) if cur_section >= 0 else ""
+
+
+## Открыть раздел (шаг section): запись — первая «не начат» с этим id.
+func _open_section(sec_id: String, sec_title: String) -> void:
+	_close_section("готово")
+	var idx := -1
+	for i in sections.size():
+		if String(sections[i]["id"]) == sec_id and String(sections[i]["state"]) == "не начат":
+			idx = i
+			break
+	if idx < 0:
+		sections.append({"id": sec_id, "title": sec_title, "checks": 0, "errors": 0, "shots": 0})
+		idx = sections.size() - 1
+	var sd: Dictionary = sections[idx]
+	sd["start"] = active_time
+	sd["sec"] = 0.0
+	sd["state"] = "идёт"
+	cur_section = idx
+	_reset_between_sections()
+	print("TestBot: ===== Раздел «%s» — начало (%s) =====" % [sec_title, clock(active_time)])
+	note("Раздел «%s»" % sec_title)
+
+
+## Закрыть открытый раздел: время, состояние ("готово" / "прерван"), метка в лог.
+func _close_section(how: String) -> void:
+	if cur_section < 0:
+		return
+	var sd: Dictionary = sections[cur_section]
+	sd["sec"] = active_time - float(sd.get("start", 0.0))
+	sd["state"] = how
+	print("TestBot: ===== Раздел «%s» — конец: %s, %s, проверок %d, ошибок %d =====" % [String(sd["title"]), how,
+		clock(float(sd["sec"])), int(sd["checks"]), int(sd["errors"])])
+	cur_section = -1
+
+
+## Между разделами: окна закрыты, звери бота убраны, цель и джойстик сброшены, каст прерван, бессмертие, обычная
+## скорость, HP/MP полные, камера по умолчанию, приручение и крафт — без подстановок.
+func _reset_between_sections() -> void:
+	_tick_fn = Callable()
+	clear_spawned()
+	AdminPanel.god = true
+	AdminPanel.speed_mult = 1
+	if main == null or not is_instance_valid(main):
+		return
+	var hud := main.get("hud") as HUD
+	if hud != null:
+		hud.close_window()
+		hud.move_vec = Vector2.ZERO
+	var tm := main.get("taming") as Taming
+	if tm != null:
+		tm.force_roll = -1.0
+	var eco := main.get("economy") as Economy
+	if eco != null:
+		eco.craft_rng = null
+	var p := player()
+	if p != null and is_instance_valid(p):
+		p.cancel_cast("")
+		p.select_target(null)
+		p.move_input = Vector2.ZERO
+		p.recalc_stats()
+		p.hp = p.max_hp
+		p.mp = p.max_mp
+		p.stats_changed.emit()
+	reset_camera()
 
 
 func note(text: String) -> void:
@@ -864,6 +981,8 @@ func shot(label: String) -> String:
 		note("Снимок «%s» не записан (ошибка %d)" % [label, err])
 		return ""
 	shots.append(fname)
+	if cur_section >= 0:
+		sections[cur_section]["shots"] = int(sections[cur_section]["shots"]) + 1
 	return fname
 
 

@@ -14,10 +14,15 @@ extends RefCounted
 ## настройки по одной против базы «Среднее», рекомендации (простые правила — recommendations), раздел сценария
 ## (BotScenario.report_lines), журнал, проверки, хвост лога Godot (user://logs/godot.log с отметки старта бота;
 ## файловый лог включён и на телефоне — project.godot debug/file_logging/enable_file_logging).
+## Игровые режимы (разделы TestBot.sections): строка «Разделов» в сводке, блок «Разделы» (итог, время, проверки,
+## ошибки, снимки, ошибки и предупреждения лога Godot — по меткам разделов в логе) и «Ошибки по разделам» (каждая
+## неудачная проверка с разделом), рекомендации — по ошибкам разделов.
 
 const TITLE := "Dark Pact — отчёт тест-бота"
 const LOG_FILE := "user://logs/godot.log"
 const LOG_LINES := 150
+## Строк ошибок лога на раздел в блоке «Разделы».
+const LOG_SECTION_LINES := 4
 const ZIP_MIME := "application/zip"
 const TXT_MIME := "text/plain"
 const KIND_TEXT := {"done": "готово", "limit": "остановлен по лимиту времени", "stopped": "остановлен вручную",
@@ -280,8 +285,12 @@ static func build_text(bot: TestBot) -> String:
 	var kind_text := String(KIND_TEXT.get(bot.result_kind, bot.result_kind))
 	var reason := bot.stop_reason
 	L.append("Итог: %s%s" % [kind_text, "" if reason == "" or reason.begins_with("готово") else " — " + reason])
-	L.append("Замеров: %d из %d · проверок: %d, ошибок: %d" % [bot.rows.size(), bot.measures_total, bot.checks.size(),
-		_errors(bot)])
+	if bot.measures_total == 0 and not bot.sections.is_empty():
+		L.append("Разделов: %d из %d · проверок: %d, ошибок: %d" % [_sections_done(bot), bot.sections.size(),
+			bot.checks.size(), _errors(bot)])
+	else:
+		L.append("Замеров: %d из %d · проверок: %d, ошибок: %d" % [bot.rows.size(), bot.measures_total, bot.checks.size(),
+			_errors(bot)])
 	L.append("Версия игры: %s · дата: %s" % [version(), bot.started_text])
 	L.append("Длительность: %s (сценарий %s, загрузка мира и паузы — остальное)" % [TestBot.clock(bot.total_time),
 		TestBot.clock(bot.active_time)])
@@ -295,6 +304,7 @@ static func build_text(bot: TestBot) -> String:
 				String(pd["reason"]), TestBot.clock(float(pd["sec"]))])
 	L.append("Графика игрока до теста: %s (после теста — вернулась)" % bot.player_quality)
 	L.append("")
+	_sections_block(bot, L)
 	L.append("Устройство")
 	var d := bot.device
 	L.append("  Модель: %s · %s" % [String(d.get("model", "?")), String(d.get("os", "?"))])
@@ -518,6 +528,8 @@ static func _heat(r: Dictionary) -> float:
 ## Рекомендации по простым правилам.
 static func recommendations(bot: TestBot) -> PackedStringArray:
 	var out := PackedStringArray()
+	if bot.rows.is_empty() and not bot.sections.is_empty():
+		return _section_advice(bot)
 	if bot.rows.is_empty():
 		out.append("Замеров нет — рекомендаций нет.")
 		return out
@@ -621,6 +633,128 @@ static func recommendations(bot: TestBot) -> PackedStringArray:
 	if bot.result_kind == "hot":
 		out.append("Тест остановлен перегревом: повторите на остывшем телефоне, без зарядки и чехла.")
 	return out
+
+
+# ---------- Разделы (игровые сценарии) ----------
+
+static func _sections_done(bot: TestBot) -> int:
+	var n := 0
+	for sd in bot.sections:
+		if String(sd["state"]) == "готово":
+			n += 1
+	return n
+
+
+## Блок «Разделы» и «Ошибки по разделам».
+static func _sections_block(bot: TestBot, L: PackedStringArray) -> void:
+	if bot.sections.is_empty():
+		return
+	var logs := log_by_section(bot.log_mark)
+	L.append("Разделы")
+	for v in bot.sections:
+		var sd: Dictionary = v
+		var t := String(sd["title"])
+		var lg: Dictionary = logs.get(t, {})
+		var head := "ок" if int(sd["errors"]) == 0 else "ошибок %d" % int(sd["errors"])
+		if String(sd["state"]) == "не начат":
+			head = "не начат"
+		elif String(sd["state"]) == "прерван":
+			head = "прерван, " + head
+		L.append("  %-16s %-22s %6s · проверок %3d · снимков %2d · лог: ошибок %d, предупреждений %d" % [t, head,
+			TestBot.clock(float(sd.get("sec", 0.0))), int(sd["checks"]), int(sd["shots"]), int(lg.get("errors", 0)),
+			int(lg.get("warnings", 0))])
+		for line in lg.get("lines", PackedStringArray()):
+			L.append("      лог: " + String(line).strip_edges().left(220))
+	L.append("")
+	if _errors(bot) == 0:
+		return
+	L.append("Ошибки по разделам")
+	for c in bot.checks:
+		var cd: Dictionary = c
+		if bool(cd["ok"]):
+			continue
+		var sec := String(cd.get("section", ""))
+		L.append("  [%s] %s (на %s)" % [sec if sec != "" else "без раздела", String(cd["text"]),
+			TestBot.clock(float(cd.get("at", 0.0)))])
+	L.append("")
+
+
+## Рекомендации игровых режимов: где ошибки, ошибки скриптов в логе, перегрев.
+static func _section_advice(bot: TestBot) -> PackedStringArray:
+	var out := PackedStringArray()
+	var bad := PackedStringArray()
+	for v in bot.sections:
+		var sd: Dictionary = v
+		if int(sd["errors"]) > 0:
+			bad.append("%s (%d)" % [String(sd["title"]), int(sd["errors"])])
+	if bad.is_empty():
+		out.append("Ошибок проверок нет.")
+	else:
+		out.append("Ошибки проверок в разделах: %s — подробности в «Ошибки по разделам»." % ", ".join(bad))
+	var logs := log_by_section(bot.log_mark)
+	var lbad := PackedStringArray()
+	for k in logs:
+		if int((logs[k] as Dictionary).get("errors", 0)) > 0:
+			lbad.append("%s (%d)" % [String(k), int((logs[k] as Dictionary)["errors"])])
+	if not lbad.is_empty():
+		out.append("Ошибки в логе Godot: %s — строки лога под разделом в «Разделы»." % ", ".join(lbad))
+	var skipped := 0
+	for v in bot.sections:
+		if String((v as Dictionary)["state"]) != "готово":
+			skipped += 1
+	if skipped > 0:
+		out.append("Не закончено разделов: %d (%s) — повторите их режимом «По разделам»." % [skipped,
+			String(KIND_TEXT.get(bot.result_kind, bot.result_kind))])
+	if not bot.pauses.is_empty():
+		out.append("Телефон уходил на остывание %d раз — бот ждал, проверки не пострадали." % bot.pauses.size())
+	if bot.result_kind == "hot":
+		out.append("Тест остановлен перегревом: повторите на остывшем телефоне, без зарядки и чехла.")
+	return out
+
+
+## Ошибки и предупреждения лога Godot по разделам (метки «===== Раздел «…» — начало» в логе с отметки mark):
+## {название раздела: {errors, warnings, lines — первые LOG_SECTION_LINES строк ошибок}}.
+static func log_by_section(mark: String) -> Dictionary:
+	var res: Dictionary = {}
+	var path := LOG_FILE
+	var lp := String(ProjectSettings.get_setting("debug/file_logging/log_path", ""))
+	if lp != "":
+		path = lp
+	if mark == "" or not FileAccess.file_exists(path):
+		return res
+	var all := FileAccess.get_file_as_string(path).split("\n")
+	var start := -1
+	for i in range(all.size() - 1, -1, -1):
+		if all[i].contains(mark):
+			start = i
+			break
+	if start < 0:
+		return res
+	var re := RegEx.create_from_string("===== Раздел «(.+?)» — (начало|конец)")
+	var cur := ""
+	for i in range(start, all.size()):
+		var line := all[i]
+		var m := re.search(line)
+		if m != null:
+			cur = m.get_string(1) if m.get_string(2) == "начало" else ""
+			continue
+		if cur == "":
+			continue
+		var is_err := line.contains("ERROR")
+		if not is_err and not line.contains("WARNING"):
+			continue
+		if not res.has(cur):
+			res[cur] = {"errors": 0, "warnings": 0, "lines": PackedStringArray()}
+		var d: Dictionary = res[cur]
+		if is_err:
+			d["errors"] = int(d["errors"]) + 1
+			var ls: PackedStringArray = d["lines"]
+			if ls.size() < LOG_SECTION_LINES:
+				ls.append(line)
+				d["lines"] = ls
+		else:
+			d["warnings"] = int(d["warnings"]) + 1
+	return res
 
 
 # ---------- Лог Godot ----------

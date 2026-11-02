@@ -27,7 +27,8 @@ extends RefCounted
 ##     любого вида MobData уровня N в 5 м перед героем (свой зверь, slot −1 — не возрождается); скорость бега героя
 ##     ×1/×2/×3 (только на эту игру); перенос в точку — постройки и места острова и зоны зверей из
 ##     world/training_island.json (свободная ровная точка рядом; деревни и город — точки старта рас).
-##   «Тест-бот» (TestBot, папка bot/): режим (сейчас «Производительность»; «Быстрый», «Полный», «По разделам» — скоро),
+##   «Тест-бот» (TestBot, папка bot/): режим («Производительность», «Быстрый», «Полный», «По разделам» — с выбором
+##     разделов переключателями, выбор запоминается),
 ##     «Начать» (бот играет отдельным тестовым героем в своём хранилище — сохранения игрока не трогает; по окончании
 ##     игрок возвращается в свой аккаунт и слот), «Стоп», состояние, «Открыть отчёт», «Поделиться».
 ## Выключить панель — ADMIN_TOOLS = false (кнопка в «Настройках» пропадёт, множитель опыта из сохранения — ×1).
@@ -45,8 +46,8 @@ extends RefCounted
 ##     "pet_revive", "pets_clear", "pets_clear_yes", "pets_clear_no";
 ##   «Мир»: "kill_target", "kill_around", "respawn_all", "mob_lvl_minus5", "mob_lvl_minus", "mob_lvl_plus",
 ##     "mob_lvl_plus5", "mob_lvl_hero", "spawn_<вид>", "speed_<1|2|3>", "tp_poi_<id>", "tp_zone_<id>" (teleports());
-##   «Тест-бот»: "bot_mode_<id>" (BotScenario.MODES; «скоро» — недоступны), "bot_start", "bot_stop", "bot_open",
-##     "bot_share".
+##   «Тест-бот»: "bot_mode_<id>" (BotScenario.MODES; «скоро» — недоступны), "bot_sec_<раздел>" (режим «По разделам»:
+##     переключатели разделов BotSection.SECTIONS), "bot_start", "bot_stop", "bot_open", "bot_share".
 
 const ADMIN_TOOLS := true
 ## Размер окна для «Среднего» размера интерфейса.
@@ -900,7 +901,9 @@ static func _flat_dist(a: Vector3, b: Vector3) -> float:
 
 static func _build_bot(main: Node, body: VBoxContainer) -> void:
 	body.add_child(_text("Бот сам играет отдельным тестовым героем в своём хранилище (ваш герой и сохранения не "
-		+ "меняются), меряет кадры, вызовы, треугольники и температуру, снимает экран и пишет отчёт: "
+		+ "меняются): «Производительность» меряет кадры, вызовы, треугольники и температуру, «Быстрый», «Полный» и "
+		+ "«По разделам» играют — бой и умения всех профессий, питомцы, приручение, торговля, склад, задания, "
+		+ "экипировка, мир, интерфейс — и проверяют; снимает экран и пишет отчёт: "
 		+ "Загрузки/DarkPact_test (архив .zip и .txt). По окончании вы вернётесь к своему герою. При нагреве бот "
 		+ "сам уходит на паузу «остывание», при сильном — останавливается.", UiScale.FONT_SMALL, MUTED))
 	_head(body, "Режим")
@@ -910,18 +913,22 @@ static func _build_bot(main: Node, body: VBoxContainer) -> void:
 		var mid := String(md["id"])
 		var avail := bool(md.get("ready", false))
 		var label := String(md["name"])
-		if avail:
+		if avail and mid == "sections":
+			label += " — выбор ниже"
+		elif avail:
 			label += " — до %d мин" % int(md.get("minutes", 12))
 		else:
 			label += " — скоро"
 		_choice(g, "bot_mode_" + mid, label, mid == bot_mode, func() -> void: AdminPanel.set_bot_mode(main, mid))
 		(buttons["bot_mode_" + mid] as Button).disabled = not avail
+	if bot_mode == "sections":
+		_build_bot_sections(main, body)
 	var running := TestBot.is_running()
 	_head(body, "Состояние: " + TestBot.status_text())
 	var r := _row(body)
 	_btn(r, "bot_start", "Начать", func() -> void: AdminPanel.bot_start(main), 140.0)
 	_btn(r, "bot_stop", "Стоп", func() -> void: AdminPanel.bot_stop(main), 140.0)
-	(buttons["bot_start"] as Button).disabled = running
+	(buttons["bot_start"] as Button).disabled = running or (bot_mode == "sections" and BotScenarioGame.chosen().is_empty())
 	(buttons["bot_stop"] as Button).disabled = not running
 	var last := TestBot.last_result()
 	_head(body, "Последний отчёт")
@@ -937,6 +944,24 @@ static func _build_bot(main: Node, body: VBoxContainer) -> void:
 	_btn(r2, "bot_share", "Поделиться", func() -> void: AdminPanel.bot_report(main, true), 160.0)
 	(buttons["bot_open"] as Button).disabled = last.is_empty()
 	(buttons["bot_share"] as Button).disabled = last.is_empty()
+
+
+## «По разделам»: разделы переключателями (выбор хранится — BotScenarioGame.chosen), оценка времени.
+static func _build_bot_sections(main: Node, body: VBoxContainer) -> void:
+	var cur := BotScenarioGame.chosen()
+	_head(body, "Разделы (выбрано %d, примерно %s)" % [cur.size(), TestBot.clock(BotScenarioGame.estimate(cur))])
+	var g := _grid(body, 3)
+	for e in BotSection.SECTIONS:
+		var sd: Dictionary = e
+		var sid := String(sd["id"])
+		_choice(g, "bot_sec_" + sid, "%s · %s" % [String(sd["name"]), TestBot.clock(float(sd.get("full", 30)))], cur.has(sid),
+			func() -> void: AdminPanel.toggle_bot_section(main, sid))
+
+
+static func toggle_bot_section(main: Node, sec_id: String) -> void:
+	BotScenarioGame.toggle_chosen(sec_id)
+	if is_open(main):
+		open(main)
 
 
 static func set_bot_mode(main: Node, mode_id: String) -> void:

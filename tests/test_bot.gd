@@ -227,8 +227,9 @@ func _check_admin_only() -> void:
 			"bot_mode_sections"]:
 		check(AdminPanel.buttons.has(k), "кнопка %s" % k)
 	check(not (AdminPanel.buttons["bot_mode_perf"] as Button).disabled, "режим «Производительность» доступен")
-	check((AdminPanel.buttons["bot_mode_quick"] as Button).disabled and (AdminPanel.buttons["bot_mode_full"] as Button).disabled,
-		"«Быстрый» и «Полный» — скоро")
+	check(not (AdminPanel.buttons["bot_mode_quick"] as Button).disabled
+		and not (AdminPanel.buttons["bot_mode_full"] as Button).disabled
+		and not (AdminPanel.buttons["bot_mode_sections"] as Button).disabled, "«Быстрый», «Полный», «По разделам» доступны")
 	check((AdminPanel.buttons["bot_stop"] as Button).disabled, "«Стоп» недоступна, пока бот не идёт")
 	main.hud.close_window()
 	# Другой логин: ни панели, ни запуска
@@ -238,7 +239,8 @@ func _check_admin_only() -> void:
 	check(not main.hud.is_window_open(), "у логина Igrok вкладка «Тест-бот» не открывается")
 	check(TestBot.start(main, "perf") != "" and not TestBot.is_running(), "у логина Igrok бот не запускается")
 	Accounts.current = "Dedok_max"
-	check(BotScenario.create("perf") != null and BotScenario.create("quick") == null, "сценарии: perf есть, quick — скоро")
+	check(BotScenario.create("perf") != null and BotScenario.create("quick") != null and BotScenario.create("full") != null
+		and BotScenario.create("sections") != null and BotScenario.create("nope") == null, "сценарии: perf, quick, full, sections")
 	check(BotScenario.create("perf").limit() == 720.0, "лимит «Производительности» — 12 мин")
 
 
