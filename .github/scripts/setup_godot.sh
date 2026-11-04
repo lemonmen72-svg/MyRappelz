@@ -13,7 +13,14 @@ if [ ! -f "$BIN" ]; then
 	unzip -q -o godot.zip
 	rm godot.zip
 fi
-sudo ln -sf "$DL/$BIN" /usr/local/bin/godot
+# godot — в своей папке bin и в PATH следующих шагов (GITHUB_PATH): без sudo, чтобы работало и на ноутбуке
+# (self-hosted исполнитель, tools/laptop/), где sudo спросил бы пароль
+mkdir -p "$DL/bin"
+ln -sf "$DL/$BIN" "$DL/bin/godot"
+export PATH="$DL/bin:$PATH"
+if [ -n "${GITHUB_PATH:-}" ]; then
+	echo "$DL/bin" >> "$GITHUB_PATH"
+fi
 godot --version
 
 if [ "${1:-}" = "android" ]; then
