@@ -93,8 +93,12 @@ func _compare(bot: TestBot) -> void:
 		bot.check((rd["xp_mismatch"] as Array).is_empty(), "Кардинал «%s»: опыт за каждое убийство = формула игры%s" % [
 			rd["title"], "" if (rd["xp_mismatch"] as Array).is_empty() else ": " + "; ".join(
 			PackedStringArray((rd["xp_mismatch"] as Array).slice(0, 5)))])
-	bot.check(float(b["speedup"]) > float(a["speedup"]), "Кардинал: ускоренный быстрее (×%.2f против ×%.2f)" % [
-		float(b["speedup"]), float(a["speedup"])])
+	# Скорость сравнима только с настоящим рендером (на телефоне): headless с --fixed-fps считает кадры без отрисовки
+	var speed_txt := "Кардинал: ускоренный быстрее (×%.2f против ×%.2f)" % [float(b["speedup"]), float(a["speedup"])]
+	if DisplayServer.get_name() == "headless":
+		bot.note(speed_txt + " — без рендера (headless) не сравнивается")
+	else:
+		bot.check(float(b["speedup"]) > float(a["speedup"]), speed_txt)
 	var data := {"version": 1, "game_version": str(ProjectSettings.get_setting("application/config/version", "dev")),
 		"scenario": id(), "seed": seed_value, "game_limit": game_limit, "runs": [a, b], "compare": _diff(a, b)}
 	var dir := bot.run_dir if bot.run_dir != "" else bot.report_dir

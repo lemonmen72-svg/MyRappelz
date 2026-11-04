@@ -40,6 +40,11 @@ var kills: Array[Dictionary] = []
 var deaths := 0
 var damage_taken := 0
 var xp_mismatch: Array[String] = []
+## Диагностика: целей выбрано, брошено, ударов по цели, «не нашёл цель» (кадров)
+var picks := 0
+var abandoned := 0
+var swings := 0
+var idle_frames := 0
 var start := {}
 var finish := {}
 
@@ -128,7 +133,10 @@ func tick(dt: float) -> void:
 			_stop_move(h)
 			_target = _pick_target(p)
 			if _target != null:
+				picks += 1
 				_go("approach")
+			else:
+				idle_frames += 1
 		"approach":
 			if not _alive(_target):
 				_go("seek")
@@ -143,6 +151,7 @@ func tick(dt: float) -> void:
 				_go("fight")
 			elif _state_t > float(profile["approach_limit"]):
 				bot.note("Кардинал: не дошёл до «%s» за %.0f с — цель брошена" % [_target.type_id, _state_t])
+				abandoned += 1
 				_target = null
 				_go("seek")
 			else:
@@ -158,9 +167,11 @@ func tick(dt: float) -> void:
 				_stop_move(h)
 				if p.current_target != _target:
 					p.select_target(_target)
-				p.try_attack()  # удержание «Атаки» (main._process)
+				if p.try_attack():  # удержание «Атаки» (main._process)
+					swings += 1
 			if _state_t > float(profile["fight_limit"]):
 				bot.note("Кардинал: бой с «%s» дольше %.0f с — брошен" % [_target.type_id, _state_t])
+				abandoned += 1
 				_target = null
 				_go("seek")
 		"loot":
@@ -277,6 +288,18 @@ func _end(reason: String) -> void:
 	Engine.max_fps = int(_saved.get("fps", 0))
 	bot.get_viewport().disable_3d = bool(_saved.get("no3d", false))
 	finish = _snapshot()
+	# Где закончил: состояние, цель, звери рядом (для разбора прогонов без убийств)
+	var near := 0
+	for n in bot.get_tree().get_nodes_in_group("mobs"):
+		var m := n as Mob
+		if _alive(m) and p != null and _flat(m.global_position, _center) <= _radius:
+			near += 1
+	bot.note("Кардинал «%s»: конец в состоянии «%s» (%.1f с), целей %d, брошено %d, ударов %d, кадров без цели %d, живых зверей в зоне %d%s%s" % [
+		title, state, _state_t, picks, abandoned, swings, idle_frames, near,
+		(", герой у (%.0f, %.0f), до центра %.0f м" % [p.global_position.x, p.global_position.z,
+			_flat(p.global_position, _center)]) if p != null else "",
+		(", цель %s %d ур. в %.1f м" % [_target.type_id, _target.level, _flat(_target.global_position, p.global_position)])
+			if _alive(_target) and p != null else ""])
 	bot.note("Кардинал «%s» закончен: %s — игровое время %s, настоящее %s, убийств %d, смертей %d" % [title, reason,
 		TestBot.clock(game_t), TestBot.clock(wall_sec()), kills.size(), deaths])
 
@@ -298,6 +321,7 @@ func result() -> Dictionary:
 		"gold": int(finish.get("gold", 0)) - int(start.get("gold", 0)),
 		"ttk_avg": snappedf(ttk / maxf(float(kills.size()), 1.0), 0.01),
 		"time_split": t_split, "xp_mismatch": xp_mismatch, "kill_log": kills,
+		"diag": {"picks": picks, "abandoned": abandoned, "swings": swings, "idle_frames": idle_frames, "end_state": state},
 	}
 
 
