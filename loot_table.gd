@@ -209,8 +209,11 @@ static func roll(type_id: String, lvl: int, dungeon: bool = false, rng: RandomNu
 	return res
 
 
-## Золото за зверя: случайное в MobData.gold_range.
+## Золото за зверя: с шансом MobData.GOLD_CHANCE (80 %, как в оригинале) — случайное в MobData.gold_range, иначе 0.
 static func gold(type_id: String, lvl: int, rng: RandomNumberGenerator = null) -> int:
+	var roll := rng.randf() if rng != null else randf()
+	if roll >= MobData.GOLD_CHANCE:
+		return 0
 	var g: Array = MobData.gold_range(type_id, lvl)
 	var lo := int(g[0])
 	var hi := maxi(lo, int(g[1]))

@@ -267,22 +267,30 @@ static func respawn_time(id: String) -> float:
 	return float(get_type(id).get("respawn", RESPAWN_TIME))
 
 
-## Золото за зверя уровня lvl: [мин., макс.] (правило Максима — немного, ± цена материала): средняя цена продажи
-## материалов (у босса — особого материала, если он дороже) × 0.8…1.2 и мягкий рост с уровнем ((lvl + 4) / (база + 4),
-## 0.75…1.5). Нет материалов — прежняя вилка gold вида.
-## Множитель золота за зверя (решение Максима: «количество выпадаемых денег увеличь в 4 раза» — впереди новые
-## товары и механики): вилка gold_range — цена материала × 0.8…1.2 × уровень × GOLD_MULT.
+## Золото за зверя — база оригинала (MonsterResource, решение Максима 04.11): обычный зверь уровня L — вилка
+## GOLD_MIN / GOLD_MAX (медиана обычных зверей уровня, 1–60, выше — как 60), × GOLD_MULT (решение Максима 01.11:
+## «количество выпадаемых денег увеличь в 4 раза»), × сила редкости MobData.power; мини-босс — ×GOLD_ELITE (элитный
+## зверь оригинала), босс — ×GOLD_BOSS (именной). Золото выпадает с шансом GOLD_CHANCE (80 %, как в оригинале).
 const GOLD_MULT := 4.0
+const GOLD_CHANCE := 0.8
+const GOLD_ELITE := 8.44
+const GOLD_BOSS := 7.5
+const GOLD_MIN := [4, 6, 8, 13, 13, 13, 14, 21, 21, 22, 22, 26, 26, 26, 26, 27, 29, 30, 31, 33, 34, 35, 37, 38, 39, 41, 42,
+	43, 44, 46, 47, 49, 50, 52, 53, 54, 56, 57, 58, 59, 61, 62, 63, 64, 65, 66, 68, 69, 70, 95, 95, 95, 95, 95, 95, 95, 95, 95,
+	95, 95]
+const GOLD_MAX := [7, 10, 13, 21, 22, 22, 24, 35, 35, 37, 37, 42, 42, 42, 43, 46, 48, 50, 52, 54, 57, 59, 61, 63, 65, 68, 70,
+	72, 74, 76, 79, 82, 84, 86, 88, 91, 93, 95, 97, 99, 101, 103, 105, 107, 109, 111, 113, 114, 116, 158, 158, 158, 158, 158,
+	158, 158, 158, 158, 158, 158]
 
 
 static func gold_range(id: String, lvl: int) -> Array:
-	var d := get_type(id)
-	var k := clampf(float(maxi(1, lvl) + 4) / float(int(d["level"]) + 4), 0.75, 1.5) * GOLD_MULT
-	var base := maxf(_avg_sell(materials(id)), _avg_sell(special_materials(id)))
-	if base <= 0.0:
-		var g: Array = d["gold"]
-		return [maxi(1, roundi(float(g[0]) * k)), maxi(1, roundi(float(g[1]) * k))]
-	return [maxi(1, roundi(base * 0.8 * k)), maxi(1, roundi(base * 1.2 * k))]
+	var i := clampi(lvl, 1, GOLD_MIN.size()) - 1
+	var k := GOLD_MULT * power(id)
+	if is_boss(id):
+		k *= GOLD_BOSS
+	elif is_mini_boss(id):
+		k *= GOLD_ELITE
+	return [maxi(1, roundi(float(GOLD_MIN[i]) * k)), maxi(1, roundi(float(GOLD_MAX[i]) * k))]
 
 
 static func _avg_sell(ids: Array) -> float:

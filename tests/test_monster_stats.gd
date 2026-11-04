@@ -302,7 +302,7 @@ func _unit_bosses() -> void:
 			"%s: 4 предмета, среди категорий — особый материал" % id)
 		var g: Array = MobData.gold_range(id, lvl)
 		var ng: Array = MobData.gold_range(sp, lvl)
-		check(int(g[0]) > int(ng[1]), "%s: золота больше (%d–%d против %d–%d)" % [id, int(g[0]), int(g[1]), int(ng[0]), int(ng[1])])
+		check(int(g[0]) >= int(ng[0]) and int(g[1]) >= int(ng[1]), "%s: золота не меньше (%d–%d против %d–%d)" % [id, int(g[0]), int(g[1]), int(ng[0]), int(ng[1])])
 		b.free()
 		n.free()
 	game.level = 1

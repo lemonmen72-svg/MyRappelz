@@ -58,8 +58,8 @@ func run_step() -> void:
 					n += int(d.items[k])
 				check(n == LootTable.item_count(tid), "%s: %d предмета (%s)" % [tid, n, LootDrop.describe(d.items, d.gold)])
 				var gr: Array = MobData.gold_range(tid, int(MobData.get_type(tid)["level"]))
-				check(d.gold > 0 and d.gold >= int(gr[0]) and d.gold <= int(gr[1]),
-					"%s: золото есть всегда, ± цена материала: %d (%d–%d)" % [tid, d.gold, int(gr[0]), int(gr[1])])
+				check(d.gold == 0 or (d.gold >= int(gr[0]) and d.gold <= int(gr[1])),
+					"%s: золото (80 %%) в вилке базы ×4: %d (%d–%d)" % [tid, d.gold, int(gr[0]), int(gr[1])])
 				# Подбор: золото — в кошелёк, предметы — в сумку
 				var g0: int = game.gold
 				var got_gold := d.gold
@@ -107,23 +107,23 @@ func _unit_gold() -> void:
 		var id := String(k)
 		var lvl := int(MobData.get_type(id)["level"])
 		var gr: Array = MobData.gold_range(id, lvl)
-		var mats := MobData.special_materials(id) if MobData.is_boss(id) else MobData.materials(id)
-		check(not mats.is_empty(), "%s: есть материал" % id)
-		var price := 0.0
-		for m in mats:
-			price += float(ItemData.get_item(String(m))["sell"])
-		price /= maxf(1.0, float(mats.size()))
-		price *= MobData.GOLD_MULT
-		# На базовом уровне вида золото ≈ цене материала: ±20 %
-		check(int(gr[0]) >= 1 and float(gr[0]) <= price * 0.8 + 1.0 and float(gr[1]) >= price * 1.2 - 1.0
-			and float(gr[1]) <= price * 1.2 + 1.0, "%s: золото %d–%d при цене материала %.0f" % [id, int(gr[0]), int(gr[1]), price])
+		check(int(gr[0]) >= 1 and int(gr[1]) > int(gr[0]), "%s: вилка золота %d–%d" % [id, int(gr[0]), int(gr[1])])
 		for i in 20:
 			var g := LootTable.gold(id, lvl, rng)
-			check(g >= int(gr[0]) and g <= int(gr[1]), "%s: золото %d в пределах %d–%d" % [id, g, int(gr[0]), int(gr[1])])
-	# С уровнем — немного больше, но не больше чем в 1.5 раза
+			check(g == 0 or (g >= int(gr[0]) and g <= int(gr[1])), "%s: золото %d — 0 или в пределах %d–%d" % [id, g, int(gr[0]), int(gr[1])])
+	# База оригинала ×4: фазан 1 ур. — 4–7 → 16–28, 20 ур. — 33–54 → 132–216
+	var p1: Array = MobData.gold_range("pheasant", 1)
+	var p20: Array = MobData.gold_range("pheasant", 20)
+	check(p1 == [16, 28] and p20 == [132, 216], "золото фазана — база оригинала ×4: %s, %s" % [p1, p20])
+	# Шанс золота — 80 %
+	var zero := 0
+	for i in 2000:
+		if LootTable.gold("pheasant", 10, rng) == 0:
+			zero += 1
+	check(zero >= 330 and zero <= 470, "без золота %d из 2000 (шанс золота 80 %%)" % zero)
 	var lo: Array = MobData.gold_range("wolf", 3)
 	var hi: Array = MobData.gold_range("wolf", 30)
-	check(int(hi[1]) > int(lo[1]) and float(hi[1]) <= float(lo[1]) * 1.5 + MobData.GOLD_MULT, "золото волка растёт с уровнем мягко: %s → %s" % [lo, hi])
+	check(int(hi[1]) > int(lo[1]), "золото волка растёт с уровнем: %s → %s" % [lo, hi])
 
 
 # ---------- Ранги ----------

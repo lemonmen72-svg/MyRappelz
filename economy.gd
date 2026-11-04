@@ -101,7 +101,7 @@ func handle_action(id: String) -> bool:
 	return false
 
 
-## Зверь убит: мешочек на землю — золото (всегда) и предметы (LootTable.roll: 2 / 3 / 4 по типу зверя).
+## Зверь убит: мешочек на землю — золото (с шансом 80 %, LootTable.gold) и предметы (LootTable.roll: 2 / 3 / 4 по типу зверя).
 func on_mob_killed(mob: Mob) -> void:
 	var g := LootTable.gold(mob.type_id, mob.level)
 	var loot := roll_loot(mob.type_id, mob.level, dungeon)
