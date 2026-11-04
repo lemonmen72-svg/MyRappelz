@@ -142,7 +142,7 @@ func _unit_values() -> void:
 	check(int(ItemData.get_item("weapon_sword_1h_r1+5")["sell"]) > int(ItemData.get_item("weapon_sword_1h_r1")["sell"])
 		and int(ItemData.get_item("weapon_sword_1h_r1+5")["sell"]) < Enchant.temper_price_at(1, 1),
 		"заточенное продаётся дороже, но много дешевле закалки")
-	check(ItemData.enchant_text("weapon_sword_1h_r1+10").contains("4 → 8"), "строка заточки: %s" % ItemData.enchant_text("weapon_sword_1h_r1+10"))
+	check(ItemData.enchant_text("weapon_sword_1h_r1+10").contains("27 → 54"), "строка заточки: %s" % ItemData.enchant_text("weapon_sword_1h_r1+10"))
 	var lines: PackedStringArray = []
 	for n in [1, 5, 10, 15, 20]:
 		lines.append("+%d: меч 2-го ранга %d → %d, доспех воина 1-го ранга %d → %d" % [int(n), 13,

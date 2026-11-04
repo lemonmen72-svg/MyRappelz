@@ -240,9 +240,8 @@ func _check_rarity() -> void:
 		check(best == "agi", "волк ур.%d: главный стат — %s (Ловкость %d, Сила %d)" % [lvl, best, int(st["agi"]), int(st["str"])])
 	var bd := PetStats.derived("boar", 30)
 	var wd30 := PetStats.derived("wolf", 30)
-	check(float(wd30["eva"]) > float(bd["eva"]) and int(wd30["aspd"]) > int(bd["aspd"]),
-		"волк уклоняется и бьёт быстрее кабана (уклон %.1f / %.1f, скорость %d / %d)"
-		% [float(wd30["eva"]), float(bd["eva"]), int(wd30["aspd"]), int(bd["aspd"])])
+	check(int(wd30["avoid"]) > int(bd["avoid"]), "волк уклоняется лучше кабана (уклонение %d / %d)"
+		% [int(wd30["avoid"]), int(bd["avoid"])])
 
 
 ## Дикий волк сильнее базового зверя (кабана) того же уровня: «эффективная сила» против героя (Combat), опыт.

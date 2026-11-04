@@ -63,9 +63,9 @@ func run_step() -> void:
 				"кнопка 1 в HUD: «%s»" % main.hud.button_text("skill1"))
 			check(player.max_mp > 0 and main.hud._mp_bar.visible, "MP %d и полоска MP в HUD" % player.max_mp)
 			var d := HeroStats.derived("assassin", OLD_LEVEL)
-			check(player.max_hp == int(d["max_hp"]) and player.eva > 0.0 and player.accuracy > 0,
-				"статы Наёмника %d ур.: HP %d, уклонение %.1f%%, точность %d" % [OLD_LEVEL, player.max_hp,
-				player.eva * 100.0, player.accuracy])
+			check(player.max_hp == int(d["max_hp"]) and player.avoid > 0 and player.accuracy > 0,
+				"статы Наёмника %d ур.: HP %d, уклонение %d, точность %d" % [OLD_LEVEL, player.max_hp,
+				player.avoid, player.accuracy])
 			check(main.hud._msg_label.text.contains("Наёмник") and game.load_note == "",
 				"сообщение при входе: %s" % main.hud._msg_label.text)
 			check(player.global_position.distance_to(main.world.spawn_point("dark_elf")) < 3.0, "старт в деревне тёмных эльфов")

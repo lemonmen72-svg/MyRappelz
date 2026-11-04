@@ -63,7 +63,7 @@ const QUESTS := {
 			{"type": "buy", "items": ["card_panther", "card_turtle", "card_pheasant"], "npc": "kirk", "n": 1,
 				"counts_existing": true, "text": "Купить карту существа у Учителя Кирка"},
 		],
-		"rewards": {"xp": 35, "gold": 10},
+		"rewards": {"xp": 7, "gold": 10},
 	},
 	"kirk_soul": {
 		"name": "Душа в карте", "giver": "kirk", "turn_in": "kirk", "level": 2, "prev": "kirk_first_card",
@@ -74,7 +74,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "tame", "target": "", "n": 1, "counts_existing": true, "text": "Поймать душу зверя в карту"},
 		],
-		"rewards": {"xp": 60, "gold": 20, "items": {"mirror_card": 1}},
+		"rewards": {"xp": 14, "gold": 20, "items": {"mirror_card": 1}},
 	},
 	"kirk_new_friend": {
 		"name": "Новый друг", "giver": "kirk", "turn_in": "kirk", "level": 2, "prev": "kirk_soul",
@@ -86,7 +86,7 @@ const QUESTS := {
 			{"type": "form", "target": "", "n": 1, "counts_existing": true, "text": "Сформировать существо из карты"},
 			{"type": "summon", "target": "", "n": 1, "counts_existing": true, "text": "Призвать питомца"},
 		],
-		"rewards": {"xp": 70, "items": {"potion_hp_r1": 3}, "jp": 5},
+		"rewards": {"xp": 17, "items": {"potion_hp_r1": 3}, "jp": 5},
 	},
 	"kirk_bond_trial": {
 		"name": "Испытание связи", "giver": "kirk", "turn_in": "kirk", "level": 3, "prev": "kirk_new_friend",
@@ -97,7 +97,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "pet_kill", "target": "", "n": 5, "text": "Победить зверей вместе с питомцем"},
 		],
-		"rewards": {"xp": 100, "gold": 40, "items": {"revive_scroll": 1}},
+		"rewards": {"xp": 35, "gold": 40, "items": {"revive_scroll": 1}},
 	},
 
 	# ---------- Староста своей деревни (герой стартует в родной деревне; чужие старосты заданий не дают) ----------
@@ -131,7 +131,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "pheasant", "n": 3, "text": "Победить фазанов"},
 		],
-		"rewards": {"xp": 35, "gold": 10, "items": {"potion_hp_r1": 2}},
+		"rewards": {"xp": 7, "gold": 10, "items": {"potion_hp_r1": 2}},
 	},
 	"elder_trophies": {
 		"name": "Шкуры для деревни", "giver": "@elder", "turn_in": "@elder", "level": 2, "prev": "elder_hunt",
@@ -165,7 +165,7 @@ const QUESTS := {
 			{"type": "collect", "items": ["wolf_pelt"], "n": 3, "take": true, "drop_from": "wolf",
 				"text": "Принести волчьи шкуры"},
 		],
-		"rewards": {"xp": 60, "gold": 15},
+		"rewards": {"xp": 14, "gold": 15},
 	},
 	"elder_potion": {
 		"name": "Глоток здоровья", "giver": "@elder", "turn_in": "@elder", "level": 2, "prev": "elder_trophies",
@@ -195,7 +195,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "use", "items": ["potion_hp"], "n": 1, "text": "Выпить зелье здоровья"},
 		],
-		"rewards": {"xp": 55, "gold": 10, "items": {"potion_hp_r1": 3}},
+		"rewards": {"xp": 13, "gold": 10, "items": {"potion_hp_r1": 3}},
 	},
 	"elder_grow": {
 		"name": "Крепкая рука", "giver": "@elder", "turn_in": "@elder", "level": 2, "prev": "elder_potion",
@@ -227,7 +227,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "level", "n": 5, "text": "Достичь 5 уровня"},
 		],
-		"rewards": {"xp": 180, "gold": 30, "items": {"revive_scroll": 1}},
+		"rewards": {"xp": 145, "gold": 30, "items": {"revive_scroll": 1}},
 	},
 	"elder_to_sage": {
 		"name": "Дорога в город", "giver": "@elder", "turn_in": "sage", "level": 5, "prev": "elder_grow",
@@ -251,7 +251,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "talk", "npc": "sage", "n": 1, "text": "Поговорить с Мудрецом Альдериком"},
 		],
-		"rewards": {"xp": 170, "gold": 20},
+		"rewards": {"xp": 137, "gold": 20},
 	},
 
 	# ---------- Мудрец Альдерик: четыре задания сразу ----------
@@ -265,7 +265,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "level", "n": 10, "text": "Достичь 10 уровня"},
 		],
-		"rewards": {"xp": 450, "gold": 60},
+		"rewards": {"xp": 984, "gold": 60},
 	},
 	"sage_storage": {
 		"name": "Городской склад", "giver": "sage", "turn_in": "sage", "level": 5, "prev": "elder_to_sage",
@@ -277,7 +277,7 @@ const QUESTS := {
 			{"type": "talk", "npc": "storekeeper", "n": 1, "text": "Поговорить с Кладовщиком Тобином"},
 			{"type": "store", "n": 1, "text": "Положить вещь на склад"},
 		],
-		"rewards": {"xp": 160, "gold": 15},
+		"rewards": {"xp": 129, "gold": 15},
 	},
 	"sage_shop": {
 		"name": "Лавка Гордея", "giver": "sage", "turn_in": "sage", "level": 5, "prev": "elder_to_sage",
@@ -289,7 +289,7 @@ const QUESTS := {
 			{"type": "buy", "items": [], "npc": "merchant", "n": 3, "text": "Купить вещи у Торговца Гордея"},
 			{"type": "sell", "items": [], "npc": "merchant", "n": 3, "text": "Продать вещи Торговцу Гордею"},
 		],
-		"rewards": {"xp": 160, "gold": 30},
+		"rewards": {"xp": 129, "gold": 30},
 	},
 	"sage_teacher": {
 		"name": "Наставник укротителей", "giver": "sage", "turn_in": "sage", "level": 5, "prev": "elder_to_sage",
@@ -300,7 +300,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "talk", "npc": "kirk", "n": 1, "text": "Поговорить с Учителем Кирком"},
 		],
-		"rewards": {"xp": 140, "gold": 25},
+		"rewards": {"xp": 113, "gold": 25},
 	},
 	"sage_to_hunter": {
 		"name": "Охотница из Западного лагеря", "giver": "sage", "turn_in": "hunter", "level": 5,
@@ -312,7 +312,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "talk", "npc": "hunter", "n": 1, "text": "Поговорить с Охотницей Яррой"},
 		],
-		"rewards": {"xp": 210, "gold": 20},
+		"rewards": {"xp": 216, "gold": 20},
 	},
 
 	# ---------- Охотница Ярра ----------
@@ -326,7 +326,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "wolf", "min_level": 6, "n": 20, "text": "Победить волков 6 уровня и выше"},
 		],
-		"rewards": {"xp": 400, "gold": 80, "items": {"potion_hp_r1": 5}},
+		"rewards": {"xp": 632, "gold": 80, "items": {"potion_hp_r1": 5}},
 	},
 	"sage_first_job": {
 		"name": "Доклад мудрецу", "giver": "hunter", "turn_in": "sage", "level": 6, "prev": "hunter_hunt",
@@ -338,7 +338,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "level", "n": 10, "text": "Достичь 10 уровня (с него выбирают профессию)"},
 		],
-		"rewards": {"xp": 600, "gold": 100},
+		"rewards": {"xp": 1311, "gold": 100},
 	},
 	"hunter_boss_pheasant": {
 		"name": "Вожак: Пламенный Златохвост", "giver": "hunter", "turn_in": "hunter", "level": 6, "prev": "hunter_hunt",
@@ -350,7 +350,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "boss_pheasant", "n": 1, "text": "Победить: Пламенный Златохвост"},
 		],
-		"rewards": {"xp": 1120, "gold": 150, "items": {"mirror_card": 1, "potion_hp_r2": 5}},
+		"rewards": {"xp": 4623, "gold": 150, "items": {"mirror_card": 1, "potion_hp_r2": 5}},
 	},
 	"hunter_boss_wolf": {
 		"name": "Вожак: Седой Вожак бури", "giver": "hunter", "turn_in": "hunter", "level": 6, "prev": "hunter_hunt",
@@ -362,7 +362,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "boss_wolf", "n": 1, "text": "Победить: Седой Вожак бури"},
 		],
-		"rewards": {"xp": 1650, "gold": 180, "items": {"mirror_card": 1, "potion_hp_r2": 5}},
+		"rewards": {"xp": 8420, "gold": 180, "items": {"mirror_card": 1, "potion_hp_r2": 5}},
 	},
 	"hunter_boss_turtle": {
 		"name": "Вожак: Тысячелетний Бастион", "giver": "hunter", "turn_in": "hunter", "level": 6, "prev": "hunter_hunt",
@@ -374,7 +374,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "boss_turtle", "n": 1, "text": "Победить: Тысячелетний Бастион"},
 		],
-		"rewards": {"xp": 2330, "gold": 220, "items": {"mirror_card": 1, "revive_scroll": 1}},
+		"rewards": {"xp": 17024, "gold": 220, "items": {"mirror_card": 1, "revive_scroll": 1}},
 	},
 	"hunter_boss_flyfish": {
 		"name": "Вожак: Владыка течений", "giver": "hunter", "turn_in": "hunter", "level": 6, "prev": "hunter_hunt",
@@ -386,7 +386,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "boss_flyfish", "n": 1, "text": "Победить: Владыка течений"},
 		],
-		"rewards": {"xp": 2630, "gold": 240, "items": {"mirror_card": 1, "revive_scroll": 1}},
+		"rewards": {"xp": 19570, "gold": 240, "items": {"mirror_card": 1, "revive_scroll": 1}},
 	},
 	"hunter_boss_panther": {
 		"name": "Вожак: Владычица полуночи", "giver": "hunter", "turn_in": "hunter", "level": 6, "prev": "hunter_hunt",
@@ -398,7 +398,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "boss_panther", "n": 1, "text": "Победить: Владычица полуночи"},
 		],
-		"rewards": {"xp": 3430, "gold": 280, "items": {"mirror_card": 1, "revive_scroll": 2}},
+		"rewards": {"xp": 25625, "gold": 280, "items": {"mirror_card": 1, "revive_scroll": 2}},
 	},
 	"hunter_boss_centaur": {
 		"name": "Вожак: Громовой хан", "giver": "hunter", "turn_in": "hunter", "level": 6, "prev": "hunter_hunt",
@@ -410,7 +410,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "boss_centaur", "n": 1, "text": "Победить: Громовой хан"},
 		],
-		"rewards": {"xp": 5200, "gold": 340, "items": {"mirror_card": 2, "revive_scroll": 2}},
+		"rewards": {"xp": 36652, "gold": 340, "items": {"mirror_card": 2, "revive_scroll": 2}},
 	},
 	"hunter_boss_anathema": {
 		"name": "Вожак: Костяной владыка", "giver": "hunter", "turn_in": "hunter", "level": 6, "prev": "hunter_hunt",
@@ -422,7 +422,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "kill", "target": "boss_anathema", "n": 1, "text": "Победить: Костяной владыка"},
 		],
-		"rewards": {"xp": 7900, "gold": 400, "items": {"mirror_card": 2, "revive_scroll": 2}},
+		"rewards": {"xp": 61608, "gold": 400, "items": {"mirror_card": 2, "revive_scroll": 2}},
 	},
 	"hunter_bosses_done": {
 		"name": "Победа над вожаками", "giver": "hunter", "turn_in": "hunter", "level": 6,
@@ -435,7 +435,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "talk", "npc": "hunter", "n": 1, "text": "Поговорить с Охотницей Яррой"},
 		],
-		"rewards": {"xp": 8000, "gold": 1500, "items": {"mirror_card": 3, "revive_scroll": 3, "potion_hp_r3": 10}},
+		"rewards": {"xp": 62388, "gold": 1500, "items": {"mirror_card": 3, "revive_scroll": 3, "potion_hp_r3": 10}},
 	},
 	"hunter_to_sage": {
 		"name": "Вести для мудреца", "giver": "hunter", "turn_in": "sage", "level": 6, "prev": "hunter_bosses_done",
@@ -447,7 +447,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "talk", "npc": "sage", "n": 1, "text": "Поговорить с Мудрецом Альдериком"},
 		],
-		"rewards": {"xp": 3500, "gold": 300, "jp": 10},
+		"rewards": {"xp": 25845, "gold": 300, "jp": 10},
 	},
 
 	# ---------- После профессии ----------
@@ -461,7 +461,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "skill", "n": 1, "text": "Изучить умение профессии"},
 		],
-		"rewards": {"xp": 520, "gold": 50, "jp": 5},
+		"rewards": {"xp": 1347, "gold": 50, "jp": 5},
 	},
 	"sage_to_merc": {
 		"name": "Глава наёмников", "giver": "sage", "turn_in": "merc_chief", "level": 10, "prev": "sage_first_skill",
@@ -473,7 +473,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "talk", "npc": "merc_chief", "n": 1, "text": "Поговорить с Корвеном"},
 		],
-		"rewards": {"xp": 600, "gold": 60},
+		"rewards": {"xp": 1554, "gold": 60},
 	},
 	"merc_closed_cave": {
 		"name": "Закрытая пещера", "giver": "merc_chief", "turn_in": "merc_chief", "level": 10, "prev": "sage_to_merc",
@@ -485,7 +485,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "talk", "npc": "merc_chief", "n": 1, "text": "Выслушать Корвена"},
 		],
-		"rewards": {"xp": 500, "gold": 50, "items": {"potion_hp_r2": 5}},
+		"rewards": {"xp": 1295, "gold": 50, "items": {"potion_hp_r2": 5}},
 	},
 }
 

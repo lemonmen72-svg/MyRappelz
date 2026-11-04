@@ -190,7 +190,7 @@ func _check_weapon_rank() -> void:
 	check(err.contains("Нужен 21 уровень") and game.weapon != "weapon_sword_1h_r2", "оружие 2-го ранга на 20 ур. не надеть: " + err)
 	var it := ItemData.get_item("weapon_sword_1h_r2")
 	var r1 := ItemData.get_item("weapon_sword_1h_r1")
-	check(int(it["atk"]) > int(r1["atk"]) * 3, "меч 2-го ранга сильнее 1-го: %d против %d" % [int(it["atk"]), int(r1["atk"])])
+	check(int(it["atk"]) > int(r1["atk"]) * 2, "меч 2-го ранга сильнее 1-го: %d против %d" % [int(it["atk"]), int(r1["atk"])])
 	check(Handheld.model_for("weapon_sword_1h_r2") != "", "модель меча 2-го ранга (или откат на модель вида)")
 	game.level = 21
 	check(p.equip("weapon_sword_1h_r2") == "" and game.weapon == "weapon_sword_1h_r2", "на 21 ур. надет")

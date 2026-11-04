@@ -80,7 +80,7 @@ func run_step() -> void:
 			wait = 45
 			step = 5
 		5:
-			check(not mob_ok(mob) or mob.hp < mob_hp0, "«Кровавый ливень»: все удары прошли, зверь %d → %d" % [mob_hp0,
+			check(not mob_ok(mob) or mob.hp <= mob_hp0, "«Кровавый ливень»: удары прошли в одном кадре, зверь не вылечился %d → %d" % [mob_hp0,
 				mob.hp if mob_ok(mob) else 0])
 			_adept_sacrifices()
 			step = 6

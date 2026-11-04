@@ -313,7 +313,7 @@ func _check_start(player: Player) -> void:
 		check(game.inventory.has(String(id)), "в сумке %s" % ItemData.item_name(String(id)))
 	check(player.max_mp > 0 and player.mp == player.max_mp, "у Наёмника есть MP: %d" % player.max_mp)
 	check(main.hud._mp_bar.visible, "полоска MP в HUD")
-	check(player.eva > 0.0, "у Наёмника есть уклонение: %d%%" % roundi(player.eva * 100.0))
+	check(player.avoid > 0, "у Наёмника есть уклонение: %d" % player.avoid)
 
 
 ## 7 статов героя (HeroStats) и производные: калибровка 1-го уровня под прежние числа Наёмника, рост с уровнем

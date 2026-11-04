@@ -109,8 +109,8 @@ func _unit_data() -> void:
 	var hb := int(MobStats.derived("anathema_blade", int(b["level"]))["max_hp"])
 	var hc := int(MobStats.derived("anathema_chief", int(c["level"]))["max_hp"])
 	check(ha < hb and hb < hc, "HP анатем растёт: %d < %d < %d" % [ha, hb, hc])
-	var st := MobStats.stats("anathema", 10)
-	check(int(st["str"]) > int(st["vit"]) and int(st["agi"]) > int(st["vit"]), "анатема: Сила и Ловкость выше Выносливости")
+	check(int(MobStats.derived("anathema", 10)["def"]) < int(MobStats.derived("turtle", 10)["def"]),
+		"анатема: защита ниже обычного зверя своего уровня")
 	check(String(c["rarity"]) == "rare" and MobData.rarity_name("anathema_chief") == "Редкий", "вожак — «Редкий»")
 	var mirror := false
 	for e in LootTable.pool("card", "anathema_chief", 25):
