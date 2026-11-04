@@ -1,5 +1,5 @@
 extends "res://tests/test_base.gd"
-## Кардинал, фаза 2: режим «Кардинал: детерминизм» — два ускоренных прогона (×4) с одним seed. Без экрана и при ровных
+## Кардинал, фаза 2: режим «Кардинал: детерминизм» — два ускоренных прогона (×8) с одним seed. Без экрана и при ровных
 ## 60 кадрах/с (CI) журналы убийств и итог (уровень, опыт, золото) обязаны совпасть; отчёт и cardinal.json с разделом
 ## determinism; игрок снова в своём аккаунте, время и 3D — как были.
 
@@ -48,6 +48,15 @@ func run_step() -> void:
 			var d: Variant = JSON.parse_string(js)
 			check(d is Dictionary and (d as Dictionary).has("determinism") and bool((d as Dictionary)["determinism"]["ok"]),
 				"cardinal.json: прогоны совпали — %s" % [(d as Dictionary).get("determinism", {}) if d is Dictionary else js.left(80)])
+			# Лимит режима — по настоящему времени: игрового прошло вчетверо больше (0.29.0 считал игровое — 2-й прогон
+			# не успевал за 6 мин)
+			var game_sum := 0.0
+			if d is Dictionary:
+				for rr in (d as Dictionary).get("runs", []):
+					game_sum += float((rr as Dictionary).get("game_sec", 0.0))
+			check(game_sum > 0.0 and _bot.active_time < game_sum * 0.6,
+				"время режима — настоящее: %.0f с при %.0f с игрового" % [_bot.active_time, game_sum])
+			check(not txt.contains("не закончен"), "оба прогона закончены")
 			step = 2
 		2:
 			if not (main != null and is_instance_valid(main) and main.is_inside_tree() and main._started

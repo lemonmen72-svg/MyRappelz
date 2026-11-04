@@ -87,6 +87,8 @@ static var _outline: ShaderMaterial
 var species := ""
 ## Своя модель стадии эволюции (<вид>_2 / <вид>_3): процедурные украшения стадии ей не нужны.
 var stage_model := false
+## Не останавливать анимацию за кадром (автотесты на телефоне без 3D-рендера — как headless в CI).
+static var always_animate := false
 ## Кто это для учёта системы анимаций (AnimResolver): "mob" — зверь мира, "pet" — питомец (ставит Pet).
 var anim_actor := "mob"
 ## Размеры и скорости вида (info_for).
@@ -276,7 +278,7 @@ func setup(id: String, s: float, color: Color = Color.WHITE, tint: Color = Color
 
 
 func _on_screen_changed(on: bool) -> void:
-	_onscreen = on
+	_onscreen = on or always_animate
 	_apply_active()
 
 

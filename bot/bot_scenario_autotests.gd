@@ -252,6 +252,12 @@ func _start(n: String) -> void:
 		return
 	reset_env()
 	var tree := bot.get_tree()
+	# Как в CI (headless): 3D не рисуется — тесту картинка не нужна, а на телефоне рисование мира, моделей и теней
+	# было главной ценой кадра (весь набор шёл до 75 мин); 2D (полоса бота) рисуется. Модели при этом не «засыпают»
+	# за кадром (CharacterModel / CreatureAsset.always_animate) — как в CI, где сигналов видимости нет.
+	tree.root.disable_3d = true
+	CharacterModel.always_animate = true
+	CreatureAsset.always_animate = true
 	_before = {}
 	for c in tree.root.get_children():
 		_before[c.get_instance_id()] = true
@@ -420,6 +426,8 @@ func reset_env() -> void:
 	var tree := bot.get_tree()
 	tree.paused = false
 	tree.root.disable_3d = false
+	CharacterModel.always_animate = false
+	CreatureAsset.always_animate = false
 	Engine.time_scale = 1.0
 	if _settings_moved and FileAccess.file_exists(Quality.PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(Quality.PATH))

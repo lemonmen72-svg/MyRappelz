@@ -5,7 +5,7 @@ extends RefCounted
 ## (HUD.move_vec относительно камеры, мосты — IslandWorld.Route), удар — удержание «Атаки» (Player.try_attack, как
 ## main._process при удержании), добыча — подойти к мешочку (LootDrop сам подбирается в 2.5 м), отдых — стоять вне
 ## боя. Ничего не начисляется напрямую: опыт, золото, добыча — по правилам игры (main._on_mob_gone, Economy).
-## Ускоренный режим (accel > 1) этой фазы: Engine.time_scale × без отрисовки 3D (Viewport.disable_3d) и без предела
+## Ускоренный режим (accel > 1, с 0.30 — ×8, тиков физики ×8, шаг тика 1/60 с): Engine.time_scale × без отрисовки 3D (Viewport.disable_3d) и без предела
 ## кадров — та же логика и формулы, только больше шагов физики на кадр (max_physics_steps_per_frame). Это временная
 ## замена SimulationClock фазы 2 — расхождения с прогоном «с картинкой» измеряются и попадают в отчёт.
 ## Время (фаза 2): game — игровые часы Util.game_time (сумма шагов физики со шкалой времени: идут с ускорением, не
@@ -102,10 +102,15 @@ func begin() -> void:
 	seed(seed_value)
 	Combat.reseed(seed_value)
 	_saved = {"time_scale": Engine.time_scale, "steps": Engine.max_physics_steps_per_frame, "fps": Engine.max_fps,
-		"no3d": bot.get_viewport().disable_3d}
+		"no3d": bot.get_viewport().disable_3d, "ticks": Engine.physics_ticks_per_second, "jitter": Engine.physics_jitter_fix}
 	if accel > 1.0:
+		# Точность как при ×1: тиков физики в accel раз больше, шаг тика тот же 1/60 с (time_scale / ticks). Раньше
+		# (×4) рос сам шаг — тик был вчетверо крупнее
+		Engine.physics_ticks_per_second = int(_saved["ticks"]) * int(round(accel))
+		# Без «сглаживания» числа тиков в кадре: оно зависит от накопленной фазы, а она у второго прогона другая
+		Engine.physics_jitter_fix = 0.0
 		Engine.time_scale = accel
-		Engine.max_physics_steps_per_frame = maxi(8, int(ceil(accel * 3.0)))
+		Engine.max_physics_steps_per_frame = maxi(8, int(ceil(accel * 4.0)))
 		Engine.max_fps = 0
 		bot.get_viewport().disable_3d = true
 	var w := IslandWorld.current
@@ -133,7 +138,15 @@ func begin() -> void:
 	_clock0 = Util.game_time()
 	bot.note("Кардинал «%s»: профиль «%s», seed %d, ускорение ×%.0f, лимит игрового времени %s" % [title,
 		String(profile["name"]), seed_value, accel, TestBot.clock(game_limit)])
-	bot.set_tick(tick)
+	# Решения «игрока» — каждый тик физики, а не кадр: при ×8 на кадр приходится 8 тиков, на телефоне кадры неровные —
+	# по кадрам прогоны с одним seed расходились (0.30: совпало 4 из 7 убийств); по тикам — одинаково при любой частоте
+	bot.get_tree().physics_frame.connect(_on_physics_frame)
+
+
+func _on_physics_frame() -> void:
+	if done or bot == null or bot.state != "running" or bot.get_tree().paused:
+		return
+	tick(Engine.time_scale / float(Engine.physics_ticks_per_second))
 
 
 func _snapshot() -> Dictionary:
@@ -342,7 +355,8 @@ func _end(reason: String) -> void:
 	done = true
 	stop_reason = reason
 	_wall_end_v = wall_sec()
-	bot.set_tick(Callable())
+	if bot.get_tree().physics_frame.is_connected(_on_physics_frame):
+		bot.get_tree().physics_frame.disconnect(_on_physics_frame)
 	var h: HUD = (bot.main.get("hud") as HUD) if bot.main != null else null
 	if h != null:
 		h.move_vec = Vector2.ZERO
@@ -351,6 +365,8 @@ func _end(reason: String) -> void:
 	if p != null and p.message.is_connected(_on_message):
 		p.message.disconnect(_on_message)
 	Engine.time_scale = float(_saved.get("time_scale", 1.0))
+	Engine.physics_ticks_per_second = int(_saved.get("ticks", 60))
+	Engine.physics_jitter_fix = float(_saved.get("jitter", 0.5))
 	Engine.max_physics_steps_per_frame = int(_saved.get("steps", 8))
 	Engine.max_fps = int(_saved.get("fps", 0))
 	bot.get_viewport().disable_3d = bool(_saved.get("no3d", false))
@@ -417,8 +433,9 @@ func _set_boost(on: bool) -> void:
 		return
 	_boosted = on
 	if accel > 1.0:
+		# Отдых: шаг тика крупнее (REST_BOOST / 60 с) — во время отдыха считается только восстановление
 		Engine.time_scale = accel * (REST_BOOST if on else 1.0)
-		Engine.max_physics_steps_per_frame = maxi(8, int(ceil(Engine.time_scale * 3.0)))
+		Engine.max_physics_steps_per_frame = maxi(8, int(ceil(accel * 4.0)))
 
 
 ## Итог прогона — машинный JSON (CARDINAL_ARCHITECTURE.md, «Отчёт»).

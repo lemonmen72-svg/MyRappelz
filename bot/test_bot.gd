@@ -448,8 +448,11 @@ func _tick_prepare(dt: float) -> void:
 
 
 func _tick_running(dt: float, fdt: float) -> void:
-	total_time += dt
-	active_time += dt
+	# Лимиты — по настоящему времени: delta умножен на Engine.time_scale, и ускоренный прогон Кардинала (×4, отдых ×32)
+	# съедал лимит режима вчетверо быстрее (0.29.0: «Кардинал: детерминизм» остановлен на 2-м прогоне из 2)
+	var real := dt / maxf(Engine.time_scale, 0.001)
+	total_time += real
+	active_time += real
 	if not scenario.owns_scene() and not _world_ready():
 		stop("Главная сцена пропала", "error")
 		return

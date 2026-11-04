@@ -9,7 +9,7 @@ extends BotScenario
 
 ## Игровое время каждого прогона, с (тест ставит меньше), ускорение второго прогона, seed.
 static var game_limit := 240.0
-static var accel := 4.0
+static var accel := 8.0
 static var seed_value := 20261104
 
 ## Допуск статистики «ускоренный / с картинкой» (отношение; вне — расхождение в отчёте).
@@ -205,6 +205,11 @@ func report_lines(_bot: TestBot) -> PackedStringArray:
 	out.append("  Профиль «Обычный игрок» v2 (брошенную цель минуту не выбирает; фаза 2 — игровые часы физики, перемотка отдыха), seed %d, зона «Окрестности деревни людей», герой — Бродяга 1 ур." % seed_value)
 	for r in runs:
 		var d := r.result()
+		if not r.done:
+			# Прерван (лимит режима, «Стоп», перегрев) — итога нет: числа конца были бы пустыми («уровень 1 → 0»)
+			out.append("  %s: не закончен — прерван на %s игрового времени (убийств %d)" % [d["title"],
+				TestBot.clock(float(d["game_sec"])), int(d["kills"])])
+			continue
 		var ts: Dictionary = d["time_split"]
 		out.append("  %s: игровое %s, настоящее %s (×%.2f), остановка — %s" % [d["title"], TestBot.clock(float(d["game_sec"])),
 			TestBot.clock(float(d["wall_sec"])), float(d["speedup"]), d["stop"]])

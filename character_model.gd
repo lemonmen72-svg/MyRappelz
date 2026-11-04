@@ -2385,6 +2385,10 @@ func _clip(key: String) -> String:
 ## Житель (Npc): за кадром анимация и кости стоят, _process пропускается — как у зверей (CreatureAsset);
 ## в кадре — снова. Проверка видимости — VisibleOnScreenNotifier3D (без отрисовки, в headless, сигналов нет —
 ## модель всегда «в кадре»); через секунду после включения невидимая сразу встаёт.
+## Не останавливать анимацию за кадром (автотесты на телефоне без 3D-рендера — как headless в CI).
+static var always_animate := false
+
+
 func pause_offscreen() -> void:
 	if _anim == null or has_node("OnScreen"):
 		return
@@ -2394,7 +2398,7 @@ func pause_offscreen() -> void:
 	vis.screen_entered.connect(_set_offscreen.bind(false))
 	vis.screen_exited.connect(_set_offscreen.bind(true))
 	add_child(vis)
-	if DisplayServer.get_name() == "headless":
+	if DisplayServer.get_name() == "headless" or always_animate:
 		return
 	# Таймер — дочерний узел (удаляется вместе с моделью)
 	var t := Timer.new()

@@ -85,6 +85,9 @@ static func skill_chain(kind: String, sid: String, use: String, grip: String, me
 		"dash":
 			if ["axe", "mace", "dual_axes", "axe_2h", "mace_2h"].has(grip):
 				chain.append(["grip", ["mq_leap_slam"]])
+			elif ranged_grip:
+				# Рывок с луком или арбалетом («Шаг тени» Наёмника) — прыжок без взмаха клинком (0.29.0: прежний жест)
+				chain.append(["grip", ["mq_jump"]])
 			if not ranged_grip:
 				chain.append(["shared", CharacterModel.MQ_DASH_BLADES])
 		_:
