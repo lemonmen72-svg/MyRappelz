@@ -45,6 +45,9 @@ var picks := 0
 var abandoned := 0
 var swings := 0
 var idle_frames := 0
+## Живых зверей в зоне в начале прогона (до возрождения) и возрождено перед прогоном
+var zone_mobs_start := 0
+var respawned := 0
 var start := {}
 var finish := {}
 
@@ -87,6 +90,11 @@ func begin() -> void:
 			_center = w.ground(c.x, c.y)
 			_radius = float(zd.get("radius", 12.0)) + 18.0
 	bot.teleport(Vector2(_center.x, _center.z), "Кардинал: %s" % title)
+	# Одинаковое начало прогонов: звери зоны на месте (пустой участок у деревни — тоже находка, пишется в отчёт)
+	zone_mobs_start = _zone_alive()
+	respawned = AdminPanel.respawn_all(bot.main)
+	if zone_mobs_start == 0:
+		bot.note("Кардинал: в зоне «%s» в начале прогона живых зверей нет — возрождено по миру %d" % [zone_id, respawned])
 	p.hp = p.max_hp
 	p.mp = p.max_mp
 	_last_hp = p.hp
@@ -203,6 +211,15 @@ func _need_rest(p: Player) -> bool:
 	return float(p.hp) < float(p.max_hp) * float(profile["rest_below"])
 
 
+func _zone_alive() -> int:
+	var n_alive := 0
+	for n in bot.get_tree().get_nodes_in_group("mobs"):
+		var m := n as Mob
+		if _alive(m) and _flat(m.global_position, _center) <= _radius:
+			n_alive += 1
+	return n_alive
+
+
 ## Ближайший живой зверь зоны: не босс, не старше героя + gap (как выбирает осторожный игрок).
 func _pick_target(p: Player) -> Mob:
 	var best: Mob = null
@@ -289,11 +306,7 @@ func _end(reason: String) -> void:
 	bot.get_viewport().disable_3d = bool(_saved.get("no3d", false))
 	finish = _snapshot()
 	# Где закончил: состояние, цель, звери рядом (для разбора прогонов без убийств)
-	var near := 0
-	for n in bot.get_tree().get_nodes_in_group("mobs"):
-		var m := n as Mob
-		if _alive(m) and p != null and _flat(m.global_position, _center) <= _radius:
-			near += 1
+	var near := _zone_alive()
 	bot.note("Кардинал «%s»: конец в состоянии «%s» (%.1f с), целей %d, брошено %d, ударов %d, кадров без цели %d, живых зверей в зоне %d%s%s" % [
 		title, state, _state_t, picks, abandoned, swings, idle_frames, near,
 		(", герой у (%.0f, %.0f), до центра %.0f м" % [p.global_position.x, p.global_position.z,
@@ -321,7 +334,7 @@ func result() -> Dictionary:
 		"gold": int(finish.get("gold", 0)) - int(start.get("gold", 0)),
 		"ttk_avg": snappedf(ttk / maxf(float(kills.size()), 1.0), 0.01),
 		"time_split": t_split, "xp_mismatch": xp_mismatch, "kill_log": kills,
-		"diag": {"picks": picks, "abandoned": abandoned, "swings": swings, "idle_frames": idle_frames, "end_state": state},
+		"diag": {"zone_mobs_start": zone_mobs_start, "respawned": respawned, "picks": picks, "abandoned": abandoned, "swings": swings, "idle_frames": idle_frames, "end_state": state},
 	}
 
 
