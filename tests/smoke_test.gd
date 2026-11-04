@@ -5,6 +5,7 @@ const MainScript := preload("res://main.gd")
 
 var mob: Mob = null
 var gold_before := 0
+var items_before := 0
 var potions_before := 0
 
 
@@ -16,6 +17,7 @@ func run_step() -> void:
 			check(count_mobs() == main._slots.size(), "звери заспавнены: %d" % count_mobs())
 			_test_touch()
 			gold_before = game.gold
+			items_before = _items()
 			step = 1
 		1:
 			mob = find_mob("pheasant")
@@ -24,14 +26,16 @@ func run_step() -> void:
 		2:
 			if not mob_ok(mob):
 				check(game.xp > 0 or game.level > 1, "игрок получил опыт")
-				# Золото — в мешочке добычи (всегда): игрок рядом, подбор через LootDrop.PICKUP_DELAY
+				# Мешочек добычи (всегда 2 предмета, золото — с шансом 80 %): игрок рядом, подбор через LootDrop.PICKUP_DELAY
 				wait = 40
 				step = 30
 				return
 			stand_near(mob)
 			player.try_attack()
 		30:
-			check(game.gold > gold_before, "игрок получил золото (мешочек подобран: %d → %d)" % [gold_before, game.gold])
+			var items_now: int = _items()
+			check(game.gold > gold_before or items_now > items_before, "мешочек подобран: золото %d → %d, предметов %d → %d"
+				% [gold_before, game.gold, items_before, items_now])
 			step = 3
 		3:
 			player.hp = 10
@@ -129,3 +133,11 @@ func _test_camera_zoom(hud: HUD, view: Vector2) -> void:
 	main._process(0.016)
 	check(is_equal_approx(main.cam_dist, MainScript.CAM_DIST_MAX), "камера не дальше %.1f м" % MainScript.CAM_DIST_MAX)
 	main.cam_dist = before
+
+
+## Сколько всего предметов в сумке (стопки — по количеству).
+func _items() -> int:
+	var t := 0
+	for id in game.inventory.ids():
+		t += game.inventory.count(String(id))
+	return t
