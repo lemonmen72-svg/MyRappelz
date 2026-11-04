@@ -467,7 +467,7 @@ static func pet_gone(pet: Pet) -> void:
 
 ## Питомец погиб: когда (воскрешение умением поднимает погибшего последним).
 static func pet_died(pet: Pet) -> void:
-	pet.record["died_at"] = Time.get_ticks_msec()
+	pet.record["died_at"] = roundi(Util.game_time() * 1000.0)
 	pet_gone(pet)
 
 

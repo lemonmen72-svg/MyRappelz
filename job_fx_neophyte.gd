@@ -335,7 +335,7 @@ static func nearest_corpse(pos: Vector3, r: float) -> int:
 
 
 static func _now() -> float:
-	return float(Time.get_ticks_msec()) / 1000.0
+	return Util.game_time()
 
 
 static func _prune() -> void:

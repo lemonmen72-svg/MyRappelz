@@ -423,6 +423,11 @@ func _on_action(id: String) -> void:
 			economy.handle_action(id)
 
 
+## Игровые часы (Util.game_time): шаг физики уже со шкалой времени.
+func _physics_process(delta: float) -> void:
+	Util.clock += delta
+
+
 func _process(delta: float) -> void:
 	if not _started:
 		return

@@ -144,7 +144,7 @@ func summary(_bot: TestBot) -> String:
 func report_lines(_bot: TestBot) -> PackedStringArray:
 	var out := PackedStringArray()
 	out.append("Кардинал — первый срез (фаза 1)")
-	out.append("  Профиль «Обычный игрок» v2 (брошенную цель минуту не выбирает), seed %d, зона «Окрестности деревни людей», герой — Бродяга 1 ур." % seed_value)
+	out.append("  Профиль «Обычный игрок» v2 (брошенную цель минуту не выбирает; фаза 2 — игровые часы физики, перемотка отдыха), seed %d, зона «Окрестности деревни людей», герой — Бродяга 1 ур." % seed_value)
 	for r in runs:
 		var d := r.result()
 		var ts: Dictionary = d["time_split"]
@@ -156,6 +156,15 @@ func report_lines(_bot: TestBot) -> PackedStringArray:
 		out.append("    время: поиск %s, путь %s, бой %s, добыча %s, отдых %s" % [TestBot.clock(float(ts["seek"])),
 			TestBot.clock(float(ts["approach"])), TestBot.clock(float(ts["fight"])), TestBot.clock(float(ts["loot"])),
 			TestBot.clock(float(ts["rest"]))])
+		var rb: Dictionary = d.get("rest_boost", {})
+		if bool(rb.get("on", false)):
+			var errs := PackedStringArray()
+			for rr in rb.get("rests", []):
+				errs.append("%.0f/%.0f с" % [float((rr as Dictionary)["actual"]), float((rr as Dictionary)["predicted"])])
+			out.append("    перемотка отдыха ×%.0f: %s игрового времени, откатов %d%s; отдых факт/расчёт: %s" % [float(rb["boost"]),
+				TestBot.clock(float(rb["game_sec"])), int(rb["aborts"]),
+				(", выключена — " + String(rb["off_reason"])) if String(rb["off_reason"]) != "" else "",
+				", ".join(errs) if not errs.is_empty() else "отдыха не было"])
 		if not (d["xp_mismatch"] as Array).is_empty():
 			out.append("    ! опыт не по формуле: " + "; ".join(PackedStringArray((d["xp_mismatch"] as Array).slice(0, 5))))
 	if not _last.is_empty():

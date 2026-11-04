@@ -3,7 +3,8 @@ extends "res://tests/test_base.gd"
 ## тест-бота; прогон целиком с коротким игровым временем — тестовый герой фармит зверей у деревни людей с картинкой и
 ## ускоренно (×4): оба прогона дошли до конца, есть убийства, опыт за каждое убийство = формула игры, ускоренный
 ## быстрее по настоящему времени; cardinal.json с двумя прогонами и сравнением, раздел отчёта; время, шаги физики,
-## предел кадров и 3D — как были; игрок снова в своём аккаунте и мире, герой не тронут.
+## предел кадров и 3D — как были; игрок снова в своём аккаунте и мире, герой не тронут. Фаза 2: отдых героя в мире
+## совпадает с расчётом CardinalRun.rest_predict и без ускорения, и при ускорении игры ×32 (основа перемотки отдыха).
 
 const BOT_REPORTS := "user://test_cardinal_reports/"
 
@@ -47,7 +48,52 @@ func run_step() -> void:
 			check(Engine.time_scale == 1.0 and not get_tree().root.disable_3d, "время и 3D — как были")
 			check(Accounts.current == "Dedok_max" and game.char_name == "Тест", "игрок снова в своём аккаунте: %s, %s" % [
 				Accounts.current, game.char_name])
-			ok_done()
+			# Фаза 2: эквивалентность отдыха — настоящий отдых героя в мире против расчёта (rest_predict), без перемотки
+			# и с ускорением игры (как буст отдыха, Engine.time_scale): игровое время по Util.game_time
+			_rest_case(1.0)
+			step = 3
+		3:
+			if _rest_tick():
+				_rest_case(32.0)
+				step = 4
+		4:
+			if _rest_tick():
+				ok_done()
+
+
+var _rest_run: CardinalRun = null
+var _rest_t0 := 0.0
+var _rest_scale := 1.0
+
+
+func _rest_case(scale: float) -> void:
+	var p: Player = main.player
+	_rest_run = CardinalRun.new()
+	_rest_scale = scale
+	for n in get_tree().get_nodes_in_group("mobs"):
+		(n as Node).set_process(false)
+	p.hp = roundi(float(p.max_hp) * 0.3)
+	p.regen_delay = Player.REST_DELAY
+	_rest_run.profile = CardinalRun.PROFILE_REGULAR
+	_rest_run.set_meta("pred", _rest_run.rest_predict(p))
+	_rest_t0 = Util.game_time()
+	Engine.time_scale = scale
+
+
+## Отдых идёт; true — закончен и проверен.
+func _rest_tick() -> bool:
+	var p: Player = main.player
+	if float(p.hp) < float(p.max_hp) * float(CardinalRun.PROFILE_REGULAR["rest_until"]):
+		if Util.game_time() - _rest_t0 > 200.0:
+			Engine.time_scale = 1.0
+			fail("отдых не закончился за 200 игровых секунд")
+		return false
+	Engine.time_scale = 1.0
+	var actual := Util.game_time() - _rest_t0
+	var pred := float(_rest_run.get_meta("pred"))
+	check(pred > 2.0 and absf(actual - pred) / pred <= CardinalRun.REST_TOL,
+		"отдых ×%.0f: факт %.1f с, расчёт %.1f с (допуск %.0f %%)" % [_rest_scale, actual, pred, CardinalRun.REST_TOL * 100.0])
+	return true
 
 
 func _check_result() -> void:

@@ -1,5 +1,15 @@
 class_name Util
 extends RefCounted
+
+
+## Игровые часы, с: сумма delta физики главной сцены (main._physics_process — уже со шкалой Engine.time_scale:
+## в Godot 4 ускорение увеличивает шаг тика, а не число тиков; пауза дерева — стоят). Для правил игры (тела зверей,
+## порядок гибели питомцев) вместо Time.get_ticks_msec — Кардинал ускоряет игру, и правила идут вместе с ней.
+static var clock := 0.0
+
+
+static func game_time() -> float:
+	return clock
 ## Общие вспомогательные функции.
 
 static var _theme: Theme

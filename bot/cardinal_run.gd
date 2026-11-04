@@ -8,11 +8,17 @@ extends RefCounted
 ## Ускоренный режим (accel > 1) этой фазы: Engine.time_scale × без отрисовки 3D (Viewport.disable_3d) и без предела
 ## кадров — та же логика и формулы, только больше шагов физики на кадр (max_physics_steps_per_frame). Это временная
 ## замена SimulationClock фазы 2 — расхождения с прогоном «с картинкой» измеряются и попадают в отчёт.
-## Время: game — сумма delta игры (со шкалой), wall — Time.get_ticks_usec (настоящее), отдельно — путь, бой, добыча,
-## отдых, поиск. Ограничители: игровое время, wall-время, застревание (цель брошена), шаги.
+## Время (фаза 2): game — игровые часы Util.game_time (сумма шагов физики со шкалой времени: идут с ускорением, не
+## зависят от кадров отрисовки), wall — Time.get_ticks_usec (настоящее), отдельно — путь, бой, добыча, отдых, поиск. Ограничители:
+## игровое время, wall-время, застревание (цель брошена), шаги.
+## Безопасная перемотка (фаза 2, только ускоренный прогон): отдых — промежуток без важных событий, пока рядом нет
+## опасности, ускорение игры × REST_BOOST (мир идёт честно: возрождение зверей, восстановление — то же, только
+## быстрее). Опасность (героя ударили, зверь целит в героя ближе SAFE_RADIUS) — сразу обычное ускорение (откат, в
+## журнал). Каждый отдых сверяется с расчётом по формуле восстановления (rest_predict): расхождение больше REST_TOL —
+## буст выключается до конца прогона (откат к точному режиму).
 
 const PROFILE_REGULAR := {
-	"id": "regular", "name": "Обычный игрок", "version": 1,
+	"id": "regular", "name": "Обычный игрок", "version": 2,
 	"rest_below": 0.45,     # доля HP: ниже — отдых перед следующим зверем
 	"rest_until": 0.95,     # отдых до этой доли HP
 	"level_gap": 1,         # зверь не старше героя + gap
@@ -30,6 +36,21 @@ var game_limit := 240.0
 var wall_limit := 600.0
 var zone_id := "human_outskirts"
 var profile: Dictionary = PROFILE_REGULAR
+
+## Буст отдыха: во сколько раз сверх accel, допуск сверки, радиус опасности.
+const REST_BOOST := 8.0
+const REST_TOL := 0.15
+const SAFE_RADIUS := 12.0
+var rest_boost := true
+var boost_game := 0.0
+var boost_aborts := 0
+var boost_off_reason := ""
+var rests: Array[Dictionary] = []
+var _boosted := false
+var _rest_t0 := 0.0
+var _rest_hp0 := 0
+var _rest_pred := 0.0
+var _clock0 := 0.0
 
 var done := false
 var stop_reason := ""
@@ -106,6 +127,7 @@ func begin() -> void:
 		p.message.connect(_on_message)
 	start = _snapshot()
 	_wall0 = Time.get_ticks_usec()
+	_clock0 = Util.game_time()
 	bot.note("Кардинал «%s»: профиль «%s», seed %d, ускорение ×%.0f, лимит игрового времени %s" % [title,
 		String(profile["name"]), seed_value, accel, TestBot.clock(game_limit)])
 	bot.set_tick(tick)
@@ -128,9 +150,15 @@ func tick(dt: float) -> void:
 	var h: HUD = (bot.main.get("hud") as HUD) if bot.main != null else null
 	if p == null or h == null:
 		return
-	game_t += dt
-	_state_t += dt
-	t_split[state] = float(t_split[state]) + dt
+	# Игровые часы — Util.game_time (сумма delta физики со шкалой времени; dt кадра не нужен)
+	var now := Util.game_time() - _clock0
+	var gdt := maxf(0.0, now - game_t)
+	game_t = now
+	_state_t += gdt
+	t_split[state] = float(t_split[state]) + gdt
+	if _boosted:
+		boost_game += gdt
+	var hurt := p.hp < _last_hp
 	if p.hp < _last_hp:
 		damage_taken += _last_hp - p.hp
 	_last_hp = p.hp
@@ -196,10 +224,20 @@ func tick(dt: float) -> void:
 		"rest":
 			_stop_move(h)
 			if float(p.hp) >= float(p.max_hp) * float(profile["rest_until"]) or _state_t > 90.0:
+				_rest_done(p)
 				_go("seek")
+			else:
+				_rest_tick(p, hurt)
 
 
 func _go(s: String) -> void:
+	if state == "rest" and s != "rest":
+		_set_boost(false)
+	if s == "rest" and state != "rest":
+		var p := bot.player()
+		_rest_t0 = game_t
+		_rest_hp0 = p.hp if p != null else 0
+		_rest_pred = rest_predict(p) if p != null else 0.0
 	state = s
 	_state_t = 0.0
 	_nav.reset()
@@ -305,6 +343,7 @@ func _end(reason: String) -> void:
 	var h: HUD = (bot.main.get("hud") as HUD) if bot.main != null else null
 	if h != null:
 		h.move_vec = Vector2.ZERO
+	_set_boost(false)
 	var p := bot.player()
 	if p != null and p.message.is_connected(_on_message):
 		p.message.disconnect(_on_message)
@@ -325,6 +364,60 @@ func _end(reason: String) -> void:
 		TestBot.clock(game_t), TestBot.clock(wall_sec()), kills.size(), deaths])
 
 
+# ---------- Фаза 2: безопасная перемотка отдыха ----------
+
+## Сколько игровых секунд отдыхать до profile.rest_until по формуле восстановления Player: статы и питомец (hp_regen,
+## aura_regen) всегда, отдых — max_hp × REST_REGEN после regen_delay.
+func rest_predict(p: Player) -> float:
+	var target := float(p.max_hp) * float(profile["rest_until"])
+	var h0 := float(p.hp)
+	if h0 >= target:
+		return 0.0
+	var stat := maxf(0.0, p.hp_regen + p.aura_regen)
+	var delay := maxf(0.0, p.regen_delay)
+	var h1 := h0 + stat * delay
+	if h1 >= target:
+		return (target - h0) / maxf(stat, 0.001)
+	return delay + (target - h1) / (float(p.max_hp) * Player.REST_REGEN + stat)
+
+
+## Кадр отдыха: буст при безопасности, откат при опасности.
+func _rest_tick(p: Player, hurt: bool) -> void:
+	if not rest_boost or accel <= 1.0:
+		return
+	var danger := hurt
+	for n in bot.get_tree().get_nodes_in_group("mobs"):
+		var m := n as Mob
+		if _alive(m) and m.target == p and _flat(m.global_position, p.global_position) < SAFE_RADIUS:
+			danger = true
+			break
+	if danger and _boosted:
+		boost_aborts += 1
+		bot.note("Кардинал: отдых — опасность рядом, перемотка снята")
+	_set_boost(not danger)
+
+
+## Отдых закончен: сверка с расчётом; расхождение больше REST_TOL — буст выключается до конца прогона.
+func _rest_done(p: Player) -> void:
+	var actual := game_t - _rest_t0
+	var err := absf(actual - _rest_pred) / maxf(_rest_pred, 0.001)
+	rests.append({"hp0": _rest_hp0, "predicted": snappedf(_rest_pred, 0.1), "actual": snappedf(actual, 0.1),
+		"error": snappedf(err, 0.01), "boost": rest_boost and accel > 1.0})
+	if rest_boost and accel > 1.0 and _rest_pred > 2.0 and err > REST_TOL:
+		rest_boost = false
+		boost_off_reason = "отдых %.1f с против расчёта %.1f с (расхождение %.0f %%)" % [actual, _rest_pred, err * 100.0]
+		bot.note("Кардинал: перемотка отдыха выключена — " + boost_off_reason)
+
+
+func _set_boost(on: bool) -> void:
+	if on == _boosted:
+		return
+	_boosted = on
+	if accel > 1.0:
+		Engine.time_scale = accel * (REST_BOOST if on else 1.0)
+		Engine.max_physics_steps_per_frame = maxi(8, int(ceil(Engine.time_scale * 3.0)))
+
+
 ## Итог прогона — машинный JSON (CARDINAL_ARCHITECTURE.md, «Отчёт»).
 func result() -> Dictionary:
 	var ttk := 0.0
@@ -342,6 +435,9 @@ func result() -> Dictionary:
 		"gold": int(finish.get("gold", 0)) - int(start.get("gold", 0)),
 		"ttk_avg": snappedf(ttk / maxf(float(kills.size()), 1.0), 0.01),
 		"time_split": t_split, "xp_mismatch": xp_mismatch, "kill_log": kills,
+		"clock": "Util.game_time",
+		"rest_boost": {"on": accel > 1.0, "boost": REST_BOOST, "game_sec": snappedf(boost_game, 0.1), "aborts": boost_aborts,
+			"off_reason": boost_off_reason, "rests": rests},
 		"diag": {"zone_mobs_start": zone_mobs_start, "respawned": respawned, "picks": picks, "abandoned": abandoned, "swings": swings, "idle_frames": idle_frames, "end_state": state},
 	}
 
