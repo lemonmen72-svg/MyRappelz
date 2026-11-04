@@ -322,8 +322,8 @@ func _check_stats(player: Player) -> void:
 	check(HeroStats.has_stats("assassin") and HeroStats.has_stats("warrior") and HeroStats.has_stats("wanderer"),
 		"статы — у всех профессий и Бродяги")
 	var s1 := HeroStats.base_stats("assassin", 1)
-	check(s1 == {"str": 21, "vit": 22, "agi": 25, "int": 18, "wis": 18, "dex": 25, "luck": 12},
-		"статы 1-го уровня (асура, Strider ур. проф. 3): %s" % [s1])
+	check(s1 == {"str": 20, "vit": 21, "agi": 24, "int": 17, "wis": 17, "dex": 24, "luck": 12},
+		"статы 1-го уровня (база Strider + 10 JLv Stepper + 1 JLv профессии): %s" % [s1])
 	var d1 := HeroStats.derived("assassin", 1)
 	var c := ClassData.cls("assassin")
 	check(int(d1["max_hp"]) == int(c["hp"]) and int(d1["patk"]) == int(c["atk"]) and int(d1["ratk"]) == int(c["atk"])

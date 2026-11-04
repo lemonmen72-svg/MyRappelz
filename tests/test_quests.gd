@@ -65,7 +65,7 @@ func run_step() -> void:
 			check(npcs.page == "quest" and npcs.buttons.has("accept"), "страница задания: «Взять задание»")
 			check(npcs.reply == String(QuestData.get_quest("kirk_first_card")["offer"]), "реплика при выдаче")
 			check(_has_text("Купить карту существа у Учителя Кирка") and _has_text("0/1"), "цель с прогрессом")
-			check(_find_live(hud._window, "reward_mirror_card") == null and _has_text("Опыт: 35"), "награда показана")
+			check(_find_live(hud._window, "reward_mirror_card") == null and _has_text("Опыт: %d" % int(QuestData.get_quest("kirk_first_card")["rewards"]["xp"])), "награда показана")
 			_press_dialog("accept")
 			check(q.state("kirk_first_card") == "active" and game.quests_active.has("kirk_first_card"), "задание взято")
 			check(game.quest_tracked == "kirk_first_card", "взятое задание отслеживается")
