@@ -61,3 +61,4 @@ test_vegetation 3
 test_vfx 4
 test_weapons 4
 perf 13
+test_cardinal 90
