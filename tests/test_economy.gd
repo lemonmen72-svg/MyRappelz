@@ -5,7 +5,7 @@ extends "res://tests/test_base.gd"
 ## трофей можно и ему). Подробно сумка — tests/test_inventory.gd, правила добычи — tests/test_loot.gd,
 ## зелья — tests/test_potions.gd.
 
-## Сколько фазанов можно убить в поисках добычи (мешочек со зверя теперь всегда: золото и 2 предмета).
+## Сколько фазанов можно убить в поисках добычи (мешочек со зверя всегда: 2 предмета, золото — с шансом 80 %).
 const MAX_KILLS := 3
 
 var mob: Mob = null
@@ -59,7 +59,7 @@ func run_step() -> void:
 				LootTable.item_count("pheasant"), n])
 			var mlvl: int = mob.level if is_instance_valid(mob) else 1
 			var gr: Array = MobData.gold_range("pheasant", mlvl)
-			check(drop_gold >= int(gr[0]) and drop_gold <= int(gr[1]), "золото в мешочке всегда: %d (%d–%d)" % [
+			check(drop_gold == 0 or (drop_gold >= int(gr[0]) and drop_gold <= int(gr[1])), "золото в мешочке (шанс 80 %%): %d (%d–%d)" % [
 				drop_gold, int(gr[0]), int(gr[1])])
 			gold_before = game.gold
 			counts_before = {}
