@@ -13,6 +13,9 @@ const FAMILIES := {
 	"panther": "panther", "turtle": "turtle", "pheasant": "pheasant", "wolf": "wolf", "centaur": "centaur",
 	"flyfish_drake": "flyfish", "anathema_chief": "anathema",
 }
+## Бой без умений один на один: какую долю HP герой может потерять (> 1 — проигрыш). Бойцы побеждают; маги в
+## оригинале сильны заклинаниями (обычная атака посохом), Зверолов — питомцем.
+const SOLO_LIMIT := {"neophyte": 2.0, "wizard": 2.0, "shaman": 2.0, "adept": 2.0, "beastmaster": 3.0}
 ## Зверь для проверки лечения в бою и вне боя.
 var regen_mob: Mob = null
 var regen_hp := 0
@@ -160,7 +163,7 @@ func _unit_jobs() -> void:
 			row += " %s %.0f%%/%.0fс" % [j, float(d[0]) * 100.0, float(d[1])]
 			# Зверолов в оригинале растит Интеллект и Мудрость (сила — через питомца): один без умений проигрывает,
 			# но не всухую
-			var lim := 3.0 if String(j) == "beastmaster" else 1.0
+			var lim := float(SOLO_LIMIT.get(String(j), 1.0))
 			check(float(d[0]) < lim and float(d[1]) < 60.0, "%s %d ур. против зверя своего уровня без умений: %.0f%% HP за %.0f с"
 				% [j, lvl, float(d[0]) * 100.0, float(d[1])])
 		print("  ур.%d (HP потеряно / время):%s" % [lvl, row])
