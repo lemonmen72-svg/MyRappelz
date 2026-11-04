@@ -39,7 +39,7 @@ func run_step() -> void:
 			step = 1
 		1:
 			# Шансы по полосам: по одной полосе за кадр (каждая попытка меняет сумку)
-			var bands: Array = [[1, 0.5], [5, 0.25], [11, 0.125], [16, 0.0625]]
+			var bands: Array = [[1, 1.0], [5, 0.7], [11, 0.25], [16, 0.09]]
 			if _band >= bands.size():
 				step = 2
 				return
@@ -359,7 +359,7 @@ func _check_save_load() -> void:
 ## Надетое оружие ломается при неудаче: снимается, лом в сумке, надеть нельзя.
 func _check_break_equipped(p: Player) -> void:
 	var inv: Inventory = game.inventory
-	Enchant.admin_set("weapon", 0, p)
+	Enchant.admin_set("weapon", 6, p)
 	var broke := false
 	for i in 60:
 		var cur: String = game.weapon
@@ -371,8 +371,8 @@ func _check_break_equipped(p: Player) -> void:
 			broke = true
 			check(game.weapon == "" and inv.has(ItemData.broken_id("weapon_sword_1h_r1")), "сломанный меч снят, лом в сумке")
 			break
-		Enchant.admin_set("weapon", 0, p)
-	check(broke, "за 60 попыток меч хоть раз сломался (шанс неудачи 50 %)")
+		Enchant.admin_set("weapon", 6, p)
+	check(broke, "за 60 попыток +6 → +7 меч хоть раз сломался (шанс неудачи 50 %)")
 	var br := ItemData.broken_id("weapon_sword_1h_r1")
 	check(game.equip_weapon(br) == Game.BROKEN_EQUIP and p.equip(br) != "", "сломанное не надеть: %s" % game.equip_weapon(br))
 	check(game.offhand == "" or game.offhand_block(game.offhand) == "", "вторая рука — по правилам после поломки")
@@ -414,7 +414,7 @@ func _check_craft_ui(p: Player) -> void:
 	win.select_cell(inv.find_cell("cube_defense_r1"))
 	win._on_cell("craft", 1)
 	check(win.craft_cube == "cube_defense_r1", "касание пустой ячейки куба — положить выбранный куб")
-	check(_has_text("шанс 50%") and _has_text("Предел кубами: +10") and _has_text("сломается"), "шанс, предел и риск на панели")
+	check(_has_text("шанс 100%") and _has_text("Предел кубами: +10") and _has_text("сломается"), "шанс, предел и риск на панели")
 	# Крафт с подтверждением
 	_wpress("act_craft")
 	check(win.craft_confirm and win.buttons.has("act_craft_yes") and win.buttons.has("act_craft_no"), "подтверждение при риске")
