@@ -33,6 +33,8 @@ func _build() -> void:
 	if not quick:
 		do("Неудача с зеркальной картой", _fail_mark.bind(card))
 		until("зверь с меткой побеждён (неудача)", _won, FIGHT + 3.0)
+		# Исход решается по сигналу gone (после анимации смерти), а не в миг is_dead
+		until("исход приручения решён (неудача)", _resolved, 4.0)
 		do("Неудача: сломалась зеркальная карта", _fail_check.bind(card))
 	do("Приручение: конец", _end)
 
@@ -104,6 +106,11 @@ func _won() -> bool:
 	return false
 
 
+func _resolved() -> bool:
+	var tm := bot.main.get("taming") as Taming
+	return tm != null and tm.attempts > _attempts0
+
+
 func _soul_caught() -> bool:
 	return Game.inventory.has(ItemData.soul_card_for(SPECIES))
 
@@ -140,6 +147,7 @@ func _fail_mark(card: String) -> void:
 	var tm := bot.main.get("taming") as Taming
 	tm.cooldown = 0.0
 	tm.force_roll = 0.99
+	_attempts0 = tm.attempts
 	press("tame")
 	check(tm.marked == _mob, "метка на втором звере")
 	bot.set_tick(_fight)
