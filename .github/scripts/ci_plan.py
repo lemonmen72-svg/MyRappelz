@@ -6,7 +6,9 @@
 GitHub API compare (push: before…sha, pull_request: base…head); не удалось узнать (новая ветка, ошибка сети,
 больше 300 файлов) — снимки идут. Ручной запуск (workflow_dispatch): части — из полей запуска.
 
-Окружение: EVENT, REPO, TOKEN, BEFORE, AFTER, BASE, HEAD, SHOTS_PARTS (число частей), PERF_PARTS (группы пресетов
+Метка «[no-shots]» в сообщении последнего коммита push (COMMIT_MSG) — без снимков и замера (быстрые итерации
+автотестов; снимки — следующим пушем без метки или ручным запуском).
+Окружение: EVENT, REPO, TOKEN, BEFORE, AFTER, BASE, HEAD, COMMIT_MSG, SHOTS_PARTS (число частей), PERF_PARTS (группы пресетов
 через пробел, например «0,1 2,3»), INPUT_SHOTS («all» / «none» / «1,3»), INPUT_PERF («true»/«false»).
 Выход (GITHUB_OUTPUT): visual, shots (JSON-список номеров частей), perf (JSON-список групп), full (все части).
 Проверка правил без сети: python3 -I .github/scripts/ci_plan.py --files путь1 путь2 …
@@ -104,6 +106,9 @@ def main(argv):
 			pic = bool(pic_files)
 			reason = "изменено файлов %d, влияют на картинку %d%s" % (len(files), len(pic_files),
 				(": " + ", ".join(pic_files[:10]) + (" …" if len(pic_files) > 10 else "")) if pic_files else "")
+		if pic and "[no-shots]" in os.environ.get("COMMIT_MSG", ""):
+			pic = False
+			reason += "; метка [no-shots] — без снимков"
 		shots = list(range(1, n + 1)) if pic else []
 		perf = perf_groups if pic else []
 	visual = bool(shots or perf)

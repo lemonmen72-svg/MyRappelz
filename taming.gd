@@ -22,7 +22,9 @@ const RANGE := 8.0
 const MARK_TIME := 30.0
 const COOLDOWN := 3.0
 ## Шанс успеха по тиру карты (ItemData.CARD_TIERS): базовая проще, уникальная сложнее.
-const CHANCE := {"basic": 0.7, "rare": 0.45, "special": 0.35, "unique": 0.25}
+## Шанс по тиру карты — база оригинала (MonsterResource taming_percentage): пантера, черепаха, фазан 80 %, волк 25 %,
+## кентавр 2 %; уникальный тир — 1 %.
+const CHANCE := {"basic": 0.8, "rare": 0.25, "special": 0.02, "unique": 0.01}
 ## Состояния значка приручения на панели цели (badge_state).
 const BADGE_READY := "ready"
 const BADGE_NEED_CARD := "need_card"

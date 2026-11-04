@@ -68,6 +68,7 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
           INPUT_SHOTS: ${{ inputs.shots }}
           INPUT_PERF: ${{ inputs.perf }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: python3 -I .github/scripts/ci_plan.py
 
       - name: Где выполнять (ноутбук или GitHub)
