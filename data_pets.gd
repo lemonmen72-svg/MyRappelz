@@ -4,13 +4,32 @@ extends RefCounted
 ## id вида совпадает с id зверя (MobData.TYPES). Названия стадий свои.
 ## Полная система характеристик (7 статов, производные, MP) — PetStats, изучаемые умения и JP — PetSkills.
 
-const MAX_LEVEL := 50
+const MAX_LEVEL := 130
 ## Доля опыта убитого зверя, которую получает призванный питомец.
 const XP_SHARE := 0.6
-## Уровни, с которых начинаются стадии эволюции.
-const STAGE_LEVELS := [1, 15, 30]
+## Эволюция — вручную у Учителя Кирка (решение Максима, как в оригинале): во 2-ю форму с 50 ур., в 3-ю — со 100.
+## Позже — сверх-эволюция: +SUPER_PER_LEVEL ко всем статам за каждый уровень сверх порога, до SUPER_MAX
+## (на 60 и 115 ур. — полная). Стадия — поле записи "stage", уровни эволюций — "evo" [ур. 1-й, ур. 2-й].
+## (В формуле сервера оригинала уровень эволюции статы не меняет: стат = база формы + прирост формы × уровень.)
+const EVOLVE_LEVELS := [50, 100]
+## Уровни, с которых возможна стадия 0 / 1 / 2 (для перебора стадий).
+const STAGE_LEVELS := [1, 50, 100]
+const SUPER_LEVELS := [60, 115]
+const SUPER_PER_LEVEL := 0.01
+const SUPER_MAX := [0.1, 0.15]
+## Опыт до следующего уровня существа 1…130 (SummonLevelResource оригинала: разница normal_exp).
+const XP_TABLE := [12, 26, 57, 128, 256, 432, 708, 1066, 1380, 2203, 3125, 4378, 5812, 7448, 9240, 11468, 14132, 16800,
+	24833, 29427, 33972, 39140, 44800, 51208, 58100, 65284, 73383, 82051, 110864, 123060, 135854, 149248, 164190, 179629,
+	196560, 213331, 231650, 251596, 329472, 355680, 383796, 411908, 442247, 474912, 507300, 542082, 579360, 616327, 797328,
+	848966, 900211, 955199, 1013277, 1071346, 1133000, 1197912, 1262816, 1331517, 1707861, 1799200, 1893294, 1989085,
+	2090592, 2193868, 2300076, 2408640, 2522704, 2642431, 3375520, 3530261, 3688265, 3853710, 4018310, 4195576, 4372039,
+	4556390, 4744320, 4935827, 6297689, 6551288, 6815525, 7078716, 7352721, 7638796, 7922768, 8219033, 8527927, 8834605,
+	11263898, 11668438, 12089297, 12517248, 12953501, 13405584, 13856237, 14333154, 14807382, 15300806, 19509292, 20145506,
+	20803280, 21474062, 22165640, 22858500, 23572456, 24310989, 25049349, 25811145, 32933405, 33934912, 34954267, 35988186,
+	37053494, 38137344, 39236272, 40352131, 41500752, 42666826, 54220865, 55466422, 56717405, 57973524, 59261486, 60554408,
+	61854135, 63183715, 64517760, 65855966]
 ## Стадии: множитель размера модели, доля сдвига цвета к цвету эволюции.
-## Скачок характеристик на эволюции дают таблицы статов (PetStats.TABLES).
+## Скачок характеристик на эволюции — база следующей формы (PetStats.FORMS).
 const STAGES := [
 	{"scale": 1.0, "tint": 0.0},
 	{"scale": 1.2, "tint": 0.45},
@@ -102,33 +121,29 @@ static func skill(id: String) -> Dictionary:
 	return SKILLS[role(id)]
 
 
-## Номер стадии эволюции (0, 1, 2) для уровня.
-static func stage_for(lvl: int) -> int:
-	var s := 0
-	for i in STAGE_LEVELS.size():
-		if lvl >= int(STAGE_LEVELS[i]):
-			s = i
-	return s
+## Стадия эволюции записи питомца (0, 1, 2).
+static func stage_of(rec: Dictionary) -> int:
+	return clampi(int(rec.get("stage", 0)), 0, STAGES.size() - 1)
 
 
-## Название стадии вида на этом уровне (оно же имя питомца).
-static func stage_name(id: String, lvl: int) -> String:
+## Название стадии вида (оно же имя питомца).
+static func stage_name(id: String, stage: int) -> String:
 	var names: Array = get_species(id)["stages"]
-	return String(names[stage_for(lvl)])
+	return String(names[clampi(stage, 0, names.size() - 1)])
 
 
-static func stage_color(id: String, lvl: int) -> Color:
+static func stage_color(id: String, stage: int) -> Color:
 	var base: Color = MobData.get_type(id)["color"]
 	var evo: Color = get_species(id)["evo_color"]
-	var st: Dictionary = STAGES[stage_for(lvl)]
+	var st: Dictionary = STAGES[clampi(stage, 0, STAGES.size() - 1)]
 	return base.lerp(evo, float(st["tint"]))
 
 
 ## Оттенок текстуры модели из файла на стадии: белый на 1-й стадии, на старших мягко сдвигается
 ## к evo_color (текстура не перекрашивается целиком).
-static func asset_tint(id: String, lvl: int) -> Color:
+static func asset_tint(id: String, stage: int) -> Color:
 	var evo: Color = get_species(id)["evo_color"]
-	var st: Dictionary = STAGES[stage_for(lvl)]
+	var st: Dictionary = STAGES[clampi(stage, 0, STAGES.size() - 1)]
 	return Color.WHITE.lerp(evo, float(st["tint"]) * 0.4)
 
 
@@ -137,18 +152,60 @@ static func fx_color(id: String, fallback: Color) -> Color:
 	return get_species(id).get("fx_color", fallback)
 
 
-static func stage_scale(id: String, lvl: int) -> float:
-	var st: Dictionary = STAGES[stage_for(lvl)]
+static func stage_scale(id: String, stage: int) -> float:
+	var st: Dictionary = STAGES[clampi(stage, 0, STAGES.size() - 1)]
 	return float(get_species(id)["scale"]) * float(st["scale"])
 
 
 ## Характеристики питомца: max_hp, max_mp, atk (главная атака роли), def (int), speed, range, cd (float)
 ## и остальные из PetStats.derived (7 статов, маг. атака, точность, крит…). skills / toggles — из записи питомца.
-static func stats_for(id: String, lvl: int, skills: Dictionary = {}, toggles: Dictionary = {}) -> Dictionary:
-	return PetStats.derived(id, lvl, skills, toggles)
+static func stats_for(id: String, lvl: int, skills: Dictionary = {}, toggles: Dictionary = {}, stage: int = 0) -> Dictionary:
+	return PetStats.derived(id, lvl, skills, toggles, {}, stage)
 
 
-## Опыт до следующего уровня питомца.
+## Характеристики питомца по записи rec (вид, уровень, стадия, сверх-эволюция, умения).
+static func stats_of(rec: Dictionary) -> Dictionary:
+	return PetStats.derived(String(rec.get("species", "boar")), int(rec.get("level", 1)), rec.get("skills", {}),
+		rec.get("toggles", {}), {}, stage_of(rec), super_bonus(rec))
+
+
+## Опыт до следующего уровня питомца (таблица оригинала XP_TABLE).
 static func xp_to_next(lvl: int) -> int:
-	var l := float(lvl)
-	return int(20.0 + 10.0 * l + 1.5 * l * l)
+	return int(XP_TABLE[clampi(lvl, 1, XP_TABLE.size()) - 1])
+
+
+## Можно ли эволюционировать запись rec: "" — да, иначе причина.
+static func evolve_block(rec: Dictionary) -> String:
+	var st := stage_of(rec)
+	if st >= EVOLVE_LEVELS.size():
+		return "Это последняя форма"
+	var need := int(EVOLVE_LEVELS[st])
+	if int(rec.get("level", 1)) < need:
+		return "Эволюция — с %d ур. (сверх-эволюция — на %d ур.)" % [need, int(SUPER_LEVELS[st])]
+	if bool(rec.get("dead", false)):
+		return "Сначала воскресите питомца"
+	return ""
+
+
+## Прибавка сверх-эволюции к статам записи rec (доля): за каждую эволюцию — SUPER_PER_LEVEL за уровень сверх
+## порога, до SUPER_MAX.
+static func super_bonus(rec: Dictionary) -> float:
+	var evo: Array = rec.get("evo", [])
+	var b := 0.0
+	for i in mini(evo.size(), EVOLVE_LEVELS.size()):
+		b += minf(float(SUPER_MAX[i]), SUPER_PER_LEVEL * float(maxi(0, int(evo[i]) - int(EVOLVE_LEVELS[i]))))
+	return b
+
+
+## Эволюционировать запись rec (без проверок — их делает evolve_block): стадия +1, уровень эволюции в "evo",
+## имя — по новой стадии (если было имя стадии).
+static func evolve_record(rec: Dictionary) -> void:
+	var sp := String(rec.get("species", ""))
+	var old_name := String(rec.get("name", ""))
+	var st := stage_of(rec)
+	var evo: Array = rec.get("evo", [])
+	evo.append(int(rec.get("level", 1)))
+	rec["evo"] = evo
+	rec["stage"] = st + 1
+	if old_name == "" or old_name == stage_name(sp, st):
+		rec["name"] = stage_name(sp, st + 1)

@@ -1,75 +1,30 @@
 class_name PetStats
 extends RefCounted
-## Характеристики питомцев (по образцу Rappelz, механика и числа — из вики, оформление своё).
-## 7 статов: Сила, Выносливость, Ловкость, Интеллект, Мудрость, Меткость, Удача — по таблицам вики
-## с опорными точками по уровню и стадии эволюции (между точками — линейная интерполяция).
-## Уровень вики = наш уровень / 0.3 (у нас макс. 50 и эволюция на 15 и 30, в оригинале — 150 и 50/100).
-## Из статов — производные значения нашего масштаба (общие формулы с героем — Stats, сборка — derived()).
-## У каждого вида они калибруются так, что на 1 уровне равны hp/atk/def из PetData.SPECIES (подобраны под
-## зверей мира MobStats: питомец своего уровня почти на равных со зверем своего уровня — зверь чуть сильнее), дальше
-## растут по статам × (1 + LEVEL_GROWTH·(L − LEVEL_GROWTH_FROM)) × STAGE_POWER стадии (HP, атаки, лечение).
-## Исходные таблицы и расчёт баланса — tools/rappelz_pet_reference.md.
+## Характеристики питомцев по базе оригинала (tools/rappelz_db_reference.md, «Существа»): 7 статов формы —
+## база формы (StatResource) + прирост формы (CreatureLevelBonus) × уровень (так считает сервер:
+## GameContent::GetSummonLevelBonus × уровень, StructSummon::applyJobLevelBonus); производные — общие формулы
+## сервера (Stats) с множителем статов существа FCM 0.7 (StructSummon::GetFCM). Формы — 1-я (с 1 ур.), 2-я и 3-я
+## (эволюция у Учителя Кирка с 50 и 100 ур., PetData.EVOLVE_LEVELS), сверх-эволюция — + доля ко всем статам
+## (PetData.super_bonus). Роли у нас свои: статы пантеры, фазана и волка переставлены под роль (SWAP).
 
 const STATS := Stats.STATS
 const STAT_NAMES := Stats.STAT_NAMES
-## Наш уровень → уровень вики: уровень / WIKI_LEVEL_SCALE.
-const WIKI_LEVEL_SCALE := Stats.WIKI_LEVEL_SCALE
 ## Множитель урона крита питомца (сила крита сервера 80 — как у всех).
 const CRIT_MULT := 1.8
-## Сила питомца против зверей мира (MobStats растут по статам героя с весом уровня 2.5, а статы питомца — по
-## таблицам вики): с LEVEL_GROWTH_FROM ур. HP, атаки и лечение × (1 + LEVEL_GROWTH·(L − LEVEL_GROWTH_FROM)) — без
-## этого питомец на 2-й и 3-й стадии отстаёт от зверей своего уровня (на 1-й стадии таблицы вики растут быстрее
-## зверей сами), и × STAGE_POWER стадии: на эволюции таблицы вики почти удваивают статы, питомец заметно крепнет,
-## но не становится вдвое сильнее зверей своего уровня. Итог (Combat.power_ratio зверя своего уровня против
-## питомца, 10–30 ур., звери с HP ×MobStats.MOB_HP_MULT): ≈ 0.97–1.25 у всех видов — почти на равных, зверь чуть
-## сильнее (у героя без умений ≈ 3); на 1–9 ур. звери слабее (вход новичка MobStats.MOB_HP_START, MOB_ATK_START) —
-## 0.13–1.0. Расчёт — tools/rappelz_pet_reference.md, «Питомец против зверей мира».
-const LEVEL_GROWTH := 0.01
-const LEVEL_GROWTH_FROM := 15
-const STAGE_POWER := [1.0, 0.72, 0.65]
+## Множитель статов существа в формулах (FCM сервера).
+const FCM := 0.7
 
-## Опорные точки статов: по стадии эволюции — список [уровень вики, [Str, Vit, Agi, Int, Wis, Dex, Luck]].
-## Стадия с одной точкой растёт с наклоном предыдущей стадии. Числа пантеры, черепахи, фазана и кентавра — из вики
-## (Pantera, Tortus, Poultry, Kentauros; стадия улучшения 0) до обмена статов под нашу роль (SWAP).
-## Кабан, волк и страж — своя раскладка тех же столбцов (у стража ×1.25: уникальный зверь).
-const TABLES := {
-	"panther": [
-		[[1, [16, 14, 5, 10, 8, 7, 10]], [60, [38, 34, 12, 24, 19, 17, 10]]],
-		[[60, [72, 64, 23, 45, 36, 31, 20]], [115, [91, 80, 29, 56, 46, 39, 20]]],
-		[[150, [119, 104, 37, 74, 60, 52, 30]]],
-	],
-	"turtle": [
-		[[1, [14, 16, 5, 10, 8, 7, 10]], [60, [34, 38, 12, 24, 19, 17, 10]]],
-		[[60, [64, 72, 23, 45, 36, 31, 20]], [115, [80, 91, 29, 56, 46, 39, 20]]],
-		[[150, [104, 119, 37, 74, 60, 52, 30]]],
-	],
-	"pheasant": [
-		[[1, [14, 7, 5, 10, 8, 16, 10]], [60, [34, 17, 12, 24, 19, 38, 10]]],
-		[[60, [64, 31, 23, 45, 36, 72, 20]], [115, [80, 39, 29, 56, 46, 91, 20]]],
-		[[150, [104, 52, 37, 74, 60, 119, 30]]],
-	],
-	"boar": [
-		[[1, [16, 14, 8, 5, 7, 10, 10]], [60, [38, 34, 19, 12, 17, 24, 10]]],
-		[[60, [72, 64, 36, 23, 31, 45, 20]], [115, [91, 80, 46, 29, 39, 56, 20]]],
-		[[150, [119, 104, 60, 37, 52, 74, 30]]],
-	],
-	"wolf": [
-		[[1, [16, 8, 14, 5, 7, 10, 10]], [60, [38, 19, 34, 12, 17, 24, 10]]],
-		[[60, [72, 36, 64, 23, 31, 45, 20]], [115, [91, 46, 80, 29, 39, 56, 20]]],
-		[[150, [119, 60, 104, 37, 52, 74, 30]]],
-	],
-	# Кентавр — числа вики (Kentauros, существо 4-го тира: статы выше, чем у пантеры), без обмена: Сила главная
-	"centaur": [
-		[[1, [23, 17, 8, 12, 12, 8, 10]], [60, [55, 41, 19, 28, 28, 19, 10]]],
-		[[60, [98, 72, 33, 50, 50, 33, 20]], [115, [130, 95, 45, 67, 67, 45, 20]]],
-		[[150, [168, 124, 58, 87, 87, 58, 30]]],
-	],
-	"golem": [
-		[[1, [18, 20, 6, 9, 10, 12, 12]], [60, [42, 48, 15, 21, 24, 30, 12]]],
-		[[60, [80, 90, 29, 39, 45, 56, 25]], [115, [100, 114, 36, 49, 58, 70, 25]]],
-		[[150, [130, 149, 46, 65, 75, 92, 38]]],
-	],
+## Формы вида: {"base": 7 статов, "grow": прирост за уровень} — порядок Stats.STATS (Сила, Вын, Ловк, Инт, Мдр,
+## Метк, Удача). У 3-й формы в базе прироста нет (до 100 ур. у нас не дойти) — берём прирост 2-й.
+const FORMS := {
+	"panther": [{"base": [16, 14, 5, 10, 8, 7, 10], "grow": [0.367, 0.334, 0.117, 0.234, 0.184, 0.167, 0]}, {"base": [69, 61, 22, 43, 35, 30, 20], "grow": [0.334, 0.288, 0.107, 0.197, 0.167, 0.137, 0]}, {"base": [119, 104, 37, 74, 60, 52, 30], "grow": [0.334, 0.288, 0.107, 0.197, 0.167, 0.137, 0]}],
+	"turtle": [{"base": [14, 16, 5, 10, 8, 7, 10], "grow": [0.334, 0.367, 0.117, 0.234, 0.184, 0.167, 0]}, {"base": [61, 69, 22, 43, 35, 30, 20], "grow": [0.288, 0.334, 0.107, 0.197, 0.167, 0.137, 0]}, {"base": [104, 119, 37, 74, 60, 52, 30], "grow": [0.288, 0.334, 0.107, 0.197, 0.167, 0.137, 0]}],
+	"pheasant": [{"base": [14, 7, 5, 10, 8, 16, 10], "grow": [0.334, 0.167, 0.117, 0.234, 0.184, 0.367, 0]}, {"base": [61, 30, 22, 43, 35, 69, 20], "grow": [0.288, 0.137, 0.107, 0.197, 0.167, 0.334, 0]}, {"base": [104, 52, 37, 74, 60, 119, 30], "grow": [0.288, 0.137, 0.107, 0.197, 0.167, 0.334, 0]}],
+	"wolf": [{"base": [14, 10, 12, 8, 9, 7, 10], "grow": [0.367, 0.2, 0.317, 0.184, 0.2, 0.15, 0]}, {"base": [64, 43, 59, 31, 39, 29, 20], "grow": [0.622, 0.304, 0.304, 0.197, 0.197, 0.182, 0]}, {"base": [134, 81, 101, 56, 66, 52, 30], "grow": [0.622, 0.304, 0.304, 0.197, 0.197, 0.182, 0]}],
+	"centaur": [{"base": [23, 17, 8, 12, 12, 8, 10], "grow": [0.534, 0.4, 0.184, 0.267, 0.267, 0.184, 0]}, {"base": [98, 72, 34, 51, 51, 34, 20], "grow": [0.485, 0.349, 0.167, 0.243, 0.243, 0.167, 0]}, {"base": [168, 124, 58, 87, 87, 58, 30], "grow": [0.485, 0.349, 0.167, 0.243, 0.243, 0.167, 0]}],
 }
+## Ушедшие из мира виды (кабан, страж — питомцы старых сохранений до перевода): формы волка и черепахи.
+const FORM_ALIAS := {"boar": "wolf", "golem": "turtle"}
 ## Обмен статов под нашу роль: пантера у нас маг (Сила ↔ Интеллект: урон от Интеллекта),
 ## фазан — лекарь (Меткость ↔ Мудрость: лечение от Мудрости). Черепаха — танк, как в оригинале.
 ## Волк — боец-«существо ловкости» (Сила ↔ Ловкость): Ловкость главная — скорость атаки, уклонение, крит.
@@ -83,48 +38,34 @@ const DERIVED_NAMES := [
 ]
 
 
-## Уровень вики для нашего уровня.
-static func wiki_level(lvl: int) -> float:
-	return Stats.wiki_level(lvl)
+## Форма вида (словарь FORMS) стадии stage.
+static func form(species: String, stage: int) -> Dictionary:
+	var fs: Array = FORMS.get(FORM_ALIAS.get(species, species), FORMS["wolf"])
+	return fs[clampi(stage, 0, fs.size() - 1)]
 
 
-## 7 статов вида на уровне (с обменом под роль, без бонусов умений): {"str": int, ...}.
-static func base_stats(species: String, lvl: int) -> Dictionary:
-	var tab: Array = TABLES.get(species, TABLES["boar"])
+## 7 статов вида на уровне lvl в форме stage (с обменом под роль, без бонусов умений): {"str": int, ...}.
+## sup — прибавка сверх-эволюции (доля, PetData.super_bonus).
+static func base_stats(species: String, lvl: int, stage: int = 0, sup: float = 0.0) -> Dictionary:
+	var f := form(species, stage)
 	var lv := clampi(lvl, 1, PetData.MAX_LEVEL)
-	var st := PetData.stage_for(lv)
-	var w := wiki_level(lv)
 	var res: Dictionary = {}
 	for i in STATS.size():
-		res[STATS[i]] = roundi(_interp(tab, st, i, w))
+		var v := float((f["base"] as Array)[i]) + float((f["grow"] as Array)[i]) * float(lv)
+		res[STATS[i]] = int(floor(v * (1.0 + sup)))
 	var sw: Array = SWAP.get(species, [])
 	if sw.size() == 2:
-		var a := String(sw[0])
-		var b := String(sw[1])
-		var t: int = res[a]
-		res[a] = res[b]
-		res[b] = t
+		var x := String(sw[0])
+		var y := String(sw[1])
+		var t: int = res[x]
+		res[x] = res[y]
+		res[y] = t
 	return res
 
 
-## Значение стата i на стадии st для уровня вики w: линейно между опорными точками стадии,
-## за краями — продолжение ближайшего отрезка; у стадии с одной точкой — наклон предыдущей стадии.
-static func _interp(tab: Array, st: int, i: int, w: float) -> float:
-	var pts: Array = tab[st]
-	if pts.size() == 1:
-		var p: Array = pts[0]
-		var sl := 0.0
-		if st > 0:
-			sl = Stats.slope(tab[st - 1], i)
-		return float(p[1][i]) + sl * (w - float(p[0]))
-	return Stats.interp(pts, i, w)
-
-
 # ---------- Производные значения ----------
-# «Сырые» формулы — общие с героем (Stats.raw_*). L — наш уровень. Вид ведут: HP — Выносливость, физ. атаку —
-# Сила, маг. атаку — Интеллект, лечение и MP — Мудрость, защиту — Выносливость и Ловкость, точность — Меткость,
-# уклонение, крит и скорость атаки — Ловкость и Удача. Прибавка за уровень — как в Rappelz (HP ≈ 33·Vit + 20·Lv),
-# пересчитанная на нашу шкалу уровней; подобрана расчётом (tools/rappelz_pet_reference.md).
+# Формулы сервера (Stats) с FCM существа: HP 30·Вын·0.7 + 20·L, атака 2·Сила·0.7 + L, маг. атака 2·Инт·0.7 + L,
+# защиты 2·Вын/Мдр·0.7 + L, точность 0.5·Метк·0.7 + L, уклонение 0.5·Ловк·0.7 + L, крит 0.2·Удача + 3 %.
 
 ## Главная атака роли: маг и лекарь — магическая (Интеллект), танк и боец — физическая (Сила).
 static func is_magic(species: String) -> bool:
@@ -132,29 +73,18 @@ static func is_magic(species: String) -> bool:
 	return r == "mage" or r == "healer"
 
 
-## Множители калибровки вида: на 1 уровне HP, главная атака и защита = hp/atk/def из PetData.SPECIES.
-static func calibration(species: String) -> Dictionary:
-	var sp := PetData.get_species(species)
-	var s1 := base_stats(species, 1)
-	var main1 := Stats.raw_matk(s1, 1.0) if is_magic(species) else Stats.raw_patk(s1, 1.0)
-	return {
-		"hp": float(sp["hp"]) / Stats.raw_hp(s1, 1.0),
-		"atk": float(sp["atk"]) / main1,
-		"def": float(sp["def"]) / Stats.raw_pdef(s1, 1.0),
-	}
-
-
 ## Все характеристики питомца вида species на уровне lvl с изученными умениями skills {id: уровень}
-## и включёнными переключаемыми умениями toggles {id: true}.
+## и включёнными переключаемыми умениями toggles {id: true}; stage — форма (0..2), sup — сверх-эволюция (доля).
 ## Ключи: stats (7 статов с бонусами), max_hp, max_mp, patk, matk, heal, atk (главная атака роли),
-## def, mdef, acc (точность), avoid (избегание), eva и crit (%, 0..100), aspd (% скорости атаки), hp_regen и mp_regen (в секунду),
-## speed, range, cd (перезарядка обычной атаки с учётом скорости), threat (шанс перехватить внимание зверя 0..1).
+## def, mdef, acc (точность), avoid (уклонение), eva и crit (%, 0..100), aspd (% скорости атаки), hp_regen и mp_regen
+## (в секунду), speed, range, cd (перезарядка обычной атаки с учётом скорости), threat (шанс перехватить внимание 0..1).
 ## extra — прибавки 7 статов от героя ({"str": 3, …}: ауры и усиления «питомцевых» профессий, PetBond.stat_extra).
-static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles: Dictionary = {}, extra: Dictionary = {}) -> Dictionary:
+static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles: Dictionary = {}, extra: Dictionary = {},
+		stage: int = 0, sup: float = 0.0) -> Dictionary:
 	var sp := PetData.get_species(species)
 	var lv := clampi(lvl, 1, PetData.MAX_LEVEL)
 	var bon := PetSkills.bonuses(species, skills, toggles)
-	var s := base_stats(species, lv)
+	var s := base_stats(species, lv, stage, sup)
 	var all_up := int(bon.get("all_stats", 0))
 	if all_up != 0:
 		for key in STATS:
@@ -163,40 +93,25 @@ static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles:
 	for key in extra:
 		if s.has(key):
 			s[key] = int(s[key]) + roundi(float(extra[key]))
-	var k := calibration(species)
-	var kh := float(k["hp"])
-	var ka := float(k["atk"])
-	var kd := float(k["def"])
 	var atk_mult := 1.0 + float(bon.get("atk_pct", 0.0))
 	var def_mult := 1.0 + float(bon.get("def_pct", 0.0))
-	# Сила редкости вида (MobData.power: базовые 1.0, «Обычный» волк 1.15…) — на HP, атаки, лечение и защиты
-	var pw := MobData.power(species)
-	kh *= pw
-	ka *= pw
-	kd *= pw
-	# Рост по уровню и сила стадии (HP, атаки, лечение; защита — только по статам)
-	var grow := (1.0 + LEVEL_GROWTH * float(maxi(0, lv - LEVEL_GROWTH_FROM))) * float(STAGE_POWER[PetData.stage_for(lv)])
-	kh *= grow
-	ka *= grow
 	var r := {"stats": s}
 	var lf := float(lv)
-	r["max_hp"] = roundi(kh * Stats.raw_hp(s, lf) * (1.0 + float(bon.get("hp_pct", 0.0))))
-	# MP — новая величина, без калибровки: Мудрость ×2, Интеллект, 4 за уровень и запас 15
-	r["max_mp"] = roundi(Stats.raw_mp(s, lf) * (1.0 + float(bon.get("mp_pct", 0.0))))
-	r["patk"] = maxi(1, roundi(ka * Stats.raw_patk(s, lf) * atk_mult))
-	r["matk"] = maxi(1, roundi(ka * Stats.raw_matk(s, lf) * atk_mult))
-	r["heal"] = maxi(1, roundi(ka * Stats.raw_heal(s, lf)))
+	r["max_hp"] = roundi(Stats.raw_hp(s, lf, FCM) * (1.0 + float(bon.get("hp_pct", 0.0))))
+	r["max_mp"] = roundi(Stats.raw_mp(s, lf, FCM) * (1.0 + float(bon.get("mp_pct", 0.0))))
+	r["patk"] = maxi(1, roundi(Stats.raw_patk(s, lf, FCM) * atk_mult))
+	r["matk"] = maxi(1, roundi(Stats.raw_matk(s, lf, FCM) * atk_mult))
+	r["heal"] = maxi(1, roundi(Stats.raw_heal(s, lf, FCM)))
 	r["atk"] = int(r["matk"]) if is_magic(species) else int(r["patk"])
-	r["def"] = roundi(kd * Stats.raw_pdef(s, lf) * def_mult) + int(bon.get("def_flat", 0))
-	# Маг. защита — от ударов пантеры и фазана (их атака магическая, MobStats)
-	r["mdef"] = roundi(kd * Stats.raw_mdef(s, lf) * def_mult)
-	# Точность против избегания зверя и уровни — Combat.hit_chance
-	r["acc"] = Stats.accuracy(s, lf, float(bon.get("acc", 0.0)))
-	r["avoid"] = Stats.avoidance(s, lf)
+	r["def"] = roundi(Stats.raw_pdef(s, lf, FCM) * def_mult) + int(bon.get("def_flat", 0))
+	r["mdef"] = roundi(Stats.raw_mdef(s, lf, FCM) * def_mult)
+	# Точность против уклонения зверя и уровни — Combat.hit_chance
+	r["acc"] = Stats.accuracy(s, lf, float(bon.get("acc", 0.0)), FCM)
+	r["avoid"] = Stats.avoidance(s, lf, FCM)
 	r["eva"] = snappedf(Stats.evasion(s, lf) + float(bon.get("eva", 0.0)), 0.1)
 	r["crit"] = snappedf(Stats.crit_chance(s) + float(bon.get("crit", 0.0)), 0.1)
 	r["aspd"] = Stats.attack_speed(s)
-	r["hp_regen"] = snappedf(kh * Stats.raw_hp_regen(s, lf) + float(bon.get("hp_regen", 0.0)), 0.1)
+	r["hp_regen"] = snappedf(Stats.raw_hp_regen(s, lf) * FCM + float(bon.get("hp_regen", 0.0)), 0.1)
 	r["mp_regen"] = snappedf(Stats.mp_regen(s, lf) + float(bon.get("mp_regen", 0.0)), 0.1)
 	r["threat"] = float(bon.get("threat", 0.0))
 	r["speed"] = float(sp["speed"])
@@ -207,8 +122,8 @@ static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles:
 
 ## Профиль питомца вида species уровня lvl для оценки силы (Combat.power_ratio против зверя мира; как
 ## Combat.profile_of у призванного питомца).
-static func combat_profile(species: String, lvl: int, skills: Dictionary = {}, toggles: Dictionary = {}) -> Dictionary:
-	var d := derived(species, lvl, skills, toggles)
+static func combat_profile(species: String, lvl: int, skills: Dictionary = {}, toggles: Dictionary = {}, stage: int = 0) -> Dictionary:
+	var d := derived(species, lvl, skills, toggles, {}, stage)
 	return {
 		"level": clampi(lvl, 1, PetData.MAX_LEVEL), "max_hp": int(d["max_hp"]), "atk": int(d["atk"]),
 		"magic": is_magic(species), "def": int(d["def"]), "mdef": int(d["mdef"]), "acc": int(d["acc"]),

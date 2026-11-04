@@ -60,7 +60,7 @@ func hero_level() -> int:
 
 
 func before_start() -> void:
-	game.active_pet = game.add_pet("wolf", PetData.stage_name("wolf", 10), 10)
+	game.active_pet = game.add_pet("wolf", PetData.stage_name("wolf", 0), 10)
 
 
 ## Записи кадров одного отрезка и оценки (см. шапку).

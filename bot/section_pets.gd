@@ -40,11 +40,11 @@ func _build() -> void:
 		until("«%s» применил умение" % nm, _skill_used, 14.0)
 		do("«%s»: итог умений" % nm, _skills_done)
 		do("«%s»: опыт и уровень" % nm, _xp)
-		do("«%s»: эволюция до 15 ур." % nm, _evolve.bind(15))
+		do("«%s»: 50 ур. и эволюция у Кирка" % nm, _evolve.bind(50))
 		wait(1.2)
 		do("«%s»: модель 2-й стадии" % nm, _check_stage.bind(1))
 		if not quick:
-			do("«%s»: эволюция до 30 ур." % nm, _evolve.bind(30))
+			do("«%s»: 100 ур. и эволюция у Кирка" % nm, _evolve.bind(100))
 			wait(1.2)
 			do("«%s»: модель 3-й стадии" % nm, _check_stage.bind(2))
 	do("Питомцы: отпустить", _end)
@@ -70,7 +70,7 @@ func _add(sp: String) -> void:
 	_mob = null
 	_sp = sp
 	no_pets()
-	var i := Game.add_pet(sp, PetData.stage_name(sp, PET_LEVEL), PET_LEVEL)
+	var i := Game.add_pet(sp, PetData.stage_name(sp, 0), PET_LEVEL)
 	if not check(i >= 0, "питомец «%s» в коллекции" % sp):
 		return
 	var rec: Dictionary = Game.pets[i]
@@ -216,13 +216,15 @@ func _evolve(lvl: int) -> void:
 		return
 	_model0 = pt.model_id
 	AdminPanel.set_pet_level(bot.main, lvl)
+	var why: String = (bot.main.pets as PetManager).evolve(Game.active_pet)
+	check(why == "", "эволюция на %d ур.%s" % [lvl, "" if why == "" else ": " + why])
 
 
 func _check_stage(stage: int) -> void:
 	var pt := pet()
 	if not check(pt != null, "питомец на месте после эволюции"):
 		return
-	check(pt.stage == stage and pt.pet_name == PetData.stage_name(_sp, pt.level), "стадия %d: «%s» (%d ур.)"
+	check(pt.stage == stage and pt.pet_name == PetData.stage_name(_sp, pt.stage), "стадия %d: «%s» (%d ур.)"
 		% [stage + 1, pt.pet_name, pt.level])
 	var want := CreatureAsset.model_for(_sp, stage)
 	check(pt.model_id == want, "модель стадии: %s (нужна %s)" % [pt.model_id, want])

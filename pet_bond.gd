@@ -368,7 +368,7 @@ static func revive(p: Player, hp_frac: float, mp_frac: float) -> bool:
 		return false
 	var rec: Dictionary = Game.pets[i]
 	PetSkills.ensure_record(rec)
-	var st := PetData.stats_for(String(rec.get("species", "boar")), int(rec.get("level", 1)), rec["skills"], rec["toggles"])
+	var st := PetData.stats_of(rec)
 	rec["dead"] = false
 	rec["hp"] = maxi(1, roundi(float(st["max_hp"]) * clampf(hp_frac, 0.01, 1.0)))
 	rec["mp"] = maxi(0, roundi(float(st["max_mp"]) * clampf(mp_frac, 0.0, 1.0)))

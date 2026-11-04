@@ -306,7 +306,7 @@ func before_start() -> void:
 	AdminPanel.god = true
 	game.add_pet("wolf", "Серохвост", 5)
 	game.active_pet = 0
-	var i: int = game.add_pet("panther", PetData.stage_name("panther", 20), 20)
+	var i: int = game.add_pet("panther", PetData.stage_name("panther", 0), 20)
 	var rec: Dictionary = game.pets[i]
 	for e in SHOWCASE_SKILLS:
 		for k in int(e[1]):
@@ -2741,7 +2741,7 @@ func _build_stage_row(list: Array) -> void:
 		var id := String(e[0])
 		var st := int(e[1])
 		var lvl := int(PetData.STAGE_LEVELS[st])
-		var sc := PetData.stage_scale(id, lvl)
+		var sc := PetData.stage_scale(id, st)
 		var mid := CreatureAsset.model_for(id, st)
 		var w := maxf(float(CreatureAsset.info_for(mid)["width"]), float(CreatureAsset.info_for(mid)["length"]) * 0.55) * sc
 		if i > 0:
@@ -2751,7 +2751,7 @@ func _build_stage_row(list: Array) -> void:
 		var holder := Node3D.new()
 		holder.set_meta("species", id)
 		_row.add_child(holder)
-		CreatureModels.build(holder, id, PetData.stage_color(id, lvl), sc, PetData.asset_tint(id, lvl), st)
+		CreatureModels.build(holder, id, PetData.stage_color(id, st), sc, PetData.asset_tint(id, st), st)
 		CreatureModels.decorate_pet(holder, id, sc, st, PetData.role(id))
 		print("  стадия %d %s: модель %s, высота %.2f м" % [st + 1, id, mid, CreatureModels.height(mid, sc)])
 	var half := x * 0.5
@@ -2766,7 +2766,7 @@ func _build_stage_row(list: Array) -> void:
 		var e: Array = list[i]
 		var id := String(e[0])
 		var mid := CreatureAsset.model_for(id, int(e[1]))
-		top_h = maxf(top_h, CreatureModels.height(mid, PetData.stage_scale(id, int(PetData.STAGE_LEVELS[int(e[1])]))))
+		top_h = maxf(top_h, CreatureModels.height(mid, PetData.stage_scale(id, int(e[1]))))
 	var dist := maxf(x * 0.95, top_h * 2.2) + 1.2
 	_top.global_position = base + Vector3(0, top_h * 0.75 + 0.4, dist)
 	_top.look_at(base + Vector3(0, top_h * 0.45, 0))

@@ -56,12 +56,17 @@ func run_step() -> void:
 				"волк — «Обычный»")
 			check(MobData.rarity_label("unique") == "Уникальный", "редкость стража — «Уникальный»")
 			check(PetData.role("boar") == "fighter" and PetData.role("wolf") == "fighter", "кабан и волк — бойцы")
-			check(PetData.stage_for(1) == 0 and PetData.stage_for(14) == 0, "стадия 1 до 15 уровня")
-			check(PetData.stage_for(15) == 1 and PetData.stage_for(30) == 2, "стадии 2 и 3 с 15 и 30 уровня")
+			var r49 := {"species": "wolf", "level": 49, "stage": 0}
+			var r50 := {"species": "wolf", "level": 50, "stage": 0}
+			var r99 := {"species": "wolf", "level": 99, "stage": 1, "evo": [55]}
+			check(PetData.evolve_block(r49) != "" and PetData.evolve_block(r50) == "" and PetData.evolve_block(r99) != "",
+				"эволюция: во 2-ю форму с 50 ур., в 3-ю со 100 (%s)" % PetData.evolve_block(r49))
+			check(is_equal_approx(PetData.super_bonus(r99), 0.05) and is_equal_approx(PetData.super_bonus({"evo": [70, 120]}), 0.25),
+				"сверх-эволюция: +1 %% за уровень сверх порога, до +10 %% и +15 %%")
 			var s1 := PetData.stats_for("boar", 1)
 			var s15 := PetData.stats_for("boar", 15)
 			check(int(s15["max_hp"]) > int(s1["max_hp"]) and int(s15["atk"]) > int(s1["atk"]), "характеристики растут с уровнем")
-			check(PetData.stage_scale("boar", 30) > PetData.stage_scale("boar", 1), "старшая стадия крупнее")
+			check(PetData.stage_scale("boar", 2) > PetData.stage_scale("boar", 0), "старшая стадия крупнее")
 			step = 1
 		1:
 			# Вожака анатем (и любую анатему) приручить нельзя
@@ -86,7 +91,7 @@ func run_step() -> void:
 				check(tm.form("card_wolf_soul"), "существо сформировано из карты с душой")
 				check(not game.inventory.has("card_wolf_soul"), "карта с душой израсходована")
 				check(String(game.pets[0]["species"]) == "wolf", "приручен волк за %d попыток" % tries)
-				check(String(game.pets[0]["name"]) == PetData.stage_name("wolf", 1), "имя питомца = название стадии 1")
+				check(String(game.pets[0]["name"]) == PetData.stage_name("wolf", 0), "имя питомца = название стадии 1")
 				step = 3
 				return
 			if tries >= MAX_TRIES:
@@ -152,16 +157,19 @@ func run_step() -> void:
 			if mob.hp < mob.max_hp and timer % 60 == 0:
 				print("  фазан: %d/%d" % [mob.hp, mob.max_hp])
 		6:
-			# Эволюция на 15 уровне
+			# Эволюция — вручную у Учителя Кирка с 50 уровня (сама не происходит)
 			var pet: Pet = pm.active_pet
-			var old_max: int = pet.max_hp
-			pet.level = 14
-			pet.xp = PetData.xp_to_next(14) - 1
+			pet.level = 49
+			pet.xp = PetData.xp_to_next(49) - 1
+			check(pm.evolve(0) != "" and pet.stage == 0, "на 49 ур. эволюции нет")
 			pet.gain_xp(5)
-			check(pet.level == 15, "питомец достиг 15 уровня")
-			check(pet.stage == 1 and pet.pet_name == PetData.stage_name("wolf", 15), "эволюция: %s" % pet.pet_name)
+			check(pet.level == 50 and pet.stage == 0, "питомец достиг 50 уровня, форма та же")
+			var old_max: int = pet.max_hp
+			check(pm.evolve(0) == "", "эволюция у Кирка на 50 ур.")
+			check(pet.stage == 1 and pet.pet_name == PetData.stage_name("wolf", 1), "эволюция: %s" % pet.pet_name)
 			check(pet.max_hp > old_max, "характеристики выросли: %d > %d" % [pet.max_hp, old_max])
-			check(int(game.pets[0]["level"]) == 15 and String(game.pets[0]["name"]) == pet.pet_name, "уровень и имя записаны в коллекцию")
+			check(int(game.pets[0]["level"]) == 50 and int(game.pets[0]["stage"]) == 1 and String(game.pets[0]["name"]) == pet.pet_name,
+				"уровень, форма и имя записаны в коллекцию")
 			check(main.hud._pet_label.text.contains(pet.pet_name), "панель питомца обновлена")
 			wait = 2
 			step = 7
@@ -193,7 +201,7 @@ func run_step() -> void:
 			step = 9
 		9:
 			# Отпускание с подтверждением
-			var idx: int = game.add_pet("wolf", PetData.stage_name("wolf", 1), 1)
+			var idx: int = game.add_pet("wolf", PetData.stage_name("wolf", 0), 1)
 			check(idx == 1, "второй питомец в коллекции")
 			main._on_action("pets_window")
 			press(pm, "release_1")
@@ -215,8 +223,8 @@ func run_step() -> void:
 			check(game.load_game(), "игра загружена")
 			check(game.pets.size() == 1, "в коллекции 1 питомец")
 			var r: Dictionary = game.pets[0]
-			check(String(r["species"]) == "wolf" and int(r["level"]) == 15, "вид и уровень восстановлены")
-			check(String(r["name"]) == PetData.stage_name("wolf", 15), "имя восстановлено")
+			check(String(r["species"]) == "wolf" and int(r["level"]) == 50 and int(r["stage"]) == 1, "вид, уровень и форма восстановлены")
+			check(String(r["name"]) == PetData.stage_name("wolf", 1), "имя восстановлено")
 			check(int(r["hp"]) == hp_saved and not bool(r["dead"]), "HP восстановлен")
 			check(game.active_pet == 0, "призванный питомец восстановлен")
 			_check_old_save()
@@ -247,7 +255,7 @@ func _check_old_save() -> void:
 	for r in game.pets:
 		sp.append(String(r["species"]))
 	check(sp == ["panther", "turtle", "pheasant", "wolf"], "старые виды переведены: %s" % [sp])
-	check(String(game.pets[0]["name"]) == PetData.stage_name("panther", 20), "имя — стадия нового вида: %s"
+	check(String(game.pets[0]["name"]) == PetData.stage_name("panther", 0), "имя — стадия нового вида: %s"
 		% game.pets[0]["name"])
 	check(int(game.pets[0]["level"]) == 20 and bool(game.pets[2]["dead"]), "уровень и гибель сохранены")
 	check(String(game.pets[3]["name"]) == "Серохвост", "имя питомца прежнего вида не тронуто")

@@ -19,7 +19,7 @@ extends Node
 ## "dq_<id>", "accept", "accept_all", "complete", "back".
 
 ## Значки пунктов о делах NPC в диалоге (id пункта NpcData talk → id значка UiIcons).
-const DIALOG_ICONS := {"storage": "btn_storage", "forge": "btn_forge", "craft": "btn_craft"}
+const DIALOG_ICONS := {"storage": "btn_storage", "forge": "btn_forge", "craft": "btn_craft", "evolve": "menu_creature"}
 
 ## Кнопка «Говорить» видна ближе этого расстояния, м; диалог закрывается дальше TALK_RANGE + 1.
 const TALK_RANGE := 4.0
@@ -561,6 +561,10 @@ func _on_npc_action(action: String) -> void:
 			close_dialog()
 			if main.get("economy") != null:
 				main.economy.open_forge()
+		"evolve":
+			close_dialog()
+			if main.get("pets") != null:
+				main.pets.open_evolve()
 
 
 func _on_trade() -> void:

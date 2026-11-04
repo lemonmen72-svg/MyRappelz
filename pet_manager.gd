@@ -271,7 +271,7 @@ func _add_forming(body: VBoxContainer) -> void:
 		info.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_TEXT))
 		var n: int = Game.inventory.count(id)
 		info.text = "%s%s → «%s» (%s, ур. 1)" % [ItemData.item_name(id), " ×%d" % n if n > 1 else "",
-			PetData.stage_name(sp, 1), PetData.role_name(sp)]
+			PetData.stage_name(sp, 0), PetData.role_name(sp)]
 		info.modulate = ItemData.frame_color(id).lerp(Color.WHITE, 0.45)
 		row.add_child(info)
 		_add_button(row, "form_" + id, "Сформировать", _on_form.bind(id))
@@ -283,7 +283,7 @@ func _add_row(body: VBoxContainer, i: int) -> void:
 	var lvl := int(rec.get("level", 1))
 	var dead := bool(rec.get("dead", false))
 	PetSkills.ensure_record(rec)
-	var st := PetData.stats_for(sp, lvl, rec["skills"], rec["toggles"])
+	var st := PetData.stats_of(rec)
 	var mhp := int(st["max_hp"])
 	var cur := int(rec.get("hp", -1))
 	if cur < 0 or cur > mhp:
@@ -355,6 +355,74 @@ static func slot_strip(rec: Dictionary, icon_px: float) -> HBoxContainer:
 	return box
 
 
+# ---------- Эволюция у Учителя Кирка ----------
+
+## Окно «Эволюция существ» (диалог Учителя Кирка, пункт «Эволюция»): питомцы коллекции, у каждого — форма,
+## уровень и «Эволюция» (недоступна — причина: уровень, последняя форма, погиб). Кнопки — window_buttons "evolve_<i>".
+func open_evolve() -> void:
+	window_buttons.clear()
+	var body: VBoxContainer = main.hud.create_window("Эволюция существ", WINDOW_SIZE)
+	_window_body = body
+	var head := Label.new()
+	head.text = "Во 2-ю форму — с %d ур., в 3-ю — со %d. Чем позже, тем сильнее: на %d и %d ур. — сверх-эволюция (+%d%% и +%d%% к статам)." % [
+		int(PetData.EVOLVE_LEVELS[0]), int(PetData.EVOLVE_LEVELS[1]), int(PetData.SUPER_LEVELS[0]), int(PetData.SUPER_LEVELS[1]),
+		roundi(float(PetData.SUPER_MAX[0]) * 100.0), roundi(float(PetData.SUPER_MAX[1]) * 100.0)]
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	head.custom_minimum_size = Vector2(UiScale.px(WINDOW_SIZE.x - 60.0), 0)
+	head.add_theme_color_override("font_color", Color(0.85, 0.8, 0.6))
+	body.add_child(head)
+	if Game.pets.is_empty():
+		var hint := Label.new()
+		hint.text = "Питомцев пока нет."
+		body.add_child(hint)
+		return
+	for i in Game.pets.size():
+		var rec: Dictionary = Game.pets[i]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", UiScale.px(10))
+		var st := PetData.stage_of(rec)
+		var info := Label.new()
+		info.text = "%s · ур. %d · %d форма%s" % [String(rec.get("name", "Питомец")), int(rec.get("level", 1)), st + 1,
+			(" · сверх +%d%%" % roundi(PetData.super_bonus(rec) * 100.0)) if PetData.super_bonus(rec) > 0.0 else ""]
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(info)
+		var why := PetData.evolve_block(rec)
+		var idx := i
+		_add_button(row, "evolve_%d" % i, "Эволюция", func() -> void: evolve(idx))
+		(window_buttons["evolve_%d" % i] as Button).disabled = why != ""
+		if why != "":
+			var w := Label.new()
+			w.text = why
+			w.add_theme_color_override("font_color", Color(0.75, 0.7, 0.6))
+			row.add_child(w)
+		body.add_child(row)
+
+
+## Эволюционировать питомца коллекции i (Учитель Кирк, админ-панель): призванный — Pet.evolve (модель, вспышка),
+## остальные — запись. Возвращает "" или причину отказа.
+func evolve(i: int) -> String:
+	if i < 0 or i >= Game.pets.size():
+		return "Нет такого питомца"
+	var rec: Dictionary = Game.pets[i]
+	var why := ""
+	if active_pet != null and is_instance_valid(active_pet) and is_same(active_pet.record, rec):
+		why = active_pet.evolve()
+	else:
+		why = PetData.evolve_block(rec)
+		if why == "":
+			var old := String(rec.get("name", ""))
+			PetData.evolve_record(rec)
+			_msg("Эволюция! «%s» теперь «%s»" % [old, String(rec["name"])])
+	if why != "":
+		_msg(why)
+	else:
+		Game.changed.emit()
+		Game.save_game()
+	if _window_is_ours() and window_buttons.has("evolve_%d" % i):
+		open_evolve()
+	return why
+
+
 func _add_button(row: HBoxContainer, key: String, text: String, cb: Callable) -> void:
 	var b := Button.new()
 	b.text = text
@@ -402,7 +470,7 @@ func _on_revive(i: int) -> void:
 		_refresh_window()
 		return
 	PetSkills.ensure_record(rec)
-	var st := PetData.stats_for(String(rec.get("species", "boar")), int(rec.get("level", 1)), rec["skills"], rec["toggles"])
+	var st := PetData.stats_of(rec)
 	rec["dead"] = false
 	rec["hp"] = maxi(1, int(float(st["max_hp"]) * 0.5))
 	_msg("Питомец «%s» воскрешён" % String(rec.get("name", "")))

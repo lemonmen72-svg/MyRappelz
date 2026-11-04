@@ -261,7 +261,7 @@ func _unit_old_save() -> void:
 	game.from_dict({
 		"name": "Старый", "race": "dark_elf", "class": "assassin", "level": 5, "gold": 10,
 		"pets": [
-			{"species": "boar", "name": PetData.stage_name("boar", 7), "level": 7, "xp": 33, "jp": 4,
+			{"species": "boar", "name": PetData.stage_name("boar", 0), "level": 7, "xp": 33, "jp": 4,
 				"skills": {"inner_fire": 2, "fierce_rush": 1}},
 			{"species": "golem", "name": "Глыба", "level": 12, "xp": 5, "jp": 1, "skills": golem_skills,
 				"toggles": {"ground_roar": true}},
@@ -273,7 +273,7 @@ func _unit_old_save() -> void:
 	var p1: Dictionary = game.pets[1]
 	check(String(p0["species"]) == "wolf" and int(p0["level"]) == 7 and int(p0["xp"]) == 33,
 		"кабан стал волком 7 ур., опыт 33: %s" % [p0])
-	check(String(p0["name"]) == PetData.stage_name("wolf", 7), "имя стадии кабана → имя стадии волка: %s" % p0["name"])
+	check(String(p0["name"]) == PetData.stage_name("wolf", 0), "имя стадии кабана → имя стадии волка: %s" % p0["name"])
 	check(int(p0["jp"]) == 4 and PetSkills.skill_level(p0, "fierce_rush") == 1, "умения кабана есть у волка — JP не меняются")
 	check(String(p1["species"]) == "turtle" and int(p1["level"]) == 12 and int(p1["xp"]) == 5 and String(p1["name"]) == "Глыба",
 		"страж стал черепахой 12 ур., своё имя сохранено: %s" % [p1])

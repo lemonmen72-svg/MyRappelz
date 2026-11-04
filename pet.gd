@@ -175,7 +175,7 @@ func setup(owner_p: Player, rec: Dictionary) -> void:
 	hp = max_hp if saved < 0 else clampi(saved, 1, max_hp)
 	var saved_mp := int(rec.get("mp", -1))
 	mp = max_mp if saved_mp < 0 else clampi(saved_mp, 0, max_mp)
-	pet_name = PetData.stage_name(species, level)
+	pet_name = PetData.stage_name(species, PetData.stage_of(rec))
 	_write_record()
 
 
@@ -1089,8 +1089,6 @@ func gain_xp(amount: int) -> void:
 		return
 	_add_jp(float(PetSkills.JP_PER_LEVEL) * float(amount) / float(PetData.xp_to_next(level)))
 	xp += amount
-	var old_stage := stage
-	var old_name := pet_name
 	var leveled := false
 	while level < PetData.MAX_LEVEL and xp >= PetData.xp_to_next(level):
 		xp -= PetData.xp_to_next(level)
@@ -1102,17 +1100,36 @@ func gain_xp(amount: int) -> void:
 		_apply_stats()
 		hp = max_hp
 		mp = max_mp
-		pet_name = PetData.stage_name(species, level)
-		if stage != old_stage:
-			_evolve_fx()
-			_say("Эволюция! «%s» теперь «%s» (ур. %d)" % [old_name, pet_name, level])
-		else:
-			_say("Питомец «%s» достиг уровня %d!" % [pet_name, level])
-			if is_inside_tree():
-				Vfx.level_up(get_parent(), global_position, 0.6 * maxf(_scale, 0.8))
+		_say("Питомец «%s» достиг уровня %d!" % [pet_name, level])
+		if stage < PetData.EVOLVE_LEVELS.size() and level == int(PetData.EVOLVE_LEVELS[stage]):
+			_say("«%s» готов к эволюции — Учитель Кирк в центре города" % pet_name)
+		if is_inside_tree():
+			Vfx.level_up(get_parent(), global_position, 0.6 * maxf(_scale, 0.8))
 	_write_record()
 	_update_label()
 	stats_changed.emit()
+
+
+## Эволюция (Учитель Кирк, админ-панель): стадия +1 по правилам PetData.evolve_block. Возвращает "" или причину отказа.
+func evolve() -> String:
+	_write_record()
+	var why := PetData.evolve_block(record)
+	if why != "":
+		return why
+	var old_name := pet_name
+	PetData.evolve_record(record)
+	_apply_stats()
+	hp = max_hp
+	mp = max_mp
+	pet_name = PetData.stage_name(species, stage)
+	_evolve_fx()
+	var sup := PetData.super_bonus(record)
+	_say("Эволюция! «%s» теперь «%s» (ур. %d)%s" % [old_name, pet_name, level,
+		(" · сверх-эволюция +%d%% к статам" % roundi(sup * 100.0)) if sup > 0.0 else ""])
+	_write_record()
+	_update_label()
+	stats_changed.emit()
+	return ""
 
 
 ## Очки умений: дробная часть копится в записи (jp_part).
@@ -1165,7 +1182,7 @@ func _regen(delta: float) -> void:
 func _apply_stats() -> void:
 	# Бонусы от героя (ауры, пассивки и усиления «питомцевых» профессий — PetBond): статы — в формулы, остальное поверх
 	var hb := PetBond.pet_bonuses(self)
-	var s := PetStats.derived(species, level, skills, toggles, PetBond.stat_extra(hb))
+	var s := PetStats.derived(species, level, skills, toggles, PetBond.stat_extra(hb), PetData.stage_of(record), PetData.super_bonus(record))
 	PetBond.apply_to_pet(self, s, hb)
 	stats = s
 	max_hp = int(s["max_hp"])
@@ -1184,9 +1201,9 @@ func _apply_stats() -> void:
 	speed = float(s["speed"])
 	attack_range = float(s["range"])
 	attack_time = float(s["cd"])
-	stage = PetData.stage_for(level)
-	_color = PetData.stage_color(species, level)
-	_scale = PetData.stage_scale(species, level)
+	stage = PetData.stage_of(record)
+	_color = PetData.stage_color(species, stage)
+	_scale = PetData.stage_scale(species, stage)
 	hp = mini(hp, max_hp)
 	mp = mini(mp, max_mp)
 	# Активные умения из ячеек «Авто» по порядку ячеек: ИИ берёт первое готовое (умения вне ячеек не применяет)
@@ -1274,7 +1291,7 @@ func _build_model() -> void:
 	add_child(_model)
 	# На 2-й и 3-й стадии — своя модель стадии, если её файл есть (иначе 1-я стадия с украшениями)
 	model_id = CreatureAsset.model_for(species, stage)
-	_mat = CreatureModels.build(_model, species, _color, _scale, PetData.asset_tint(species, level), stage)
+	_mat = CreatureModels.build(_model, species, _color, _scale, PetData.asset_tint(species, stage), stage)
 	_asset = CreatureModels.asset_of(_model)
 	CreatureModels.decorate_pet(_model, species, _scale, stage, role)
 	_col = CreatureModels.add_collision(self, model_id, _scale)

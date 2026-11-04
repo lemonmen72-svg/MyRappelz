@@ -33,8 +33,8 @@ func hero_level() -> int:
 func before_start() -> void:
 	# Звери вокруг сильные и много: герой под «бессмертием» (снимается на время проверки «Общей боли»)
 	AdminPanel.god = true
-	game.add_pet("wolf", PetData.stage_name("wolf", 30), 30)
-	game.add_pet("panther", PetData.stage_name("panther", 30), 30)
+	game.add_pet("wolf", PetData.stage_name("wolf", 0), 30)
+	game.add_pet("panther", PetData.stage_name("panther", 0), 30)
 	game.active_pet = 0
 
 

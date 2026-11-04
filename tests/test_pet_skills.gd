@@ -20,10 +20,10 @@ var skills_saved: Dictionary = {}
 
 
 func before_start() -> void:
-	game.add_pet("panther", PetData.stage_name("panther", 1), 1)
-	game.add_pet("turtle", PetData.stage_name("turtle", 20), 20)
-	game.add_pet("pheasant", PetData.stage_name("pheasant", 10), 10)
-	game.add_pet("boar", PetData.stage_name("boar", 5), 5)
+	game.add_pet("panther", PetData.stage_name("panther", 0), 1)
+	game.add_pet("turtle", PetData.stage_name("turtle", 0), 20)
+	game.add_pet("pheasant", PetData.stage_name("pheasant", 0), 10)
+	game.add_pet("boar", PetData.stage_name("boar", 0), 5)
 	game.active_pet = 0
 
 
@@ -44,7 +44,7 @@ func run_step() -> void:
 			check(main.hud._pet_mp_bar.visible, "полоска MP питомца в HUD")
 			var rec: Dictionary = game.pets[0]
 			check(int(rec["jp"]) == PetSkills.JP_START, "у нового питомца %d JP" % PetSkills.JP_START)
-			check(PetSkills.learn_block(rec, "shadow_rend").contains("ур. 3"), "«Двойной росчерк» — с 3 уровня: "
+			check(PetSkills.learn_block(rec, "shadow_rend").contains("ур. 10"), "«Двойной росчерк» — с 10 уровня (1:1 с оригиналом): "
 				+ PetSkills.learn_block(rec, "shadow_rend"))
 			check(PetSkills.learn(rec, "inner_fire"), "изучен «Внутренний огонь» (ур. 1)")
 			check(int(rec["jp"]) == PetSkills.JP_START - 1, "списан 1 JP")
@@ -61,14 +61,15 @@ func run_step() -> void:
 				check(PetSkills.learn(rec, "shadow_rend"), "«Двойной росчерк» ур. %d" % (i + 1))
 			check(PetSkills.learn_block(rec, "shadow_rend").contains("стадия 2"), "6-й уровень — со 2-й стадии: "
 				+ PetSkills.learn_block(rec, "shadow_rend"))
-			check(PetSkills.cap_for("shadow_rend", 12) == 5 and PetSkills.cap_for("shadow_rend", 18) == 10,
-				"на 1-й стадии — до 5 ур., на 2-й (с 18 ур.) — до 10")
+			check(PetSkills.cap_for("shadow_rend", 12) == 5 and PetSkills.cap_for("shadow_rend", 60, 0) == 5
+				and PetSkills.cap_for("shadow_rend", 60, 1) == 10, "на 1-й форме — до 5 ур., на 2-й (с 60 ур.) — до 10")
 			check(PetSkills.learn(rec, "dusk_rupture"), "после «Двойного росчерка» изучен «Сумрачный разрыв»")
 			check(PetSkills.learn(rec, "shadow_fang") and PetSkills.learn(rec, "daze"), "изучены «Клык полуночи» и «Морок»")
 			check(int(rec["jp"]) == 60 - 5 - 1 - 2 - 2, "JP списаны верно: %d" % int(rec["jp"]))
 			check(rec["slots"] == ["shadow_rend", "dusk_rupture", "shadow_fang"] and not (rec["slots"] as Array).has("daze"),
 				"новые активные умения сами встали в ячейки «Авто» (мест 3 — «Морок» без ячейки): %s" % [rec["slots"]])
-			check(PetSkills.learn_block(rec, "shadow_bond").contains("ур. 14"), "«Узы тени» — с 14 уровня")
+			var bond_lvl := PetSkills.level_needed("shadow_bond", 1)
+			check(PetSkills.learn_block(rec, "shadow_bond").contains("ур. %d" % bond_lvl), "«Узы тени» — с %d уровня" % bond_lvl)
 			# Пассивки меняют характеристики
 			var atk0 := pet.atk
 			var hp0 := pet.max_hp
@@ -400,11 +401,8 @@ func _check_balance() -> void:
 
 ## Данные умений: у каждого вида есть умения, у активных — MP и перезарядка; уровни вики → наши; бюджет JP.
 func _check_skill_data() -> void:
-	check(PetSkills.req_level(10) == 3 and PetSkills.req_level(15) == 5 and PetSkills.req_level(20) == 6
-		and PetSkills.req_level(25) == 8 and PetSkills.req_level(30) == 9 and PetSkills.req_level(45) == 14,
-		"уровни вики 10–45 → 3, 5, 6, 8, 9, 14")
-	check(PetSkills.req_level(1) == 1 and PetSkills.req_level(50) == 15 and PetSkills.req_level(95) == 29
-		and PetSkills.req_level(100) == 30 and PetSkills.req_level(150) == 45, "уровни вики 50–150 → 15–45")
+	check(PetSkills.req_level(1) == 1 and PetSkills.req_level(10) == 10 and PetSkills.req_level(50) == 50
+		and PetSkills.req_level(150) == 150, "уровни вики → наши 1:1")
 	var bad := ""
 	for sp in PetData.SPECIES:
 		var ids := PetSkills.list_for(String(sp))

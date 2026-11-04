@@ -342,36 +342,53 @@ func _check_pets() -> void:
 	_open("pets")
 	for s in AdminPanel.pet_species():
 		for v in AdminPanel.PET_LEVELS:
-			check(AdminPanel.buttons.has("pet_%s_%d" % [String(s), int(v)]), "кнопка питомца %s %d ур." % [s, int(v)])
+			check(AdminPanel.buttons.has("pet_%s_%d" % [String(s), int(v[0])]), "кнопка питомца %s %d ур." % [s, int(v[0])])
 	check(not AdminPanel.pet_species().has("boar") and AdminPanel.pet_species().has("centaur"), "виды питомцев острова")
 	check(game.pets.is_empty(), "питомцев нет")
-	# По питомцу каждой стадии
-	var cases := [["panther", 1, 0], ["wolf", 15, 1], ["centaur", 30, 2]]
+	# По питомцу каждой формы: 1 ур., 2-я форма на 60, 3-я на 115
+	var cases := [["panther", 1, 0], ["wolf", 60, 1], ["centaur", 115, 2]]
 	for c in cases:
 		var sp := String(c[0])
 		var lvl := int(c[1])
 		_press("pet_%s_%d" % [sp, lvl])
 		var rec: Dictionary = game.pets[game.pets.size() - 1]
-		check(String(rec["species"]) == sp and int(rec["level"]) == lvl and String(rec["name"]) == PetData.stage_name(sp, lvl),
-			"питомец %s %d ур.: «%s»" % [sp, lvl, String(rec["name"])])
+		check(String(rec["species"]) == sp and int(rec["level"]) == lvl and int(rec["stage"]) == int(c[2])
+			and String(rec["name"]) == PetData.stage_name(sp, int(c[2])), "питомец %s %d ур.: «%s»" % [sp, lvl, String(rec["name"])])
 		var pc := _pet()
 		check(pc != null and pc.species == sp and pc.level == lvl and pc.stage == int(c[2]),
-			"призван: стадия %d" % (int(c[2]) + 1))
+			"призван: форма %d" % (int(c[2]) + 1))
 		if pc != null:
-			check(pc.model_id == CreatureAsset.model_for(sp, int(c[2])), "модель стадии: %s" % pc.model_id)
+			check(pc.model_id == CreatureAsset.model_for(sp, int(c[2])), "модель формы: %s" % pc.model_id)
 	var pet := _pet()
 	check(pet != null, "призван кентавр")
 	if pet == null:
 		return
-	_press("pet_lvl_plus")
-	check(pet.level == 31 and int(game.pets[game.active_pet]["level"]) == 31, "питомец +1 → 31")
+	# Уровень меняется, форма — нет; эволюция — по правилам Кирка
+	_press("pet_devolve")
+	check(pet.stage == 0 and pet.model_id == CreatureAsset.model_for("centaur", 0) and int(game.pets[game.active_pet]["stage"]) == 0,
+		"«Вернуть 1-ю форму»")
+	_press("pet_lvl_30")
+	check(pet.level == 30 and pet.stage == 0, "питомец сразу 30 ур.")
+	_press("pet_evolve")
+	check(pet.stage == 0, "на 30 ур. эволюции нет")
+	_press("pet_lvl_plus10")
+	_press("pet_lvl_plus10")
+	check(pet.level == 50, "питомец +10 +10 → 50")
+	_press("pet_evolve")
+	check(pet.stage == 1 and pet.model_id == CreatureAsset.model_for("centaur", 1) and pet.pet_name == PetData.stage_name("centaur", 1)
+		and is_equal_approx(PetData.super_bonus(pet.record), 0.0), "эволюция на 50 ур.: 2-я форма, без сверх-эволюции")
+	_press("pet_lvl_115")
+	_press("pet_evolve")
+	check(pet.stage == 2 and is_equal_approx(PetData.super_bonus(pet.record), 0.15), "эволюция на 115 ур.: 3-я форма, сверх +15 %%")
+	_press("pet_lvl_minus10")
 	_press("pet_lvl_minus5")
-	check(pet.level == 26 and pet.stage == 1 and pet.model_id == CreatureAsset.model_for("centaur", 1)
-		and pet.pet_name == PetData.stage_name("centaur", 26), "питомец −5 → 26: 2-я стадия, модель и имя стадии")
-	_press("pet_lvl_plus5")
-	check(pet.level == 31 and pet.stage == 2 and pet.model_id == CreatureAsset.model_for("centaur", 2), "питомец +5 → 31: 3-я стадия")
+	check(pet.level == 100 and pet.stage == 2, "питомец −10 −5 → 100, форма та же")
+	var xl := pet.level
+	_press("pet_xp_next")
+	check(pet.level == xl + 1, "опыт до следующего уровня: %d" % pet.level)
+	_press("pet_lvl_30")
 	_press("pet_lvl_minus")
-	check(pet.level == 30 and int(game.pets[game.active_pet]["level"]) == 30, "питомец −1 → 30")
+	check(pet.level == 29 and int(game.pets[game.active_pet]["level"]) == 29, "питомец −1 → 29")
 	pet.hp = 1
 	_press("pet_full")
 	check(pet.hp == pet.max_hp, "полное HP питомца")

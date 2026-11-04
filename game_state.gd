@@ -483,7 +483,7 @@ func add_pet(species: String, pet_name: String, lvl: int = 1) -> int:
 		return -1
 	pets.append({
 		"species": species, "name": pet_name, "level": lvl, "xp": 0, "hp": -1, "dead": false,
-		"mp": -1, "jp": PetStats.default_jp(lvl), "jp_part": 0.0, "skills": {}, "toggles": {},
+		"mp": -1, "jp": PetStats.default_jp(lvl), "jp_part": 0.0, "skills": {}, "toggles": {}, "stage": 0, "evo": [],
 	})
 	changed.emit()
 	return pets.size() - 1
@@ -569,6 +569,7 @@ func from_dict(d: Dictionary) -> void:
 	inventory.from_dict(migrate_items(old_inv))
 	inventory.load_layout(d.get("bag", []))
 	var retired := false
+	var devolved := false
 	for p in d.get("pets", []):
 		var r: Dictionary = p
 		var sp := String(r.get("species", "boar"))
@@ -578,7 +579,7 @@ func from_dict(d: Dictionary) -> void:
 		if new_sp != sp:
 			# Вид из старой версии заменён новым: имя — название стадии нового вида
 			sp = new_sp
-			pet_name = PetData.stage_name(sp, lvl)
+			pet_name = PetData.stage_name(sp, 0)
 		# Кабан и каменный страж (модели из примитивов) ушли с острова: питомец становится волком / черепахой
 		# с тем же уровнем и опытом, JP за умения, которых у нового вида нет, возвращаются
 		var refund := 0
@@ -587,7 +588,7 @@ func from_dict(d: Dictionary) -> void:
 			sp = String(RETIRED_PETS[old_sp])
 			refund = retired_refund(sp, r.get("skills", {}))
 			if (PetData.get_species(old_sp)["stages"] as Array).has(pet_name):
-				pet_name = PetData.stage_name(sp, lvl)
+				pet_name = PetData.stage_name(sp, 0)
 			retired = true
 		var prec := {
 			"species": sp, "name": pet_name,
@@ -600,7 +601,16 @@ func from_dict(d: Dictionary) -> void:
 			"skills": _load_skills(sp, r.get("skills", {})),
 			"toggles": _load_toggles(r.get("toggles", {}), sp),
 			"cmd": String(r.get("cmd", PetSkills.DEFAULT_COMMAND)),
+			# Эволюция — у Учителя Кирка с 50 / 100 ур. (раньше — сама на 15 / 30): у старых сохранений стадии нет
+			"stage": int(r.get("stage", 0)),
+			"evo": (r.get("evo", []) as Array).duplicate(),
 		}
+		if not r.has("stage"):
+			var names: Array = PetData.get_species(sp)["stages"]
+			if names.find(pet_name) > 0:
+				pet_name = PetData.stage_name(sp, 0)
+				prec["name"] = pet_name
+				devolved = true
 		# Ячейки умений («Авто», «Ауры»): у старых сохранений их нет — PetSkills.ensure_record заполнит
 		# из изученных активных и включённых переключаемых
 		if r.get("slots") is Array:
@@ -609,6 +619,9 @@ func from_dict(d: Dictionary) -> void:
 			prec["aura_slots"] = (r["aura_slots"] as Array).duplicate()
 		PetSkills.ensure_record(prec)
 		pets.append(prec)
+	if devolved:
+		var evo_note := "Эволюция питомцев теперь у Учителя Кирка — с 50 и 100 ур. (на 60 и 115 — сверх-эволюция): питомцы вернулись в 1-ю форму"
+		load_note = evo_note if load_note == "" else load_note + ". " + evo_note
 	if retired:
 		var pet_note := "Кабаны и каменные стражи ушли с острова: ваши питомцы-кабаны стали волками, стражи — черепахами (уровень и опыт сохранены, JP за недоступные умения возвращены)"
 		load_note = pet_note if load_note == "" else load_note + ". " + pet_note

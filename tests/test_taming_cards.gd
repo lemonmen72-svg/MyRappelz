@@ -110,7 +110,7 @@ func run_step() -> void:
 			check(_has_text("Сформируйте существо"), "в описании — что делать с картой")
 			_press("act_form")
 			check(game.pets.size() == 1 and String(game.pets[0]["species"]) == "pheasant", "в коллекции фазан")
-			check(String(game.pets[0]["name"]) == PetData.stage_name("pheasant", 1) and int(game.pets[0]["level"]) == 1,
+			check(String(game.pets[0]["name"]) == PetData.stage_name("pheasant", 0) and int(game.pets[0]["level"]) == 1,
 				"имя — 1-я стадия, ур. 1")
 			check(not inv.has("card_pheasant_soul"), "карта с душой израсходована")
 			check(game.active_pet == 0, "новое существо сразу призвано")

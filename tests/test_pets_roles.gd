@@ -17,7 +17,7 @@ var hp_low := 0
 
 func before_start() -> void:
 	for sp in SPECIES:
-		game.add_pet(sp, PetData.stage_name(sp, 1), int(LEVELS.get(sp, 1)))
+		game.add_pet(sp, PetData.stage_name(sp, 0), int(LEVELS.get(sp, 1)))
 	game.active_pet = 0
 	game.inventory.add("card_pheasant", 1)
 	game.inventory.add("card_wolf", 1)
@@ -145,7 +145,7 @@ func run_step() -> void:
 				"кабан и страж — фиолетовый значок «нельзя приручить»")
 			# Полная коллекция (прирученный в старой версии кабан тоже в ней): метка ставится (душа ляжет в карту),
 			# а формировать некуда
-			game.add_pet("boar", PetData.stage_name("boar", 1), 1)
+			game.add_pet("boar", PetData.stage_name("boar", 0), 1)
 			check(game.pets.size() == Game.MAX_PETS, "коллекция полна")
 			check(pm.summon(game.pets.size() - 1) and pm.active_pet != null and pm.active_pet.species == "boar", "прежний кабан-питомец призывается")
 			pm.recall()

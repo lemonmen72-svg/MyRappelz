@@ -343,9 +343,9 @@ static func value(pair: Array, n: int) -> float:
 	return float(pair[0]) + float(pair[1]) * float(maxi(n, 1) - 1)
 
 
-## Уровень вики → наш уровень питомца: × 0.3, к ближайшему, не меньше 1.
+## Уровень вики → наш уровень питомца: 1:1 с оригиналом (решение Максима), не меньше 1.
 static func req_level(wiki_lvl: int) -> int:
-	return maxi(1, roundi(float(wiki_lvl) * PetStats.WIKI_LEVEL_SCALE))
+	return maxi(1, wiki_lvl)
 
 
 ## Наибольший уровень умения.
@@ -379,9 +379,8 @@ static func level_needed(id: String, n: int) -> int:
 	return req_level(int(tiers[t][0]))
 
 
-## Наибольший уровень умения, доступный питомцу уровня lvl (по стадии и уровню).
-static func cap_for(id: String, lvl: int) -> int:
-	var st := PetData.stage_for(lvl)
+## Наибольший уровень умения, доступный питомцу уровня lvl на стадии st (по стадии и уровню).
+static func cap_for(id: String, lvl: int, st: int = 0) -> int:
 	var tiers: Array = get_skill(id).get("tiers", [])
 	var best := 0
 	for i in tiers.size():
@@ -617,10 +616,10 @@ static func learn_block(rec: Dictionary, id: String) -> String:
 		return "Изучено полностью"
 	var t := tier_for(id, n)
 	var lvl := int(rec.get("level", 1))
-	var st := PetData.stage_for(lvl)
+	var st := PetData.stage_of(rec)
 	var need_lvl := level_needed(id, n)
 	if st < t:
-		return "Нужна стадия %d (ур. %d)" % [t + 1, need_lvl]
+		return "Нужна стадия %d (эволюция у Учителя Кирка, ур. %d)" % [t + 1, need_lvl]
 	if lvl < need_lvl:
 		return "Нужен ур. %d" % need_lvl
 	if sk.has("pre"):

@@ -74,11 +74,11 @@ func _build_models() -> void:
 			if not PetData.SPECIES.has(id):
 				break  # летающие рыбы питомцами не бывают
 			var lvl := int(PetData.STAGE_LEVELS[st])
-			var sc := PetData.stage_scale(id, lvl)
+			var sc := PetData.stage_scale(id, st)
 			var p := _holder(id, Vector3(x, 0, 3.0 + 3.0 * float(st)))
-			check(CreatureModels.build(p, id, PetData.stage_color(id, lvl), sc, PetData.asset_tint(id, lvl)) != null,
+			check(CreatureModels.build(p, id, PetData.stage_color(id, st), sc, PetData.asset_tint(id, st)) != null,
 				"модель питомца %s собрана" % id)
-			CreatureModels.decorate_pet(p, id, sc, PetData.stage_for(lvl), PetData.role(id))
+			CreatureModels.decorate_pet(p, id, sc, st, PetData.role(id))
 			if CreatureModels.asset_of(p) != null:
 				check(p.find_child("Charm", true, false) != null, "самоцвет роли у питомца %s (стадия %d)" % [id, st + 1])
 				var am := CreatureModels.asset_of(p).material

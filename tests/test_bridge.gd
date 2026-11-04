@@ -20,7 +20,7 @@ func race_class() -> Array:
 
 
 func before_start() -> void:
-	game.active_pet = game.add_pet("turtle", PetData.stage_name("turtle", 6), 6)
+	game.active_pet = game.add_pet("turtle", PetData.stage_name("turtle", 0), 6)
 
 
 func run_step() -> void:

@@ -17,7 +17,7 @@ func race_class() -> Array:
 
 
 func before_start() -> void:
-	var i: int = game.add_pet("panther", PetData.stage_name("panther", 20), 20)
+	var i: int = game.add_pet("panther", PetData.stage_name("panther", 0), 20)
 	var rec: Dictionary = game.pets[i]
 	PetSkills.ensure_record(rec)
 	(rec["skills"] as Dictionary)["shadow_bond"] = 1

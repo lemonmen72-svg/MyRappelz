@@ -129,7 +129,7 @@ func form(card_id: String) -> bool:
 		return false
 	var sp := ItemData.card_species(card_id)
 	Game.inventory.remove(card_id)
-	var pet_name := PetData.stage_name(sp, 1)
+	var pet_name := PetData.stage_name(sp, 0)
 	var idx: int = Game.add_pet(sp, pet_name, 1)
 	if main != null and main.get("player") != null and is_instance_valid(main.player):
 		var pos: Vector3 = main.player.global_position
@@ -254,7 +254,7 @@ static func card_lines(card_id: String) -> Array:
 		roundi(float(CHANCE.get(tier, 0.5)) * 100.0)])
 	if ItemData.is_soul_card(card_id):
 		res.append("Сформируйте существо в окне «Питомцы» или кнопкой «Сформировать». Появится «%s», ур. 1."
-			% PetData.stage_name(sp, 1))
+			% PetData.stage_name(sp, 0))
 	else:
 		res.append("Где взять: " + where_to_get(card_id))
 		res.append("Примените «Приручить» к зверю, затем победите его. Неудача ломает карту, если в сумке нет зеркальной карты.")

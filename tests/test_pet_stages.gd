@@ -18,7 +18,7 @@ func race_class() -> Array:
 
 
 func before_start() -> void:
-	pet_idx = game.add_pet("panther", PetData.stage_name("panther", 14), 14)
+	pet_idx = game.add_pet("panther", PetData.stage_name("panther", 0), 49)
 	game.active_pet = pet_idx
 
 
@@ -32,20 +32,22 @@ func run_step() -> void:
 			_check_wild()
 			step = 1
 		1:
-			# Питомец 1-й стадии (ур. 14) — модель «panther»
+			# Питомец 1-й стадии (ур. 49) — модель «panther»
 			var pet: Pet = pm.active_pet
 			check(pet != null and pet.species == "panther" and pet.stage == 0, "призвана пантера 1-й стадии")
 			check(pet.model_id == "panther" and pet._asset != null and pet._asset.species == "panther",
 				"1-я стадия: модель panther (%s)" % pet.model_id)
 			check(pet.find_child("Halo", true, false) == null, "нимба на 1-й стадии нет")
-			# До 15 уровня — эволюция во 2-ю стадию: модель меняется на panther_2
+			# 50 уровень — сама форма не меняется; эволюция у Кирка — модель меняется на panther_2
 			pet.gain_xp(PetData.xp_to_next(pet.level) - pet.xp)
-			check(pet.level == 15 and pet.stage == 1, "эволюция: ур. %d, стадия %d" % [pet.level, pet.stage + 1])
+			check(pet.level == 50 and pet.stage == 0, "50 ур.: форма та же, пока не эволюционировал")
+			check(pm.evolve(pet_idx) == "", "эволюция у Кирка")
+			check(pet.level == 50 and pet.stage == 1, "эволюция: ур. %d, стадия %d" % [pet.level, pet.stage + 1])
 			check(pet.model_id == "panther_2" and pet._asset != null and pet._asset.species == "panther_2",
 				"2-я стадия: модель panther_2 (%s)" % pet.model_id)
 			check(pet._asset.stage_model and pet._asset.material.albedo_color.is_equal_approx(Color.WHITE),
 				"у модели стадии текстура без оттенка")
-			check(is_equal_approx(pet._height, CreatureModels.height("panther_2", PetData.stage_scale("panther", 15))),
+			check(is_equal_approx(pet._height, CreatureModels.height("panther_2", PetData.stage_scale("panther", 1))),
 				"высота подписи — по модели стадии")
 			wait = 5
 			step = 2
@@ -56,16 +58,17 @@ func run_step() -> void:
 				if c is Node3D and CreatureModels.asset_of(c as Node3D) != null:
 					models += 1
 			check(models == 1, "после эволюции у питомца одна модель (старая удалена): %d" % models)
-			# До 30 уровня — 3-я стадия: panther_3, без нимба и сияния (стадию видно по самой модели)
-			while pet.level < 30:
+			# 100 уровень и эволюция — 3-я стадия: panther_3, без нимба и сияния (стадию видно по самой модели)
+			while pet.level < 100:
 				pet.gain_xp(PetData.xp_to_next(pet.level) - pet.xp)
+			check(pm.evolve(pet_idx) == "", "вторая эволюция на 100 ур.")
 			check(pet.stage == 2 and pet.model_id == "panther_3" and pet._asset.species == "panther_3",
 				"3-я стадия: модель panther_3 (%s)" % pet.model_id)
 			check(pet.find_child("Halo", true, false) == null and pet.find_child("Aura", true, false) == null,
 				"у модели 3-й стадии нет процедурного нимба и сияния")
 			check(pet.find_child("Charm", true, false) != null, "самоцвет роли над головой остался")
-			check(String(game.pets[pet_idx]["species"]) == "panther" and int(game.pets[pet_idx]["level"]) == 30,
-				"запись питомца: вид прежний, уровень 30")
+			check(String(game.pets[pet_idx]["species"]) == "panther" and int(game.pets[pet_idx]["level"]) == 100
+				and int(game.pets[pet_idx]["stage"]) == 2, "запись питомца: вид прежний, уровень 100, 3-я форма")
 			wait = 5
 			step = 3
 		3:
@@ -78,7 +81,9 @@ func run_step() -> void:
 				% (ca.species if ca != null else "нет"))
 			main.hud.close_window()
 			# Волк-питомец: окно показывает редкость «Обычный»
-			var wi: int = game.add_pet("wolf", PetData.stage_name("wolf", 30), 30)
+			var wi: int = game.add_pet("wolf", PetData.stage_name("wolf", 2), 115)
+			game.pets[wi]["stage"] = 2
+			game.pets[wi]["evo"] = [60, 115]
 			check(cw.open(wi, "stats"), "окно существа волка открыто")
 			check(_window_text().contains("Обычный"), "в окне существа волка редкость «Обычный»")
 			var wa := CreatureModels.asset_of(cw._holder)
@@ -99,10 +104,10 @@ func _check_files() -> void:
 			check(CreatureAsset.model_for(id, st) == want, "стадия %d вида %s → %s" % [st + 1, id, CreatureAsset.model_for(id, st)])
 			check(CreatureAsset.species_of(want) == id and CreatureAsset.is_asset_species(want), "%s — модель вида %s" % [want, id])
 			var lvl := int(PetData.STAGE_LEVELS[st])
-			var sc := PetData.stage_scale(id, lvl)
+			var sc := PetData.stage_scale(id, st)
 			var n := Node3D.new()
 			box.add_child(n)
-			CreatureModels.build(n, id, PetData.stage_color(id, lvl), sc, PetData.asset_tint(id, lvl), st)
+			CreatureModels.build(n, id, PetData.stage_color(id, st), sc, PetData.asset_tint(id, st), st)
 			CreatureModels.decorate_pet(n, id, sc, st, PetData.role(id))
 			var ca := CreatureModels.asset_of(n)
 			check(ca != null and ca.species == want, "питомец %s стадии %d — модель %s" % [id, st + 1, want])

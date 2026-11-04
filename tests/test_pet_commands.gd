@@ -34,7 +34,7 @@ func hero_level() -> int:
 func before_start() -> void:
 	AdminPanel.god = true
 	game.add_pet("wolf", "Серохвост", 12)
-	var i: int = game.add_pet("panther", PetData.stage_name("panther", 20), 20)
+	var i: int = game.add_pet("panther", PetData.stage_name("panther", 0), 20)
 	var rec: Dictionary = game.pets[i]
 	rec["jp"] = 200
 	for id in ["shadow_rend", "dusk_rupture", "shadow_fang", "daze", "shadow_bond", "provoke"]:

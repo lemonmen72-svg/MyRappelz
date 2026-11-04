@@ -184,7 +184,7 @@ func _build_stats(body: VBoxContainer, rec: Dictionary) -> void:
 	var sp := _species
 	var lvl := int(rec.get("level", 1))
 	var pet := _live_pet(rec)
-	var st: Dictionary = pet.stats if pet != null else PetData.stats_for(sp, lvl, rec["skills"], rec["toggles"])
+	var st: Dictionary = pet.stats if pet != null else PetData.stats_of(rec)
 	var dead := bool(rec.get("dead", false))
 	var mhp := int(st["max_hp"])
 	var mmp := int(st["max_mp"])
@@ -210,10 +210,13 @@ func _build_stats(body: VBoxContainer, rec: Dictionary) -> void:
 	info.add_child(nm)
 	info.add_child(_label("%s · %s · %s" % [String(MobData.get_type(sp)["name"]), PetData.role_name(sp),
 		MobData.rarity_name(sp)], UiScale.FONT_HEAD, MUTED))
-	var stage := PetData.stage_for(lvl)
-	var stage_line := "Стадия эволюции %d из 3: %s" % [stage + 1, PetData.stage_name(sp, lvl)]
-	if stage < PetData.STAGE_LEVELS.size() - 1:
-		stage_line += " (следующая — с ур. %d)" % int(PetData.STAGE_LEVELS[stage + 1])
+	var stage := PetData.stage_of(rec)
+	var stage_line := "Стадия эволюции %d из 3: %s" % [stage + 1, PetData.stage_name(sp, stage)]
+	if stage < PetData.EVOLVE_LEVELS.size():
+		stage_line += " (эволюция у Учителя Кирка — с ур. %d, сверх-эволюция — на %d)" % [int(PetData.EVOLVE_LEVELS[stage]),
+			int(PetData.SUPER_LEVELS[stage])]
+	if PetData.super_bonus(rec) > 0.0:
+		stage_line += " · сверх-эволюция +%d%% к статам" % roundi(PetData.super_bonus(rec) * 100.0)
 	info.add_child(_label(stage_line, UiScale.FONT_HEAD, Color.WHITE))
 	var status := "погиб — воскресите свитком" if dead else ("призван" if pet != null else "отдыхает")
 	info.add_child(_label("Уровень %d / %d  ·  %s" % [lvl, PetData.MAX_LEVEL, status], UiScale.FONT_HEAD,
@@ -338,8 +341,8 @@ func _build_preview(rec: Dictionary) -> Control:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.62, 0.64, 0.76)
 	env.ambient_light_energy = 0.6
-	var sc := PetData.stage_scale(sp, lvl)
-	var stage := PetData.stage_for(lvl)
+	var stage := PetData.stage_of(rec)
+	var sc := PetData.stage_scale(sp, stage)
 	# Своя модель стадии эволюции, если есть (CreatureAsset.model_for)
 	var mid := CreatureAsset.model_for(sp, stage)
 	var h := CreatureModels.height(mid, sc)
@@ -379,7 +382,7 @@ func _build_preview(rec: Dictionary) -> Control:
 	vp.add_child(_pivot)
 	_holder = Node3D.new()
 	_pivot.add_child(_holder)
-	CreatureModels.build(_holder, sp, PetData.stage_color(sp, lvl), sc, PetData.asset_tint(sp, lvl), stage)
+	CreatureModels.build(_holder, sp, PetData.stage_color(sp, stage), sc, PetData.asset_tint(sp, stage), stage)
 	CreatureModels.decorate_pet(_holder, sp, sc, stage, PetData.role(sp))
 	return svc
 
@@ -395,7 +398,7 @@ func _build_skills(body: VBoxContainer, rec: Dictionary) -> void:
 	head.add_theme_constant_override("separation", int(UiScale.px(20)))
 	body.add_child(head)
 	head.add_child(_label("Очки умений: %d JP" % int(rec.get("jp", 0)), UiScale.FONT_HEAD, GOLD))
-	var st := PetData.stage_for(lvl)
+	var st := PetData.stage_of(rec)
 	head.add_child(_label("Ур. %d, стадия %d" % [lvl, st + 1], UiScale.FONT_TEXT, Color.WHITE))
 	if pet != null:
 		var up := pet.toggle_upkeep()
@@ -524,7 +527,7 @@ func _card(rec: Dictionary, id: String, pet: Pet) -> Control:
 	var lvl := int(rec.get("level", 1))
 	var cur := PetSkills.skill_level(rec, id)
 	var mx := PetSkills.max_level(id)
-	var cap := PetSkills.cap_for(id, lvl)
+	var cap := PetSkills.cap_for(id, lvl, PetData.stage_of(rec))
 	var block := PetSkills.learn_block(rec, id)
 	var kind := String(sk["kind"])
 	box.add_child(_label(String(sk["name"]), UiScale.FONT_NAME, GOLD, w))

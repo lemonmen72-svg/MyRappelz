@@ -19,9 +19,10 @@ extends RefCounted
 ##     карты существ, трофеи; кладётся столько, сколько поместится), заточка надетого оружия и брони −1/+1/до предела
 ##     кубами/сброс (Enchant.admin_set, этап 3), «Очистить сумку» с подтверждением (надетое оружие, щит, броня
 ##     и украшения остаются).
-##   «Питомцы»: питомец любого вида (PetData, кроме ушедших с острова Game.RETIRED_PETS) 1, 15 или 30 ур. (1–3 стадия,
-##     сразу призывается), уровень призванного −5/−1/+1/+5 (стадия и модель меняются), полное HP/MP питомца,
-##     воскресить погибших (без свитка), «Отпустить всех» с подтверждением.
+##   «Питомцы»: питомец любого вида (PetData, кроме ушедших с острова Game.RETIRED_PETS) 1 / 30 ур., 2-я форма на
+##     60 ур., 3-я на 115 (сразу призывается), уровень призванного −10/−5/−1/+1/+5/+10 и сразу 1/30/50/60/100/115
+##     (форма не меняется), «Эволюция» по правилам Кирка, «Вернуть 1-ю форму», опыт до следующего уровня, полное
+##     HP/MP питомца, воскресить погибших (без свитка), «Отпустить всех» с подтверждением.
 ##   «Мир»: «Убить цель», «Убить всех вокруг (30 м)» (с опытом и добычей, как обычное убийство), «Возродить всех
 ##     зверей» (пустые слоты сразу, main._spawn_slot не ставит второго зверя в занятый слот); поставить зверя
 ##     любого вида MobData уровня N в 5 м перед героем (свой зверь, slot −1 — не возрождается); скорость бега героя
@@ -42,7 +43,8 @@ extends RefCounted
 ##   «Опыт»: "xp_<N>", "xp_next", "pet_xp_next";
 ##   «Предметы»: "item_<id>_1", "item_<id>_10", "ench_<слот>_minus", "ench_<слот>_plus", "ench_<слот>_max",
 ##     "ench_<слот>_zero" (слот — InventoryWindow.WORN_SLOTS), "clear_bag", "clear_bag_yes", "clear_bag_no";
-##   «Питомцы»: "pet_<вид>_<ур.>", "pet_lvl_minus5", "pet_lvl_minus", "pet_lvl_plus", "pet_lvl_plus5", "pet_full",
+##   «Питомцы»: "pet_<вид>_<ур.>", "pet_lvl_minus10", "pet_lvl_minus5", "pet_lvl_minus", "pet_lvl_plus", "pet_lvl_plus5",
+##     "pet_lvl_plus10", "pet_lvl_<1|30|50|60|100|115>", "pet_evolve", "pet_devolve", "pet_xp_next", "pet_full",
 ##     "pet_revive", "pets_clear", "pets_clear_yes", "pets_clear_no";
 ##   «Мир»: "kill_target", "kill_around", "respawn_all", "mob_lvl_minus5", "mob_lvl_minus", "mob_lvl_plus",
 ##     "mob_lvl_plus5", "mob_lvl_hero", "spawn_<вид>", "speed_<1|2|3>", "tp_poi_<id>", "tp_zone_<id>" (teleports());
@@ -64,8 +66,10 @@ const TABS := [["hero", "Герой"], ["xp", "Опыт"], ["items", "Предм
 const XP_MULTS := [1, 2, 5, 10, 20, 50]
 const SPEED_MULTS := [1, 2, 3]
 const LEVEL_PRESETS := [1, 10, 15, 20, 30, 40]
-## Уровни нового питомца — начала стадий эволюции (PetData.STAGE_LEVELS).
-const PET_LEVELS := [1, 15, 30]
+## Новый питомец: [уровень, стадия] — 1 ур., 30 ур., 2-я форма на 60 ур. и 3-я на 115 (со сверх-эволюцией).
+const PET_LEVELS := [[1, 0], [30, 0], [60, 1], [115, 2]]
+## Уровень призванного питомца сразу: пороги эволюции и сверх-эволюции.
+const PET_LEVEL_PRESETS := [1, 30, 50, 60, 100, 115]
 ## Группы предметов на вкладке «Предметы»: [тип ItemData, подпись]; прочие типы — «Прочее».
 const ITEM_GROUPS := [["weapon", "Оружие"], ["armor", "Броня"], ["jewelry", "Украшения"], ["consumable", "Расходники"],
 	["cube", "Кубы"], ["card", "Карты существ"], ["trophy", "Трофеи"]]
@@ -546,9 +550,10 @@ static func _build_pets(main: Node, body: VBoxContainer) -> void:
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		grid.add_child(l)
 		for v in PET_LEVELS:
-			var lvl := int(v)
-			_btn(grid, "pet_%s_%d" % [sp, lvl], "Ур. %d (%d стадия)" % [lvl, PetData.stage_for(lvl) + 1],
-				func() -> void: AdminPanel.add_pet(main, sp, lvl), 150.0)
+			var lvl := int(v[0])
+			var stg := int(v[1])
+			_btn(grid, "pet_%s_%d" % [sp, lvl], "Ур. %d (%d форма)" % [lvl, stg + 1],
+				func() -> void: AdminPanel.add_pet(main, sp, lvl, stg), 150.0)
 	var pet := _pet(main)
 	if pet != null:
 		_head(body, "Призванный питомец: «%s», ур. %d, стадия %d, HP %d/%d" % [pet.pet_name, pet.level, pet.stage + 1,
@@ -556,10 +561,20 @@ static func _build_pets(main: Node, body: VBoxContainer) -> void:
 	else:
 		_head(body, "Призванного питомца нет (уровень меняется у призванного)")
 	var lr := _row(body)
+	_btn(lr, "pet_lvl_minus10", "Ур. −10", func() -> void: AdminPanel.pet_level(main, -10))
 	_btn(lr, "pet_lvl_minus5", "Ур. −5", func() -> void: AdminPanel.pet_level(main, -5))
 	_btn(lr, "pet_lvl_minus", "Ур. −1", func() -> void: AdminPanel.pet_level(main, -1))
 	_btn(lr, "pet_lvl_plus", "Ур. +1", func() -> void: AdminPanel.pet_level(main, 1))
 	_btn(lr, "pet_lvl_plus5", "Ур. +5", func() -> void: AdminPanel.pet_level(main, 5))
+	_btn(lr, "pet_lvl_plus10", "Ур. +10", func() -> void: AdminPanel.pet_level(main, 10))
+	var pr := _row(body)
+	for v in PET_LEVEL_PRESETS:
+		var pl := int(v)
+		_btn(pr, "pet_lvl_%d" % pl, "Ур. %d" % pl, func() -> void: AdminPanel.set_pet_level(main, pl))
+	var er := _row(body)
+	_btn(er, "pet_evolve", "Эволюция (как у Кирка)", func() -> void: AdminPanel.pet_evolve(main))
+	_btn(er, "pet_devolve", "Вернуть 1-ю форму", func() -> void: AdminPanel.pet_devolve(main))
+	_btn(er, "pet_xp_next", "Опыт до след. уровня", func() -> void: AdminPanel.pet_xp_next(main))
 	var ar := _row(body)
 	_btn(ar, "pet_full", "Полное HP/MP питомца", func() -> void: AdminPanel.pet_full(main))
 	_btn(ar, "pet_revive", "Воскресить погибших", func() -> void: AdminPanel.pet_revive(main))
@@ -582,11 +597,18 @@ static func pet_species() -> Array:
 
 
 ## Новый питомец вида species уровня lvl в коллекцию и сразу призвать. Индекс или -1 (коллекция полна).
-static func add_pet(main: Node, species: String, lvl: int) -> int:
-	var i := Game.add_pet(species, PetData.stage_name(species, lvl), clampi(lvl, 1, PetData.MAX_LEVEL))
+static func add_pet(main: Node, species: String, lvl: int, stage: int = 0) -> int:
+	var st := clampi(stage, 0, PetData.STAGES.size() - 1)
+	var i := Game.add_pet(species, PetData.stage_name(species, st), clampi(lvl, 1, PetData.MAX_LEVEL))
 	if i < 0:
 		_done(main, "Коллекция полна (%d) — отпустите питомцев" % Game.MAX_PETS)
 		return -1
+	# Форма сразу: эволюции на уровнях сверх-эволюции (не выше уровня питомца)
+	var evo: Array = []
+	for k in st:
+		evo.append(mini(int(PetData.SUPER_LEVELS[k]), int(Game.pets[i]["level"])))
+	Game.pets[i]["stage"] = st
+	Game.pets[i]["evo"] = evo
 	if main.get("pets") != null:
 		(main.pets as PetManager).summon(i)
 	_done(main, "Питомец «%s» (ур. %d) добавлен и призван" % [String(Game.pets[i]["name"]), lvl])
@@ -609,7 +631,6 @@ static func set_pet_level(main: Node, lvl: int) -> void:
 	if pet == null:
 		return
 	var old := pet.level
-	var old_stage := pet.stage
 	pet.level = clampi(lvl, 1, PetData.MAX_LEVEL)
 	pet.xp = 0
 	if pet.level > old:
@@ -617,15 +638,48 @@ static func set_pet_level(main: Node, lvl: int) -> void:
 	pet._apply_stats()
 	pet.hp = pet.max_hp
 	pet.mp = pet.max_mp
-	pet.pet_name = PetData.stage_name(pet.species, pet.level)
-	if pet.stage != old_stage:
-		if pet.stage > old_stage:
-			pet._evolve_fx()
-		else:
-			pet._build_model()
 	pet._write_record()
 	pet._update_label()
 	pet.stats_changed.emit()
+	_done(main, "Питомец «%s»: уровень %d" % [pet.pet_name, pet.level])
+
+
+## Эволюция призванного питомца по правилам Учителя Кирка (Pet.evolve).
+static func pet_evolve(main: Node) -> void:
+	var pet := _pet(main)
+	if pet == null:
+		_done(main, "Сначала призовите питомца")
+		return
+	var why := pet.evolve()
+	_done(main, why if why != "" else "Питомец «%s»: %d форма" % [pet.pet_name, pet.stage + 1])
+
+
+## Вернуть призванного питомца в 1-ю форму (проверить эволюцию заново).
+static func pet_devolve(main: Node) -> void:
+	var pet := _pet(main)
+	if pet == null:
+		_done(main, "Сначала призовите питомца")
+		return
+	pet.record["stage"] = 0
+	pet.record["evo"] = []
+	pet._apply_stats()
+	pet.hp = pet.max_hp
+	pet.mp = pet.max_mp
+	pet.pet_name = PetData.stage_name(pet.species, 0)
+	pet._build_model()
+	pet._write_record()
+	pet._update_label()
+	pet.stats_changed.emit()
+	_done(main, "Питомец «%s»: 1-я форма" % pet.pet_name)
+
+
+## Опыт призванному питомцу ровно до следующего уровня (как обычный рост).
+static func pet_xp_next(main: Node) -> void:
+	var pet := _pet(main)
+	if pet == null:
+		_done(main, "Сначала призовите питомца")
+		return
+	pet.gain_xp(maxi(1, PetData.xp_to_next(pet.level) - pet.xp))
 	_done(main, "Питомец «%s»: уровень %d" % [pet.pet_name, pet.level])
 
 

@@ -75,7 +75,7 @@ func run_step() -> void:
 			# Формирование: кентавр 1-го уровня в коллекции и сразу призван
 			check(tm.form("card_centaur_soul"), "кентавр сформирован")
 			check(game.pets.size() == 1 and String(game.pets[0]["species"]) == "centaur", "в коллекции кентавр")
-			check(String(game.pets[0]["name"]) == PetData.stage_name("centaur", 1), "имя — 1-я стадия: %s" % game.pets[0]["name"])
+			check(String(game.pets[0]["name"]) == PetData.stage_name("centaur", 0), "имя — 1-я стадия: %s" % game.pets[0]["name"])
 			check(game.active_pet == 0, "кентавр призван")
 			wait = 5
 			step = 3
@@ -179,10 +179,10 @@ func _unit_models() -> void:
 		check(CreatureAsset.model_for("centaur", st) == want, "стадия %d → %s" % [st + 1, CreatureAsset.model_for("centaur", st)])
 		check(CreatureAsset.species_of(want) == "centaur" and CreatureAsset.is_asset_species(want), "%s — модель кентавра" % want)
 		var lvl := int(PetData.STAGE_LEVELS[st])
-		var sc := PetData.stage_scale("centaur", lvl)
+		var sc := PetData.stage_scale("centaur", st)
 		var n := Node3D.new()
 		box.add_child(n)
-		CreatureModels.build(n, "centaur", PetData.stage_color("centaur", lvl), sc, PetData.asset_tint("centaur", lvl), st)
+		CreatureModels.build(n, "centaur", PetData.stage_color("centaur", st), sc, PetData.asset_tint("centaur", st), st)
 		var ca := CreatureModels.asset_of(n)
 		check(ca != null and ca.species == want, "питомец-кентавр стадии %d — модель %s" % [st + 1, want])
 		if ca == null:
