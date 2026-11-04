@@ -44,7 +44,7 @@ extends RefCounted
 ##   «Предметы»: "item_<id>_1", "item_<id>_10", "ench_<слот>_minus", "ench_<слот>_plus", "ench_<слот>_max",
 ##     "ench_<слот>_zero" (слот — InventoryWindow.WORN_SLOTS), "clear_bag", "clear_bag_yes", "clear_bag_no";
 ##   «Питомцы»: "pet_<вид>_<ур.>", "pet_lvl_minus10", "pet_lvl_minus5", "pet_lvl_minus", "pet_lvl_plus", "pet_lvl_plus5",
-##     "pet_lvl_plus10", "pet_lvl_<1|30|50|60|100|115>", "pet_evolve", "pet_devolve", "pet_xp_next", "pet_full",
+##     "pet_lvl_plus10", "pet_lvl_<1|30|50|60|100|115>", "pet_evolve", "pet_devolve", "pet_xp_up", "pet_full",
 ##     "pet_revive", "pets_clear", "pets_clear_yes", "pets_clear_no";
 ##   «Мир»: "kill_target", "kill_around", "respawn_all", "mob_lvl_minus5", "mob_lvl_minus", "mob_lvl_plus",
 ##     "mob_lvl_plus5", "mob_lvl_hero", "spawn_<вид>", "speed_<1|2|3>", "tp_poi_<id>", "tp_zone_<id>" (teleports());
@@ -574,7 +574,7 @@ static func _build_pets(main: Node, body: VBoxContainer) -> void:
 	var er := _row(body)
 	_btn(er, "pet_evolve", "Эволюция (как у Кирка)", func() -> void: AdminPanel.pet_evolve(main))
 	_btn(er, "pet_devolve", "Вернуть 1-ю форму", func() -> void: AdminPanel.pet_devolve(main))
-	_btn(er, "pet_xp_next", "Опыт до след. уровня", func() -> void: AdminPanel.pet_xp_next(main))
+	_btn(er, "pet_xp_up", "Опыт до след. уровня", func() -> void: AdminPanel.pet_xp_next(main))
 	var ar := _row(body)
 	_btn(ar, "pet_full", "Полное HP/MP питомца", func() -> void: AdminPanel.pet_full(main))
 	_btn(ar, "pet_revive", "Воскресить погибших", func() -> void: AdminPanel.pet_revive(main))
@@ -671,16 +671,6 @@ static func pet_devolve(main: Node) -> void:
 	pet._update_label()
 	pet.stats_changed.emit()
 	_done(main, "Питомец «%s»: 1-я форма" % pet.pet_name)
-
-
-## Опыт призванному питомцу ровно до следующего уровня (как обычный рост).
-static func pet_xp_next(main: Node) -> void:
-	var pet := _pet(main)
-	if pet == null:
-		_done(main, "Сначала призовите питомца")
-		return
-	pet.gain_xp(maxi(1, PetData.xp_to_next(pet.level) - pet.xp))
-	_done(main, "Питомец «%s»: уровень %d" % [pet.pet_name, pet.level])
 
 
 static func pet_full(main: Node) -> void:

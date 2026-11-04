@@ -384,7 +384,7 @@ func _check_pets() -> void:
 	_press("pet_lvl_minus5")
 	check(pet.level == 100 and pet.stage == 2, "питомец −10 −5 → 100, форма та же")
 	var xl := pet.level
-	_press("pet_xp_next")
+	_press("pet_xp_up")
 	check(pet.level == xl + 1, "опыт до следующего уровня: %d" % pet.level)
 	_press("pet_lvl_30")
 	_press("pet_lvl_minus")
