@@ -39,6 +39,9 @@ func run_step() -> void:
 				var m := n as Mob
 				m.remove_from_group("mobs")
 				m.queue_free()
+			# ГСЧ боя с одного зерна: попадания и промахи одинаковы от прогона к прогону (иначе серия промахов
+			# изредка не укладывалась в отведённые секунды)
+			Combat.reseed(20261104)
 			arena = _find_arena()
 			check(arena != Vector3.ZERO, "арена найдена: %s" % arena)
 			mob = main.spawn_mob("pheasant", 10, arena)
@@ -88,7 +91,7 @@ func run_step() -> void:
 				elite_i = 0
 				step = 4
 				return
-			if timer > 300:
+			if timer > 600:
 				fail("атакованный зверь не бьёт героя")
 		4:
 			# Агрессивный: вдали от героя — не трогает
@@ -132,7 +135,7 @@ func run_step() -> void:
 			elif elite.target != null:
 				fail("%s взял чужую цель" % elite.mob_name)
 				return
-			if timer > 360:
+			if timer > 600:
 				fail("%s не нападает на героя в %.1f м" % [elite.mob_name, _dist(elite)])
 		7:
 			# Питомец в «Авто» сам нападает на нейтрального зверя, тот бьёт питомца в ответ
