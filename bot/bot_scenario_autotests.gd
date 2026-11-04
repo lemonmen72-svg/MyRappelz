@@ -118,10 +118,39 @@ func test_names() -> PackedStringArray:
 	return out
 
 
-## Имена тестов в res://tests/ (в APK скрипты — .gdc и .gd.remap, в редакторе — .gd).
+## Список тестов на случай, когда папку не перечислить (APK со сборкой Gradle кладёт res:// в assets/ APK, и
+## DirAccess на телефоне 0.27.0 не открыл res://tests/). Сверку с папкой держит tests/test_bot.gd.
+const INDEX := "res://tests/tests_index.txt"
+
+
+## Имена тестов в res://tests/ (в APK скрипты — .gdc и .gd.remap, в редакторе — .gd); папку не перечислить — INDEX.
 static func list_tests() -> PackedStringArray:
+	var out := scan_tests()
+	if out.is_empty():
+		out = index_tests()
+	return out
+
+
+## Тесты из файла INDEX (по одному имени в строке).
+static func index_tests() -> PackedStringArray:
+	var out := PackedStringArray()
+	var f := FileAccess.open(INDEX, FileAccess.READ)
+	if f == null:
+		return out
+	for line in f.get_as_text().split("\n"):
+		var n := line.strip_edges()
+		if n != "" and not n.begins_with("#"):
+			out.append(n)
+	return out
+
+
+## Тесты по самой папке res://tests/ (DirAccess).
+static func scan_tests() -> PackedStringArray:
 	var seen := {}
-	for f in DirAccess.get_files_at(TESTS_DIR):
+	var files := DirAccess.get_files_at(TESTS_DIR)
+	if files.is_empty():
+		files = DirAccess.get_files_at(TESTS_DIR.trim_suffix("/"))
+	for f in files:
 		var s := String(f).trim_suffix(".remap")
 		var ext := s.get_extension()
 		if ext != "gd" and ext != "gdc":

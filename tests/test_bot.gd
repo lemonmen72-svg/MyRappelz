@@ -454,6 +454,10 @@ func _start_autotests() -> void:
 	var all := AutoScenario.list_tests()
 	check(all.size() >= 50 and all[0] == "smoke_test" and all.has("test_combat") and all.has("test_bot")
 		and not all.has("test_base"), "список автотестов: %d, первый %s" % [all.size(), all[0] if all.size() > 0 else "—"])
+	# Запасной список для телефона (DirAccess в APK с Gradle папку не перечислил) совпадает с папкой tests/
+	var idx := AutoScenario.index_tests()
+	check(idx == AutoScenario.scan_tests(), "tests/tests_index.txt совпадает с папкой tests/ (%d и %d) — новый тест допишите в список"
+		% [idx.size(), AutoScenario.scan_tests().size()])
 	var quick := BotScenario.create("autotests_quick")
 	check(quick != null and quick.mode_key == "autotests_quick" and quick.limit() == 15.0 * 60.0
 		and BotScenario.create("autotests").limit() == 75.0 * 60.0, "режимы автотестов: лимиты 75 и 15 мин")
