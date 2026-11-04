@@ -164,6 +164,11 @@ const ASSET_IDLE := [["idle", 0.0, 2.0, 1.0], ["regular_jump", 0.0, 0.07, 0.0],
 	["sword_judgment", 0.0, 0.22, 0.0]]
 ## Покой с арбалетом: оружие у лица на изготовку (цикл); нет клипа — обычный покой.
 const ASSET_IDLE_CROSSBOW := [["crossbow_idle", 0.0, 1.67, 1.0]]
+## Боевой покой (система анимаций 1.0, AnimResolver.combat_idle): стойка с клинком Sword_Idle (UAL) — COMBAT_HOLD с после
+## атаки, умения или удара по герою, только одноручное оружие ближнего боя (у двуручного в покое — хват наперевес
+## TwoHandIK, у лука, арбалета и посоха своя стойка или её нет). Только вид — на бой не влияет.
+const ASSET_IDLE_COMBAT := [["sword_idle", 0.0, 1.67, 1.0]]
+const COMBAT_HOLD := 6.0
 ## Прежние шаг и бег (UAL; модели без клипов манекенов — запасные герои старых файлов, жители): по WALK_NATIVE / RUN_NATIVE.
 const ASSET_WALK := [["walking_woman"], ["walking"]]
 const ASSET_RUN := [["running"]]
@@ -462,6 +467,8 @@ var _shots := 0
 var _shot_gap := 1.0
 ## Петля каста умения героя (настоящее имя клипа; "" — каста нет): play_cast_loop / stop_cast_loop.
 var _cast_loop := ""
+## Время последнего боевого действия модели (атака, умение, урон) — для боевого покоя.
+var _combat_t := -100.0
 ## Поворот на месте: смещение модели по вертикали (рад, rotation.y), начало и конец смещения за клип, остаток поворота
 ## родителя, пока клип играет, клип поворота ("" — нет), прежний поворот родителя; покой после поворота — без перехода.
 var _turn_off := 0.0
@@ -1816,6 +1823,7 @@ func _process(delta: float) -> void:
 ## Обычная атака под оружие: удар, выстрел из лука или взмах посохом. interval — интервал атаки героя, с (0 — темп
 ## клипа): движение манекена Meshy укладывается в него (MQ_SPEED_MIN…MQ_SPEED_MAX).
 func play_attack(interval: float = 0.0) -> void:
+	_combat_t = _t
 	if _asset != null:
 		if weapon_kind == "crossbow":
 			# Выстрел из стойки; после серии выстрелов, когда стрельба прервалась, — перезарядка (_asset_process)
@@ -2056,6 +2064,7 @@ func play_wave() -> void:
 ## Получение урона: красноватая вспышка и отшатывание назад.
 func play_hit() -> void:
 	_flash = 1.0
+	_combat_t = _t
 	if _asset != null:
 		_asset_recoil()
 		# Клип реакции на удар — только когда стоит и ничего не делает (каст не сбивается и с виду)
@@ -2250,7 +2259,7 @@ func _setup_asset(path: String) -> bool:
 			if not a.has_meta("cm_prepared"):
 				a.set_meta("cm_prepared", true)
 				var k := String(an).to_lower()
-				if k.contains("walk") or k.ends_with("running") or k == "idle" or k == "crossbow_idle" or k.ends_with("_loop") or k.ends_with("_hold") or MQ_LOCO_CLIPS.has(k):
+				if k.contains("walk") or k.ends_with("running") or k == "idle" or k == "crossbow_idle" or k == "sword_idle" or k.ends_with("_loop") or k.ends_with("_hold") or MQ_LOCO_CLIPS.has(k):
 					a.loop_mode = Animation.LOOP_LINEAR
 				_pin_root(a, skel)
 	return true
@@ -2459,15 +2468,20 @@ func _asset_process(delta: float) -> void:
 			return
 	if want == "idle":
 		var idle: Array = []
+		var idle_key := "idle"
 		if weapon_kind == "crossbow":
 			idle = _pick(ASSET_IDLE_CROSSBOW)
+		elif in_combat_stance():
+			idle = _pick(ASSET_IDLE_COMBAT)
+			idle_key = "idle_combat"
 		if idle.is_empty():
 			idle = _pick(ASSET_IDLE)
+			idle_key = "idle"
 		if idle.is_empty():
 			return
 		var looped := float(idle[3]) > 0.0
-		if _loco != "idle":
-			_loco = "idle"
+		if _loco != idle_key:
+			_loco = idle_key
 			_loco_kind = ""
 			_anim.speed_scale = 1.0
 			# После поворота на месте — без перехода: корпус клипа уже довёрнут, смещение модели снято в тот же кадр
@@ -2593,6 +2607,8 @@ func _turn_update(delta: float) -> void:
 
 ## Клип поворота под нужный угол (−_turn_off): той же стороны и ближе всех по величине; 180° — в любую сторону.
 func _turn_start() -> void:
+	# Поворот кончается позой обычного покоя без перехода (_turn_snap) — боевая стойка снимается
+	_combat_t = -100.0
 	var need := -_turn_off
 	var info: Dictionary = asset_rig(String(spec.get("asset", ""))).get("clips", {})
 	var best := ""
@@ -2643,8 +2659,13 @@ func _asset_act(kind: String, any: bool = false) -> void:
 		if not all.is_empty():
 			a = all[randi() % all.size()]
 	if a.is_empty():
+		if AnimResolver.enabled:
+			AnimResolver.note("act:" + kind, weapon_kind, "", "idle", "")
 		return
 	var c := String(a[0])
+	if AnimResolver.enabled:
+		# Клип своего действия из общей таблицы (урон, подбор, уклонение…) или прежний жест вместо атаки
+		AnimResolver.note("act:" + kind, weapon_kind, "", "shared", c)
 	_anim.speed_scale = 1.0
 	_anim.play(c, 0.08, float(a[3]))
 	_anim.seek(float(a[1]), true)
@@ -2658,6 +2679,12 @@ func _asset_act(kind: String, any: bool = false) -> void:
 
 # ---------- Движения манекенов Meshy (клипы Mq_*) ----------
 
+## Боевой покой сейчас: система включена, недавно было боевое действие, одноручное оружие ближнего боя.
+func in_combat_stance() -> bool:
+	return AnimResolver.enabled and AnimResolver.combat_idle and _t - _combat_t < COMBAT_HOLD and _melee() \
+		and not two_handed and _asset_speed < 0.3
+
+
 ## Хват для выбора движений: вид оружия модели, щит ("sword_shield"), двуручное ("sword_2h", "axe_2h", "mace_2h").
 func mq_grip() -> String:
 	if weapon_kind == "sword" and bool(spec.get("shield", false)):
@@ -2668,6 +2695,10 @@ func mq_grip() -> String:
 
 
 ## Настоящие имена клипов из списка ключей (в нижнем регистре), которые есть в модели — только точные совпадения.
+func _mq_clip(key: String) -> String:
+	return String(_clips.get(key, ""))
+
+
 func _mq_names(keys: Array) -> Array[String]:
 	var out: Array[String] = []
 	for k in keys:
@@ -2683,10 +2714,14 @@ func _mq_attack(interval: float) -> bool:
 		return false
 	var names := _mq_names(MQ_ATTACKS.get(mq_grip(), []))
 	if names.is_empty():
+		if AnimResolver.enabled:
+			AnimResolver.note("attack", mq_grip(), "", "legacy", "")
 		return false
 	if _t - _mq_last > MQ_COMBO_RESET:
 		_mq_step = 0
 	var c := names[_mq_step % names.size()]
+	if AnimResolver.enabled:
+		AnimResolver.note("attack", mq_grip(), "", "grip", c)
 	_mq_step += 1
 	_mq_last = _t
 	var sp := 1.0
@@ -2704,6 +2739,20 @@ func _mq_attack(interval: float) -> bool:
 func play_skill(kind: String, sid: String = "", use: String = "", release: bool = false) -> bool:
 	if _asset == null or _anim == null or not is_inside_tree():
 		return false
+	_combat_t = _t
+	if AnimResolver.enabled:
+		var r := AnimResolver.pick(AnimResolver.skill_chain(kind, sid, use, mq_grip(), _melee()), _mq_clip)
+		var got: Array = r["names"]
+		if got.is_empty():
+			AnimResolver.note("skill:" + kind, mq_grip(), sid, "legacy", "")
+			return false
+		var k := absi(hash(sid)) % got.size() if sid != "" else randi() % got.size()
+		AnimResolver.note("skill:" + kind, mq_grip(), sid, String(r["level"]), String(got[k]))
+		_mq_play(String(got[k]), 1.0)
+		if release:
+			_anim.seek(maxf(0.0, _act_hit - MQ_RELEASE_LEAD), true)
+		return true
+	# Прежний выбор (AnimResolver.enabled = false — откат)
 	var opts: Array = []
 	if MQ_SKILL_BY_ID.has(sid):
 		opts = [MQ_SKILL_BY_ID[sid]]

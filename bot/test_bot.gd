@@ -281,6 +281,7 @@ static func clock(sec: float) -> String:
 
 func _begin() -> void:
 	current = self
+	AnimResolver.reset_stats()
 	var now := Time.get_datetime_dict_from_system()
 	started_text = "%04d-%02d-%02d %02d:%02d" % [int(now["year"]), int(now["month"]), int(now["day"]), int(now["hour"]),
 		int(now["minute"])]

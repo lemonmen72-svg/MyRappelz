@@ -109,9 +109,11 @@ func run_step() -> void:
 			wait = 70
 			step = 52
 		52:
-			check(hero._act_end < 0.0 and hero._loco == "idle", "герой: после удара — стойка покоя")
-			check(hero._anim.current_animation == hero._clip("idle"),
-				"герой: покой играет клип Idle (%s)" % hero._anim.current_animation)
+			check(hero._act_end < 0.0 and ["idle", "idle_combat"].has(hero._loco), "герой: после удара — стойка покоя (%s)" % hero._loco)
+			# После удара — боевой покой (стойка с клинком, система анимаций 1.0), иначе обычный Idle
+			var want_idle := hero._clip("sword_idle") if hero.in_combat_stance() else hero._clip("idle")
+			check(hero._anim.current_animation == want_idle,
+				"герой: покой играет клип покоя (%s, ждём %s)" % [hero._anim.current_animation, want_idle])
 			_hero_check_pose("в покое")
 			# Стоя без дела — подбор добычи
 			hero.play_pickup()

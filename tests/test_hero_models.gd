@@ -262,6 +262,9 @@ func run_step() -> void:
 			for i in models.size():
 				var m := models[i]
 				var idle := m._pick(CharacterModel.ASSET_IDLE_CROSSBOW if m.weapon_kind == "crossbow" else CharacterModel.ASSET_IDLE)
+				# Боевой покой (система анимаций 1.0): после выпуска умения с клинком — стойка Sword_Idle
+				if m.in_combat_stance():
+					idle = m._pick(CharacterModel.ASSET_IDLE_COMBAT)
 				check(not idle.is_empty() and m._anim.current_animation == String(idle[0]), "%s: после выпуска — покой (%s)" % [
 					HEROES[i], m._anim.current_animation])
 			# Поворот на месте: герой (родитель) развернулся на 100° влево — модель сначала смотрит по-старому и

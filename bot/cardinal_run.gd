@@ -439,6 +439,7 @@ func result() -> Dictionary:
 		"ttk_avg": snappedf(ttk / maxf(float(kills.size()), 1.0), 0.01),
 		"time_split": t_split, "xp_mismatch": xp_mismatch, "kill_log": kills,
 		"clock": "Util.game_time",
+		"anim": AnimResolver.summary(),
 		"rest_boost": {"on": accel > 1.0, "boost": REST_BOOST, "game_sec": snappedf(boost_game, 0.1), "aborts": boost_aborts,
 			"off_reason": boost_off_reason, "rests": rests},
 		"diag": {"zone_mobs_start": zone_mobs_start, "respawned": respawned, "picks": picks, "abandoned": abandoned, "swings": swings, "idle_frames": idle_frames, "end_state": state},

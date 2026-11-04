@@ -49,7 +49,8 @@ extends RefCounted
 ##   «Мир»: "kill_target", "kill_around", "respawn_all", "mob_lvl_minus5", "mob_lvl_minus", "mob_lvl_plus",
 ##     "mob_lvl_plus5", "mob_lvl_hero", "spawn_<вид>", "speed_<1|2|3>", "tp_poi_<id>", "tp_zone_<id>" (teleports());
 ##   «Тест-бот»: "bot_mode_<id>" (BotScenario.MODES; «скоро» — недоступны), "bot_sec_<раздел>" (режим «По разделам»:
-##     переключатели разделов BotSection.SECTIONS), "bot_start", "bot_stop", "bot_open", "bot_share".
+##     переключатели разделов BotSection.SECTIONS), "bot_start", "bot_stop", "bot_open", "bot_share",
+##     "anim_system", "anim_combat_idle" (система анимаций 1.0 и боевая стойка — выключатели отката).
 
 const ADMIN_TOOLS := true
 ## Размер окна для «Среднего» размера интерфейса.
@@ -326,6 +327,14 @@ static func zero_gold(main: Node) -> void:
 static func full(main: Node) -> void:
 	_full_hero(main)
 	_done(main, "HP и MP полные")
+
+
+## Система анимаций и боевая стойка (AnimResolver.enabled, combat_idle): выкл. — прежний выбор клипов (откат).
+static func set_anim(main: Node, on: bool, combat: bool) -> void:
+	AnimResolver.enabled = on
+	AnimResolver.combat_idle = combat
+	_done(main, "Система анимаций %s, боевая стойка %s" % ["включена" if on else "выключена (прежний выбор клипов)",
+		"включена" if combat else "выключена"])
 
 
 static func set_god(main: Node, on: bool) -> void:
@@ -989,6 +998,14 @@ static func _build_bot(main: Node, body: VBoxContainer) -> void:
 	_btn(r2, "bot_share", "Поделиться", func() -> void: AdminPanel.bot_report(main, true), 160.0)
 	(buttons["bot_open"] as Button).disabled = last.is_empty()
 	(buttons["bot_share"] as Button).disabled = last.is_empty()
+	# Система анимаций 1.0 (AnimResolver): откат на прежний выбор клипов и боевой покой — до перезапуска
+	_head(body, "Анимации")
+	body.add_child(_text("Решения выбора клипов: " + AnimResolver.summary_line(), UiScale.FONT_SMALL, INFO))
+	var r3 := _row(body)
+	_choice(r3, "anim_system", "Система анимаций: вкл." if AnimResolver.enabled else "Система анимаций: выкл.",
+		AnimResolver.enabled, func() -> void: AdminPanel.set_anim(main, not AnimResolver.enabled, AnimResolver.combat_idle))
+	_choice(r3, "anim_combat_idle", "Боевая стойка: вкл." if AnimResolver.combat_idle else "Боевая стойка: выкл.",
+		AnimResolver.combat_idle, func() -> void: AdminPanel.set_anim(main, AnimResolver.enabled, not AnimResolver.combat_idle))
 
 
 ## «По разделам»: разделы переключателями (выбор хранится — BotScenarioGame.chosen), оценка времени.

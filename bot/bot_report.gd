@@ -415,6 +415,9 @@ static func build_text(bot: TestBot) -> String:
 	if not extra.is_empty():
 		L.append_array(extra)
 		L.append("")
+	# Система анимаций 1.0: какие уровни выбора клипа сработали за запуск, чего не хватило (только диагностика)
+	L.append("Анимации (AnimResolver%s): %s" % ["" if AnimResolver.enabled else ", выключен", AnimResolver.summary_line()])
+	L.append("")
 	L.append("Журнал")
 	L.append_array(bot.journal)
 	L.append("")

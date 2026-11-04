@@ -63,3 +63,4 @@ test_weapons 4
 perf 13
 test_cardinal 90
 test_cardinal_det 60
+test_anim_system 40
