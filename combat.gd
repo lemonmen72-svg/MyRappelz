@@ -1,58 +1,60 @@
 class_name Combat
 extends RefCounted
-## Единая модель боя «статы против статов» (решение Максима): герой, питомец и зверь мира сталкивают свои
-## характеристики — одинаковыми формулами для всех сторон.
-## • Попадание: точность атакующего (Stats.accuracy — Меткость) против избегания цели (Stats.avoidance — Ловкость)
-##   и разница уровней. Равный уровень ≈ 95 %, цель выше на 5 ур. — 65 %, на 10 — 21 %, на 20 — 0.2 %;
-##   цель ниже — до 99 %. Уклонение героя и питомца (eva, %) — отдельный бросок у них (Player/Pet.take_damage).
-##   Умения не промахиваются по цели своего уровня и ниже (и до +SKILL_SURE_LEVELS), выше — по той же кривой уровней.
-## • Урон: «сырой» удар (атака × множитель умения + разброс, крит) × пробивание защиты power / (power + защита)
-##   (защита снижает урон, но не в ноль; физ. атака — против физ. защиты, магия — против маг. защиты)
-##   × множитель разницы уровней 1 + 0.0015·d·|d| (±1.4 % на 3 ур., ±15 % на 10, ×1.6 / ×0.4 на 20).
-## • Крит: шанс атакующего (Удача, Ловкость, оружие) ±1 % за уровень разницы, не больше 75 %.
+## Единая модель боя для героя, питомца и зверя — формулы сервера оригинала (StructCreature::CalcDamage,
+## GetCriticalDamage; tools/rappelz_db_reference.md, «Формулы сервера»).
+## • Попадание: шанс, % = точность / уклонение цели × max(10, 2·(44 + L атакующего − L цели)) + 7 (бросок 0…99).
+##   Равные уровни и статы — 95 %, цель на 10 ур. выше — 75 %, на 39+ — 17 %; цель ниже — почти всегда.
+##   Отдельный бросок уклонения героя и питомца (eva, %: умения, пояса) и блок щитом — у них (take_damage).
+##   Умения не промахиваются по цели до +SKILL_SURE_LEVELS выше, дальше — доля шанса по уровням.
+## • Урон: A — атака (у умения — атака × множитель), D — защита цели (физ. или маг.), L — уровень атакующего:
+##   A·max(0.05, 1 − 0.5·D/A) + 1.7·L·max(0.3, 1 − 0.4·D/A), не меньше 1 (защита вычитается наполовину).
+##   У нас урон умения и крит — доля от урона по атаке (damage_factor = урон(A) / A), так множители умений
+##   и разброс остаются как были.
+## • Крит: шанс атакующего (0.2·Удача + 3 %, оружие, умения), урон × 1.8 у всех (сила крита 80).
 ## • Опыт: множитель по разнице уровней зверя и героя (питомца) — xp_factor, глобальный Game.xp_mult.
 ## Где применяется: Player (обычная атака, умения, HeroSkillFx), Pet (атаки и умения), Mob (удары по герою и питомцу).
 ## take_damage у всех — уже готовый урон (защиту учитывает атакующий через damage()).
 
-## Попадание: база на равном уровне, потолок, ширина спада по уровням (шанс × exp(−d² / HIT_SPREAD)).
+## Попадание: множитель уровней 2·(HIT_LEVEL_BASE + L атакующего − L цели), не меньше HIT_LEVEL_MIN, + HIT_FLAT %.
+const HIT_LEVEL_BASE := 44
+const HIT_LEVEL_MIN := 10.0
+const HIT_FLAT := 7.0
+## Шанс на равных уровнях и статах (для доли у умений).
 const HIT_BASE := 0.95
-const HIT_MAX := 0.99
-const HIT_SPREAD := 66.0
-## Цель ниже: +0.5 % за уровень (до HIT_MAX).
-const HIT_LOWER_STEP := 0.005
-## Точность против избегания: ±0.2 % за единицу разницы, не больше ±5 %.
-const HIT_STAT_K := 0.002
-const HIT_STAT_CAP := 0.05
+const HIT_MAX := 1.0
 ## Умения бьют без промаха по цели выше героя не больше чем на столько уровней.
 const SKILL_SURE_LEVELS := 2
-## Множитель урона по разнице уровней: 1 + K·d·|d| в пределах [MIN, MAX].
-const LEVEL_DMG_K := 0.0015
-const LEVEL_DMG_MIN := 0.4
-const LEVEL_DMG_MAX := 1.6
-## Крит: ±1 % за уровень разницы, потолок.
-const CRIT_LEVEL_K := 0.01
+## Урон: доля атаки после защиты (A − 0.5·D, не меньше 5 % A) и «уровневая» часть 1.7·L (× 1 − 0.4·D/A, не меньше 30 %).
+const DEF_HALF := 0.5
+const ATK_FLOOR := 0.05
+const LEVEL_PART := 1.7
+const LEVEL_DEF := 0.4
+const LEVEL_FLOOR := 0.3
+## Крит не выше CRIT_MAX; урон крита зверя — как у всех (×1.8; герой — Player.CRIT_MULT, питомец — PetStats.CRIT_MULT).
 const CRIT_MAX := 0.75
-## Крит зверя — ×1.5 (у героя Player.CRIT_MULT, у питомца PetStats.CRIT_MULT).
-const MOB_CRIT_MULT := 1.5
+const MOB_CRIT_MULT := 1.8
 
 
 # ---------- Попадание ----------
 
-## Шанс попасть только по уровням (d = уровень цели − уровень атакующего).
+## Множитель уровней в шансе попасть (d = уровень цели − уровень атакующего), в процентах на единицу «точность /
+## уклонение».
+static func level_factor(d: int) -> float:
+	return maxf(HIT_LEVEL_MIN, 2.0 * float(HIT_LEVEL_BASE - d))
+
+
+## Шанс попасть только по уровням (точность равна уклонению цели).
 static func level_hit(d: int) -> float:
-	if d <= 0:
-		return minf(HIT_MAX, HIT_BASE + HIT_LOWER_STEP * float(-d))
-	return HIT_BASE * exp(-float(d * d) / HIT_SPREAD)
+	return clampf((level_factor(d) + HIT_FLAT) / 100.0, 0.0, HIT_MAX)
 
 
-## Шанс попасть обычной атакой: точность acc против избегания avoid цели, уровни атакующего и цели (0..0.99).
+## Шанс попасть обычной атакой: точность acc против уклонения avoid цели, уровни атакующего и цели (0..1).
 static func hit_chance(acc: float, avoid: float, atk_lvl: int, def_lvl: int) -> float:
-	var base := level_hit(def_lvl - atk_lvl)
-	var st := clampf(HIT_STAT_K * (acc - avoid), -HIT_STAT_CAP, HIT_STAT_CAP)
-	return clampf(base + st * base / HIT_BASE, 0.0, HIT_MAX)
+	var ratio := maxf(0.0, acc) / maxf(1.0, avoid)
+	return clampf((ratio * level_factor(def_lvl - atk_lvl) + HIT_FLAT) / 100.0, 0.0, HIT_MAX)
 
 
-## Шанс, что умение достанет цель: 1.0 до +SKILL_SURE_LEVELS, выше — та же кривая уровней.
+## Шанс, что умение достанет цель: 1.0 до +SKILL_SURE_LEVELS, выше — доля шанса по уровням.
 static func skill_hit_chance(atk_lvl: int, def_lvl: int) -> float:
 	var d := def_lvl - atk_lvl
 	if d <= SKILL_SURE_LEVELS:
@@ -62,26 +64,28 @@ static func skill_hit_chance(atk_lvl: int, def_lvl: int) -> float:
 
 # ---------- Урон ----------
 
-## Множитель урона по разнице уровней атакующего и цели.
-static func level_damage(atk_lvl: int, def_lvl: int) -> float:
-	var d := float(atk_lvl - def_lvl)
-	return clampf(1.0 + LEVEL_DMG_K * d * absf(d), LEVEL_DMG_MIN, LEVEL_DMG_MAX)
+## Урон сервера по атаке power против защиты armor, уровень атакующего atk_lvl.
+static func server_damage(power: float, armor: float, atk_lvl: int) -> float:
+	var a := maxf(1.0, power)
+	var r := maxf(0.0, armor) / a
+	return maxf(1.0, a * maxf(ATK_FLOOR, 1.0 - DEF_HALF * r) + LEVEL_PART * float(atk_lvl) * maxf(LEVEL_FLOOR, 1.0 - LEVEL_DEF * r))
 
 
-## Доля урона, которая проходит сквозь защиту: power / (power + armor) × разница уровней.
-static func damage_factor(power: float, armor: float, atk_lvl: int, def_lvl: int) -> float:
+## Доля урона, которая проходит сквозь защиту: урон сервера / атака. def_lvl — для совместимости (в оригинале
+## разница уровней урон не меняет, только попадание).
+static func damage_factor(power: float, armor: float, atk_lvl: int, _def_lvl: int = 0) -> float:
 	var p := maxf(1.0, power)
-	return p / (p + maxf(0.0, armor)) * level_damage(atk_lvl, def_lvl)
+	return server_damage(p, armor, atk_lvl) / p
 
 
-## Готовый урон по цели: «сырой» удар raw (атака × множитель, крит) после защиты armor и уровней. Не меньше 1.
+## Готовый урон по цели: «сырой» удар raw (атака × множитель, крит) после защиты armor. Не меньше 1.
 static func damage(raw: float, power: float, armor: float, atk_lvl: int, def_lvl: int) -> int:
 	return maxi(1, roundi(raw * damage_factor(power, armor, atk_lvl, def_lvl)))
 
 
-## Шанс крита base (0..1) с поправкой на разницу уровней.
-static func crit_chance(base: float, atk_lvl: int, def_lvl: int) -> float:
-	return clampf(base + CRIT_LEVEL_K * float(atk_lvl - def_lvl), 0.0, CRIT_MAX)
+## Шанс крита base (0..1): как у сервера, от уровней не зависит.
+static func crit_chance(base: float, _atk_lvl: int = 0, _def_lvl: int = 0) -> float:
+	return clampf(base, 0.0, CRIT_MAX)
 
 
 # ---------- Стороны боя ----------
@@ -185,11 +189,7 @@ static func expected_dps(a: Dictionary, b: Dictionary) -> float:
 
 
 ## «Эффективная сила» зверя m относительно героя h (профили): (HP × урон в секунду) зверя / то же у героя.
-## < 1 — герой сильнее (бой 1×1 выигрышный). Зверь своего уровня без прибавки HP равен герою (≈ 1.0), с HP
-## ×MobStats.MOB_HP_MULT — ≈ 3 с 10 ур. (один на один без умений, питомца и зелий герой проигрывает); на 1–5 ур. вход
-## новичка (MobStats.MOB_HP_START, MOB_ATK_START) — ≈ 0.45–0.55, Бродяга побеждает, на 6–9 ур. — переход к ≈ 3. Вместо героя может быть
-## питомец (profile_of(pet), PetStats.combat_profile): питомец своего уровня против зверя своего уровня — ≈ 0.95–1.3
-## (почти на равных), герой с питомцем вместе побеждают уверенно.
+## < 1 — герой сильнее (бой 1×1 выигрышный). Вместо героя может быть питомец (profile_of(pet), PetStats.combat_profile).
 static func power_ratio(h: Dictionary, m: Dictionary) -> float:
 	var dh := expected_dps(h, m)
 	var dm := expected_dps(m, h)

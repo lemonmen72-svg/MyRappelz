@@ -302,7 +302,7 @@ func _build_jobs() -> void:
 		return
 	job_detail = ""
 	var w := ClassData.cls(ClassData.WANDERER)
-	var st := HeroStats.base_stats(ClassData.WANDERER, 1)
+	var st := HeroStats.base_stats(ClassData.WANDERER, 1, _race)
 	var parts: PackedStringArray = []
 	for k in Stats.STATS:
 		parts.append("%s %d" % [String(Stats.STAT_NAMES[k]), int(st[k])])

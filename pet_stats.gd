@@ -14,8 +14,8 @@ const STATS := Stats.STATS
 const STAT_NAMES := Stats.STAT_NAMES
 ## Наш уровень → уровень вики: уровень / WIKI_LEVEL_SCALE.
 const WIKI_LEVEL_SCALE := Stats.WIKI_LEVEL_SCALE
-## Множитель урона крита питомца.
-const CRIT_MULT := 1.5
+## Множитель урона крита питомца (сила крита сервера 80 — как у всех).
+const CRIT_MULT := 1.8
 ## Сила питомца против зверей мира (MobStats растут по статам героя с весом уровня 2.5, а статы питомца — по
 ## таблицам вики): с LEVEL_GROWTH_FROM ур. HP, атаки и лечение × (1 + LEVEL_GROWTH·(L − LEVEL_GROWTH_FROM)) — без
 ## этого питомец на 2-й и 3-й стадии отстаёт от зверей своего уровня (на 1-й стадии таблицы вики растут быстрее

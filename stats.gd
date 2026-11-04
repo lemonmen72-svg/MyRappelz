@@ -1,12 +1,10 @@
 class_name Stats
 extends RefCounted
-## Общие формулы характеристик героя (HeroStats), питомцев (PetStats) и зверей мира (MobStats), по образцу Rappelz
-## (механика и числа — из вики, оформление своё). 7 статов: Сила, Выносливость, Ловкость, Интеллект,
-## Мудрость, Меткость, Удача. Из них — производные значения нашего масштаба: здесь «сырые» формулы,
-## а HeroStats и PetStats калибруют их так, чтобы на 1 уровне получались прежние HP, атака и защита (MobStats —
-## от калибровки героя). Попадание, урон через защиту и крит в бою — Combat.
-## Опорные точки статов по уровню и линейная интерполяция между ними — тоже здесь.
-## Справка: tools/rappelz_pet_reference.md (питомцы), tools/rappelz_strider_reference.md (герой).
+## Общие формулы характеристик героя (HeroStats), питомцев (PetStats) и зверей мира (MobStats) — формулы сервера
+## оригинала (StructCreature::calcAttribute, CalculateStat; tools/rappelz_db_reference.md, «Формулы сервера»).
+## 7 статов: Сила, Выносливость, Ловкость, Интеллект, Мудрость, Меткость, Удача (в оригинале str, vit, agi, int,
+## men, dex, luk). L — настоящий уровень, fcm — множитель статов (герой и зверь 1.0, существо 0.7).
+## Попадание, урон через защиту и крит в бою — Combat. Опорные точки и интерполяция — для таблиц питомцев.
 
 const STATS := ["str", "vit", "agi", "int", "wis", "dex", "luck"]
 const STAT_NAMES := {
@@ -52,49 +50,51 @@ static func slope(pts: Array, i: int) -> float:
 
 
 # ---------- «Сырые» формулы (до калибровки) ----------
-# s — 7 статов, lvl — уровень в формуле (у питомца — наш уровень, у героя — с весом HeroStats.LEVEL_WEIGHT).
-# Как в Rappelz: HP ведёт Выносливость (там 33·Vit + 20·Lv), физ. атаку ближнего боя — Сила (2.8·Str + Lv),
-# дальнего — Меткость и Ловкость (2.2·Dex + 1.2·Agi + Lv), маг. атаку — Интеллект, MP и маг. защиту — Мудрость,
-# физ. защиту — Выносливость, точность — Меткость, уклонение и скорость атаки — Ловкость, крит — Удача.
-# Коэффициенты пересчитаны на нашу шкалу уровней (tools/rappelz_pet_reference.md).
+# s — 7 статов, lvl — уровень, fcm — множитель статов (FCM оригинала).
 
-static func raw_hp(s: Dictionary, lvl: float) -> float:
-	return 2.0 * float(s["vit"]) + 3.0 * lvl
+## Макс. HP: 30·Вын + 20·L.
+static func raw_hp(s: Dictionary, lvl: float, fcm: float = 1.0) -> float:
+	return 30.0 * float(s["vit"]) * fcm + 20.0 * lvl
 
 
-static func raw_patk(s: Dictionary, lvl: float) -> float:
-	return float(s["str"]) + 0.2 * float(s["dex"]) + 4.0 * lvl
+## Физ. атака ближнего боя: 2·Сила + L (оружие — сверху).
+static func raw_patk(s: Dictionary, lvl: float, fcm: float = 1.0) -> float:
+	return 2.0 * float(s["str"]) * fcm + lvl
 
 
-## Физ. атака дальнего боя (лук, арбалет): Rappelz 2.2·Dex + 1.2·Agi в масштабе raw_patk (÷ 2.8).
-static func raw_ratk(s: Dictionary, lvl: float) -> float:
-	return 0.79 * float(s["dex"]) + 0.43 * float(s["agi"]) + 4.0 * lvl
+## Физ. атака дальнего боя (лук, арбалет): (1.6·Меткость + 0.4·Сила) + L.
+static func raw_ratk(s: Dictionary, lvl: float, fcm: float = 1.0) -> float:
+	return (1.6 * float(s["dex"]) + 0.4 * float(s["str"])) * fcm + lvl
 
 
-static func raw_matk(s: Dictionary, lvl: float) -> float:
-	return float(s["int"]) + 0.2 * float(s["wis"]) + 4.0 * lvl
+## Маг. атака: 2·Инт + L.
+static func raw_matk(s: Dictionary, lvl: float, fcm: float = 1.0) -> float:
+	return 2.0 * float(s["int"]) * fcm + lvl
 
 
-static func raw_heal(s: Dictionary, lvl: float) -> float:
-	return float(s["wis"]) + 0.2 * float(s["int"]) + 4.0 * lvl
+## Сила лечения (умения лечения питомцев): маг. атака от Интеллекта и Мудрости поровну.
+static func raw_heal(s: Dictionary, lvl: float, fcm: float = 1.0) -> float:
+	return (float(s["int"]) + float(s["wis"])) * fcm + lvl
 
 
-static func raw_pdef(s: Dictionary, lvl: float) -> float:
-	return 0.5 * float(s["vit"]) + 0.2 * float(s["agi"]) + 3.0 * lvl
+## Физ. защита: 2·Вын + L.
+static func raw_pdef(s: Dictionary, lvl: float, fcm: float = 1.0) -> float:
+	return 2.0 * float(s["vit"]) * fcm + lvl
 
 
-static func raw_mdef(s: Dictionary, lvl: float) -> float:
-	return 0.5 * float(s["wis"]) + 0.2 * float(s["int"]) + 3.0 * lvl
+## Маг. защита: 2·Мдр + L.
+static func raw_mdef(s: Dictionary, lvl: float, fcm: float = 1.0) -> float:
+	return 2.0 * float(s["wis"]) * fcm + lvl
 
 
-## MP: Мудрость ×2, Интеллект, 4 за уровень и запас 15.
-static func raw_mp(s: Dictionary, lvl: float) -> float:
-	return 2.0 * float(s["wis"]) + float(s["int"]) + 4.0 * lvl + 15.0
+## Макс. MP: 30·Инт + 20·L.
+static func raw_mp(s: Dictionary, lvl: float, fcm: float = 1.0) -> float:
+	return 30.0 * float(s["int"]) * fcm + 20.0 * lvl
 
 
-## Восстановление HP в секунду (до калибровки по HP).
+## Восстановление HP в секунду в бою (наше: в оригинале — тики раз в несколько секунд; отдых — Player.REST_*).
 static func raw_hp_regen(s: Dictionary, lvl: float) -> float:
-	return 0.01 * float(s["vit"]) + 0.01 * lvl
+	return 0.05 * float(s["vit"]) + 0.1 * lvl
 
 
 ## Восстановление MP в секунду.
@@ -102,26 +102,27 @@ static func mp_regen(s: Dictionary, lvl: float) -> float:
 	return 0.5 + 0.05 * float(s["wis"]) + 0.02 * lvl
 
 
-## Точность (шанс попасть — Combat.hit_chance: против избегания цели), bonus — от умений.
-static func accuracy(s: Dictionary, lvl: float, bonus: float = 0.0) -> int:
-	return roundi(0.5 * float(s["dex"]) + 1.5 * lvl + 5.0 + bonus)
+## Точность: 0.5·Меткость + L (+ бонус умений). Попадание — Combat.hit_chance (точность / уклонение цели).
+static func accuracy(s: Dictionary, lvl: float, bonus: float = 0.0, fcm: float = 1.0) -> int:
+	return roundi(0.5 * float(s["dex"]) * fcm + lvl + bonus)
 
 
-## Избегание (против точности атакующего, Combat.hit_chance): от Ловкости и уровня — пара к accuracy.
-static func avoidance(s: Dictionary, lvl: float) -> int:
-	return roundi(0.5 * float(s["agi"]) + 1.5 * lvl + 5.0)
+## Уклонение (избегание, avoid): 0.5·Ловкость + L.
+static func avoidance(s: Dictionary, lvl: float, fcm: float = 1.0) -> int:
+	return roundi(0.5 * float(s["agi"]) * fcm + lvl)
 
 
-## Уклонение, % (без бонусов умений).
-static func evasion(s: Dictionary, lvl: float) -> float:
-	return 0.1 * float(s["agi"]) + 0.05 * float(s["luck"]) + 0.05 * lvl
+## Отдельный шанс увернуться, % — в оригинале его нет (всё решает точность против уклонения); только от умений,
+## поясов и т. п.
+static func evasion(_s: Dictionary, _lvl: float) -> float:
+	return 0.0
 
 
-## Шанс крита, % (без бонусов умений).
+## Шанс крита, %: 0.2·Удача + 3.
 static func crit_chance(s: Dictionary) -> float:
-	return 2.0 + 0.1 * float(s["luck"]) + 0.05 * float(s["agi"])
+	return 0.2 * float(s["luck"]) + 3.0
 
 
-## Скорость атаки, % (100 — обычная; перезарядка атаки делится на неё / 100).
-static func attack_speed(s: Dictionary) -> int:
-	return roundi(100.0 * (1.0 + 0.002 * float(s["agi"])))
+## Скорость атаки, % (100 — обычная): в оригинале от статов не зависит — только оружие и умения.
+static func attack_speed(_s: Dictionary) -> int:
+	return 100
