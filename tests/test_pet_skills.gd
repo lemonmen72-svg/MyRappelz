@@ -439,7 +439,7 @@ func _check_skill_data() -> void:
 	check(PetSkills.effect_text("shadow_rend", 1).contains("2 × 60%"), "«Двойной росчерк»: 2 удара по 60%: "
 		+ PetSkills.effect_text("shadow_rend", 1))
 	check(PetSkills.effect_text("shadow_rend", 15).contains("200%"), "на 15 ур. — по 200%")
-	check(PetSkills.mp_cost("shadow_rend", 1) == 5, "MP из вики × 0.1: 54 → 5")
+	check(PetSkills.mp_cost("shadow_rend", 1) == 54, "MP 1:1 с вики (запас MP как в оригинале): 54")
 
 
 ## Древо умений пантеры: значок на каждое умение, ярусы помещаются, сверху вниз по уровню, пререквизиты выше,

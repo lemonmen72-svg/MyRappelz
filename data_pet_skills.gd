@@ -26,8 +26,8 @@ extends RefCounted
 ## Очки умений: у нового питомца и за каждый уровень опыта (начисляются по долям за убийства).
 const JP_START := 2
 const JP_PER_LEVEL := 3
-## Стоимость MP из вики × MP_SCALE (наш запас MP примерно в 10 раз меньше).
-const MP_SCALE := 0.1
+## Стоимость MP из вики × MP_SCALE: с баланса по базе запас MP — как в оригинале, MP умений тоже 1:1.
+const MP_SCALE := 1.0
 ## Поддержка переключаемых умений списывается раз в UPKEEP_PERIOD секунд.
 const UPKEEP_PERIOD := 10.0
 const KIND_NAMES := {"active": "активное", "passive": "пассивное", "toggle": "переключаемое"}
