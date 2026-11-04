@@ -18,7 +18,7 @@ extends RefCounted
 ## Поля активных: dmg — доля главной атаки роли за удар, hits — число ударов, radius — по площади вокруг цели,
 ## threat — зверь переключается на питомца, charge — рывок к цели в 3–10 м, slow / vuln / miss — замедление,
 ## уязвимость (больше урона) и промахи зверя (доля, 10 с), weaken — ослабление: удары зверя слабее (доля, 10 с),
-## stun — оглушение (с), blind — морок: зверь бьёт мимо (с),
+## stun — оглушение (с), blind — морок: зверь бьёт мимо (с), fear — страх: зверь убегает и не бьёт (с, Mob.frighten),
 ## buff — "atk" (атака хозяина, % на time с), "guard" (хозяин получает меньше урона), "heal" (лечение хозяина
 ## и питомца, доля макс. HP). prio — порядок выбора ИИ (больше — раньше).
 ## Поля пассивных и переключаемых: bonus — что усиливает (PetStats.derived), value; owner — бонус и хозяину.
@@ -288,12 +288,57 @@ const SKILLS := {
 		"tiers": [[45, 5], [95, 10], [145, 15]], "bonus": "atk_pct", "value": [0.06, 0.015], "owner": true,
 		"mp": [46.0, 36.0], "upkeep": [3.0, 3.0],
 	},
-	# ---------- Кабан, волк, каменный страж (своё: одно активное по роли) ----------
-	"fierce_rush": {
+	# ---------- Волк (Wolf Pup → Warg → Fenrir; числа — база оригинала: SkillResource, StateResource, SkillTreeResource;
+	# урон и MP — 1:1, перезарядки и каст — наши, как у других видов) ----------
+	"rending_bite": {  # ← Gouging Bite: 160%…460% (+20 %/ур.), 10 с точность цели −11 %…−25 %
+		"name": "Рвущий укус", "kind": "active", "glyph": "Р", "color": Color(0.85, 0.25, 0.25), "jp": 1,
+		"desc": "Глубокий укус: большой урон, и 10 с зверь чаще промахивается.",
+		"tiers": [[20, 5], [70, 10], [120, 15]], "pre": ["fierce_rush", [1, 6, 11]],
+		"mp": [117.0, 13.0], "cd": 15.0, "cast": 0.75, "dmg": [1.8, 0.2], "miss": [0.11, 0.01], "prio": 60,
+	},
+	"chilling_howl": {  # ← Roar: страх 2.2…5.0 с (Fear, +0.2 с за ур.)
+		"name": "Леденящий вой", "kind": "active", "glyph": "В", "color": Color(0.55, 0.75, 0.95), "jp": 2,
+		"desc": "Волк воет: зверь в страхе убегает и не нападает.",
+		"tiers": [[30, 5], [80, 10], [130, 15]], "mp": [127.0, 7.0], "cd": 30.0, "cast": 0.5,
+		"fear": [2.2, 0.2], "prio": 65,
+	},
+	"lunging_bite": {  # ← Lunging Bite: рывок к цели, 60%…200%, оглушение 2 с
+		"name": "Бросок волка", "kind": "active", "glyph": "Б", "color": Color(0.75, 0.6, 0.45), "jp": 2,
+		"desc": "Разгон к цели в 3–10 м и укус в прыжке: оглушение на 2 с.",
+		"tiers": [[35, 5], [85, 10], [135, 15]], "mp": [159.0, 9.0], "cd": 20.0, "cast": 0.0,
+		"dmg": [0.6, 0.1], "stun": 2.0, "charge": true, "prio": 70,
+	},
+	"fang_flurry": {  # ← Shredding Fangs: 3 укуса по 130%…220%
+		"name": "Шквал клыков", "kind": "active", "glyph": "Ш", "color": Color(0.8, 0.35, 0.3), "jp": 2,
+		"desc": "Три мощных укуса подряд.",
+		"tiers": [[0, 0], [90, 5], [140, 10]], "mp": [209.0, 19.0], "cd": 45.0, "cast": 0.5,
+		"dmg": [1.3, 0.1], "hits": 3, "prio": 90,
+	},
+	"alpha_call": {  # ← Encouragement: Strength, Agility (Сила и Ловкость хозяина, 10 с)
+		"name": "Клич вожака", "kind": "active", "glyph": "К", "color": Color(0.7, 0.8, 0.95), "jp": 2,
+		"desc": "Волк зовёт стаю: атака хозяина выше на 10 с.",
+		"tiers": [[0, 0], [85, 5], [135, 10]], "mp": [98.0, 21.0], "cd": 90.0, "cast": 0.5,
+		"buff": "atk", "value": [0.06, 0.025], "time": 10.0, "prio": 85,
+	},
+	"moon_frenzy": {  # ← Rampage: 220% по зверям вокруг (4 м), 10 с их точность −30 %
+		"name": "Лунное буйство", "kind": "active", "glyph": "Л", "color": Color(0.6, 0.65, 0.95), "jp": 2,
+		"desc": "Вихрь укусов по всем зверям вокруг цели: урон, и 10 с они чаще промахиваются.",
+		"tiers": [[0, 0], [0, 0], [150, 1]], "pre": ["fang_flurry", [0, 0, 6]],
+		"mp": [597.0, 0.0], "cd": 90.0, "cast": 0.75, "dmg": [2.2, 0.0], "radius": 4.0,
+		"miss": [0.3, 0.0], "prio": 100,
+	},
+	"pack_bond": {  # ← Unity: Wolf (уклонение хозяину и волку; в базе избегание +29…+147 — у нас доля уклонения)
+		"name": "Узы стаи", "kind": "toggle", "glyph": "У", "color": Color(0.65, 0.75, 0.9), "jp": 2,
+		"desc": "Пока включено, хозяин и волк чаще уклоняются от ударов.",
+		"tiers": [[45, 5], [95, 10], [145, 15]], "bonus": "eva", "value": [2.0, 0.5], "owner": true,
+		"mp": [46.0, 36.0], "upkeep": [3.0, 3.0],
+	},
+	# ---------- Кабан, каменный страж (своё: одно активное по роли); «Свирепый натиск» — и у волка ----------
+	"fierce_rush": {  # ← у волка — Piercing Fangs: 2 укуса по 70%…210% (MP 54…180)
 		"name": "Свирепый натиск", "kind": "active", "glyph": "С", "color": RED, "jp": 1,
-		"desc": "Мощный удар по цели.",
-		"tiers": [[10, 5], [60, 10], [110, 15]], "mp": [60.0, 10.0], "cd": 10.0, "cast": 0.0,
-		"dmg": [1.5, 0.15], "prio": 50,
+		"desc": "Два стремительных укуса подряд.",
+		"tiers": [[10, 5], [60, 10], [110, 15]], "mp": [54.0, 9.0], "cd": 8.0, "cast": 0.5,
+		"dmg": [0.7, 0.1], "hits": 2, "prio": 50,
 	},
 	"ground_roar": {
 		"name": "Гул земли", "kind": "active", "glyph": "Г", "color": Color(0.6, 0.6, 0.5), "jp": 1,
@@ -318,7 +363,9 @@ const SPECIES_SKILLS := {
 		"daze", "hoof_quake", "mending", "calm_mind", "steppe_bond", "keen_eye", "war_horn", "spear_storm",
 		"endless_life", "ruin_storm", "ancestor_gift"],
 	"boar": ["inner_fire", "hardening", "vitality", "fierce_rush"],
-	"wolf": ["inner_fire", "hardening", "vitality", "fierce_rush"],
+	"wolf": ["inner_fire", "hardening", "fierce_rush", "provoke", "rending_bite", "vitality", "deep_spring",
+		"chilling_howl", "mending", "calm_mind", "lunging_bite", "pack_bond", "keen_eye", "alpha_call", "fang_flurry",
+		"feather_step", "moon_frenzy", "ancestor_gift"],
 	"golem": ["inner_fire", "hardening", "vitality", "ground_roar"],
 }
 
@@ -745,6 +792,8 @@ static func effect_text(id: String, n: int) -> String:
 		parts.append("оглушение %s с" % _num(float(sk["stun"])))
 	if sk.has("blind"):
 		parts.append("морок %s с" % _num(value(sk["blind"], n)))
+	if sk.has("fear"):
+		parts.append("страх %s с" % _num(value(sk["fear"], n)))
 	match String(sk.get("buff", "")):
 		"atk":
 			parts.append("атака хозяина +%s на %s с" % [_pct(value(sk["value"], n)), _num(float(sk["time"]))])

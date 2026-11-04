@@ -783,7 +783,7 @@ func _update_aura() -> void:
 		return
 	var b := PetSkills.bonuses(species, skills, toggles, true)
 	owner_node.set_pet_aura(self, float(b.get("atk_pct", 0.0)), roundi(float(b.get("def_flat", 0.0))),
-		float(b.get("hp_regen", 0.0)))
+		float(b.get("hp_regen", 0.0)), float(b.get("eva", 0.0)) / 100.0)
 	# Значки «Уз» и у хозяина: те включённые, что дают бонус и ему (поле owner)
 	var on := {}
 	for id in toggles:
@@ -822,6 +822,8 @@ func _pick_active(t: Mob) -> String:
 		if sk.has("blind") and (t.blind_time > 0.0 or (t.target != owner_node and t.target != self)):
 			continue
 		if sk.has("stun") and not sk.has("dmg") and t.stun_time > 0.0:
+			continue
+		if sk.has("fear") and t.fear_time > 0.0:
 			continue
 		return id
 	return ""
@@ -956,6 +958,9 @@ func _apply_skill(id: String, t: Mob) -> void:
 		if sk.has("stun"):
 			m.stun(float(sk["stun"]), src)
 			Util.float_text(parent, above, "Оглушён!", Color(1, 1, 0.5))
+		if sk.has("fear"):
+			m.frighten(PetSkills.value(sk["fear"], n), global_position, src)
+			Util.float_text(parent, above, "Страх!", Color(0.7, 0.85, 1.0))
 		if sk.has("blind"):
 			m.blind(PetSkills.value(sk["blind"], n), src)
 			Util.float_text(parent, above, "Морок!", Color(0.75, 0.65, 1.0))

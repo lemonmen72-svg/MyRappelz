@@ -35,6 +35,7 @@ func run_step() -> void:
 			_check_tables()
 			_check_balance()
 			_check_skill_data()
+			_check_wolf()
 			step = 1
 		1:
 			# Изучение умений: уровень, JP, пререквизит, стадия
@@ -509,3 +510,33 @@ func press_cw(key: String) -> void:
 	check(b != null and is_instance_valid(b), "кнопка «%s» в окне существа" % key)
 	if b != null:
 		b.pressed.emit()
+
+
+## Древо волка по базе оригинала (Wolf Pup → Warg → Fenrir): 18 умений, как у других видов; своё — по SkillResource.
+## Прежде у волка было 4 умения на всех стадиях (жалоба Максима).
+func _check_wolf() -> void:
+	var ids: Array = PetSkills.list_for("wolf")
+	check(ids.size() == 18, "у волка 18 умений (%d)" % ids.size())
+	for id in ids:
+		check(not PetSkills.get_skill(String(id)).is_empty(), "умение волка «%s» описано" % id)
+	for id in ["rending_bite", "chilling_howl", "lunging_bite", "pack_bond", "alpha_call", "fang_flurry", "moon_frenzy",
+			"feather_step"]:
+		check(ids.has(id), "у волка есть «%s»" % PetSkills.get_skill(String(id)).get("name", id))
+	var by_stage := [0, 0, 0]
+	for st in 3:
+		for id in ids:
+			if PetSkills.cap_for(String(id), 150, st) > 0:
+				by_stage[st] += 1
+	check(by_stage[0] >= 13 and by_stage[2] == 18, "волк: умений на стадиях %s (на 3-й все 18)" % str(by_stage))
+	# Страх «Леденящего воя» и уклонение «Уз стаи» хозяину
+	var sk := PetSkills.get_skill("chilling_howl")
+	check(sk.has("fear") and PetSkills.value(sk["fear"], 15) > 4.9, "«Леденящий вой»: страх до 5 с (%.1f)" % PetSkills.value(sk["fear"], 15))
+	var b := PetSkills.bonuses("wolf", {"pack_bond": 5}, {"pack_bond": true}, true)
+	check(float(b.get("eva", 0.0)) > 0.0, "«Узы стаи» дают уклонение хозяину (%.1f %%)" % float(b.get("eva", 0.0)))
+	var p: Player = main.player
+	var e0 := p.cur_eva()
+	p.set_pet_aura(null, 0.0, 0, 0.0, 0.04)
+	var e1 := p.cur_eva()
+	p.set_pet_aura(null, 0.0, 0, 0.0)
+	check(e1 > e0, "уклонение героя от уз питомца растёт (%.2f → %.2f)" % [e0, e1])
+

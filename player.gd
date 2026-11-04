@@ -154,6 +154,8 @@ var shade_crit := 0.0
 var aura_atk := 0.0
 var aura_def := 0
 var aura_regen := 0.0
+## Уклонение от «Уз стаи» волка (доля).
+var aura_eva := 0.0
 ## Кто поставил бонусы: id объекта питомца (0 — никто).
 var _aura_src := 0
 ## Действующие эффекты для HUD (значки у полоски HP): усиления выше (atk, speed, guard, shade — сверяются
@@ -518,9 +520,9 @@ func cur_crit() -> float:
 	return crit + shade_crit
 
 
-## Шанс уклониться с «Танцем теней» (не больше 60%).
+## Шанс уклониться с «Танцем теней» и «Узами стаи» волка (не больше 60%).
 func cur_eva() -> float:
-	return clampf(eva + shade_eva, 0.0, 0.6)
+	return clampf(eva + shade_eva + aura_eva, 0.0, 0.6)
 
 
 ## Скорость бега с усилением; ×2 / ×3 — тест из админ-панели (AdminPanel.speed_mult).
@@ -781,11 +783,12 @@ func set_toggle(id: String, on: bool) -> String:
 
 
 ## Бонусы хозяину от включённых умений питомца src (атака — доля, защита, HP в секунду).
-func set_pet_aura(src: Object, atk_pct: float, def_bonus: int, regen: float) -> void:
+func set_pet_aura(src: Object, atk_pct: float, def_bonus: int, regen: float, eva_bonus: float = 0.0) -> void:
 	_aura_src = src.get_instance_id() if src != null else 0
 	aura_atk = atk_pct
 	aura_def = def_bonus
 	aura_regen = regen
+	aura_eva = eva_bonus
 	stats_changed.emit()
 
 
