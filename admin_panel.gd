@@ -764,7 +764,7 @@ static func respawn_all(main: Node) -> int:
 	var alive: Dictionary = {}
 	for n in main.get_tree().get_nodes_in_group("mobs"):
 		var m := n as Mob
-		if m != null and not m.is_dead:
+		if m != null and not m.is_dead and m.get_parent() == main:
 			alive[m.slot] = true
 	var count := 0
 	for i in slots.size():

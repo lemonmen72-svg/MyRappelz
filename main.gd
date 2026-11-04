@@ -356,10 +356,12 @@ func _build_slots() -> void:
 
 
 func _spawn_slot(i: int) -> void:
-	# Слот уже занят живым зверем (админ-панель возродила зверей раньше таймера) — второго не ставим
+	# Слот уже занят живым зверем этой сцены (админ-панель возродила зверей раньше таймера) — второго не ставим.
+	# Звери прежней сцены (restart_scene: она удаляется в конце кадра, а новая строит мир раньше) — не в счёт,
+	# иначе после перезапуска с героем (тест-бот, возврат к герою игрока) мир оставался без зверей.
 	for n in get_tree().get_nodes_in_group("mobs"):
 		var o := n as Mob
-		if o != null and o.slot == i:
+		if o != null and o.slot == i and o.get_parent() == self:
 			return
 	var s: Dictionary = _slots[i]
 	spawn_mob(String(s["type"]), int(s.get("level", -1)), s["pos"], i)

@@ -91,6 +91,18 @@ func run_step() -> void:
 		6:
 			check(game.char_name == "Тест" and game.race_id == "human" and game.slot == 0, "«Играть»: загружен первый герой")
 			_check_spawn("загруженный герой")
+			# Перезапуск сцены с героем (тест-бот, возврат к герою игрока): мир сразу, звери во всех слотах
+			main = main.restart_scene()
+			wait = 3
+			step = 20
+		20:
+			var own := 0
+			for n in main.get_tree().get_nodes_in_group("mobs"):
+				if (n as Node).get_parent() == main:
+					own += 1
+			var slots: Array = main.get("_slots")
+			check(main.player != null and slots.size() > 0 and own >= slots.size(),
+				"перезапуск сцены с героем — звери во всех слотах (%d из %d)" % [own, slots.size()])
 			main = main.back_to_menu()
 			wait = 3
 			step = 7
