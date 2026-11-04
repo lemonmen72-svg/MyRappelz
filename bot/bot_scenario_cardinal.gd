@@ -144,7 +144,7 @@ func summary(_bot: TestBot) -> String:
 func report_lines(_bot: TestBot) -> PackedStringArray:
 	var out := PackedStringArray()
 	out.append("Кардинал — первый срез (фаза 1)")
-	out.append("  Профиль «Обычный игрок» v1, seed %d, зона «Окрестности деревни людей», герой — Бродяга 1 ур." % seed_value)
+	out.append("  Профиль «Обычный игрок» v2 (брошенную цель минуту не выбирает), seed %d, зона «Окрестности деревни людей», герой — Бродяга 1 ур." % seed_value)
 	for r in runs:
 		var d := r.result()
 		var ts: Dictionary = d["time_split"]

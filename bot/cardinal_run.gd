@@ -35,6 +35,10 @@ var done := false
 var stop_reason := ""
 var state := "seek"
 var game_t := 0.0
+## Брошенные цели (не дошёл, бой затянулся): id экземпляра → до какого игрового времени не выбирать (как игрок —
+## зверь за оградой или на уступе: ищет другого, отчёт 0.27.0 — 10 раз подряд один и тот же фазан).
+var _skip := {}
+const SKIP_SEC := 60.0
 var t_split := {"seek": 0.0, "approach": 0.0, "fight": 0.0, "loot": 0.0, "rest": 0.0}
 var kills: Array[Dictionary] = []
 var deaths := 0
@@ -160,6 +164,7 @@ func tick(dt: float) -> void:
 			elif _state_t > float(profile["approach_limit"]):
 				bot.note("Кардинал: не дошёл до «%s» за %.0f с — цель брошена" % [_target.type_id, _state_t])
 				abandoned += 1
+				_skip[_target.get_instance_id()] = game_t + SKIP_SEC
 				_target = null
 				_go("seek")
 			else:
@@ -180,6 +185,7 @@ func tick(dt: float) -> void:
 			if _state_t > float(profile["fight_limit"]):
 				bot.note("Кардинал: бой с «%s» дольше %.0f с — брошен" % [_target.type_id, _state_t])
 				abandoned += 1
+				_skip[_target.get_instance_id()] = game_t + SKIP_SEC
 				_target = null
 				_go("seek")
 		"loot":
@@ -227,6 +233,8 @@ func _pick_target(p: Player) -> Mob:
 	for n in bot.get_tree().get_nodes_in_group("mobs"):
 		var m := n as Mob
 		if not _alive(m) or m.is_boss or m.level > Game.level + int(profile["level_gap"]):
+			continue
+		if float(_skip.get(m.get_instance_id(), -1.0)) > game_t:
 			continue
 		if _flat(m.global_position, _center) > _radius:
 			continue
