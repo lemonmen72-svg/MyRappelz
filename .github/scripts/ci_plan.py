@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """План «Проверки кода» (задача plan в check.yml): нужны ли скриншоты и замер нагрузки и какие части запускать.
 
-Снимки (visual) и замер (perf) идут, только если изменились файлы, влияющие на картинку: всё, кроме NO_PICTURE
+С 04.11 (решение Максима): на обычных пушах снимков и замера нет; пуш новой версии в android/release_version.txt
+(сборка APK) — только часть 1 снимков (MIN_SHOTS); полный набор и замер — ручным запуском.
+Раньше: снимки (visual) и замер (perf) шли, только если изменились файлы, влияющие на картинку: всё, кроме NO_PICTURE
 (документы, tools/, автотесты test_*.gd, сборка APK и Android, скрипты только для smoke). Изменённые файлы —
 GitHub API compare (push: before…sha, pull_request: base…head); не удалось узнать (новая ветка, ошибка сети,
 больше 300 файлов) — снимки идут. Ручной запуск (workflow_dispatch): части — из полей запуска.
@@ -18,6 +20,10 @@ import os
 import re
 import sys
 import urllib.request
+
+# Пуш новой версии сюда запускает сборку APK — тогда снимается минимальный набор кадров (MIN_SHOTS — части)
+RELEASE_FILE = "android/release_version.txt"
+MIN_SHOTS = [1]
 
 # Файлы, от которых картинка не меняется: при изменении только их снимки не снимаются
 NO_PICTURE = [
@@ -106,11 +112,17 @@ def main(argv):
 			pic = bool(pic_files)
 			reason = "изменено файлов %d, влияют на картинку %d%s" % (len(files), len(pic_files),
 				(": " + ", ".join(pic_files[:10]) + (" …" if len(pic_files) > 10 else "")) if pic_files else "")
-		if pic and "[no-shots]" in os.environ.get("COMMIT_MSG", ""):
-			pic = False
+		# Решение Максима (04.11): снимки — только перед сборкой APK (пуш новой версии в android/release_version.txt)
+		# и по минимуму — часть 1 (мир, HUD, основные окна); замер нагрузки — только вручную. Остальные пуши — без
+		# снимков; полный набор — ручным запуском (поле shots).
+		release = files is not None and RELEASE_FILE in files
+		if not release:
+			reason += "; снимки — только перед сборкой APK"
+		elif "[no-shots]" in os.environ.get("COMMIT_MSG", ""):
+			release = False
 			reason += "; метка [no-shots] — без снимков"
-		shots = list(range(1, n + 1)) if pic else []
-		perf = perf_groups if pic else []
+		shots = MIN_SHOTS[:] if release else []
+		perf = []
 	visual = bool(shots or perf)
 	print("План: %s → снимки %s, замер %s" % (reason, shots or "нет", perf or "нет"))
 	out = os.environ.get("GITHUB_OUTPUT")
