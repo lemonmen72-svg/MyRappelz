@@ -161,12 +161,24 @@ static func badge_state(type_id: String) -> String:
 ## Где взять карту: «продаётся у Учителя Кирка в центре города» (кто торгует ею — NpcData) или «выпадает
 ## из волка» (по добыче MobData; только звери, что водятся на острове — кабана и стража там больше нет).
 static func where_to_get(card_id: String) -> String:
+	var shop := ""
 	if int(ItemData.get_item(card_id).get("buy", 0)) > 0:
 		var sellers := NpcData.sellers_of(card_id)
 		if sellers.is_empty():
-			return "продаётся у торговца"
-		var s := String(sellers[0])
-		return "продаётся у %s %s" % [NpcData.name_gen(s), String(NpcData.npc(s).get("where", ""))]
+			shop = "продаётся у торговца"
+		else:
+			var s := String(sellers[0])
+			shop = "продаётся у %s %s" % [NpcData.name_gen(s), String(NpcData.npc(s).get("where", ""))]
+	var drop := _drop_text(card_id)
+	if shop != "" and drop != "":
+		return "%s; %s" % [shop, drop]
+	if shop != "":
+		return shop
+	return drop if drop != "" else "пока не добыть"
+
+
+## «выпадает из волка, …» ("" — ни с кого).
+static func _drop_text(card_id: String) -> String:
 	var from: Array = []
 	for k in MobData.TYPES:
 		if not lives_in_world(String(k)):
@@ -176,7 +188,7 @@ static func where_to_get(card_id: String) -> String:
 			if String(entry[0]) == card_id:
 				from.append(MobData.name_gen(String(k)))
 	if from.is_empty():
-		return "пока не добыть"
+		return ""
 	return "выпадает из " + ", ".join(PackedStringArray(from))
 
 

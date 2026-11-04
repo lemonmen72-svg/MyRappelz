@@ -307,10 +307,16 @@ func _walk(p: Player, h: HUD, to: Vector3, dt: float) -> void:
 	var yaw := float(bot.main.get("cam_yaw"))
 	var mv := Vector3(dir.x, 0.0, dir.z).rotated(Vector3.UP, -yaw)
 	h.move_vec = Vector2(mv.x, mv.z)
+	# Сразу и герою — в этом же тике физики (main._process переносит джойстик в героя раз в кадр отрисовки: на
+	# ускорении ×8 это разные тики, и два прогона с одним seed расходились)
+	p.move_input = Vector2(dir.x, dir.z) if dir.length() >= 0.15 else Vector2.ZERO
 
 
 func _stop_move(h: HUD) -> void:
 	h.move_vec = Vector2.ZERO
+	var p := bot.player()
+	if p != null:
+		p.move_input = Vector2.ZERO
 
 
 func _on_kill(p: Player) -> void:

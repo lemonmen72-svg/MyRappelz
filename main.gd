@@ -395,7 +395,9 @@ func _on_mob_gone(mob: Mob, killed: bool) -> void:
 			player.play_emote("boss")
 	# Звери, поставленные админ-панелью (slot -1), не возрождаются
 	if mob.slot >= 0:
-		get_tree().create_timer(MobData.respawn_time(mob.type_id)).timeout.connect(_respawn_slot.bind(mob.slot, _spawn_gen))
+		# По тикам физики (process_in_physics): при ускорении Кардинала (×8) кадров отрисовки меньше, чем тиков, и
+		# таймер кадров возрождал зверя на разном тике в двух прогонах — детерминизм расходился
+		get_tree().create_timer(MobData.respawn_time(mob.type_id), true, true).timeout.connect(_respawn_slot.bind(mob.slot, _spawn_gen))
 
 
 ## Поколение зверей мира: reset_mobs увеличивает — таймеры возрождения прежних зверей ничего не делают.

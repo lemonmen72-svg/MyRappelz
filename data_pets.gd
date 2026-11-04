@@ -165,8 +165,10 @@ static func stats_for(id: String, lvl: int, skills: Dictionary = {}, toggles: Di
 
 ## Характеристики питомца по записи rec (вид, уровень, стадия, сверх-эволюция, умения).
 static func stats_of(rec: Dictionary) -> Dictionary:
-	return PetStats.derived(String(rec.get("species", "boar")), int(rec.get("level", 1)), rec.get("skills", {}),
+	var r := PetStats.derived(String(rec.get("species", "boar")), int(rec.get("level", 1)), rec.get("skills", {}),
 		rec.get("toggles", {}), {}, stage_of(rec), super_bonus(rec))
+	PetGear.apply(rec, r)
+	return r
 
 
 ## Опыт до следующего уровня питомца (таблица оригинала XP_TABLE).

@@ -48,7 +48,7 @@ func _build() -> void:
 	do("Кирк: задание", func() -> void: press_dialog("dq_" + CARD_QUEST))
 	wait(0.2)
 	do("Кирк: «Взять задание»", _accept.bind(CARD_QUEST))
-	do("Кирк: купить карту", _buy_card)
+	do("Кирк: карта фазана в подарок", _buy_card)
 	do("Кирк: значок «=», сдать", _talk_ready.bind(CARD_QUEST))
 	wait(0.3)
 	do("Кирк: «Задания»", func() -> void: press_dialog("opt_quests"))
@@ -164,10 +164,8 @@ func _complete(qid: String) -> void:
 
 ## «Первая карта»: окно лавки Кирка, карта фазана куплена у него — цель засчитана.
 func _buy_card() -> void:
-	var eco := economy()
-	eco.open_shop("kirk")
-	check(eco.buy(ItemData.card_for(TARGET), 1, "kirk"), "карта куплена у Кирка (%s)" % last_msg())
-	close_window()
+	# С 0.31 первую карту (фазана) Кирк дарит при взятии задания (карты в лавке — по ценам базы, 8000)
+	check(Game.inventory.has(ItemData.card_for(TARGET)), "карта фазана — подарок Кирка (%s)" % last_msg())
 
 
 func _journal() -> void:

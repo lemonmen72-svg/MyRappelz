@@ -120,9 +120,9 @@ const POTION_BAG := [
 	["potion_aspd_r2", 3], ["potion_cast_r12", 1], ["potion_speed_r1", 4], ["weapon_staff_2h_r2", 1], ["weapon_sword_1h_r2", 1],
 ]
 ## Кадры 270–274 (экипировка): надето кроме доспеха (доспех — по профессии героя) и лежит в сумке.
-const GEAR_SHOT_WORN := ["armor_helmet_r1", "armor_gloves_r1", "armor_boots_r1", "ring_hp_r1", "ring_cast_r1",
-	"earring_crit_r1", "pendant_mdef_r1", "belt_speed_r1"]
-const GEAR_SHOT_BAG := ["pendant_hp_r1", "ring_critdmg_r2", "armor_body_warrior_r1", "armor_helmet_r2", "earring_aspd_r1"]
+const GEAR_SHOT_WORN := ["armor_helmet_r1", "armor_gloves_r1", "armor_boots_r1", "ring_vit_r1", "ring_wis_r1",
+	"earring_crit_r1", "pendant_mdef_r1", "belt_light_r1"]
+const GEAR_SHOT_BAG := ["pendant_hpregen_r1", "ring_str_r2", "armor_body_warrior_r1", "armor_helmet_r2", "earring_speed_r1"]
 ## Предметы для кадров сумки и торговца (27–30): [id, количество]. Карты существ: пустые, с душой, зеркальная.
 const BAG_ITEMS := [
 	["dagger_steel", 1], ["sword_steel", 2], ["crossbow_heavy", 1], ["card_panther", 4], ["card_wolf", 1], ["card_turtle", 1],
@@ -2022,7 +2022,7 @@ func run_step() -> void:
 			step = 1242
 		1242:
 			shot("271_armor_card_compare")
-			main.economy.window.select_cell(game.inventory.find_cell("pendant_hp_r1"))
+			main.economy.window.select_cell(game.inventory.find_cell("pendant_hpregen_r1"))
 			wait = 8
 			step = 1243
 		1243:
@@ -2043,8 +2043,8 @@ func run_step() -> void:
 			main.cam_yaw = 0.25
 			main.cam_pitch = 0.3
 			main.cam_dist = 6.5
-			main.economy.spawn_drop(Vector3(-1.4, 0.0, -0.6), {"armor_helmet_r1": 1, "armor_boots_r2": 1, "belt_eva_r1": 1}, 14)
-			main.economy.spawn_drop(Vector3(0.3, 0.0, 2.6), {"armor_gloves_r1": 1, "ring_aspd_r1": 1}, 9)
+			main.economy.spawn_drop(Vector3(-1.4, 0.0, -0.6), {"armor_helmet_r1": 1, "armor_boots_r2": 1, "belt_light_r1": 1}, 14)
+			main.economy.spawn_drop(Vector3(0.3, 0.0, 2.6), {"armor_gloves_r1": 1, "ring_agi_r1": 1}, 9)
 			wait = 30
 			step = 1245
 		1245:

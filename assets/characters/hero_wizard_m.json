@@ -584,28 +584,28 @@
 			"hit": 0.856
 		},
 		"Mq_Walking": {
-			"length": 1.033,
+			"length": 1.133,
 			"loop": true,
-			"source": "mannequin m1:Walking",
-			"speed": 1.774
+			"source": "mannequin c1:walk@0-999",
+			"speed": 1.384
 		},
 		"Mq_Running": {
-			"length": 0.633,
+			"length": 0.733,
 			"loop": true,
-			"source": "mannequin m1:Running",
-			"speed": 6.695
+			"source": "mannequin c1:jog@0-999",
+			"speed": 5.925
 		},
 		"Mq_Running_B": {
 			"length": 0.733,
 			"loop": true,
-			"source": "mannequin m2:run_fast_3_inplace",
-			"speed": 3.417
+			"source": "mannequin c1:jog@0-999",
+			"speed": 3.827
 		},
 		"Mq_Sprint": {
-			"length": 0.467,
+			"length": 0.733,
 			"loop": true,
-			"source": "mannequin m2:RunFast",
-			"speed": 8.509
+			"source": "mannequin c1:jog@0-999",
+			"speed": 6.792
 		}
 	}
 }

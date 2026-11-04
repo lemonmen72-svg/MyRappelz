@@ -124,18 +124,18 @@ func run_step() -> void:
 				"карты существ продаёт не торговец, а Учитель Кирк")
 			check(not eco.buy("card_panther", 1, "merchant"), "у торговца карту не купить")
 			# Покупка свитка: касание товара → «Купить»
-			game.gold = 100
+			game.gold = 2000
 			var scrolls: int = game.inventory.count("revive_scroll")
 			_press("good_revive_scroll")
 			_press("act_buy")
-			check(game.gold == 70 and game.inventory.count("revive_scroll") == scrolls + 1,
+			check(game.gold == 500 and game.inventory.count("revive_scroll") == scrolls + 1,
 				"куплен свиток: золото %d, свитков %d" % [game.gold, game.inventory.count("revive_scroll")])
 			# Покупка ×5
-			game.gold = 100
+			game.gold = 1100
 			var potions: int = game.inventory.count("potion_hp_r1")
 			_press("good_potion_hp_r1")
 			_press("act_buy5")
-			check(game.gold == 50 and game.inventory.count("potion_hp_r1") == potions + 5, "куплено 5 зелий")
+			check(game.gold == 100 and game.inventory.count("potion_hp_r1") == potions + 5, "куплено 5 зелий")
 			# Зелья 1-го и 2-го ранга всех видов (на острове — только они), ранг дороже
 			for kind in ItemData.POTION_KINDS:
 				for r in [1, 2]:

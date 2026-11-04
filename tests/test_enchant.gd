@@ -104,7 +104,7 @@ func _unit_ids() -> void:
 		and ItemData.icon_path(ItemData.broken_id("weapon_shield_r1")).ends_with("broken_armor.png"), "значки лома: оружие / броня и щит")
 	check(ItemData.item_type(br) == "broken" and not ItemData.is_weapon(br) and not ItemData.is_equipment(br),
 		"сломанная — лом, не снаряжение")
-	for bad in ["weapon_sword_1h_r1+0", "ring_hp_r1+2", "nope+3", "potion_hp_r1+1", "ring_hp_r1!broken", "weapon_sword_1h_r1+x"]:
+	for bad in ["weapon_sword_1h_r1+0", "ring_vit_r1+6", "nope+3", "potion_hp_r1+1", "ring_vit_r1!broken", "weapon_sword_1h_r1+x"]:
 		check(ItemData.get_item(String(bad)).is_empty(), "нет такой вещи: %s" % bad)
 	check(ItemData.get_item("weapon_sword_1h_r1+21").is_empty(), "заточки больше +20 нет")
 	# Кубы
@@ -117,8 +117,11 @@ func _unit_ids() -> void:
 	check(ItemData.cube_rank_for_level(1) == 1 and ItemData.cube_rank_for_level(20) == 1 and ItemData.cube_rank_for_level(21) == 2
 		and ItemData.cube_rank_for_level(80) == 2, "ранг куба по уровню: 1–20 — 1-й, 21+ — 2-й")
 	check(ItemData.enchant_kind("weapon_sword_1h_r1") == "attack" and ItemData.enchant_kind("weapon_shield_r1") == "defense"
-		and ItemData.enchant_kind("armor_body_warrior_r1") == "defense" and ItemData.enchant_kind("ring_hp_r1") == ""
-		and ItemData.enchant_kind(br) == "", "чем точится: оружие — атака, броня и щит — защита, украшения — нет")
+		and ItemData.enchant_kind("armor_body_warrior_r1") == "defense" and ItemData.enchant_kind("ring_vit_r1") == "acc"
+		and ItemData.enchant_kind(br) == "", "чем точится: оружие — атака, броня и щит — защита, украшения — кубом украшений")
+	var rv: Dictionary = ItemData.get_item("ring_vit_r1+5")
+	check(not rv.is_empty() and int(roundf(float(rv["bonus"]["hp"]))) == ItemData.enchant_value(75, 5),
+		"кольцо +5: HP %s (база 75 +50 %%)" % [rv.get("bonus", {})])
 
 
 func _unit_values() -> void:
@@ -196,8 +199,8 @@ func _stat_band(target: int, want: float) -> void:
 func _unit_limits() -> void:
 	check(Enchant.cube_cap("weapon_sword_1h_r1") == 10 and Enchant.cube_cap("weapon_sword_1h_r2") == 20
 		and Enchant.cube_cap("armor_body_warrior_r1") == 10 and Enchant.cube_cap("armor_body_warrior_r2") == 10
-		and Enchant.cube_cap("weapon_shield_r2") == 10 and Enchant.cube_cap("ring_hp_r1") == 0,
-		"пределы кубами: оружие 1-го ранга +10, 2-го +20, броня и щит +10, украшения — нет")
+		and Enchant.cube_cap("weapon_shield_r2") == 10 and Enchant.cube_cap("ring_vit_r1") == 5,
+		"пределы кубами: оружие 1-го ранга +10, 2-го +20, броня и щит +10, украшения +5")
 	var inv: Inventory = game.inventory
 	for c in ["cube_attack_r1", "cube_attack_r2", "cube_defense_r1", "cube_defense_r2"]:
 		inv.add(String(c), 1)
@@ -213,8 +216,8 @@ func _unit_limits() -> void:
 		"меч 2-го ранга точится дальше +10 (до +20)")
 	check(Enchant.cube_block("weapon_sword_1h_r2+20", "cube_attack_r2") != "", "+20 — предел оружия 2-го ранга")
 	check(Enchant.cube_block("armor_body_warrior_r2+10", "cube_defense_r2").contains("предел брони"), "броня 2-го ранга — не больше +10")
-	check(Enchant.cube_block("ring_hp_r1", "cube_defense_r1") != "" and Enchant.cube_block(ItemData.broken_id("weapon_sword_1h_r1"),
-		"cube_attack_r1") != "", "украшения и лом не чаруются")
+	check(Enchant.cube_block("ring_vit_r1", "cube_defense_r1") != "" and Enchant.cube_block(ItemData.broken_id("weapon_sword_1h_r1"),
+		"cube_attack_r1") != "", "украшения — не кубом защиты, лом не чаруется")
 	var none := Enchant.use_cube("weapon_sword_1h_r1+10", "cube_attack_r2")
 	check(String(none["error"]) != "" and inv.has("cube_attack_r2"), "отказ — куб цел: %s" % none["error"])
 	for c in ["cube_attack_r1", "cube_attack_r2", "cube_defense_r1", "cube_defense_r2"]:
@@ -241,7 +244,7 @@ func _unit_temper_prices() -> void:
 		print("  ЗАКАЛКА %d-й ранг: %s (всего %d)" % [rank_n, ", ".join(row), total])
 	check(Enchant.temper_price("weapon_sword_1h_r1+4") == Enchant.temper_price_at(1, 5), "цена — по следующему уровню")
 	check(Enchant.temper_block("weapon_sword_1h_r2+10") != "" and Enchant.temper_block("weapon_sword_1h_r2+9") == ""
-		and Enchant.temper_block("ring_hp_r1") != "", "кузнец — до +10, украшения не закаляет")
+		and Enchant.temper_block("ring_vit_r1") != "", "кузнец — до +10, украшения не закаляет")
 
 
 ## Закалка вещи из сумки: 10 раз по 100 %, золото по ценам; дальше +10 — нельзя; без золота — отказ.

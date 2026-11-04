@@ -146,9 +146,10 @@ func _unit_kind() -> void:
 		"карты вида: card_centaur и card_centaur_soul")
 	check(ItemData.is_soul_card("card_centaur_soul") and ItemData.card_species("card_centaur_soul") == "centaur",
 		"карта с душой — кентавра")
-	check(int(ItemData.get_item("card_centaur")["buy"]) == 0, "карта кентавра не продаётся")
+	check(int(ItemData.get_item("card_centaur")["buy"]) == 80000 and NpcData.sellers_of("card_centaur") == ["kirk"],
+		"карта кентавра — у Кирка за 80 000 (база)")
 	for s in ["kirk", "merchant"]:
-		check(not (NpcData.npc(s).get("shop", []) as Array).has("card_centaur"), "%s не продаёт карту кентавра" % s)
+		check(s == "kirk" or not (NpcData.npc(s).get("shop", []) as Array).has("card_centaur"), "%s не продаёт карту кентавра" % s)
 	for e in MobData.materials("centaur"):
 		check(not ItemData.get_item(String(e)).is_empty(), "добыча кентавра есть в предметах: %s" % e)
 	var dropped := false
@@ -246,7 +247,7 @@ func _unit_pet_data() -> void:
 ## Умения кентавра: 18 штук, свои тексты, ослабление зверя.
 func _unit_skills() -> void:
 	var ids := PetSkills.list_for("centaur")
-	check(ids.size() == 18, "у кентавра 18 умений: %d" % ids.size())
+	check(PetSkills.SPECIES_SKILLS["centaur"].size() == 18 and ids.size() == 18 + 14, "у кентавра 18 умений древа и 14 из базы: %d" % ids.size())
 	for id in ["spear_flurry", "piercing_strike", "hoof_quake", "spear_storm", "war_horn", "ruin_storm", "steppe_bond"]:
 		check(ids.has(id) and String(PetSkills.get_skill(id).get("desc", "")) != "", "умение кентавра %s" % id)
 		check(PetSkills.effect_text(id, 1) != "" and PetSkills.requirement_text(id, 1) != "", "тексты умения %s" % id)

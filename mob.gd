@@ -221,10 +221,7 @@ func _update_sleep(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
-	if is_dead:
-		return
-	_update_sleep(delta)
-	if _asleep:
+	if is_dead or _asleep:
 		return
 	_anim_t += delta
 	var hv := Vector2(velocity.x, velocity.z).length()
@@ -239,6 +236,10 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Сон дальнего зверя — по тикам физики (он останавливает и бродяжничество): по кадрам отрисовки при ускорении
+	# Кардинала (×8) звери засыпали на разных тиках в двух прогонах — детерминизм расходился (с 0.31 зверей вдвое больше)
+	if not is_dead:
+		_update_sleep(delta)
 	if is_dead or _asleep:
 		return
 	attack_cd = maxf(0.0, attack_cd - delta)

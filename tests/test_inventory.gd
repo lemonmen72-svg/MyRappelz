@@ -214,8 +214,8 @@ func run_step() -> void:
 					"card_boar", "card_golem"]:
 				check(not win.buttons.has("good_" + String(id)), "у торговца не продаётся: %s" % id)
 			var kirk_goods := InventoryWindow.goods(game.class_id, "kirk")
-			check(kirk_goods.has("card_panther") and kirk_goods.has("mirror_card") and not kirk_goods.has("card_wolf"),
-				"карты существ — у Учителя Кирка: %s" % [kirk_goods])
+			check(kirk_goods.has("card_panther") and kirk_goods.has("card_wolf") and kirk_goods.has("unit_card")
+				and not kirk_goods.has("mirror_card"), "карты существ и карта снаряжения — у Учителя Кирка: %s" % [kirk_goods])
 			# Оружия у торговца нет — оно у Оружейника Бранда
 			check(not win.buttons.has("good_dagger_steel") and not win.buttons.has("good_crossbow_starter"),
 				"у торговца оружия нет")
@@ -223,10 +223,10 @@ func run_step() -> void:
 			check(win.buttons.has("cell_0"), "сумка в окне торговца")
 			_press("good_potion_hp_r1")
 			check(win.sel_kind == "good" and win.buttons.has("act_buy") and win.buttons.has("act_buy5"), "карточка товара")
-			game.gold = 100
+			game.gold = 1100
 			var potions: int = inv.count("potion_hp_r1")
 			_press("act_buy5")
-			check(game.gold == 50 and inv.count("potion_hp_r1") == potions + 5, "куплено 5 зелий")
+			check(game.gold == 100 and inv.count("potion_hp_r1") == potions + 5, "куплено 5 зелий")
 			# Продажа в окне торговца — из ячейки сумки
 			var sc := inv.find_cell("shell_plate")
 			_press("cell_%d" % sc)
@@ -262,19 +262,20 @@ func run_step() -> void:
 			game.gold = 10
 			_press("act_buy")
 			check(not inv.has("dagger_steel", 2) and game.gold == 10, "без золота не купить")
-			game.gold = 500
+			game.gold = 5000
 			# Выше в сумку клали по одному каждому предмету игры (их стало больше 40 ячеек) — освободим место:
 			# уберём оружие 1-го и 2-го ранга (не надетое), зелья всех рангов, броню и украшения (ничего не надето)
 			for key in ItemData.ITEMS:
 				var wid := String(key)
 				if wid.begins_with("weapon_") and wid != game.weapon and wid != game.offhand:
 					inv.remove(wid, inv.count(wid))
-				elif ItemData.is_potion(wid) or ItemData.is_gear(wid) or ItemData.is_cube(wid):
+				elif ItemData.is_potion(wid) or ItemData.is_gear(wid) or ItemData.is_cube(wid) \
+						or ["upgrade", "consumable", "trophy"].has(ItemData.item_type(wid)):
 					inv.remove(wid, inv.count(wid))
 			var steel: int = inv.count("dagger_steel")
 			var free_slots: int = inv.room_for("dagger_steel")
 			_press("act_buy")
-			check(inv.count("dagger_steel") == steel + 1 and game.gold == 500 - int(ItemData.get_item("dagger_steel")["buy"]),
+			check(inv.count("dagger_steel") == steel + 1 and game.gold == 5000 - int(ItemData.get_item("dagger_steel")["buy"]),
 				"куплен стальной кинжал (было %d, стало %d, золото %d, место %d, в продаже %s, сообщение «%s»)" % [steel,
 				inv.count("dagger_steel"), game.gold, free_slots, InventoryWindow.goods(game.class_id, "weaponsmith").has("dagger_steel"),
 				main.hud._msg_label.text])
@@ -321,7 +322,7 @@ func _unit_stacks() -> void:
 		"150 клыков — стопки 99 + 51")
 	check(inv.room_for("boar_tusk") == (Inventory.CAPACITY - 2) * 99 + 48, "место для клыков: %d" % inv.room_for("boar_tusk"))
 	check(ItemData.stack_size("dagger_steel") == 1 and ItemData.stack_size("potion_hp_r1") == ItemData.STACK
-		and ItemData.stack_size("armor_helmet_r1") == 1 and ItemData.stack_size("ring_hp_r1") == 1, "размер стопок (броня и украшения по 1)")
+		and ItemData.stack_size("armor_helmet_r1") == 1 and ItemData.stack_size("ring_vit_r1") == 1, "размер стопок (броня и украшения по 1)")
 	inv.add("dagger_steel", 3)
 	check(inv.used_cells() == 5, "оружие — по одному в ячейке")
 	inv.add("sword_steel", Inventory.CAPACITY - 5)

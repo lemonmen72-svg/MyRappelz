@@ -121,7 +121,9 @@ func setup(list: Array, sz: Vector2, sel: String = "") -> void:
 			col_of[String(id)] = c
 			ncols = maxi(ncols, c + 1)
 	var avail := sz.x - label_w
-	var col_w := clampf(avail / float(ncols), UiScale.px(COL_MIN), UiScale.px(COL_MAX))
+	# Много умений в ярусе (у питомцев с 0.31 — до 32 умений) — колонки уже, значки мельче, всё внутри древа
+	var col_w := minf(avail / float(ncols), UiScale.px(COL_MAX))
+	icon_size = minf(icon_size, col_w - UiScale.px(6))
 	var x0 := label_w + maxf(0.0, (avail - col_w * float(ncols)) * 0.5)
 	for ri in rows.size():
 		var r: Dictionary = rows[ri]

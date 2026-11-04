@@ -66,14 +66,14 @@ func run_step() -> void:
 			# Мешочек с бронёй и украшением у ног героя
 			var pos := player.global_position + Vector3(1.0, 0.0, 0.0)
 			_had_gloves = inv.count("armor_gloves_r1")
-			_had_ring = inv.count("ring_mp_r1")
-			drop = eco.spawn_drop(pos, {"armor_gloves_r1": 1, "ring_mp_r1": 1}, 5)
+			_had_ring = inv.count("ring_int_r1")
+			drop = eco.spawn_drop(pos, {"armor_gloves_r1": 1, "ring_int_r1": 1}, 5)
 			wait = 40
 			step = 6
 		6:
 			check(not is_instance_valid(drop) or drop.is_queued_for_deletion(), "мешочек с бронёй подобран")
-			check(inv.count("armor_gloves_r1") == _had_gloves + 1 and inv.count("ring_mp_r1") == _had_ring + 1,
-				"перчатки и кольцо из мешочка — в сумке (%d, %d)" % [inv.count("armor_gloves_r1"), inv.count("ring_mp_r1")])
+			check(inv.count("armor_gloves_r1") == _had_gloves + 1 and inv.count("ring_int_r1") == _had_ring + 1,
+				"перчатки и кольцо из мешочка — в сумке (%d, %d)" % [inv.count("armor_gloves_r1"), inv.count("ring_int_r1")])
 			ok_done()
 
 
@@ -93,7 +93,8 @@ func _unit_items() -> void:
 				"%s: снаряжение %d-го ранга" % [id, int(r)])
 			check(ItemData.required_level(id) == (1 if int(r) == 1 else 21), "%s: надеть с %d ур." % [id, ItemData.required_level(id)])
 			check(ItemData.stack_size(id) == 1, "%s: по одному в ячейке" % id)
-			check(ItemData.icon_path(id) == ItemData.ICON_DIR + id + ".png", "%s: значок — %s" % [id, ItemData.icon_path(id)])
+			# Значок — свой или (у новых украшений базы, пока своих нет) прежний похожий: icon_file
+			check(ItemData.icon_path(id) == ItemData.ICON_DIR + String(it.get("icon_file", id)) + ".png", "%s: значок — %s" % [id, ItemData.icon_path(id)])
 			check(not ItemData.gear_slots_for(id).is_empty(), "%s: есть ячейка экипировки" % id)
 			check(not ItemData.gear_bonus(id).is_empty(), "%s: бонус %s" % [id, ItemData.gear_bonus_text(ItemData.gear_bonus(id))])
 			check(int(it.get("sell", 0)) > 0 and (int(it.get("buy", 0)) > 0) == (int(r) == 1),
@@ -101,14 +102,14 @@ func _unit_items() -> void:
 	check(n == (ItemData.ARMOR_DEFS.size() + ItemData.JEWELRY_DEFS.size()) * 2, "вещей рангов 1–2: %d" % n)
 	# Контракт id со значками и торговцами
 	for id in ["armor_body_warrior_r1", "armor_body_mage_r2", "armor_body_summoner_r1", "armor_helmet_r2", "armor_gloves_r1",
-			"armor_boots_r2", "ring_hp_r1", "ring_mp_r2", "ring_crit_r1", "ring_critdmg_r2", "ring_aspd_r1", "ring_cast_r2",
-			"earring_crit_r1", "earring_critdmg_r1", "earring_aspd_r2", "earring_cast_r1", "pendant_hp_r1", "pendant_mp_r2",
-			"pendant_pdef_r1", "pendant_mdef_r2", "belt_pdef_r1", "belt_mdef_r2", "belt_eva_r1", "belt_speed_r2"]:
+			"armor_boots_r2", "ring_vit_r1", "ring_int_r2", "ring_dex_r1", "ring_str_r2", "ring_agi_r1", "ring_wis_r2",
+			"earring_crit_r1", "earring_atk_r1", "earring_speed_r2", "earring_matk_r1", "pendant_hpregen_r1", "pendant_mpregen_r2",
+			"pendant_mdef_r1", "pendant_mdef_r2", "belt_light_r1", "belt_light_r2", "belt_light_r1", "belt_light_r2"]:
 		check(ItemData.is_gear(String(id)), "id из контракта: %s" % id)
 	# Ячейки: 9, кольцо — в обе ячейки колец
 	check(ItemData.GEAR_SLOTS.size() == 9, "ячеек брони и украшений — 9")
-	check(ItemData.gear_slots_for("ring_hp_r1") == ["ring1", "ring2"], "кольцо — в «Кольцо 1» и «Кольцо 2»")
-	check(ItemData.gear_slots_for("armor_body_mage_r1") == ["body"] and ItemData.gear_slots_for("belt_eva_r1") == ["belt"],
+	check(ItemData.gear_slots_for("ring_vit_r1") == ["ring1", "ring2"], "кольцо — в «Кольцо 1» и «Кольцо 2»")
+	check(ItemData.gear_slots_for("armor_body_mage_r1") == ["body"] and ItemData.gear_slots_for("belt_light_r1") == ["belt"],
 		"доспех — «Тело», пояс — «Пояс»")
 	# Варианты доспеха: воин — физ. выше маг., маг — наоборот, призыватель — между
 	for r in [1, 2]:
@@ -121,10 +122,10 @@ func _unit_items() -> void:
 	for base in ["armor_helmet", "armor_gloves", "armor_boots"]:
 		var b := ItemData.gear_bonus(ItemData.gear_id(String(base), 1))
 		check(b.has("def") and b.has("mdef"), "%s: физ. и маг. защита (база оригинала)" % base)
-	check(ItemData.item_type("ring_hp_r1") == "jewelry" and ItemData.type_name("ring_hp_r1") == "Украшение"
+	check(ItemData.item_type("ring_vit_r1") == "jewelry" and ItemData.type_name("ring_vit_r1") == "Украшение"
 		and ItemData.type_name("armor_helmet_r1") == "Броня", "типы: «Броня», «Украшение»")
-	check(ItemData.sort_before("weapon_sword_1h_r1", "armor_helmet_r1") and ItemData.sort_before("armor_helmet_r1", "ring_hp_r1")
-		and ItemData.sort_before("ring_hp_r1", "potion_hp_r1"), "сортировка: оружие, броня, украшения, расходники")
+	check(ItemData.sort_before("weapon_sword_1h_r1", "armor_helmet_r1") and ItemData.sort_before("armor_helmet_r1", "ring_vit_r1")
+		and ItemData.sort_before("ring_vit_r1", "potion_hp_r1"), "сортировка: оружие, броня, украшения, расходники")
 
 
 func _unit_fits() -> void:
@@ -139,7 +140,7 @@ func _unit_fits() -> void:
 			var id := ItemData.gear_id("armor_body_" + String(v), 1)
 			check(ItemData.armor_fits(id, String(job)) == (String(v) == String(want[job])),
 				"%s: %s %s" % [job, id, "подходит" if String(v) == String(want[job]) else "не подходит"])
-		check(ItemData.armor_fits("armor_helmet_r2", String(job)) and ItemData.armor_fits("ring_cast_r1", String(job)),
+		check(ItemData.armor_fits("armor_helmet_r2", String(job)) and ItemData.armor_fits("ring_wis_r1", String(job)),
 			"%s: шлем и кольцо — всем" % job)
 	for v in ItemData.BODY_ARMOR:
 		check(ItemData.armor_fits(ItemData.gear_id("armor_body_" + String(v), 2), ClassData.WANDERER), "Бродяге — любой доспех: %s" % v)
@@ -227,7 +228,7 @@ func _unit_loot() -> void:
 		var share := float(got.get(k, 0)) / float(maxi(1, total))
 		var want := float(bc[k]) / total_w
 		check(absf(share - want) < SHARE_TOL, "босс: доля «%s» %.3f ≈ %.3f" % [k, share, want])
-	check(variants.size() == 3, "из босса — все три варианта доспеха: %s" % [variants.keys()])
+	check(variants.size() == 4, "из босса — все четыре варианта доспеха (с охотником): %s" % [variants.keys()])
 	for k in ["head", "body", "hands", "feet", "ring", "earring", "pendant", "belt"]:
 		check(int(kinds.get(k, 0)) > 20, "выпадает %s: %d" % [k, int(kinds.get(k, 0))])
 	print("  ДОБЫЧА босс 24 ур.: броня %d, украшения %d из %d предметов; виды %s" % [int(got.get("armor", 0)),
@@ -271,7 +272,7 @@ func _unit_quest_rewards() -> void:
 			if ItemData.armor_variant(String(k)) != "":
 				any_variant[ItemData.armor_variant(String(k))] = true
 	check(int(got.get("armor", 0)) > 50 and int(got.get("jewelry", 0)) > 20, "в наградах есть броня и украшения: %s" % [got])
-	check(any_variant.size() == 3, "Бродяге — доспехи всех вариантов: %s" % [any_variant.keys()])
+	check(any_variant.size() == 4, "Бродяге — доспехи всех вариантов (с охотником): %s" % [any_variant.keys()])
 	print("  НАГРАДЫ Воин 25 ур. (1500 заданий): %s" % [got])
 
 
@@ -282,8 +283,8 @@ func _equip_each_slot() -> void:
 	var p: Player = main.player
 	var list := {
 		"head": "armor_helmet_r1", "body": "armor_body_warrior_r1", "hands": "armor_gloves_r1", "feet": "armor_boots_r1",
-		"ring1": "ring_hp_r1", "ring2": "ring_crit_r1", "earring": "earring_aspd_r1", "pendant": "pendant_mp_r1",
-		"belt": "belt_speed_r1",
+		"ring1": "ring_vit_r1", "ring2": "ring_dex_r1", "earring": "earring_speed_r1", "pendant": "pendant_mpregen_r1",
+		"belt": "belt_light_r1",
 	}
 	for gs in list:
 		var id := String(list[gs])
@@ -324,20 +325,20 @@ func _equip_rules() -> void:
 	game.ensure_gear()
 	check(game.gear_in("head") == "", "уровень ниже ранга — шлем снят (ensure_gear)")
 	# Нет в сумке
-	check(not inv.has("belt_eva_r1") and String(game.equip_gear("belt_eva_r1")).contains("нет в сумке"), "чего нет в сумке — не надеть")
-	inv.add("ring_mp_r1")
+	check(not inv.has("earring_def_r1") and String(game.equip_gear("earring_def_r1")).contains("нет в сумке"), "чего нет в сумке — не надеть")
+	inv.add("ring_int_r1")
 	# Два одинаковых кольца: второе — только если есть вторая штука
-	check(String(game.equip_gear("ring_mp_r1", "ring1")) == "", "кольцо маны — в «Кольцо 1»")
-	var e4: String = game.equip_gear("ring_mp_r1", "ring2")
+	check(String(game.equip_gear("ring_int_r1", "ring1")) == "", "кольцо маны — в «Кольцо 1»")
+	var e4: String = game.equip_gear("ring_int_r1", "ring2")
 	check(e4.contains("Второй"), "одно кольцо в две ячейки не надеть: %s" % e4)
-	inv.add("ring_mp_r1")
-	check(String(game.equip_gear("ring_mp_r1", "ring2")) == "", "второе такое же кольцо — в «Кольцо 2»")
-	check(inv.count("ring_mp_r1") == 2 and inv.find_cell("ring_mp_r1") == -1, "оба кольца надеты, ячеек не занимают")
+	inv.add("ring_int_r1")
+	check(String(game.equip_gear("ring_int_r1", "ring2")) == "", "второе такое же кольцо — в «Кольцо 2»")
+	check(inv.count("ring_int_r1") == 2 and inv.find_cell("ring_int_r1") == -1, "оба кольца надеты, ячеек не занимают")
 	# Без ячейки — первая свободная, иначе замена в первой
 	game.unequip_gear("ring1")
-	check(game.gear_slot_for("ring_hp_r1") == "ring1", "свободное кольцо — «Кольцо 1»")
-	check(String(game.equip_gear("ring_hp_r1")) == "" and game.gear_in("ring1") == "ring_hp_r1", "кольцо жизни — в первую свободную")
-	check(game.gear_slot_for("ring_crit_r1") == "ring1", "обе заняты — замена в «Кольцо 1»")
+	check(game.gear_slot_for("ring_vit_r1") == "ring1", "свободное кольцо — «Кольцо 1»")
+	check(String(game.equip_gear("ring_vit_r1")) == "" and game.gear_in("ring1") == "ring_vit_r1", "кольцо жизни — в первую свободную")
+	check(game.gear_slot_for("ring_dex_r1") == "ring1", "обе заняты — замена в «Кольцо 1»")
 	game.unequip_gear("ring1")
 	game.unequip_gear("ring2")
 	p.recalc_stats()
@@ -357,36 +358,38 @@ func _stats_grow() -> void:
 	var s0 := p.speed
 	check(is_equal_approx(p.crit_mult, Player.CRIT_MULT), "без украшений сила крита ×%.2f" % p.crit_mult)
 	var inv: Inventory = game.inventory
-	var worn := ["armor_body_warrior_r1", "armor_helmet_r1", "armor_gloves_r1", "armor_boots_r1", "ring_hp_r1", "ring_critdmg_r1",
-		"earring_cast_r1", "pendant_mp_r1", "belt_speed_r1"]
+	var worn := ["armor_body_warrior_r1", "armor_helmet_r1", "armor_gloves_r1", "armor_boots_r1", "ring_vit_r1", "ring_str_r1",
+		"earring_matk_r1", "pendant_mpregen_r1", "belt_light_r1"]
 	for id in worn:
 		if not inv.has(String(id), 1):
 			inv.add(String(id))
 		var err: String = p.equip_gear(String(id))
 		check(err == "", "надето %s %s" % [id, err])
 	var gb: Dictionary = game.gear_bonus()
-	check(int(gb["def"]) == 33 and int(gb["mdef"]) == 19, "комплект воина 1-го ранга (база оригинала): физ. +%d, маг. +%d" % [int(gb["def"]), int(gb["mdef"])])
-	check(p.defense - d0 >= 25, "физ. защита %d → %d" % [d0, p.defense])
-	check(p.mdef - m0 == 19, "маг. защита %d → %d" % [m0, p.mdef])
-	check(p.max_hp - hp0 >= 30, "HP %d → %d (кольцо жизни +30)" % [hp0, p.max_hp])
-	check(p.max_mp - mp0 >= 20, "MP %d → %d (кулон маны +20)" % [mp0, p.max_mp])
-	check(is_equal_approx(p.crit_mult, Player.CRIT_MULT + 0.1), "сила крита ×%.2f (кольцо сокрушения +10%%)" % p.crit_mult)
-	check(is_equal_approx(p.cast_speed - cs0, 0.05), "скорость каста +5%%: %.2f → %.2f" % [cs0, p.cast_speed])
-	check(p.speed > s0 * 1.03, "скорость бега %.2f → %.2f (пояс +4%%)" % [s0, p.speed])
-	check(is_equal_approx(p.aspd, a0) and is_equal_approx(p.crit, c0), "крит и скорость атаки без таких украшений — те же")
-	# Шанс крита, скорость атаки, уклонение
+	# База оригинала: доспех воина 16/6, шлем 3/3, перчатки и сапоги 4/4, пояс 3/0, кулон духа 0/12
+	check(int(gb["def"]) == 30 and int(gb["mdef"]) == 29, "комплект воина 1-го ранга: физ. +%d, маг. +%d" % [int(gb["def"]), int(gb["mdef"])])
+	check(p.defense - d0 >= 30, "физ. защита %d → %d" % [d0, p.defense])
+	check(p.mdef - m0 >= 29, "маг. защита %d → %d" % [m0, p.mdef])
+	check(p.max_hp - hp0 >= 150, "HP %d → %d (кольца стойкости и силы +75 и характеристики)" % [hp0, p.max_hp])
+	check(is_equal_approx(p.mp_regen_flat, 0.05), "кулон духа: восст. MP +%.2f/с" % p.mp_regen_flat)
+	check(int(gb.get("vit", 0)) == 2 and int(gb.get("str", 0)) == 2 and int(gb.get("matk", 0)) == 10,
+		"характеристики колец и маг. атака серёг: %s" % ItemData.gear_bonus_text(gb))
+	check(is_equal_approx(p.crit_mult, Player.CRIT_MULT), "сила крита та же ×%.2f" % p.crit_mult)
+	check(is_equal_approx(p.aspd, a0) and is_equal_approx(p.crit, c0) and is_equal_approx(p.cast_speed, cs0),
+		"крит, скорость атаки и каста без таких украшений — те же")
+	# Серьги-капли — бег, кольцо меткости — HP и Меткость
 	p.unequip_gear("ring1")
 	p.unequip_gear("earring")
 	p.unequip_gear("belt")
-	for id in ["ring_crit_r1", "earring_aspd_r1", "belt_eva_r1"]:
+	for id in ["ring_dex_r1", "earring_speed_r1", "belt_light_r1"]:
 		if not inv.has(String(id), 1):
 			inv.add(String(id))
 		check(String(p.equip_gear(String(id))) == "", "надето %s" % id)
-	check(is_equal_approx(p.crit - c0, 0.02), "шанс крита +2%%: %.3f → %.3f" % [c0, p.crit])
-	check(is_equal_approx(p.aspd - a0, 0.04), "скорость атаки +4%%: %.2f → %.2f" % [a0, p.aspd])
-	check(is_equal_approx(p.eva - e0, 0.02) or p.eva >= 0.6, "уклонение +2%%: %.3f → %.3f" % [e0, p.eva])
+	check(p.speed > s0 * 1.01, "скорость бега %.2f → %.2f (серьги +1.2%%)" % [s0, p.speed])
+	check(int(game.gear_bonus().get("dex", 0)) == 2, "кольцо меткости: Меткость +2")
+	check(is_equal_approx(p.eva, e0) or p.eva >= 0.6, "уклонение без таких украшений — то же: %.3f → %.3f" % [e0, p.eva])
 	var prof := Combat.profile_of(p)
-	check(is_equal_approx(float(prof["crit_mult"]), p.crit_mult) and int(prof["def"]) >= d0 + 25, "профиль боя видит экипировку")
+	check(is_equal_approx(float(prof["crit_mult"]), p.crit_mult) and int(prof["def"]) >= d0 + 27, "профиль боя видит экипировку")
 	print("  ГЕРОЙ 15 ур. Воин: защита %d → %d, маг. %d → %d, HP %d → %d, MP %d → %d" % [d0, p.defense, m0, p.mdef, hp0,
 		p.max_hp, mp0, p.max_mp])
 
@@ -403,10 +406,10 @@ func _save_load() -> void:
 	check(game.inventory.used_cells() == used and game.inventory.find_cell("armor_body_warrior_r1") == -1,
 		"надетое по-прежнему не в ячейках (занято %d)" % game.inventory.used_cells())
 	main.player.recalc_stats()
-	check(int(game.gear_bonus()["def"]) == 33, "бонусы после загрузки")
+	check(int(game.gear_bonus()["def"]) == 30, "бонусы после загрузки: физ. %d" % int(game.gear_bonus()["def"]))
 	# Испорченная запись: чужая ячейка, вещи нет в сумке, не та ячейка
 	var bad := d.duplicate(true)
-	bad["equip"] = {"head": "ring_hp_r1", "bogus": "armor_helmet_r1", "belt": "belt_pdef_r2", "body": "armor_body_warrior_r1"}
+	bad["equip"] = {"head": "ring_vit_r1", "bogus": "armor_helmet_r1", "belt": "belt_light_r2", "body": "armor_body_warrior_r1"}
 	game.from_dict(JSON.parse_string(JSON.stringify(bad)))
 	check(game.equip == {"body": "armor_body_warrior_r1"}, "лишнее из сохранения снято: %s" % [game.equip])
 	# Старое сохранение — без equip
@@ -473,26 +476,26 @@ func _bag_window() -> void:
 	game.unequip_gear("ring2")
 	main.player.recalc_stats()
 	main.economy.open_bag()
-	inv.add("ring_aspd_r1")
-	_press("cell_%d" % inv.find_cell("ring_aspd_r1"))
+	inv.add("ring_agi_r1")
+	_press("cell_%d" % inv.find_cell("ring_agi_r1"))
 	check(win.buttons.has("act_equip_ring2"), "у кольца — «Во 2-е кольцо»")
 	_press("act_equip_ring2")
-	check(game.gear_in("ring2") == "ring_aspd_r1" and game.gear_in("ring1") == "", "кольцо — во вторую ячейку")
-	var rc := inv.find_cell("ring_hp_r1")
+	check(game.gear_in("ring2") == "ring_agi_r1" and game.gear_in("ring1") == "", "кольцо — во вторую ячейку")
+	var rc := inv.find_cell("ring_vit_r1")
 	var slot1: Button = win.buttons["equip_ring1"]
 	var belt: Button = win.buttons["equip_belt"]
 	check(slot1.call("_can_drop_data", Vector2.ZERO, {"inv_cell": rc}), "кольцо можно бросить в «Кольцо 1»")
 	check(not belt.call("_can_drop_data", Vector2.ZERO, {"inv_cell": rc}), "кольцо в «Пояс» не бросить")
 	check(not (win.buttons["equip_weapon"] as Button).call("_can_drop_data", Vector2.ZERO, {"inv_cell": rc}), "кольцо в «Оружие» не бросить")
 	slot1.call("_drop_data", Vector2.ZERO, {"inv_cell": rc})
-	check(game.gear_in("ring1") == "ring_hp_r1", "кольцо жизни надето перетаскиванием")
+	check(game.gear_in("ring1") == "ring_vit_r1", "кольцо жизни надето перетаскиванием")
 	# Замена перетаскиванием: прежняя вещь — в ту же ячейку сумки
-	inv.add("belt_pdef_r1")
+	inv.add("belt_light_r1")
 	main.economy.open_bag()
-	var bc := inv.find_cell("belt_pdef_r1")
+	var bc := inv.find_cell("belt_light_r1")
 	var old_belt: String = game.gear_in("belt")
 	(win.buttons["equip_belt"] as Button).call("_drop_data", Vector2.ZERO, {"inv_cell": bc})
-	check(game.gear_in("belt") == "belt_pdef_r1" and String(inv.cell(bc).get("id", "")) == old_belt,
+	check(game.gear_in("belt") == "belt_light_r1" and String(inv.cell(bc).get("id", "")) == old_belt,
 		"пояс заменён, прежний (%s) — в той же ячейке" % old_belt)
 	# Пустой слот — подсказка
 	game.unequip_gear("earring")
@@ -521,7 +524,7 @@ func _storage() -> void:
 	var st: Inventory = game.storage
 	st.from_dict({})
 	st.add("armor_helmet_r1", 2)
-	st.add("ring_hp_r1", 1)
+	st.add("ring_vit_r1", 1)
 	check(st.used_cells() == 3, "на складе броня и украшения — по одному в ячейке (%d)" % st.used_cells())
 	var eco: Economy = main.economy
 	var inv: Inventory = game.inventory

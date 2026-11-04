@@ -86,9 +86,11 @@ static func derived(species: String, lvl: int, skills: Dictionary = {}, toggles:
 	var bon := PetSkills.bonuses(species, skills, toggles)
 	var s := base_stats(species, lv, stage, sup)
 	var all_up := int(bon.get("all_stats", 0))
-	if all_up != 0:
-		for key in STATS:
-			s[key] = int(s[key]) + all_up
+	for key in STATS:
+		# «Дар предков» — все, «Благословение …» — своя характеристика
+		var up := all_up + int(bon.get("stat_" + String(key), 0))
+		if up != 0:
+			s[key] = int(s[key]) + up
 	# Статы от героя (PetBond: ауры, пассивки, усиления на время)
 	for key in extra:
 		if s.has(key):

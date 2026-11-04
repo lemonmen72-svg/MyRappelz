@@ -34,119 +34,119 @@ const BASE_ITEMS := {
 	# ---------- Карты существ: базовые продаёт Учитель Кирк, остальные выпадают из зверей своего вида ----------
 	"card_panther": {
 		"name": "Карта существа: Пантера", "type": "card", "species": "panther", "icon": "card", "stack": 20,
-		"buy": 25, "sell": 8, "color": Color(0.62, 0.52, 0.78), "desc": "Чистая карта: ловит дух пантеры.",
+		"buy": 8000, "sell": 2000, "color": Color(0.62, 0.52, 0.78), "desc": "Чистая карта: ловит дух пантеры.",
 	},
 	"card_turtle": {
 		"name": "Карта существа: Черепаха", "type": "card", "species": "turtle", "icon": "card", "stack": 20,
-		"buy": 25, "sell": 8, "color": Color(0.5, 0.72, 0.45), "desc": "Чистая карта: ловит дух черепахи.",
+		"buy": 8000, "sell": 2000, "color": Color(0.5, 0.72, 0.45), "desc": "Чистая карта: ловит дух черепахи.",
 	},
 	"card_pheasant": {
 		"name": "Карта существа: Фазан", "type": "card", "species": "pheasant", "icon": "card", "stack": 20,
-		"buy": 25, "sell": 8, "color": Color(0.9, 0.58, 0.3), "desc": "Чистая карта: ловит дух фазана.",
+		"buy": 8000, "sell": 2000, "color": Color(0.9, 0.58, 0.3), "desc": "Чистая карта: ловит дух фазана.",
 	},
 	"card_wolf": {
 		"name": "Карта существа: Волк", "type": "card", "species": "wolf", "icon": "card", "stack": 20,
-		"buy": 0, "sell": 12, "color": Color(0.66, 0.68, 0.74), "desc": "Чистая карта: ловит дух волка.",
+		"buy": 20000, "sell": 5000, "color": Color(0.66, 0.68, 0.74), "desc": "Чистая карта: ловит дух волка.",
 	},
 	"card_centaur": {
 		"name": "Карта существа: Кентавр", "type": "card", "species": "centaur", "icon": "card", "stack": 20,
-		"buy": 0, "sell": 20, "color": Color(0.78, 0.58, 0.38), "desc": "Чистая карта: ловит дух кентавра.",
+		"buy": 80000, "sell": 20000, "color": Color(0.78, 0.58, 0.38), "desc": "Чистая карта: ловит дух кентавра.",
 	},
 	"card_panther_soul": {
 		"name": "Карта пантеры (с душой)", "type": "card", "species": "panther", "soul": true, "icon": "card",
-		"stack": 1, "buy": 0, "sell": 15, "color": Color(0.62, 0.52, 0.78), "desc": "В карте спит пойманная душа пантеры.",
+		"stack": 1, "buy": 0, "sell": 2000, "color": Color(0.62, 0.52, 0.78), "desc": "В карте спит пойманная душа пантеры.",
 	},
 	"card_turtle_soul": {
 		"name": "Карта черепахи (с душой)", "type": "card", "species": "turtle", "soul": true, "icon": "card",
-		"stack": 1, "buy": 0, "sell": 15, "color": Color(0.5, 0.72, 0.45), "desc": "В карте спит пойманная душа черепахи.",
+		"stack": 1, "buy": 0, "sell": 2000, "color": Color(0.5, 0.72, 0.45), "desc": "В карте спит пойманная душа черепахи.",
 	},
 	"card_pheasant_soul": {
 		"name": "Карта фазана (с душой)", "type": "card", "species": "pheasant", "soul": true, "icon": "card",
-		"stack": 1, "buy": 0, "sell": 15, "color": Color(0.9, 0.58, 0.3), "desc": "В карте спит пойманная душа фазана.",
+		"stack": 1, "buy": 0, "sell": 2000, "color": Color(0.9, 0.58, 0.3), "desc": "В карте спит пойманная душа фазана.",
 	},
 	"card_wolf_soul": {
 		"name": "Карта волка (с душой)", "type": "card", "species": "wolf", "soul": true, "icon": "card",
-		"stack": 1, "buy": 0, "sell": 18, "color": Color(0.66, 0.68, 0.74), "desc": "В карте спит пойманная душа волка.",
+		"stack": 1, "buy": 0, "sell": 5000, "color": Color(0.66, 0.68, 0.74), "desc": "В карте спит пойманная душа волка.",
 	},
 	"card_centaur_soul": {
 		"name": "Карта кентавра (с душой)", "type": "card", "species": "centaur", "soul": true, "icon": "card",
-		"stack": 1, "buy": 0, "sell": 30, "color": Color(0.78, 0.58, 0.38), "desc": "В карте спит пойманная душа кентавра.",
+		"stack": 1, "buy": 0, "sell": 20000, "color": Color(0.78, 0.58, 0.38), "desc": "В карте спит пойманная душа кентавра.",
 	},
 	"mirror_card": {
-		"name": "Зеркальная карта", "type": "card", "icon": "card", "stack": 20, "buy": 60, "sell": 20,
+		"name": "Зеркальная карта", "type": "card", "icon": "card", "stack": 20, "buy": 1998, "sell": 499,
 		"color": Color(0.82, 0.88, 0.98),
 		"desc": "Оберег для приручения: если попытка не удалась, ломается зеркальная карта, а карта существа остаётся цела.",
 	},
 	# Зелья (potion_<вид>_r<ранг>) — не здесь: их 5 видов × 15 рангов строит _static_init (POTION_KINDS)
 	"revive_scroll": {
-		"name": "Свиток воскрешения", "type": "consumable", "icon": "scroll", "buy": 30, "sell": 10,
+		"name": "Свиток воскрешения", "type": "consumable", "icon": "scroll", "buy": 1500, "sell": 375,
 		"color": Color(0.95, 0.9, 0.6), "desc": "Воскрешает погибшего питомца.",
 	},
 	# ---------- Оружие 1-го ранга (ур. 1–20): у торговца; стартовое у Бродяги и профессий (STARTER_WEAPONS) ----------
 	# Бонусы — по виду (WEAPON_KINDS stats / aspd / cast): из чисел atk, matk, def, block действуют только те, что есть у вида.
 	"weapon_sword_1h_r1": {
 		"name": "Учебный меч", "type": "weapon", "icon": "sword", "weapon": "sword_1h", "rank": 1,
-		"atk": 27, "range": 2.6, "crit": 0.02, "buy": 40, "sell": 8,
+		"atk": 27, "range": 2.6, "crit": 0.02, "buy": 500, "sell": 125,
 		"color": Color(0.85, 0.87, 0.92), "desc": "Простой одноручный меч новичка. Вторая рука свободна — для щита или второго меча.",
 	},
 	"weapon_sword_2h_r1": {
 		"name": "Двуручный меч новичка", "type": "weapon", "icon": "swords", "weapon": "sword_2h", "rank": 1,
-		"atk": 52, "range": 2.9, "crit": 0.02, "buy": 55, "sell": 12,
+		"atk": 52, "range": 2.9, "crit": 0.02, "buy": 750, "sell": 187,
 		"color": Color(0.8, 0.83, 0.92), "desc": "Длинный тяжёлый клинок: бьёт реже, но сильнее.",
 	},
 	"weapon_dagger_r1": {
 		"name": "Кинжал новичка", "type": "weapon", "icon": "dagger", "weapon": "dagger", "rank": 1,
-		"atk": 24, "matk": 23, "range": 2.2, "crit": 0.05, "buy": 35, "sell": 7,
+		"atk": 24, "matk": 23, "range": 2.2, "crit": 0.05, "buy": 500, "sell": 125,
 		"color": Color(0.78, 0.75, 0.9), "desc": "Короткий клинок: частые удары и больше критов, немного помогает и магии.",
 	},
 	"weapon_mace_1h_r1": {
 		"name": "Учебная булава", "type": "weapon", "icon": "mace", "weapon": "mace_1h", "rank": 1,
-		"atk": 34, "matk": 24, "range": 2.5, "crit": 0.0, "buy": 40, "sell": 8,
+		"atk": 34, "matk": 24, "range": 2.5, "crit": 0.0, "buy": 500, "sell": 125,
 		"color": Color(0.72, 0.7, 0.66), "desc": "Окованная булава в одну руку. Хороша со щитом.",
 	},
 	"weapon_mace_2h_r1": {
 		"name": "Тяжёлая булава новичка", "type": "weapon", "icon": "mace", "weapon": "mace_2h", "rank": 1,
-		"atk": 57, "matk": 34, "range": 2.8, "crit": 0.0, "buy": 55, "sell": 12,
+		"atk": 57, "matk": 34, "range": 2.8, "crit": 0.0, "buy": 750, "sell": 187,
 		"color": Color(0.68, 0.66, 0.62), "desc": "Двуручная булава: медленно, зато каждый удар чувствуется.",
 	},
 	"weapon_axe_1h_r1": {
 		"name": "Учебный топор", "type": "weapon", "icon": "axe", "weapon": "axe_1h", "rank": 1,
-		"atk": 33, "matk": 15, "range": 2.5, "crit": 0.03, "buy": 40, "sell": 8,
+		"atk": 35, "matk": 15, "range": 2.5, "crit": 0.03, "buy": 500, "sell": 125,
 		"color": Color(0.8, 0.72, 0.6), "desc": "Лёгкий топор в одну руку. Во второй руке может быть ещё один.",
 	},
 	"weapon_axe_2h_r1": {
 		"name": "Двуручный топор новичка", "type": "weapon", "icon": "axe", "weapon": "axe_2h", "rank": 1,
-		"atk": 58, "matk": 20, "range": 2.9, "crit": 0.04, "buy": 55, "sell": 12,
+		"atk": 58, "matk": 20, "range": 2.9, "crit": 0.04, "buy": 750, "sell": 187,
 		"color": Color(0.78, 0.68, 0.55), "desc": "Широкое лезвие на длинной рукояти: самый тяжёлый удар среди оружия новичка.",
 	},
 	"weapon_staff_1h_r1": {
 		"name": "Жезл новичка", "type": "weapon", "icon": "staff", "weapon": "staff_1h", "rank": 1,
-		"matk": 37, "range": 9.0, "crit": 0.0, "buy": 40, "sell": 8,
+		"matk": 37, "range": 9.0, "crit": 0.0, "buy": 500, "sell": 125,
 		"color": Color(0.82, 0.68, 0.45), "desc": "Короткий посох: обычная атака — сгусток магии издалека, заклинания быстрее. Вторая рука свободна.",
 	},
 	"weapon_staff_2h_r1": {
 		"name": "Посох новичка", "type": "weapon", "icon": "staff", "weapon": "staff_2h", "rank": 1,
-		"matk": 55, "range": 10.0, "crit": 0.0, "buy": 55, "sell": 12,
+		"matk": 55, "range": 10.0, "crit": 0.0, "buy": 750, "sell": 187,
 		"color": Color(0.8, 0.64, 0.4), "desc": "Посох в две руки: магия сильнее, сгусток летит дальше.",
 	},
 	"weapon_spear_r1": {
 		"name": "Копьё новичка", "type": "weapon", "icon": "spear", "weapon": "spear", "rank": 1,
-		"atk": 46, "range": 3.3, "crit": 0.03, "buy": 55, "sell": 12,
+		"atk": 46, "range": 3.3, "crit": 0.03, "buy": 750, "sell": 187,
 		"color": Color(0.82, 0.8, 0.72), "desc": "Длинное копьё в две руки: достаёт зверя дальше меча, бьёт сильно и точно.",
 	},
 	"weapon_shield_r1": {
 		"name": "Деревянный щит", "type": "weapon", "icon": "shield", "weapon": "shield", "rank": 1,
-		"def": 12, "block": 0.12, "range": 0.0, "crit": 0.0, "buy": 35, "sell": 7,
+		"def": 12, "block": 0.12, "range": 0.0, "crit": 0.0, "buy": 250, "sell": 62,
 		"color": Color(0.62, 0.45, 0.28), "desc": "Щит во вторую руку (к одноручному оружию): защита выше, часть ударов приходится в щит.",
 	},
 	"weapon_bow_r1": {
 		"name": "Лук новичка", "type": "weapon", "icon": "bow", "weapon": "bow", "rank": 1,
-		"atk": 67, "range": 13.0, "crit": 0.03, "buy": 50, "sell": 10,
+		"atk": 67, "range": 13.0, "crit": 0.03, "buy": 750, "sell": 187,
 		"color": Color(0.62, 0.44, 0.26), "desc": "Простой лук в две руки: стрелы летят дальше всех, но натягивать тетиву долго.",
 	},
 	"crossbow_starter": {
 		"name": "Лёгкий арбалет", "type": "weapon", "icon": "crossbow", "weapon": "crossbow", "rank": 1,
-		"atk": 34, "range": 11.0, "crit": 0.0, "buy": 50, "sell": 10,
+		"atk": 34, "range": 11.0, "crit": 0.0, "buy": 750, "sell": 187,
 		"color": Color(0.72, 0.52, 0.32), "desc": "Стреляет болтами издалека, но реже.",
 	},
 	# ---------- Оружие 2-го ранга (ур. 21–50): на острове не продаётся (только 1-й ранг), выпадает из зверей 21+ ур.
@@ -155,110 +155,161 @@ const BASE_ITEMS := {
 	# assets/handheld/weapon_<вид>_r2.glb (поле model; нет файла — модель вида 1-го ранга, Handheld.model_for).
 	"weapon_sword_1h_r2": {
 		"name": "Меч стражника", "type": "weapon", "icon": "sword", "weapon": "sword_1h", "rank": 2,
-		"model": "weapon_sword_1h_r2", "atk": 77, "range": 2.6, "crit": 0.03, "buy": 0, "sell": 32,
+		"model": "weapon_sword_1h_r2", "atk": 77, "range": 2.6, "crit": 0.03, "buy": 0, "sell": 7550,
 		"color": Color(0.82, 0.88, 0.96), "desc": "Надёжный одноручный меч стражи. Вторая рука свободна — для щита или второго меча.",
 	},
 	"weapon_sword_2h_r2": {
 		"name": "Двуручный меч ветерана", "type": "weapon", "icon": "swords", "weapon": "sword_2h", "rank": 2,
-		"model": "weapon_sword_2h_r2", "atk": 130, "range": 2.9, "crit": 0.03, "buy": 0, "sell": 48,
+		"model": "weapon_sword_2h_r2", "atk": 130, "range": 2.9, "crit": 0.03, "buy": 0, "sell": 11375,
 		"color": Color(0.78, 0.84, 0.95), "desc": "Тяжёлый клинок бывалого бойца: бьёт реже, но рассекает надвое.",
 	},
 	"weapon_dagger_r2": {
 		"name": "Кинжал следопыта", "type": "weapon", "icon": "dagger", "weapon": "dagger", "rank": 2,
-		"model": "weapon_dagger_r2", "atk": 60, "matk": 57, "range": 2.2, "crit": 0.06, "buy": 0, "sell": 28,
+		"model": "weapon_dagger_r2", "atk": 60, "matk": 57, "range": 2.2, "crit": 0.06, "buy": 0, "sell": 7550,
 		"color": Color(0.76, 0.74, 0.95), "desc": "Узкий клинок с рунной канавкой: частые удары, много критов, помогает и магии.",
 	},
 	"weapon_mace_1h_r2": {
 		"name": "Булава стражника", "type": "weapon", "icon": "mace", "weapon": "mace_1h", "rank": 2,
-		"model": "weapon_mace_1h_r2", "atk": 86, "matk": 61, "range": 2.5, "crit": 0.0, "buy": 0, "sell": 32,
+		"model": "weapon_mace_1h_r2", "atk": 86, "matk": 61, "range": 2.5, "crit": 0.0, "buy": 0, "sell": 7550,
 		"color": Color(0.74, 0.72, 0.68), "desc": "Шипастая булава в одну руку. Хороша со щитом.",
 	},
 	"weapon_mace_2h_r2": {
 		"name": "Тяжёлая булава ветерана", "type": "weapon", "icon": "mace", "weapon": "mace_2h", "rank": 2,
-		"model": "weapon_mace_2h_r2", "atk": 142, "matk": 84, "range": 2.8, "crit": 0.0, "buy": 0, "sell": 48,
+		"model": "weapon_mace_2h_r2", "atk": 142, "matk": 84, "range": 2.8, "crit": 0.0, "buy": 0, "sell": 11375,
 		"color": Color(0.7, 0.68, 0.64), "desc": "Окованная двуручная булава: медленно, зато зверь чувствует каждый удар.",
 	},
 	"weapon_axe_1h_r2": {
 		"name": "Топор следопыта", "type": "weapon", "icon": "axe", "weapon": "axe_1h", "rank": 2,
-		"model": "weapon_axe_1h_r2", "atk": 88, "matk": 38, "range": 2.5, "crit": 0.04, "buy": 0, "sell": 32,
+		"model": "weapon_axe_1h_r2", "atk": 88, "matk": 38, "range": 2.5, "crit": 0.04, "buy": 0, "sell": 7550,
 		"color": Color(0.82, 0.74, 0.62), "desc": "Острый топор в одну руку. Во второй руке может быть ещё один.",
 	},
 	"weapon_axe_2h_r2": {
 		"name": "Секира ветерана", "type": "weapon", "icon": "axe", "weapon": "axe_2h", "rank": 2,
-		"model": "weapon_axe_2h_r2", "atk": 146, "matk": 50, "range": 2.9, "crit": 0.05, "buy": 0, "sell": 48,
+		"model": "weapon_axe_2h_r2", "atk": 146, "matk": 50, "range": 2.9, "crit": 0.05, "buy": 0, "sell": 11375,
 		"color": Color(0.8, 0.7, 0.56), "desc": "Широкая секира на длинном древке: самый тяжёлый удар среди оружия 2-го ранга.",
 	},
 	"weapon_staff_1h_r2": {
 		"name": "Жезл чародея", "type": "weapon", "icon": "staff", "weapon": "staff_1h", "rank": 2,
-		"model": "weapon_staff_1h_r2", "matk": 96, "range": 9.0, "crit": 0.0, "buy": 0, "sell": 32,
+		"model": "weapon_staff_1h_r2", "matk": 96, "range": 9.0, "crit": 0.0, "buy": 0, "sell": 7550,
 		"color": Color(0.84, 0.7, 0.48), "desc": "Жезл с кристаллом в навершии: сгусток магии издалека, заклинания быстрее. Вторая рука свободна.",
 	},
 	"weapon_staff_2h_r2": {
 		"name": "Посох чародея", "type": "weapon", "icon": "staff", "weapon": "staff_2h", "rank": 2,
-		"model": "weapon_staff_2h_r2", "matk": 138, "range": 10.0, "crit": 0.0, "buy": 0, "sell": 48,
+		"model": "weapon_staff_2h_r2", "matk": 138, "range": 10.0, "crit": 0.0, "buy": 0, "sell": 11375,
 		"color": Color(0.82, 0.66, 0.42), "desc": "Посох в две руки из старого дерева: магия сильнее, сгусток летит дальше.",
 	},
 	"weapon_spear_r2": {
 		"name": "Копьё ветерана", "type": "weapon", "icon": "spear", "weapon": "spear", "rank": 2,
-		"model": "weapon_spear_r2", "atk": 115, "range": 3.3, "crit": 0.04, "buy": 0, "sell": 48,
+		"model": "weapon_spear_r2", "atk": 115, "range": 3.3, "crit": 0.04, "buy": 0, "sell": 11375,
 		"color": Color(0.84, 0.82, 0.74), "desc": "Длинное копьё с широким наконечником: достаёт зверя дальше меча.",
 	},
 	"weapon_shield_r2": {
 		"name": "Окованный щит", "type": "weapon", "icon": "shield", "weapon": "shield", "rank": 2,
-		"model": "weapon_shield_r2", "def": 31, "block": 0.15, "range": 0.0, "crit": 0.0, "buy": 0, "sell": 28,
+		"model": "weapon_shield_r2", "def": 31, "block": 0.15, "range": 0.0, "crit": 0.0, "buy": 0, "sell": 3725,
 		"color": Color(0.66, 0.5, 0.32), "desc": "Щит с железной оковкой во вторую руку (к одноручному оружию): защита выше, часть ударов приходится в щит.",
 	},
 	"weapon_bow_r2": {
 		"name": "Охотничий лук", "type": "weapon", "icon": "bow", "weapon": "bow", "rank": 2,
-		"model": "weapon_bow_r2", "atk": 168, "range": 13.0, "crit": 0.04, "buy": 0, "sell": 40,
+		"model": "weapon_bow_r2", "atk": 168, "range": 13.0, "crit": 0.04, "buy": 0, "sell": 11375,
 		"color": Color(0.66, 0.48, 0.28), "desc": "Тугой лук в две руки: стрелы летят дальше всех, но натягивать тетиву долго.",
 	},
 	"weapon_crossbow_r2": {
 		"name": "Арбалет стражника", "type": "weapon", "icon": "crossbow", "weapon": "crossbow", "rank": 2,
-		"model": "weapon_crossbow_r2", "atk": 84, "range": 11.5, "crit": 0.01, "buy": 0, "sell": 40,
+		"model": "weapon_crossbow_r2", "atk": 84, "range": 11.5, "crit": 0.01, "buy": 0, "sell": 11375,
 		"color": Color(0.74, 0.54, 0.34), "desc": "Арбалет с воротом: болты пробивают шкуру издалека, но заряжать его дольше.",
 	},
 	# ---------- Улучшенное оружие у торговца ----------
 	"dagger_steel": {
 		"name": "Стальной кинжал", "type": "weapon", "icon": "dagger", "rarity": "improved", "weapon": "dagger", "rank": 1,
-		"atk": 30, "matk": 28, "range": 2.2, "crit": 0.06, "buy": 60, "sell": 20,
+		"atk": 30, "matk": 28, "range": 2.2, "crit": 0.06, "buy": 1000, "sell": 250,
 		"color": Color(0.7, 0.8, 1.0), "desc": "Закалённый кинжал странницы. Два таких — в обе руки.",
 	},
 	"sword_steel": {
 		"name": "Стальной меч", "type": "weapon", "icon": "sword", "rarity": "improved", "weapon": "sword_1h", "rank": 1,
-		"atk": 36, "range": 2.6, "crit": 0.01, "buy": 60, "sell": 20,
+		"atk": 36, "range": 2.6, "crit": 0.01, "buy": 1000, "sell": 250,
 		"color": Color(0.75, 0.9, 1.0), "desc": "Закалённый одноручный меч. Два таких — в обе руки.",
 	},
 	"crossbow_heavy": {
 		"name": "Тяжёлый арбалет", "type": "weapon", "icon": "crossbow", "rarity": "improved", "weapon": "crossbow", "rank": 1,
-		"atk": 42, "range": 12.0, "crit": 0.02, "buy": 140, "sell": 45,
+		"atk": 42, "range": 12.0, "crit": 0.02, "buy": 1500, "sell": 375,
 		"color": Color(0.85, 0.6, 0.35), "desc": "Мощные болты, бьёт чуть дальше.",
 	},
-	"boar_tusk": {"name": "Клык кабана", "type": "trophy", "icon": "fang", "buy": 0, "sell": 4, "color": Color(0.95, 0.9, 0.8), "desc": "Крепкий изогнутый клык кабана. Трофей для торговца."},
-	"wolf_pelt": {"name": "Волчья шкура", "type": "trophy", "icon": "pelt", "buy": 0, "sell": 7, "color": Color(0.6, 0.6, 0.65), "desc": "Серая шкура с густым мехом. Трофей для торговца."},
-	"panther_fang": {"name": "Клык пантеры", "type": "trophy", "icon": "fang", "buy": 0, "sell": 12, "color": Color(0.9, 0.86, 0.95), "desc": "Острый клык пантеры. Трофей для торговца."},
-	"pheasant_feather": {"name": "Перо фазана", "type": "trophy", "icon": "feather", "buy": 0, "sell": 15, "color": Color(0.85, 0.5, 0.2), "desc": "Яркое рыжее перо. Трофей для торговца."},
-	"shell_plate": {"name": "Пластина панциря", "type": "trophy", "icon": "plate", "buy": 0, "sell": 18, "color": Color(0.45, 0.6, 0.35), "desc": "Прочная пластина черепашьего панциря. Трофей для торговца."},
-	"golem_shard": {"name": "Осколок стража", "type": "trophy", "icon": "shard", "rarity": "rare", "buy": 0, "sell": 40, "color": Color(0.55, 0.55, 0.5), "desc": "Обломок каменного стража, в трещинах мерцают руны. Ценный трофей."},
-	"flyfish_scale": {"name": "Летучая чешуя", "type": "trophy", "icon": "scale", "buy": 0, "sell": 10, "color": Color(0.35, 0.55, 0.85), "desc": "Лёгкая синяя чешуйка летучего зубана, переливается на свету. Трофей для торговца."},
-	"sail_fin": {"name": "Плавник-парус", "type": "trophy", "icon": "fin", "buy": 0, "sell": 16, "color": Color(0.95, 0.6, 0.3), "desc": "Тонкий плавник рыбы-парусника с прочными лучами. Трофей для торговца."},
-	"drake_crest": {"name": "Гребень змеекрыла", "type": "trophy", "icon": "fin", "buy": 0, "sell": 30, "color": Color(0.3, 0.45, 0.8), "desc": "Колючий гребень змеекрыла, ещё хранит запах ветра. Ценный трофей."},
+	"boar_tusk": {"name": "Клык кабана", "type": "trophy", "icon": "fang", "buy": 0, "sell": 40, "color": Color(0.95, 0.9, 0.8), "desc": "Крепкий изогнутый клык кабана. Трофей для торговца."},
+	"wolf_pelt": {"name": "Волчья шкура", "type": "trophy", "icon": "pelt", "buy": 0, "sell": 70, "color": Color(0.6, 0.6, 0.65), "desc": "Серая шкура с густым мехом. Трофей для торговца."},
+	"panther_fang": {"name": "Клык пантеры", "type": "trophy", "icon": "fang", "buy": 0, "sell": 120, "color": Color(0.9, 0.86, 0.95), "desc": "Острый клык пантеры. Трофей для торговца."},
+	"pheasant_feather": {"name": "Перо фазана", "type": "trophy", "icon": "feather", "buy": 0, "sell": 150, "color": Color(0.85, 0.5, 0.2), "desc": "Яркое рыжее перо. Трофей для торговца."},
+	"shell_plate": {"name": "Пластина панциря", "type": "trophy", "icon": "plate", "buy": 0, "sell": 180, "color": Color(0.45, 0.6, 0.35), "desc": "Прочная пластина черепашьего панциря. Трофей для торговца."},
+	"golem_shard": {"name": "Осколок стража", "type": "trophy", "icon": "shard", "rarity": "rare", "buy": 0, "sell": 400, "color": Color(0.55, 0.55, 0.5), "desc": "Обломок каменного стража, в трещинах мерцают руны. Ценный трофей."},
+	"flyfish_scale": {"name": "Летучая чешуя", "type": "trophy", "icon": "scale", "buy": 0, "sell": 100, "color": Color(0.35, 0.55, 0.85), "desc": "Лёгкая синяя чешуйка летучего зубана, переливается на свету. Трофей для торговца."},
+	"sail_fin": {"name": "Плавник-парус", "type": "trophy", "icon": "fin", "buy": 0, "sell": 160, "color": Color(0.95, 0.6, 0.3), "desc": "Тонкий плавник рыбы-парусника с прочными лучами. Трофей для торговца."},
+	"drake_crest": {"name": "Гребень змеекрыла", "type": "trophy", "icon": "fin", "buy": 0, "sell": 300, "color": Color(0.3, 0.45, 0.8), "desc": "Колючий гребень змеекрыла, ещё хранит запах ветра. Ценный трофей."},
 	# Трофеи кентавра
-	"spear_tip": {"name": "Наконечник копья", "type": "trophy", "icon": "spike", "buy": 0, "sell": 26, "color": Color(0.78, 0.8, 0.86), "desc": "Стальной наконечник копья кентавра, по лезвию — степной узор. Ценный трофей."},
-	"horse_hair": {"name": "Конский волос", "type": "trophy", "icon": "pelt", "buy": 0, "sell": 14, "color": Color(0.42, 0.26, 0.15), "desc": "Жёсткая прядь из хвоста кентавра, годится на тетиву. Трофей для торговца."},
+	"spear_tip": {"name": "Наконечник копья", "type": "trophy", "icon": "spike", "buy": 0, "sell": 260, "color": Color(0.78, 0.8, 0.86), "desc": "Стальной наконечник копья кентавра, по лезвию — степной узор. Ценный трофей."},
+	"horse_hair": {"name": "Конский волос", "type": "trophy", "icon": "pelt", "buy": 0, "sell": 140, "color": Color(0.42, 0.26, 0.15), "desc": "Жёсткая прядь из хвоста кентавра, годится на тетиву. Трофей для торговца."},
 	# Трофеи анатем (ящеры с костяными клинками)
-	"lizard_scale": {"name": "Чешуя ящера", "type": "trophy", "icon": "scale", "buy": 0, "sell": 12, "color": Color(0.3, 0.45, 0.25), "desc": "Жёсткая тёмно-зелёная чешуя анатемы. Трофей для торговца."},
-	"bone_blade": {"name": "Костяной клинок", "type": "trophy", "icon": "fang", "buy": 0, "sell": 22, "color": Color(0.92, 0.88, 0.78), "desc": "Изогнутый костяной серп с предплечья анатемы-рубаки, острый как сталь. Ценный трофей."},
-	"chief_spike": {"name": "Шип вожака", "type": "trophy", "icon": "spike", "rarity": "rare", "buy": 0, "sell": 40, "color": Color(0.85, 0.8, 0.68), "desc": "Костяной шип с плеча вожака анатем, весь в зазубринах. Ценный трофей."},
+	"lizard_scale": {"name": "Чешуя ящера", "type": "trophy", "icon": "scale", "buy": 0, "sell": 120, "color": Color(0.3, 0.45, 0.25), "desc": "Жёсткая тёмно-зелёная чешуя анатемы. Трофей для торговца."},
+	"bone_blade": {"name": "Костяной клинок", "type": "trophy", "icon": "fang", "buy": 0, "sell": 220, "color": Color(0.92, 0.88, 0.78), "desc": "Изогнутый костяной серп с предплечья анатемы-рубаки, острый как сталь. Ценный трофей."},
+	"chief_spike": {"name": "Шип вожака", "type": "trophy", "icon": "spike", "rarity": "rare", "buy": 0, "sell": 400, "color": Color(0.85, 0.8, 0.68), "desc": "Костяной шип с плеча вожака анатем, весь в зазубринах. Ценный трофей."},
 	# Трофеи боссов (MobData boss_*): выпадают всегда
-	"golden_plume": {"name": "Пламенное перо", "type": "trophy", "icon": "feather", "rarity": "rare", "buy": 0, "sell": 70, "color": Color(1.0, 0.72, 0.25), "desc": "Перо Пламенного Златохвоста, тёплое, будто из костра. Трофей босса."},
-	"storm_fang": {"name": "Клык бури", "type": "trophy", "icon": "fang", "rarity": "rare", "buy": 0, "sell": 85, "color": Color(0.78, 0.84, 1.0), "desc": "Клык Седого Вожака бури, по нему пробегают искры. Трофей босса."},
-	"bastion_shard": {"name": "Осколок бастиона", "type": "trophy", "icon": "plate", "rarity": "rare", "buy": 0, "sell": 100, "color": Color(0.35, 0.68, 0.62), "desc": "Обломок панциря Тысячелетнего Бастиона, тяжёлый, как камень. Трофей босса."},
-	"current_pearl": {"name": "Жемчужина течений", "type": "trophy", "icon": "shard", "rarity": "rare", "buy": 0, "sell": 105, "color": Color(0.55, 0.78, 1.0), "desc": "Жемчужина из гребня Владыки течений, внутри словно плещется вода. Трофей босса."},
-	"midnight_claw": {"name": "Коготь полуночи", "type": "trophy", "icon": "fang", "rarity": "rare", "buy": 0, "sell": 115, "color": Color(0.62, 0.42, 0.95), "desc": "Чёрный коготь Владычицы полуночи с фиолетовым отливом. Трофей босса."},
-	"thunder_spear": {"name": "Громовой наконечник", "type": "trophy", "icon": "spike", "rarity": "rare", "buy": 0, "sell": 130, "color": Color(1.0, 0.85, 0.45), "desc": "Наконечник копья Громового хана, звенит от прикосновения. Трофей босса."},
-	"bone_crown": {"name": "Костяной венец", "type": "trophy", "icon": "spike", "rarity": "unique", "buy": 0, "sell": 160, "color": Color(0.95, 0.9, 0.72), "desc": "Венец из костяных шипов Костяного владыки. Трофей босса."},
+	"golden_plume": {"name": "Пламенное перо", "type": "trophy", "icon": "feather", "rarity": "rare", "buy": 0, "sell": 700, "color": Color(1.0, 0.72, 0.25), "desc": "Перо Пламенного Златохвоста, тёплое, будто из костра. Трофей босса."},
+	"storm_fang": {"name": "Клык бури", "type": "trophy", "icon": "fang", "rarity": "rare", "buy": 0, "sell": 850, "color": Color(0.78, 0.84, 1.0), "desc": "Клык Седого Вожака бури, по нему пробегают искры. Трофей босса."},
+	"bastion_shard": {"name": "Осколок бастиона", "type": "trophy", "icon": "plate", "rarity": "rare", "buy": 0, "sell": 1000, "color": Color(0.35, 0.68, 0.62), "desc": "Обломок панциря Тысячелетнего Бастиона, тяжёлый, как камень. Трофей босса."},
+	"current_pearl": {"name": "Жемчужина течений", "type": "trophy", "icon": "shard", "rarity": "rare", "buy": 0, "sell": 1050, "color": Color(0.55, 0.78, 1.0), "desc": "Жемчужина из гребня Владыки течений, внутри словно плещется вода. Трофей босса."},
+	"midnight_claw": {"name": "Коготь полуночи", "type": "trophy", "icon": "fang", "rarity": "rare", "buy": 0, "sell": 1150, "color": Color(0.62, 0.42, 0.95), "desc": "Чёрный коготь Владычицы полуночи с фиолетовым отливом. Трофей босса."},
+	"thunder_spear": {"name": "Громовой наконечник", "type": "trophy", "icon": "spike", "rarity": "rare", "buy": 0, "sell": 1300, "color": Color(1.0, 0.85, 0.45), "desc": "Наконечник копья Громового хана, звенит от прикосновения. Трофей босса."},
+	"bone_crown": {"name": "Костяной венец", "type": "trophy", "icon": "spike", "rarity": "unique", "buy": 0, "sell": 1600, "color": Color(0.95, 0.9, 0.72), "desc": "Венец из костяных шипов Костяного владыки. Трофей босса."},
 }
+
+## Предметы прокачки (type "upgrade") и существ — база оригинала (ItemResource, MarketResource; tools/
+## rappelz_db_reference.md, «Прокачка»). Цены базы: Unit Card 500, Chalk of Restoration 1000, Empty Bottle for Potion
+## 5000; донат-предметы (Blessed Stabilizing Powder 1998, Altered Ancient Element 900 у 2-го ранга) — у Торговца
+## наград за золото (решение Максима: донат-валюты пока нет). Расширителя пояса в этой версии базы нет (только
+## подсказка «+1 ячейка; неудача — пояс снова с 1 ячейкой») — цена как у порошка.
+const UPGRADE_ITEMS := {
+	"stab_powder_r1": {"name": "Порошок стабильности I", "type": "upgrade", "icon": "shard", "rank": 1, "buy": 1998, "sell": 0,
+		"upgrade": "powder", "color": Color(0.9, 0.9, 0.6),
+		"desc": "Защищает вещь 1-го ранга при чаровании: если не удалось — вещь не ломается (и украшение не теряет заточку). Тратится при любом исходе."},
+	"stab_powder_r2": {"name": "Порошок стабильности II", "type": "upgrade", "icon": "shard", "rank": 2, "buy": 1998, "sell": 0,
+		"upgrade": "powder", "color": Color(0.95, 0.85, 0.45),
+		"desc": "Защищает вещь 2-го ранга и младше при чаровании: если не удалось — вещь не ломается (и украшение не теряет заточку). Тратится при любом исходе."},
+	"element_attack_r1": {"name": "Древний элемент атаки I", "type": "upgrade", "icon": "shard", "rank": 1, "buy": 400, "sell": 0,
+		"upgrade": "element", "target": "attack", "color": Color(1.0, 0.45, 0.3),
+		"desc": "Вместе с кубом атаки 1-го ранга шанс чарования оружия выше на 10 %. Тратится при любом исходе."},
+	"element_attack_r2": {"name": "Древний элемент атаки II", "type": "upgrade", "icon": "shard", "rank": 2, "buy": 900, "sell": 0,
+		"upgrade": "element", "target": "attack", "color": Color(1.0, 0.35, 0.25),
+		"desc": "Вместе с кубом атаки 2-го ранга шанс чарования оружия выше на 10 %. Тратится при любом исходе."},
+	"element_defense_r1": {"name": "Древний элемент защиты I", "type": "upgrade", "icon": "shard", "rank": 1, "buy": 400, "sell": 0,
+		"upgrade": "element", "target": "defense", "color": Color(0.35, 0.7, 1.0),
+		"desc": "Вместе с кубом защиты 1-го ранга шанс чарования брони и щита выше на 10 %. Тратится при любом исходе."},
+	"element_defense_r2": {"name": "Древний элемент защиты II", "type": "upgrade", "icon": "shard", "rank": 2, "buy": 900, "sell": 0,
+		"upgrade": "element", "target": "defense", "color": Color(0.3, 0.55, 1.0),
+		"desc": "Вместе с кубом защиты 2-го ранга шанс чарования брони и щита выше на 10 %. Тратится при любом исходе."},
+	"belt_expander": {"name": "Расширитель пояса", "type": "upgrade", "icon": "shard", "buy": 1998, "sell": 0,
+		"upgrade": "belt", "color": Color(0.75, 0.55, 0.35),
+		"desc": "+1 ячейка карт существ на поясе (до 6). Чем больше ячеек, тем ниже шанс; неудача — снова одна ячейка. Использовать — в окне «Питомцы», блок «Пояс»."},
+	"unit_card": {"name": "Карта снаряжения", "type": "upgrade", "icon": "card", "buy": 500, "sell": 125,
+		"upgrade": "unit", "color": Color(0.8, 0.75, 0.6),
+		"desc": "Запечатывает оружие или доспех, чтобы его надел питомец (окно существа, ячейки «Оружие» и «Броня»). Тратится при надевании."},
+	"restore_chalk": {"name": "Мел восстановления", "type": "upgrade", "icon": "shard", "buy": 1000, "sell": 250,
+		"upgrade": "chalk", "color": Color(0.92, 0.92, 0.88),
+		"desc": "Достаёт вещь из карты снаряжения: нужен, чтобы снять оружие или доспех с питомца. Тратится."},
+	"empty_bottle": {"name": "Пустой флакон", "type": "upgrade", "icon": "flask", "buy": 5000, "sell": 1250,
+		"upgrade": "bottle", "color": Color(0.8, 0.88, 0.95),
+		"desc": "Нужен питомцу 3-й формы, чтобы сварить зелье своего вида (умение «Создание: зелье»)."},
+	# Материалы существ (Creation базы): у пантеры, черепахи, фазана и кентавра — их трофеи; у волка — коготь
+	"wolf_claw": {"name": "Волчий коготь", "type": "trophy", "icon": "fang", "buy": 0, "sell": 25, "color": Color(0.75, 0.75, 0.8),
+		"desc": "Крепкий коготь волка. Нужен для умения волка «Зализать раны»; торговец купит как трофей."},
+}
+## Зелья существ (Creation: <вид> Potion базы, StateResource 4031–4048, уровень состояния 10, 1 час): варит питомец
+## 3-й формы своего вида из пустого флакона. bonus — ключи Player.timed_bonus (atk_flat, def_flat, acc_flat, avoid_flat).
+const CREATURE_POTIONS := {
+	"panther": {"name": "Зелье пантеры", "bonus": {"atk_flat": 90.0}, "what": "физ. атака +90"},
+	"turtle": {"name": "Зелье черепахи", "bonus": {"def_flat": 90.0}, "what": "физ. защита +90"},
+	"pheasant": {"name": "Зелье фазана", "bonus": {"acc_flat": 22.0}, "what": "точность +22"},
+	"wolf": {"name": "Зелье волка", "bonus": {"atk_flat": 105.0, "avoid_flat": 25.0}, "what": "физ. атака +105, избегание +25"},
+	"centaur": {"name": "Зелье кентавра", "bonus": {"atk_flat": 230.0}, "what": "физ. атака +230"},
+}
+const CREATURE_POTION_TIME := 3600.0
 
 ## Все предметы: BASE_ITEMS и зелья всех видов и рангов (_static_init). Читать через get_item / ITEMS.
 static var ITEMS: Dictionary = {}
@@ -279,6 +330,13 @@ static func _static_init() -> void:
 	for k in CUBE_KINDS:
 		for r in range(1, CUBE_RANKS + 1):
 			ITEMS[cube_id(String(k), r)] = _make_cube(String(k), r)
+	for k in UPGRADE_ITEMS:
+		ITEMS[k] = (UPGRADE_ITEMS[k] as Dictionary).duplicate(true)
+	for sp in CREATURE_POTIONS:
+		var cp: Dictionary = CREATURE_POTIONS[sp]
+		ITEMS["potion_" + String(sp)] = {"name": String(cp["name"]), "type": "consumable", "icon": "flask",
+			"creature_potion": String(sp), "buy": 0, "sell": 25, "color": MobData.TYPES.get(String(sp), {}).get("color", Color(0.8, 0.6, 0.9)),
+			"desc": "Сварил питомец. На 1 час: %s." % String(cp["what"])}
 	_derived.clear()
 
 
@@ -295,18 +353,27 @@ const POTION_RANKS := 15
 const POTION_RANK_LEVELS := 10
 
 ## Зелья (type "consumable", поле potion — вид, rank — ранг 1–15, id potion_<вид>_r<ранг>): name — название вида,
-## color — цвет колбы, buy — цена 1-го ранга (ранг N — × (1 + 1.5·(N − 1)); продажа — треть), order — порядок в сумке.
+## color — цвет колбы, order — порядок в сумке. Цена — база оригинала (potion_price): здоровье и мана — красные и синие
+## зелья по уровням 1, 20, 40 … 140 (POTION_PRICE_ANCHORS, между опорами — линейно по нижнему уровню ранга), ускорения —
+## Quick / Spell / Wind Potion 1000 (+100 за ранг сверх 1-го); продажа — четверть (как у всех предметов, SELL_SHARE).
 ## Здоровье и мана — мгновенно: POTION_PCT запаса + число по рангу (potion_flat ≈ четверть HP / MP героя на нижнем
 ## уровне ранга: на нижнем уровне ранга зелье даёт ≈ 50 % запаса, на верхнем ≈ 35 %), перезарядка Economy.POTION_CD.
 ## Скорость атаки, каста и бега — усиление на POTION_BUFF_TIME с: +10 % на 1-м ранге, +1 % за ранг (15-й — +24 %);
 ## значок у полоски HP ("buff:potion_<вид>"), повтор того же вида — заменяет и продлевает.
 const POTION_KINDS := {
-	"hp": {"name": "Зелье здоровья", "color": Color(0.9, 0.2, 0.25), "buy": 10, "order": 0},
-	"mp": {"name": "Зелье маны", "color": Color(0.25, 0.48, 0.98), "buy": 12, "order": 1},
-	"aspd": {"name": "Зелье скорости атаки", "color": Color(0.98, 0.55, 0.15), "buy": 20, "order": 2},
-	"cast": {"name": "Зелье скорости каста", "color": Color(0.72, 0.38, 0.98), "buy": 20, "order": 3},
-	"speed": {"name": "Зелье скорости бега", "color": Color(0.3, 0.86, 0.45), "buy": 15, "order": 4},
+	"hp": {"name": "Зелье здоровья", "color": Color(0.9, 0.2, 0.25), "buy": 200, "order": 0},
+	"mp": {"name": "Зелье маны", "color": Color(0.25, 0.48, 0.98), "buy": 300, "order": 1},
+	"aspd": {"name": "Зелье скорости атаки", "color": Color(0.98, 0.55, 0.15), "buy": 1000, "order": 2},
+	"cast": {"name": "Зелье скорости каста", "color": Color(0.72, 0.38, 0.98), "buy": 1000, "order": 3},
+	"speed": {"name": "Зелье скорости бега", "color": Color(0.3, 0.86, 0.45), "buy": 1000, "order": 4},
 }
+## Цены красных (здоровье) и синих (мана) зелий базы по уровню использования: [уровень, цена].
+const POTION_PRICE_ANCHORS := {
+	"hp": [[1, 200], [20, 400], [40, 800], [60, 1400], [80, 2200], [100, 3200], [120, 4400], [140, 5800]],
+	"mp": [[1, 300], [20, 600], [40, 1200], [60, 2100], [80, 3300], [100, 4800], [120, 6600], [140, 8700]],
+}
+## Продажа торговцу — доля цены предмета в базе (GameRule::GetItemSellPrice сервера: × 0.25).
+const SELL_SHARE := 0.25
 const POTION_PCT := 0.25
 const POTION_BUFF_TIME := 60.0
 ## Ключ бонуса героя (Player.timed_bonus → recalc_stats) у зелий-ускорений.
@@ -414,9 +481,19 @@ static func potion_buff(rank_n: int) -> float:
 	return 0.10 + 0.01 * float(clampi(rank_n, 1, POTION_RANKS) - 1)
 
 
-## Цена покупки зелья вида kind ранга rank_n.
+## Цена покупки зелья вида kind ранга rank_n (база: POTION_PRICE_ANCHORS; ускорения — 1000 + 100 за ранг).
 static func potion_price(kind: String, rank_n: int) -> int:
-	return roundi(float(POTION_KINDS[kind]["buy"]) * (1.0 + 1.5 * float(rank_n - 1)))
+	if not POTION_PRICE_ANCHORS.has(kind):
+		return int(POTION_KINDS[kind]["buy"]) + 100 * (rank_n - 1)
+	var l := float(rank_level_range(rank_n, true)[0])
+	var a: Array = POTION_PRICE_ANCHORS[kind]
+	for i in range(a.size() - 1):
+		var l0 := float(a[i][0])
+		var l1 := float(a[i + 1][0])
+		if l <= l1:
+			var t := clampf((l - l0) / (l1 - l0), 0.0, 1.0)
+			return roundi(lerpf(float(a[i][1]), float(a[i + 1][1]), t) / 10.0) * 10
+	return int(a[a.size() - 1][1])
 
 
 static func _make_potion(kind: String, r: int) -> Dictionary:
@@ -438,7 +515,7 @@ static func _make_potion(kind: String, r: int) -> Dictionary:
 			desc = "Скорость бега +%d%% на %d с." % [buff, int(POTION_BUFF_TIME)]
 	return {
 		"name": "%s %s" % [String(pk["name"]), roman(r)], "type": "consumable", "icon": "flask", "potion": kind,
-		"rank": r, "buy": buy, "sell": maxi(1, buy / 3), "color": pk["color"], "desc": desc,
+		"rank": r, "buy": buy, "sell": maxi(1, roundi(float(buy) * SELL_SHARE)), "color": pk["color"], "desc": desc,
 	}
 
 
@@ -538,6 +615,10 @@ static func item_name(id: String) -> String:
 static func migrate_id(id: String) -> String:
 	if PAIRED.has(id):
 		return String(PAIRED[id])
+	# Прежние украшения (свои бонусы до 0.31) → украшения базы того же ранга
+	var i := id.rfind("_r")
+	if i > 0 and JEWELRY_RENAMED.has(id.substr(0, i)) and id.substr(i + 2).is_valid_int():
+		return "%s_r%s" % [String(JEWELRY_RENAMED[id.substr(0, i)]), id.substr(i + 2)]
 	return String(RENAMED.get(id, id))
 
 
@@ -759,82 +840,111 @@ const BODY_ARMOR := {
 	"warrior": {"name": "доспех воина", "jobs": ["assassin", "warrior", "swordsman"], "who": "Наёмник, Воин, Мечник"},
 	"mage": {"name": "доспех мага", "jobs": ["neophyte", "wizard", "shaman"], "who": "Неофит, Волшебник, Шаман"},
 	"summoner": {"name": "доспех призывателя", "jobs": ["adept", "beastmaster", "conjurer"], "who": "Адепт, Зверолов, Колдун"},
+	# Охотничий доспех базы (Hunter Armor: лучники 2-й профессии): у наших 1-х профессий его нет — носят Бродяга и
+	# питомцы (фазан и волк получают с ним «Живучесть: охотничий доспех»).
+	"hunter": {"name": "доспех охотника", "jobs": [], "who": "Бродяга и питомцы"},
 }
-## Броня по рангам (индекс — ранг − 1): def — физ. защита, mdef — маг. защита, buy / sell — цены (2-й ранг на острове
-## не продаётся — buy 0). Числа — база оригинала (ItemResource, tools/rappelz_db_reference.md, «Оружие»): доспех 2-го
-## ранга воина 77/31, мага 31/77, призывателя 46/62; 1-й ранг — та же сумма, что у кожанки базы (≈ 22) в тех же долях;
-## шлем 9/5 и 15/9, перчатки и сапоги 4/4 и 9/9. Урон — формула сервера (Combat): броня вычитается наполовину.
+## Броня по рангам (индекс — ранг − 1): def — физ. защита, mdef — маг. защита, speed — скорость бега (доля),
+## buy / sell — цены. Числа и цены — база оригинала (ItemResource, MarketResource; tools/rappelz_db_reference.md,
+## «Броня»): доспех 2-го ранга воина 77/31, охотника 62/46 и бег +10 (из 120 — +8 %), мага 31/77, призывателя 46/62,
+## шлем 3/3 и 8/8, перчатки и сапоги 4/4 и 9/9, сапоги 2-го ранга — бег +5 (+4 %); доспех 1-го ранга — та же сумма, что
+## у кожанки базы (≈ 22), в долях своего варианта. Цены: доспех 1-го ранга 350, шлем 250, перчатки и сапоги 240;
+## 2-го — воин и охотник 21 100, маг и призыватель 19 400, шлем 14 900, перчатки и сапоги 14 400 (на острове
+## 2-й ранг не продаётся — buy 0); продажа — четверть цены базы. Урон — формула сервера (Combat): броня вычитается наполовину.
 const ARMOR_DEFS := {
 	"armor_body_warrior": {"slot": "body", "armor": "warrior", "icon": "plate", "def": [16, 77], "mdef": [6, 31],
-		"buy": [60, 0], "sell": [15, 45], "names": ["Стёганый доспех бойца", "Кольчуга ветерана"],
+		"buy": [350, 0], "sell": [87, 5275], "names": ["Стёганый доспех бойца", "Кольчуга ветерана"],
 		"color": Color(0.72, 0.62, 0.5), "desc": "Доспех воина: крепко держит удары, но почти не защищает от магии."},
+	"armor_body_hunter": {"slot": "body", "armor": "hunter", "icon": "plate", "def": [12, 62], "mdef": [10, 46],
+		"speed": [0.0, 0.08], "buy": [350, 0], "sell": [87, 5275], "names": ["Куртка следопыта", "Охотничий доспех"],
+		"color": Color(0.5, 0.62, 0.38), "desc": "Доспех охотника: лёгкая кожа — защита от ударов и магии, на 2-м ранге ещё и бег быстрее."},
 	"armor_body_summoner": {"slot": "body", "armor": "summoner", "icon": "plate", "def": [9, 46], "mdef": [13, 62],
-		"buy": [60, 0], "sell": [15, 45], "names": ["Куртка укротителя", "Доспех заклинателя зверей"],
+		"buy": [350, 0], "sell": [87, 4850], "names": ["Куртка укротителя", "Доспех заклинателя зверей"],
 		"color": Color(0.55, 0.68, 0.48), "desc": "Доспех призывателя: поровну защищает и от ударов, и от магии."},
 	"armor_body_mage": {"slot": "body", "armor": "mage", "icon": "plate", "def": [6, 31], "mdef": [16, 77],
-		"buy": [60, 0], "sell": [15, 45], "names": ["Мантия ученика", "Мантия чародея"],
+		"buy": [350, 0], "sell": [87, 4850], "names": ["Мантия ученика", "Мантия чародея"],
 		"color": Color(0.5, 0.55, 0.85), "desc": "Доспех мага: зачарованная ткань хорошо держит магию, но не удары."},
-	"armor_helmet": {"slot": "head", "icon": "plate", "def": [9, 15], "mdef": [5, 9], "buy": [30, 0], "sell": [8, 25],
+	"armor_helmet": {"slot": "head", "icon": "plate", "def": [3, 8], "mdef": [3, 8], "buy": [250, 0], "sell": [62, 3725],
 		"names": ["Кожаный шлем", "Железный шлем"], "color": Color(0.7, 0.66, 0.6),
-		"desc": "Шлем: немного физ. защиты. Подходит всем."},
-	"armor_gloves": {"slot": "hands", "icon": "plate", "def": [4, 9], "mdef": [4, 9], "buy": [30, 0], "sell": [8, 25],
+		"desc": "Шлем: немного защиты от ударов и магии. Подходит всем."},
+	"armor_gloves": {"slot": "hands", "icon": "plate", "def": [4, 9], "mdef": [4, 9], "buy": [240, 0], "sell": [60, 3600],
 		"names": ["Кожаные перчатки", "Латные перчатки"], "color": Color(0.68, 0.6, 0.5),
-		"desc": "Перчатки: немного физ. защиты. Подходят всем."},
-	"armor_boots": {"slot": "feet", "icon": "plate", "def": [4, 9], "mdef": [4, 9], "buy": [30, 0], "sell": [8, 25],
-		"names": ["Кожаные сапоги", "Окованные сапоги"], "color": Color(0.62, 0.52, 0.42),
-		"desc": "Ботинки: немного физ. защиты. Подходят всем."},
+		"desc": "Перчатки: немного защиты от ударов и магии. Подходят всем."},
+	"armor_boots": {"slot": "feet", "icon": "plate", "def": [4, 9], "mdef": [4, 9], "speed": [0.0, 0.04], "buy": [240, 0],
+		"sell": [60, 3600], "names": ["Кожаные сапоги", "Окованные сапоги"], "color": Color(0.62, 0.52, 0.42),
+		"desc": "Сапоги: немного защиты от ударов и магии, 2-й ранг — бег чуть быстрее. Подходят всем."},
 }
-## Украшения по рангам: bonus — ключ (GEAR_BONUS_NAMES), value — по рангам: hp, mp, def, mdef — числа; crit (шанс крита),
-## crit_dmg (сила крита: к множителю Player.CRIT_MULT 1.8), aspd, cast, eva, speed — доли (0.04 = +4 %).
-## Числа: HP кольца 1-го ранга ≈ 11 % HP героя 10 ур., 2-го — ≈ 11 % на 35 ур.; скорости и крит — небольшие.
-## Украшения выпадают только с боссов (LootTable); 1-й ранг можно и продавать (buy), 2-й — нет.
+## Украшения — база оригинала (ItemResource, tools/rappelz_db_reference.md, «Украшения»): кольца — HP или MP и
+## характеристика (Power Ring … Wizard Ring), серьги — физ. / маг. атака, защита, крит, бег (Fang of Wind, Earring of
+## Neophyte, Guardian Earring, Owl's Eye, Tear Drop), кулоны — маг. защита и восстановление HP / MP (Tear of Glass,
+## Spirit Seeker; 1-й ранг — Chaos Necklace), пояс — физ. защита и ячейки карт существ (Light Belt). bonus — по рангам
+## [1-й, 2-й]: hp, mp, def, mdef, atk, matk, hp_regen, mp_regen, характеристики str/vit/agi/int/wis/dex/luck — числа;
+## crit, speed — доли; восстановление — в секунду (очки базы × 0.03 для HP и × 0.015 для MP — как у умений питомцев:
+## Meditation «+10» → 0.3 HP/с; кулон базы HP +22 → 0.66/с, MP +6 → 0.09/с). 2-й ранг — числа базы; в базе колец и серёг 1-го ранга нет — у нас 1-й ранг вдвое слабее 2-го
+## (как 2-й к 3-му в базе: кольцо HP 150 → 300, характеристика 4 → 8). Бег базы в очках: из 120 (+3 → +2.5 %).
+## icon — значок (пока своих нет у новых — прежние значки похожих украшений, ItemIcon: «icon_file»).
+## Выпадают с боссов (LootTable); 1-й ранг продаёт Ювелир Лиора, 2-й — нет (JEWELRY_BUY / JEWELRY_SELL — по базе:
+## кольцо 5000, серьги 7000, кулон 9000, пояс 13 100; 1-й ранг — 350 / 500 / 500 / 1000).
 const JEWELRY_DEFS := {
-	"ring_hp": {"slot": "ring", "bonus": "hp", "value": [50, 150], "names": ["Бронзовое кольцо жизни", "Золотое кольцо жизни"],
-		"color": Color(0.95, 0.4, 0.4)},
-	"ring_mp": {"slot": "ring", "bonus": "mp", "value": [30, 80], "names": ["Бронзовое кольцо маны", "Золотое кольцо маны"],
-		"color": Color(0.4, 0.6, 1.0)},
-	"ring_crit": {"slot": "ring", "bonus": "crit", "value": [0.02, 0.03],
-		"names": ["Бронзовое кольцо меткого удара", "Золотое кольцо меткого удара"], "color": Color(1.0, 0.75, 0.3)},
-	"ring_critdmg": {"slot": "ring", "bonus": "crit_dmg", "value": [0.1, 0.2],
-		"names": ["Бронзовое кольцо сокрушения", "Золотое кольцо сокрушения"], "color": Color(1.0, 0.5, 0.25)},
-	"ring_aspd": {"slot": "ring", "bonus": "aspd", "value": [0.04, 0.06],
-		"names": ["Бронзовое кольцо быстроты", "Золотое кольцо быстроты"], "color": Color(0.98, 0.6, 0.2)},
-	"ring_cast": {"slot": "ring", "bonus": "cast", "value": [0.05, 0.08],
-		"names": ["Бронзовое кольцо чар", "Золотое кольцо чар"], "color": Color(0.72, 0.42, 0.98)},
-	"earring_crit": {"slot": "earring", "bonus": "crit", "value": [0.02, 0.03],
-		"names": ["Бронзовые серьги меткого удара", "Золотые серьги меткого удара"], "color": Color(1.0, 0.75, 0.3)},
-	"earring_critdmg": {"slot": "earring", "bonus": "crit_dmg", "value": [0.1, 0.2],
-		"names": ["Бронзовые серьги сокрушения", "Золотые серьги сокрушения"], "color": Color(1.0, 0.5, 0.25)},
-	"earring_aspd": {"slot": "earring", "bonus": "aspd", "value": [0.04, 0.06],
-		"names": ["Бронзовые серьги быстроты", "Золотые серьги быстроты"], "color": Color(0.98, 0.6, 0.2)},
-	"earring_cast": {"slot": "earring", "bonus": "cast", "value": [0.05, 0.08],
-		"names": ["Бронзовые серьги чар", "Золотые серьги чар"], "color": Color(0.72, 0.42, 0.98)},
-	"pendant_hp": {"slot": "pendant", "bonus": "hp", "value": [60, 180], "names": ["Бронзовый кулон жизни", "Золотой кулон жизни"],
-		"color": Color(0.95, 0.4, 0.4)},
-	"pendant_mp": {"slot": "pendant", "bonus": "mp", "value": [40, 120], "names": ["Бронзовый кулон маны", "Золотой кулон маны"],
-		"color": Color(0.4, 0.6, 1.0)},
-	"pendant_pdef": {"slot": "pendant", "bonus": "def", "value": [12, 24],
-		"names": ["Бронзовый кулон стойкости", "Золотой кулон стойкости"], "color": Color(0.75, 0.72, 0.65)},
-	"pendant_mdef": {"slot": "pendant", "bonus": "mdef", "value": [12, 24],
-		"names": ["Бронзовый кулон оберега", "Золотой кулон оберега"], "color": Color(0.55, 0.75, 1.0)},
-	"belt_pdef": {"slot": "belt", "bonus": "def", "value": [3, 6], "names": ["Кожаный пояс стойкости", "Золотой пояс стойкости"],
-		"color": Color(0.7, 0.55, 0.38)},
-	"belt_mdef": {"slot": "belt", "bonus": "mdef", "value": [3, 6], "names": ["Кожаный пояс оберега", "Золотой пояс оберега"],
-		"color": Color(0.55, 0.65, 0.9)},
-	"belt_eva": {"slot": "belt", "bonus": "eva", "value": [0.02, 0.03], "names": ["Кожаный пояс ловкости", "Золотой пояс ловкости"],
-		"color": Color(0.5, 0.85, 0.6)},
-	"belt_speed": {"slot": "belt", "bonus": "speed", "value": [0.04, 0.06],
-		"names": ["Кожаный пояс странника", "Золотой пояс странника"], "color": Color(0.35, 0.86, 0.5)},
+	"ring_str": {"slot": "ring", "bonus": {"hp": [75, 150], "str": [2, 4]}, "icon": "ring_critdmg",
+		"names": ["Медное кольцо силы", "Кольцо силы"], "color": Color(1.0, 0.5, 0.25)},
+	"ring_vit": {"slot": "ring", "bonus": {"hp": [75, 150], "vit": [2, 4]}, "icon": "ring_hp",
+		"names": ["Медное кольцо стойкости", "Кольцо стойкости"], "color": Color(0.95, 0.4, 0.4)},
+	"ring_dex": {"slot": "ring", "bonus": {"hp": [75, 150], "dex": [2, 4]}, "icon": "ring_crit",
+		"names": ["Медное кольцо меткости", "Кольцо меткости"], "color": Color(1.0, 0.75, 0.3)},
+	"ring_agi": {"slot": "ring", "bonus": {"hp": [75, 150], "agi": [2, 4]}, "icon": "ring_aspd",
+		"names": ["Медное кольцо ловкости", "Кольцо ловкости"], "color": Color(0.98, 0.6, 0.2)},
+	"ring_int": {"slot": "ring", "bonus": {"mp": [40, 80], "int": [2, 4]}, "icon": "ring_mp",
+		"names": ["Медное кольцо разума", "Кольцо разума"], "color": Color(0.4, 0.6, 1.0)},
+	"ring_wis": {"slot": "ring", "bonus": {"mp": [40, 80], "wis": [2, 4]}, "icon": "ring_cast",
+		"names": ["Медное кольцо мудрости", "Кольцо мудрости"], "color": Color(0.72, 0.42, 0.98)},
+	"ring_luck": {"slot": "ring", "bonus": {"mp": [40, 80], "luck": [2, 4]},
+		"names": ["Медное кольцо удачи", "Клеверное кольцо"], "color": Color(0.4, 0.85, 0.45)},
+	"ring_warrior": {"slot": "ring", "bonus": {"hp": [75, 150], "str": [1, 2], "vit": [1, 2]},
+		"names": ["Медное кольцо воина", "Кольцо воина"], "color": Color(0.85, 0.35, 0.3)},
+	"ring_bowman": {"slot": "ring", "bonus": {"hp": [75, 150], "agi": [1, 2], "dex": [1, 2]},
+		"names": ["Медное кольцо стрелка", "Кольцо стрелка"], "color": Color(0.9, 0.7, 0.3)},
+	"ring_wizard": {"slot": "ring", "bonus": {"mp": [40, 80], "int": [1, 2], "wis": [1, 2]},
+		"names": ["Медное кольцо чародея", "Кольцо чародея"], "color": Color(0.55, 0.45, 0.98)},
+	"earring_atk": {"slot": "earring", "bonus": {"atk": [5, 10]}, "icon": "earring_critdmg",
+		"names": ["Медные серьги клыка", "Серьги «Клык ветра»"], "color": Color(1.0, 0.5, 0.25)},
+	"earring_matk": {"slot": "earring", "bonus": {"matk": [10, 20]}, "icon": "earring_cast",
+		"names": ["Медные серьги чар", "Серьги неофита"], "color": Color(0.72, 0.42, 0.98)},
+	"earring_def": {"slot": "earring", "bonus": {"def": [2, 4]},
+		"names": ["Медные серьги стража", "Серьги стража"], "color": Color(0.7, 0.72, 0.78)},
+	"earring_crit": {"slot": "earring", "bonus": {"atk": [6, 12], "crit": [0.01, 0.02]}, "icon": "earring_crit",
+		"names": ["Медные серьги совы", "Серьги «Совиный глаз»"], "color": Color(1.0, 0.75, 0.3)},
+	"earring_speed": {"slot": "earring", "bonus": {"speed": [0.012, 0.025]}, "icon": "earring_aspd",
+		"names": ["Медные серьги-капли", "Серьги «Слеза»"], "color": Color(0.35, 0.86, 0.6)},
+	"pendant_mdef": {"slot": "pendant", "bonus": {"mdef": [12, 24]}, "icon": "pendant_mdef",
+		"names": ["Ожерелье хаоса", "Кулон оберега"], "color": Color(0.55, 0.75, 1.0)},
+	"pendant_hpregen": {"slot": "pendant", "bonus": {"mdef": [12, 29], "hp_regen": [0.33, 0.66]}, "icon": "pendant_hp",
+		"names": ["Медный кулон жизни", "Кулон «Стеклянная слеза»"], "color": Color(0.95, 0.4, 0.4)},
+	"pendant_mpregen": {"slot": "pendant", "bonus": {"mdef": [12, 24], "mp_regen": [0.05, 0.09]}, "icon": "pendant_mp",
+		"names": ["Медный кулон духа", "Кулон «Искатель духа»"], "color": Color(0.4, 0.6, 1.0)},
+	"belt_light": {"slot": "belt", "bonus": {"def": [3, 6]}, "icon": "belt_pdef",
+		"names": ["Кожаный пояс", "Лёгкий пояс"], "color": Color(0.7, 0.55, 0.38)},
 }
-## Цены украшений по рангам (2-й ранг не продаётся).
-const JEWELRY_BUY := [90, 0]
-const JEWELRY_SELL := [20, 60]
+## Цены украшений по видам и рангам (2-й ранг на острове не продаётся — buy 0, продажа — четверть цены базы).
+const JEWELRY_BUY := {"ring": [350, 0], "earring": [500, 0], "pendant": [500, 0], "belt": [1000, 0]}
+const JEWELRY_PRICE := {"ring": [350, 5000], "earring": [500, 7000], "pendant": [500, 9000], "belt": [1000, 13100]}
+## Прежние украшения (до 0.31, свои бонусы) → украшения базы того же ранга (Game.from_dict, RENAMED).
+const JEWELRY_RENAMED := {
+	"ring_hp": "ring_vit", "ring_mp": "ring_int", "ring_crit": "ring_dex", "ring_critdmg": "ring_str",
+	"ring_aspd": "ring_agi", "ring_cast": "ring_wis", "earring_critdmg": "earring_atk", "earring_aspd": "earring_speed",
+	"earring_cast": "earring_matk", "pendant_hp": "pendant_hpregen", "pendant_mp": "pendant_mpregen",
+	"pendant_pdef": "pendant_mdef", "belt_pdef": "belt_light", "belt_mdef": "belt_light", "belt_eva": "belt_light",
+	"belt_speed": "belt_light",
+}
 ## Бонусы брони и украшений: ключ → подпись; GEAR_PCT_KEYS — доли (показываются процентами).
 const GEAR_BONUS_NAMES := {
-	"def": "физ. защита", "mdef": "маг. защита", "hp": "макс. HP", "mp": "макс. MP", "crit": "шанс крита",
+	"def": "физ. защита", "mdef": "маг. защита", "hp": "макс. HP", "mp": "макс. MP", "atk": "физ. атака",
+	"matk": "маг. атака", "str": "Сила", "vit": "Выносливость", "agi": "Ловкость", "dex": "Меткость", "int": "Интеллект",
+	"wis": "Мудрость", "luck": "Удача", "hp_regen": "восст. HP", "mp_regen": "восст. MP", "crit": "шанс крита",
 	"crit_dmg": "сила крита", "aspd": "скорость атаки", "cast": "скорость каста", "eva": "уклонение", "speed": "скорость бега",
 }
-const GEAR_BONUS_ORDER := ["def", "mdef", "hp", "mp", "crit", "crit_dmg", "aspd", "cast", "eva", "speed"]
+const GEAR_BONUS_ORDER := ["def", "mdef", "hp", "mp", "atk", "matk", "str", "vit", "agi", "dex", "int", "wis", "luck",
+	"hp_regen", "mp_regen", "crit", "crit_dmg", "aspd", "cast", "eva", "speed"]
 const GEAR_PCT_KEYS := ["crit", "crit_dmg", "aspd", "cast", "eva", "speed"]
 
 
@@ -853,6 +963,8 @@ static func _make_gear(base: String, r: int, d: Dictionary, t: String) -> Dictio
 	if t == "armor":
 		it["def"] = int((d["def"] as Array)[i])
 		it["mdef"] = int((d["mdef"] as Array)[i])
+		if d.has("speed") and float((d["speed"] as Array)[i]) > 0.0:
+			it["bonus"] = {"speed": float((d["speed"] as Array)[i])}
 		it["buy"] = int((d["buy"] as Array)[i])
 		it["sell"] = int((d["sell"] as Array)[i])
 		it["desc"] = String(d["desc"])
@@ -861,13 +973,18 @@ static func _make_gear(base: String, r: int, d: Dictionary, t: String) -> Dictio
 			it["armor"] = v
 			it["desc"] = String(d["desc"]) + " Для профессий: %s (и Бродяги)." % String(BODY_ARMOR[v]["who"])
 	else:
-		var key := String(d["bonus"])
-		var val: float = float((d["value"] as Array)[i])
-		it["bonus"] = {key: val}
-		it["buy"] = int(JEWELRY_BUY[i])
-		it["sell"] = int(JEWELRY_SELL[i])
-		it["desc"] = "Украшение (%s): %s. Подходит всем." % [String(GEAR_KIND_NAMES[String(d["slot"])]),
-			gear_bonus_text({key: val})]
+		var bon: Dictionary = {}
+		for k in d["bonus"]:
+			bon[String(k)] = float((d["bonus"][k] as Array)[i])
+		it["bonus"] = bon
+		var sl := String(d["slot"])
+		it["buy"] = int((JEWELRY_BUY[sl] as Array)[i])
+		it["sell"] = roundi(float((JEWELRY_PRICE[sl] as Array)[i]) * SELL_SHARE)
+		it["icon_file"] = "%s_r%d" % [String(d.get("icon", base)), mini(r, 2)]
+		var extra := ""
+		if sl == "belt":
+			extra = " Ячейки карт существ: %d (больше — «Расширитель пояса»)." % BELT_SLOTS_BASE
+		it["desc"] = "Украшение (%s): %s. Подходит всем.%s" % [String(GEAR_KIND_NAMES[sl]), gear_bonus_text(bon), extra]
 	return it
 
 
@@ -998,6 +1115,8 @@ static func gear_bonus_text(b: Dictionary) -> String:
 
 ## Значение бонуса: «+16» или «+4%».
 static func gear_value_text(key: String, v: float) -> String:
+	if key == "hp_regen" or key == "mp_regen":
+		return "%s%s/с" % ["+" if v >= 0.0 else "−", String.num(absf(v), 2)]
 	if GEAR_PCT_KEYS.has(key):
 		return "%s%d%%" % ["+" if v >= 0.0 else "−", roundi(absf(v) * 100.0)]
 	return "%s%d" % ["+" if v >= 0.0 else "−", roundi(absf(v))]
@@ -1028,6 +1147,7 @@ const TYPES := {
 	"card": {"name": "Карта существа", "order": 5, "color": Color(0.78, 0.56, 0.34)},
 	"trophy": {"name": "Трофей", "order": 6, "color": Color(0.85, 0.65, 0.4)},
 	"broken": {"name": "Лом", "order": 7, "color": Color(0.5, 0.5, 0.52)},
+	"upgrade": {"name": "Прокачка", "order": 5, "color": Color(0.85, 0.8, 0.55)},
 }
 ## Редкость: название, ранг (для сортировки), цвет рамки и названия.
 const RARITIES := {
@@ -1241,16 +1361,32 @@ const ENCHANT_SELL := 0.2
 ## Сломанная вещь — лом: доля цены продажи базовой вещи (не меньше 1 зол.), стопка в ячейке.
 const BROKEN_SELL := 0.25
 const BROKEN_STACK := 20
-## Кубы чарования (type "cube"): вид → название, что чарует, цвет. Ранги 1–CUBE_RANKS (значки cube_<вид>_r1 / _r2);
-## ранг куба со зверя — по его уровню, как у снаряжения (cube_rank_for_level: 1-й — 1–20 ур., 2-й — 21+).
-## Куб ранга N чарует вещи ранга ≤ N (решено так, а не «ровно N»: младшую вещь можно точить и старшим кубом —
-## кубы не пропадают зря; старшую вещь младшим кубом — нельзя).
+## Кубы чарования (type "cube"): вид → название, что чарует (target: "attack" — оружие, "defense" — броня и щит,
+## "acc" — украшения), таблица шансов (chances — Enchant.CHANCE_TABLES), цена по рангам (price — база: обычный куб
+## 2-го ранга 200, древний 400, куб украшений 100; 1-й ранг в базе не бывает — у нас вдвое дешевле), вес в добыче
+## (weight). Ранги 1–CUBE_RANKS (значки cube_<вид>_r1 / _r2); ранг куба со зверя — по его уровню
+## (cube_rank_for_level: 1-й — 1–20 ур., 2-й — 21+). Куб ранга N чарует вещи ранга ≤ N (решено так, а не «ровно N»).
+## Древние кубы базы (Ancient Cube - Strike / Defense / Accessory) — шанс выше, у торговца наград (донат) и редко со
+## зверей; куб украшений (Cube-Accessory) точит украшения до +5, неудача — заточка украшения пропадает (до +0).
 const CUBE_KINDS := {
-	"attack": {"name": "Куб атаки", "what": "оружие", "color": Color(1.0, 0.45, 0.3)},
-	"defense": {"name": "Куб защиты", "what": "броню и щит", "color": Color(0.35, 0.7, 1.0)},
+	"attack": {"name": "Куб атаки", "target": "attack", "what": "оружие", "chances": "normal", "price": [100, 200],
+		"weight": 1.0, "color": Color(1.0, 0.45, 0.3)},
+	"defense": {"name": "Куб защиты", "target": "defense", "what": "броню и щит", "chances": "normal", "price": [100, 200],
+		"weight": 1.0, "color": Color(0.35, 0.7, 1.0)},
+	"acc": {"name": "Куб украшений", "target": "acc", "what": "украшения", "chances": "acc", "price": [50, 100],
+		"weight": 0.5, "color": Color(0.95, 0.75, 0.3)},
+	"ancient_attack": {"name": "Древний куб атаки", "target": "attack", "what": "оружие", "chances": "ancient",
+		"price": [200, 400], "weight": 0.12, "color": Color(1.0, 0.3, 0.55)},
+	"ancient_defense": {"name": "Древний куб защиты", "target": "defense", "what": "броню и щит", "chances": "ancient",
+		"price": [200, 400], "weight": 0.12, "color": Color(0.45, 0.45, 1.0)},
+	"ancient_acc": {"name": "Древний куб украшений", "target": "acc", "what": "украшения", "chances": "ancient_acc",
+		"price": [200, 400], "weight": 0.08, "color": Color(1.0, 0.6, 0.15)},
 }
 const CUBE_RANKS := 2
-const CUBE_SELL := [12, 40]
+## Предел заточки украшений (у куба украшений базы шансы только до +5).
+const ACC_ENCHANT_MAX := 5
+## Ячеек карт существ у пояса без расширителя (PetBelt).
+const BELT_SLOTS_BASE := 1
 
 ## Записи заточенных и сломанных вещей (строит get_item, сбрасывает _static_init).
 static var _derived: Dictionary = {}
@@ -1299,6 +1435,8 @@ static func enchant_kind(id: String) -> String:
 		return "defense" if is_shield(id) else "attack"
 	if t == "armor":
 		return "defense"
+	if t == "jewelry":
+		return "acc"
 	return ""
 
 
@@ -1324,7 +1462,10 @@ static func _make_derived(id: String) -> Dictionary:
 	if b == id or not ITEMS.has(b) or not is_enchantable(b):
 		return {}
 	var base: Dictionary = ITEMS[b]
+	var acc := enchant_kind(b) == "acc"
 	if id.ends_with(BROKEN_MARK):
+		if acc:
+			return {}
 		var blade := String(base.get("type", "")) == "weapon" and not is_shield(b)
 		return {
 			"name": "%s (сломано)" % String(base.get("name", b)), "type": "broken", "base": b,
@@ -1335,7 +1476,7 @@ static func _make_derived(id: String) -> Dictionary:
 			"desc": "Сломано при чаровании. Надеть и чаровать нельзя — торговец купит как лом.",
 		}
 	var n := enchant_level(id)
-	if n <= 0 or enchanted_id(b, n) != id:
+	if n <= 0 or enchanted_id(b, n) != id or (acc and n > ACC_ENCHANT_MAX):
 		return {}
 	var it: Dictionary = base.duplicate(true)
 	it["name"] = "%s +%d" % [String(base.get("name", b)), n]
@@ -1348,6 +1489,15 @@ static func _make_derived(id: String) -> Dictionary:
 	for k in ["atk", "matk", "def", "mdef"]:
 		if it.has(k):
 			it[k] = enchant_value(int(it[k]), n)
+	# Украшения: все бонусы × (1 + ENCHANT_PCT) (числа — вверх, доли — точно)
+	if String(it.get("type", "")) == "jewelry":
+		var bon: Dictionary = (it.get("bonus", {}) as Dictionary).duplicate()
+		for k in bon:
+			if GEAR_PCT_KEYS.has(String(k)) or String(k).ends_with("_regen"):
+				bon[k] = snappedf(float(bon[k]) * (1.0 + enchant_pct(n)), 0.001)
+			else:
+				bon[k] = float(enchant_value(roundi(float(bon[k])), n))
+		it["bonus"] = bon
 	return it
 
 
@@ -1358,6 +1508,8 @@ static func enchant_text(id: String) -> String:
 		return ""
 	var base := get_item(base_id(id))
 	var it := get_item(id)
+	if String(it.get("type", "")) == "jewelry":
+		return "Заточка +%d (+%d%%): %s" % [n, roundi(enchant_pct(n) * 100.0), gear_bonus_text(it.get("bonus", {}))]
 	var names := {"atk": "физ. атака", "matk": "маг. атака", "def": "физ. защита", "mdef": "маг. защита"}
 	var parts: PackedStringArray = []
 	for k in names:
@@ -1376,9 +1528,15 @@ static func is_cube(id: String) -> bool:
 	return item_type(id) == "cube"
 
 
-## Вид куба: "attack" | "defense" ("" — не куб).
+## Вид куба: ключ CUBE_KINDS ("attack", "ancient_acc" …; "" — не куб).
 static func cube_kind(id: String) -> String:
 	return String(get_item(id).get("cube", ""))
+
+
+## Что точит куб: "attack" | "defense" | "acc" ("" — не куб).
+static func cube_target(id: String) -> String:
+	var k := cube_kind(id)
+	return String(CUBE_KINDS[k]["target"]) if CUBE_KINDS.has(k) else ""
 
 
 ## Ранг куба со зверя уровня lvl (и в награде герою уровня lvl): как у снаряжения, не выше CUBE_RANKS.
@@ -1388,9 +1546,14 @@ static func cube_rank_for_level(lvl: int) -> int:
 
 static func _make_cube(kind: String, r: int) -> Dictionary:
 	var ck: Dictionary = CUBE_KINDS[kind]
+	var price := int((ck["price"] as Array)[mini(r, 2) - 1])
+	var acc := String(ck["target"]) == "acc"
+	var fail := "Неудача — заточка украшения пропадает (до +0), само украшение цело." if acc \
+		else "Неудача — вещь ломается (Порошок стабильности спасает)."
 	return {
 		"name": "%s %s" % [String(ck["name"]), roman(r)], "type": "cube", "icon": "cube", "cube": kind, "rank": r,
-		"buy": 0, "sell": int(CUBE_SELL[mini(r, CUBE_SELL.size()) - 1]), "color": ck["color"],
-		"desc": "Чарует %s %d-го ранга и младше: заточка +1 с шансом (чем выше заточка, тем ниже шанс). Неудача — вещь ломается. Куб тратится в любом случае. Крафт — в сумке, кнопка «Крафт»."
-			% [String(ck["what"]), r],
+		"buy": price if kind.begins_with("ancient") else 0, "sell": roundi(float(price) * SELL_SHARE), "price": price,
+		"color": ck["color"],
+		"desc": "Чарует %s %d-го ранга и младше: заточка +1 с шансом (чем выше заточка, тем ниже шанс). %s Куб тратится в любом случае. Крафт — в сумке, кнопка «Крафт»."
+			% [String(ck["what"]), r, fail],
 	}

@@ -73,7 +73,7 @@ const PET_LEVELS := [[1, 0], [30, 0], [60, 1], [115, 2]]
 const PET_LEVEL_PRESETS := [1, 30, 50, 60, 100, 115]
 ## Группы предметов на вкладке «Предметы»: [тип ItemData, подпись]; прочие типы — «Прочее».
 const ITEM_GROUPS := [["weapon", "Оружие"], ["armor", "Броня"], ["jewelry", "Украшения"], ["consumable", "Расходники"],
-	["cube", "Кубы"], ["card", "Карты существ"], ["trophy", "Трофеи"]]
+	["cube", "Кубы"], ["upgrade", "Прокачка"], ["card", "Карты существ"], ["trophy", "Трофеи"]]
 const KILL_RADIUS := 30.0
 const MOB_MAX_LEVEL := 50
 ## Зверь админ-панели ставится в SPAWN_DIST м перед героем.

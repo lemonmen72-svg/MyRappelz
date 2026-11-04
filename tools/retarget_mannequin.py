@@ -188,10 +188,16 @@ MQ_CLIPS = {
 ## Вид: walk — шаг, jog — трусца (между шагом и бегом), run — бег, sprint — быстрый бег (усиления скорости); стиль
 ## пластики и пределы проверки — свои. Третье поле — сколько циклов (по два шага) в клипе; «клип@t0-t1» — отрезок
 ## исходника (стык сводится loop_close).
-MQ_LOCO = {"Mq_Walking": ("walk", "m1:Walking", 1),
-	"Mq_Running": ("run", "m1:Running", 1), "Mq_Running_B": ("jog", "m2:run_fast_3_inplace", 1),
-	"Mq_Sprint": ("sprint", "m2:RunFast", 1)}
-MQ_STRIDE = {"walk": 1.0, "jog": 1.0, "run": 1.0, "sprint": 0.6}
+## Шаг и бег — живой мокап CMU (жалоба Максима на 0.30.0: «анимация бега и ходьбы отвратительная, не похожа на
+## человеческую»): источник c1 — tools/mocap/cmu_loco.glb (tools/bvh_to_glb.py: шаг 35_01, трусца 35_22 одного
+## человека, по одному ровному циклу). Трусца — как есть (3.6 м/с), бег и быстрый бег — та же трусца с бо́льшим
+## размахом бедра, колена и рук (MQ_AMP), а не растянутым выносом стоп (прежний бег манекена m1 под 7 м/с давал
+## «шпагат» и прямые ноги). Пальцы — средняя поза из бега манекена (у CMU пальцев нет, MQ_FINGERS).
+MQ_LOCO = {"Mq_Walking": ("walk", "c1:walk@0-999", 1),
+	"Mq_Running": ("run", "c1:jog@0-999", 1), "Mq_Running_B": ("jog", "c1:jog@0-999", 1),
+	"Mq_Sprint": ("sprint", "c1:jog@0-999", 1)}
+MQ_FINGERS = "m1:Running"
+MQ_STRIDE = {"walk": 1.0, "jog": 1.0, "run": 1.0, "sprint": 1.0}
 ## Бег под скорость героя (жалоба Максима после 0.25: «очень сильно поднимает ноги, как будто перешагивает или
 ## быстро бежит по воде»). Бег манекена m1 Running — бег спринтера: бедро вперёд до 67–86° (колено почти на высоте
 ## таза), пятка до ягодицы (колено сгибается на 155–158°), 3.16 шаг/с, шаг 1.8 м; на герое своя скорость
@@ -203,9 +209,12 @@ MQ_STRIDE = {"walk": 1.0, "jog": 1.0, "run": 1.0, "sprint": 0.6}
 ##   * MQ_LIFT — высота стопы над землёй в переносе (выше LOCO_LOW): доля исходной; нога в переносе разгибается
 ##     (IK), колено ниже, пятка не к ягодице — как у бега трусцой манекена (run_fast_3_inplace: бедро 40–46°,
 ##     колено 124–131°), но с темпом и шагом бега.
-MQ_LOCO_TARGET = {"run": 7.0}
+MQ_LOCO_TARGET = {}
+## Размах (amp_scale): ноги, руки — × вокруг средней позы цикла (только у мокапа CMU, MQ_AMP_SRC).
+MQ_AMP = {"run": (1.6, 1.25), "sprint": (1.85, 1.3)}
+MQ_AMP_SRC = ("c1",)
 MQ_STRIDE_MAX = 1.3
-MQ_LIFT = {"walk": 1.0, "jog": 1.0, "run": 0.62, "sprint": 1.0}
+MQ_LIFT = {"walk": 1.0, "jog": 1.0, "run": 1.0, "sprint": 1.0}
 MQ_FEM = {"walk": "walk", "jog": "mq_run", "run": "mq_run", "sprint": "mq_sprint"}
 ## Бег героини: стиль бега UAL (колея уже, таз вращается, руки ближе, наклон меньше), длина выноса — своя
 ## (MQ_FEM_RUN_STRIDE = 1: раньше 0.9, при 7 м/с выходило больше 4 шагов в секунду — семенила; длину шага задаёт
@@ -219,11 +228,11 @@ ph.FEM_STYLES["mq_sprint"] = dict(ph.FEM_STYLES["run"], stride=0.9)
 ## Проверка шага и бега: опорная стопа (носок у земли) едет назад со скоростью клипа с ошибкой не больше LOCO_SLIDE,
 ## м; вертикальный ход таза за цикл не больше LOCO_BOB, м; длина шага (скорость × полцикла) в пределах LOCO_STEP, м.
 LOCO_SLIDE = 0.03
-LOCO_BOB = {"walk": 0.09, "jog": 0.12, "run": 0.08, "sprint": 0.08}
-LOCO_STEP = {"walk": (0.5, 1.1), "jog": (0.9, 1.5), "run": (1.7, 2.4), "sprint": (1.4, 2.6)}
+LOCO_BOB = {"walk": 0.09, "jog": 0.12, "run": 0.11, "sprint": 0.11}
+LOCO_STEP = {"walk": (0.5, 1.1), "jog": (0.9, 1.5), "run": (1.7, 2.4), "sprint": (1.7, 2.8)}
 ## Перенос стопы: наибольший подъём носка над покоем не больше LOCO_LIFT_MAX × рост (у манекена m1 Running —
 ## 0.47–0.50 роста, после MQ_LIFT 0.62 — 0.28–0.32; трусца m2 как есть — 0.34–0.39, быстрый бег — 0.32–0.42, шаг — 0.10).
-LOCO_LIFT_MAX = {"walk": 0.14, "jog": 0.42, "run": 0.36, "sprint": 0.45}
+LOCO_LIFT_MAX = {"walk": 0.14, "jog": 0.42, "run": 0.52, "sprint": 0.58}
 ## Опору, до которой прямая нога не достаёт дальше LOCO_REACH (м), достаёт таз ниже (не больше LOCO_DROP_MAX, м).
 LOCO_REACH = 0.004
 LOCO_DROP_MAX = 0.08
@@ -648,6 +657,29 @@ def stride_scale(rt, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, k: float
 	return short
 
 
+def amp_scale(rt, Lq: np.ndarray, k_leg: float, k_arm: float) -> None:
+	"""Размах шага и рук × k вокруг средней позы цикла (локальные повороты бедра, голени и стопы; плеча и предплечья):
+	быстрее человек бежит не «растянутыми» ногами, а бо́льшим махом бедра и сгибом колена — поза остаётся живой."""
+	bones = []
+	for c in rt.roles["legs"].values():
+		bones += [(b, k_leg) for b in c[:3]]
+	for c in rt.roles["arms"].values():
+		bones += [(b, k_arm) for b in c[1:3]]
+	for b, k in bones:
+		if abs(k - 1.0) < 1e-6:
+			continue
+		q = ra.continuous(Lq[:, b].copy())
+		m = q.mean(axis=0)
+		m = m / np.linalg.norm(m)
+		d = ra.qmul(np.broadcast_to(ra.qconj(m), q.shape), q)
+		d = d * np.where(d[:, 3:4] < 0.0, -1.0, 1.0)
+		ang = 2.0 * np.arccos(np.clip(d[:, 3], -1.0, 1.0))
+		s = np.sin(ang * 0.5)
+		axis = np.where(s[:, None] > 1e-8, d[:, :3] / np.maximum(s[:, None], 1e-8), np.array([1.0, 0.0, 0.0]))
+		d2 = np.concatenate([axis * np.sin(ang * k * 0.5)[:, None], np.cos(ang * k * 0.5)[:, None]], 1)
+		Lq[:, b] = ra.qnorm(ra.qmul(np.broadcast_to(m, q.shape), d2))
+
+
 def loco_upsample(times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, k_up: int) -> tuple:
 	"""Цикл в k_up раз чаще (повороты slerp, сдвиги линейно): ключи шага и бега — 90 к/с, как импорт героев в Godot;
 	опору plant_loco ставит по каждому кадру, и между ключами носок не чертит по земле."""
@@ -741,6 +773,16 @@ def make_loco(rts: dict, hero: Hero, name: str, kind: str, src_clip: str, female
 		times, Lq, Lt = times[keep] - times[keep][0], Lq[keep].copy(), Lt[keep].copy()
 		loop_close(times, Lq, Lt)
 	ph.pin_xz(rt, Lt)
+	if sid in MQ_AMP_SRC and MQ_FINGERS:
+		fs, fn = MQ_FINGERS.split(":", 1)
+		_t, fq, _l = rts[fs].clip([fn], False)
+		for side in hero.fingers.values():
+			for ch in side.values():
+				for b in ch:
+					q = ra.continuous(fq[:, b].copy()).mean(axis=0)
+					Lq[:, b] = q / np.linalg.norm(q)
+	if kind in MQ_AMP and sid in MQ_AMP_SRC:
+		amp_scale(rt, Lq, *MQ_AMP[kind])
 	fem = 0.0
 	if female:
 		fem = ph.feminize(rt, MQ_FEM[kind], times, Lq, Lt)
@@ -1206,12 +1248,13 @@ def main() -> None:
 	ap.add_argument("--m1", required=True)
 	ap.add_argument("--m2", required=True)
 	ap.add_argument("--m3", required=True)
+	ap.add_argument("--cmu", default=os.path.join(TOOLS, "mocap", "cmu_loco.glb"), help="мокап CMU (tools/bvh_to_glb.py)")
 	ap.add_argument("--check", action="store_true", help="без записи")
 	ap.add_argument("--preview", default="", help="папка для картинок-проверок")
 	ap.add_argument("--survey", default="", help="папка: исходные клипы целиком на первом герое")
 	ap.add_argument("--only", default="", help="клипы через запятую (для --survey; с --check — проверить только эти)")
 	args = ap.parse_args()
-	srcs = {k: MixamoSource(ra.Glb(p)) for k, p in (("m1", args.m1), ("m2", args.m2), ("m3", args.m3))}
+	srcs = {k: MixamoSource(ra.Glb(p)) for k, p in (("m1", args.m1), ("m2", args.m2), ("m3", args.m3), ("c1", args.cmu))}
 	heroes = args.heroes or sorted(glob.glob(os.path.join(ROOT, "assets", "characters", "hero_*.glb"))) + [
 		os.path.join(ROOT, "assets", "characters", "dark_elf_wanderer.glb")]
 	if args.survey:

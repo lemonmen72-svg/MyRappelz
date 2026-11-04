@@ -275,7 +275,7 @@ func _sage_quests(first: bool) -> void:
 	if first:
 		inv.add("wolf_pelt", 1)
 		check(eco.nearest_trader() == "kirk" and eco.sell_cell(inv.find_cell("wolf_pelt"), 1) == 1, "продано Кирку")
-		game.gold += 30
+		game.gold += 8000
 		check(eco.buy("card_pheasant", 1, "kirk"), "куплено у Кирка")
 		check(q.goal_progress("sage_shop", 0) == 0 and q.goal_progress("sage_shop", 1) == 0, "у Кирка — не в счёт лавки Гордея")
 	# Склад: поговорить, положить вещь
@@ -473,7 +473,7 @@ func _hunter(first: bool) -> void:
 	check(q.is_ready("hunter_bosses_done") and npcs.buttons.has("complete"), "разговор с охотницей засчитан сразу")
 	var g0: int = game.gold
 	_press("complete")
-	check(q.is_done("hunter_bosses_done") and game.gold == g0 + 1500, "большая награда: +1500 зол.")
+	check(q.is_done("hunter_bosses_done") and game.gold == g0 + 30000, "большая награда: +30 000 зол.")
 	check(npcs.reply == QuestData.text("hunter_bosses_done", "done"), "охотница отправляет к мудрецу")
 	npcs.close_dialog()
 	check(q.accept("hunter_to_sage"), "«Вести для мудреца» взято")

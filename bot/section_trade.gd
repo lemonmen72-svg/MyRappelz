@@ -5,7 +5,7 @@ extends BotSection
 ## ещё «Купить ×5» расходника у Гордея.
 
 ## [id NPC, как открыть лавку: "button" — кнопка HUD «Торговец», "dialog" — «Торговля» в диалоге, "" — сразу].
-const TRADERS := [["merchant", "button"], ["weaponsmith", "dialog"], ["armorer", ""], ["jeweler", ""], ["kirk", "dialog"]]
+const TRADERS := [["merchant", "button"], ["weaponsmith", "dialog"], ["armorer", ""], ["jeweler", ""], ["kirk", "dialog"], ["rare_merchant", ""]]
 const QUICK_TRADERS := ["merchant", "weaponsmith", "kirk"]
 
 

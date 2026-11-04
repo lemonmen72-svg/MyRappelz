@@ -79,6 +79,11 @@ var crit_mult := CRIT_MULT
 ## Бонусы надетых брони и украшений (Game.gear_bonus: def, mdef, hp, mp, crit, crit_dmg, aspd, cast, eva, speed) —
 ## для окна героя (источники показателей).
 var gear_bonus: Dictionary = {}
+## Восстановление MP от украшений (кулоны базы), в секунду сверх доли запаса.
+var mp_regen_flat := 0.0
+## Бонусы карт существ в поясе (PetBelt.hero_bonus: характеристики — числа, atk_pct / def_pct / acc_pct /
+## avoid_pct — доли) — для окна героя.
+var belt_bonus: Dictionary = {}
 ## "melee" | "ranged" | "magic"
 var attack_kind := "melee"
 ## Вид хвата (ItemData.grip_kind: вид оружия, у двух одинаковых — вид пары "daggers" и т. п.; "" — без оружия)
@@ -256,10 +261,19 @@ func recalc_stats() -> void:
 	# Связь с питомцем (PetBond: «Слияние душ» — доля статов питомца)
 	PetBond.add_hero_bonus(self, b)
 	skill_bonus = b
+	# Броня и украшения (Game.equip): характеристики украшений базы (кольца) — в статы до производных
+	var gb: Dictionary = Game.gear_bonus()
+	gear_bonus = gb
 	var extra: Dictionary = {}
 	for k in Stats.STATS:
-		if b.has(k):
-			extra[k] = b[k]
+		var v := float(b.get(k, 0.0)) + float(gb.get(k, 0.0))
+		if v != 0.0:
+			extra[k] = v
+	# Карты существ в поясе (Game.belt_cards: «Способность карты» — доля своей характеристики героя)
+	belt_bonus = PetBelt.hero_bonus(Game.class_id, Game.level)
+	for k in Stats.STATS:
+		if belt_bonus.has(k):
+			extra[k] = float(extra.get(k, 0.0)) + float(belt_bonus[k])
 	var stat_aspd := 1.0
 	if HeroStats.has_stats(Game.class_id):
 		var h := HeroStats.derived(Game.class_id, Game.level, extra)
@@ -295,10 +309,10 @@ func recalc_stats() -> void:
 		attack_range = float(w.get("range", attack_range))
 		crit += float(w.get("crit", 0.0))
 	defense += int(wb["def"])
-	# Броня и украшения (Game.equip, решение Максима: на персонаже, модель не меняется): защиты и HP/MP — числа,
-	# крит, сила крита, скорости атаки, каста и бега, уклонение — доли
-	var gb: Dictionary = Game.gear_bonus()
-	gear_bonus = gb
+	# Броня и украшения (Game.equip, решение Максима: на персонаже, модель не меняется): защиты, атаки и HP/MP —
+	# числа, крит, сила крита, скорости атаки, каста и бега, уклонение — доли
+	atk += roundi(float(gb.get("atk" if attack_kind != "magic" else "matk", 0.0)))
+	matk += roundi(float(gb.get("matk", 0.0)))
 	defense += roundi(float(gb.get("def", 0.0)))
 	mdef += roundi(float(gb.get("mdef", 0.0)))
 	max_hp += roundi(float(gb.get("hp", 0.0)))
@@ -326,7 +340,17 @@ func recalc_stats() -> void:
 	block = clampf(float(wb["block"]) + _bv(b, "block"), 0.0, 0.75)
 	skill_guard = clampf(_bv(b, "guard"), 0.0, 0.9)
 	cdr = clampf(_bv(b, "cdr"), 0.0, 0.5)
-	hp_regen += _bv(b, "regen")
+	hp_regen += _bv(b, "regen") + float(gb.get("hp_regen", 0.0))
+	mp_regen_flat = float(gb.get("mp_regen", 0.0))
+	if accuracy >= 0:
+		accuracy += roundi(_bv(b, "acc_flat"))
+	avoid += roundi(_bv(b, "avoid_flat"))
+	# Пояс: «Способность карты» на атаку, защиту, точность, избегание — доля итогового числа
+	atk = roundi(float(atk) * (1.0 + float(belt_bonus.get("atk_pct", 0.0))))
+	defense = roundi(float(defense) * (1.0 + float(belt_bonus.get("def_pct", 0.0))))
+	if accuracy >= 0:
+		accuracy = roundi(float(accuracy) * (1.0 + float(belt_bonus.get("acc_pct", 0.0))))
+	avoid = roundi(float(avoid) * (1.0 + float(belt_bonus.get("avoid_pct", 0.0))))
 	max_hp = roundi(float(max_hp) * (1.0 + _bv(b, "hp_pct") + _bv(b, "hp_from_eva") * eva)) + roundi(_bv(b, "hp_flat"))
 	max_mp = roundi(float(max_mp) * (1.0 + _bv(b, "mp_from_eva") * eva + _bv(b, "mp_pct")))
 	hp = mini(hp, max_hp)
@@ -532,7 +556,7 @@ func cur_speed() -> float:
 
 ## Восстановление MP в секунду: в бою (in_combat) или на отдыхе.
 func mp_regen_rate(in_combat: bool) -> float:
-	return float(max_mp) * (MP_REGEN_COMBAT if in_combat else MP_REGEN_REST)
+	return float(max_mp) * (MP_REGEN_COMBAT if in_combat else MP_REGEN_REST) + mp_regen_flat
 
 
 ## Шанс попасть обычной атакой по зверю t (Combat: точность против избегания, уровни; 1.0 — без промахов).

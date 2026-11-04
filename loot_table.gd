@@ -133,14 +133,15 @@ static func pool(cat: String, type_id: String, lvl: int) -> Array:
 	return res
 
 
-## Кубы чарования для уровня lvl: атаки и защиты поровну, ранг — ItemData.cube_rank_for_level.
+## Кубы чарования для уровня lvl: вес вида — ItemData.CUBE_KINDS weight (атаки и защиты поровну, украшений —
+## вдвое реже, древние — редко), ранг — ItemData.cube_rank_for_level.
 static func cube_pool(lvl: int) -> Array:
 	var r := ItemData.cube_rank_for_level(lvl)
 	var res: Array = []
 	for k in ItemData.CUBE_KINDS:
 		var id := ItemData.cube_id(String(k), r)
 		if not ItemData.get_item(id).is_empty():
-			res.append([id, 1.0])
+			res.append([id, float(ItemData.CUBE_KINDS[k].get("weight", 1.0))])
 	return res
 
 

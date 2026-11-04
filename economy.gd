@@ -229,6 +229,22 @@ func drink(id: String) -> bool:
 	return true
 
 
+## Выпить зелье существа id (ItemData.CREATURE_POTIONS: сварил питомец 3-й формы) — усиление героя на час.
+func drink_creature_potion(id: String) -> bool:
+	var p: Player = main.player
+	var sp := String(ItemData.get_item(id).get("creature_potion", ""))
+	if sp == "" or p == null or not Game.inventory.has(id):
+		_msg("Нет такого зелья")
+		return false
+	Game.inventory.remove(id)
+	var cp: Dictionary = ItemData.CREATURE_POTIONS[sp]
+	p.add_timed_bonus("creature_potion", ItemData.CREATURE_POTION_TIME, (cp["bonus"] as Dictionary).duplicate(),
+		{"name": ItemData.item_name(id), "icon": IconView.item(id)})
+	_msg("%s: %s на 1 час" % [ItemData.item_name(id), String(cp["what"])])
+	used.emit(id)
+	return true
+
+
 ## Доля оставшейся перезарядки зелья маны: 0 = готово.
 func mana_cooldown_frac() -> float:
 	return clampf(_mana_cd / POTION_CD, 0.0, 1.0)
@@ -380,8 +396,8 @@ func sell_cell(i: int, n: int = 1) -> int:
 # ---------- Чарование и кузница ----------
 
 ## Чаровать вещь item кубом cube (where — где вещь: "" сумка или ячейка экипировки). Enchant.use_cube + сообщение.
-func craft(item: String, cube: String, where: String = "") -> Dictionary:
-	var r := Enchant.use_cube(item, cube, where, craft_rng, main.player if main != null else null)
+func craft(item: String, cube: String, where: String = "", opts: Dictionary = {}) -> Dictionary:
+	var r := Enchant.use_cube(item, cube, where, craft_rng, main.player if main != null else null, opts)
 	if main != null and main.hud != null:
 		_msg(String(r["text"]))
 	if String(r["error"]) == "":

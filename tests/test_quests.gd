@@ -64,14 +64,14 @@ func run_step() -> void:
 			_press_dialog("dq_kirk_first_card")
 			check(npcs.page == "quest" and npcs.buttons.has("accept"), "страница задания: «Взять задание»")
 			check(npcs.reply == String(QuestData.get_quest("kirk_first_card")["offer"]), "реплика при выдаче")
-			check(_has_text("Купить карту существа у Учителя Кирка") and _has_text("0/1"), "цель с прогрессом")
+			check(_has_text("Взять карту фазана у Учителя Кирка"), "цель задания")
 			check(_find_live(hud._window, "reward_mirror_card") == null and _has_text("Опыт: %d" % int(QuestData.get_quest("kirk_first_card")["rewards"]["xp"])), "награда показана")
+			var cards0: int = inv.count("card_pheasant")
 			_press_dialog("accept")
-			check(q.state("kirk_first_card") == "active" and game.quests_active.has("kirk_first_card"), "задание взято")
-			check(game.quest_tracked == "kirk_first_card", "взятое задание отслеживается")
-			check(npcs.reply == String(QuestData.get_quest("kirk_first_card")["progress"]), "реплика — напоминание")
-			check(kirk.mark_kind == "active" and kirk.mark_text() == "?", "над Кирком «?» (взято)")
-			check(q.tracker.visible and _tracker_has("Первая карта") and _tracker_has("0/1"), "трекер: %s" % [q.tracker_lines()])
+			check(game.quests_active.has("kirk_first_card"), "задание взято")
+			check(inv.count("card_pheasant") == cards0 + 1, "Кирк подарил карту фазана (цены карт — как в базе, 8000)")
+			check(q.is_ready("kirk_first_card") and q.goal_progress("kirk_first_card", 0) == 1, "цель «взять карту» — сразу 1/1")
+			check(kirk.mark_kind == "ready" and kirk.mark_text() == "=", "над Кирком «=» (можно сдать)")
 			check(not q.accept("kirk_first_card"), "дважды не взять")
 			# «Назад» → «Торговля»: окно лавки Кирка с картами существ
 			_press_dialog("back")
@@ -81,9 +81,9 @@ func run_step() -> void:
 			check(eco.is_shop_open() and eco.window.seller == "kirk", "открыта лавка Учителя Кирка")
 			check(not npcs.is_dialog_open(), "диалог закрыт, открыта торговля")
 			var win: InventoryWindow = eco.window
-			for id in ["card_panther", "card_pheasant", "card_turtle", "mirror_card"]:
+			for id in ["card_panther", "card_pheasant", "card_turtle", "card_wolf", "unit_card"]:
 				check(win.buttons.has("good_" + id), "Кирк продаёт: %s" % id)
-			for id in ["potion_hp_r1", "revive_scroll", "dagger_steel"]:
+			for id in ["potion_hp_r1", "revive_scroll", "dagger_steel", "mirror_card"]:
 				check(not win.buttons.has("good_" + id), "Кирк не продаёт: %s" % id)
 			check(_has_text("Лавка Учителя Кирка"), "заголовок окна торговли")
 			# Продажа из сумки — и у Кирка
@@ -94,15 +94,11 @@ func run_step() -> void:
 			check(win.buttons.has("act_sell"), "у Кирка можно продать из сумки")
 			_press_shop("act_sell")
 			check(game.gold == gold0 + int(ItemData.get_item("boar_tusk")["sell"]), "клык продан Кирку")
-			# Покупка карты фазана — цель задания
-			game.gold = 100
+			# Покупка карты фазана — цена базы
+			game.gold = 10000
 			_press_shop("good_card_pheasant")
 			_press_shop("act_buy")
-			check(inv.count("card_pheasant") == 1 and game.gold == 75, "куплена карта фазана")
-			check(q.is_ready("kirk_first_card") and q.goal_progress("kirk_first_card", 0) == 1, "цель выполнена 1/1")
-			check(last_hud_text().contains("вернитесь к Учителю Кирку"), "сообщение: " + last_hud_text())
-			check(kirk.mark_kind == "ready" and kirk.mark_text() == "=", "над Кирком «=» (можно сдать)")
-			check(_tracker_has("Сдать: Учитель Кирк"), "трекер: сдать Кирку %s" % [q.tracker_lines()])
+			check(inv.count("card_pheasant") == cards0 + 2 and game.gold == 2000, "куплена карта фазана за 8000")
 			# Торговец карт не продаёт
 			check(not InventoryWindow.goods(game.class_id, "merchant").has("card_pheasant"), "у торговца карт нет")
 			hud.close_window()
@@ -118,7 +114,7 @@ func run_step() -> void:
 			var g0: int = game.gold
 			_press_dialog("complete")
 			check(q.state("kirk_first_card") == "done" and q.times_done("kirk_first_card") == 1, "задание сдано")
-			check(_total_xp() == xp0 + int(QuestData.get_quest("kirk_first_card")["rewards"]["xp"]) and game.gold == g0 + 10, "награда: опыт и 10 зол. (опыт %d → %d)"
+			check(_total_xp() == xp0 + int(QuestData.get_quest("kirk_first_card")["rewards"]["xp"]) and game.gold == g0 + 200, "награда: опыт и 200 зол. (опыт %d → %d)"
 				% [xp0, _total_xp()])
 			check(npcs.reply == String(QuestData.get_quest("kirk_first_card")["done"]), "слова Кирка при сдаче")
 			check(last_hud_text().contains("«Первая карта» выполнено"), "сообщение о сдаче: " + last_hud_text())
@@ -163,8 +159,8 @@ func run_step() -> void:
 			var mirrors := inv.count("mirror_card")
 			var g0: int = game.gold
 			check(q.complete("kirk_soul"), "«Душа в карте» сдано")
-			check(inv.count("mirror_card") == mirrors + 1 + _bonus("mirror_card") and game.gold == g0 + 20,
-				"награда: зеркальная карта и 20 зол.")
+			check(inv.count("mirror_card") == mirrors + 1 + _bonus("mirror_card") and game.gold == g0 + 400,
+				"награда: зеркальная карта и 400 зол.")
 			_check_bonus("kirk_soul")
 			# «Новый друг»: формирование и призыв
 			check(q.accept("kirk_new_friend"), "взято «Новый друг»")
@@ -245,7 +241,7 @@ func run_step() -> void:
 			check(_has_text("Победить зверей вместе с питомцем") and _has_text("5/5"), "цель с прогрессом")
 			check(_has_text("Все цели выполнены — вернитесь к Учителю Кирку"), "подсказка, кому сдавать")
 			check(_find_live(hud._window, "reward_revive_scroll") != null, "награда-предмет со значком")
-			check(_has_text("Золото: 40") and _has_text("Опыт: %d" % int(QuestData.get_quest("kirk_bond_trial")["rewards"]["xp"])), "награда: опыт и золото")
+			check(_has_text("Золото: 800") and _has_text("Опыт: %d" % int(QuestData.get_quest("kirk_bond_trial")["rewards"]["xp"])), "награда: опыт и золото")
 			check(_find_live(hud._window, "reward_random") != null and _has_text("Случайная награда: 1–2 предмета"),
 				"в журнале — «Случайная награда: 1–2 предмета»")
 			_press_journal("tab_done")
@@ -271,7 +267,7 @@ func run_step() -> void:
 				and game.gold == g0, "сообщение, задание осталось взятым")
 			inv.remove("sword_steel", inv.count("sword_steel"))
 			check(q.complete("kirk_bond_trial"), "«Испытание связи» сдано")
-			check(inv.count("revive_scroll") == 1 + _bonus("revive_scroll") and game.gold == g0 + 40, "награда: свиток и 40 зол.")
+			check(inv.count("revive_scroll") == 1 + _bonus("revive_scroll") and game.gold == g0 + 800, "награда: свиток и 800 зол.")
 			_check_bonus("kirk_bond_trial")
 			for id in CHAIN:
 				check(q.state(String(id)) == "done", "цепочка: %s сдано" % id)
@@ -370,14 +366,15 @@ func _unit_data() -> void:
 		"предыдущие задания: строка или список")
 	# Торговля: у Кирка карты существ, у торговца — нет
 	var kg := InventoryWindow.goods("assassin", "kirk")
-	check(kg == ["card_panther", "card_pheasant", "card_turtle", "mirror_card"], "товары Кирка: %s" % [kg])
+	check(kg == ["card_panther", "card_pheasant", "card_turtle", "card_wolf", "card_centaur", "unit_card", "restore_chalk",
+		"empty_bottle"], "товары Кирка: %s" % [kg])
 	var mg := InventoryWindow.goods("assassin", "merchant")
 	for id in mg:
 		check(ItemData.item_type(String(id)) != "card", "у торговца нет карт: %s" % id)
 	check(mg.has("potion_hp_r1") and mg.has("revive_scroll") and not mg.has("dagger_steel"), "у торговца зелья и свиток, оружия нет")
 	check(InventoryWindow.goods("assassin", "weaponsmith").has("dagger_steel"), "оружие — у Оружейника Бранда")
 	check(NpcData.sellers_of("card_turtle") == ["kirk"], "карту черепахи продаёт только Кирк")
-	check(Taming.where_to_get("card_turtle") == "продаётся у Учителя Кирка в центре города", "где взять: "
+	check(Taming.where_to_get("card_turtle").begins_with("продаётся у Учителя Кирка в центре города"), "где взять: "
 		+ Taming.where_to_get("card_turtle"))
 	# Место в сумке для нескольких наград сразу
 	var a := Inventory.new()

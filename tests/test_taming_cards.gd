@@ -31,8 +31,7 @@ func run_step() -> void:
 			for sp in SPECIES:
 				check(not inv.has("card_" + String(sp)), "карт существ у нового героя нет: %s" % sp)
 			check(not inv.has("crystal_common"), "кристаллов души у нового героя нет")
-			check(game.gold >= int(ItemData.get_item("card_panther")["buy"]), "стартового золота хватает на карту: %d"
-				% game.gold)
+			check(game.gold == Game.START_GOLD, "стартовое золото: %d (карту фазана дарит Кирк заданием)" % game.gold)
 			# Рядом с Учителем Кирком (он продаёт карты существ)
 			var kp: Vector3 = main.npcs.kirk.global_position
 			var to_c := Vector3(-kp.x, 0, -kp.z).normalized()
@@ -45,16 +44,17 @@ func run_step() -> void:
 			eco.open_shop("kirk")
 			check(eco.is_shop_open() and eco.window.seller == "kirk", "окно торговли Учителя Кирка открыто")
 			var win: InventoryWindow = eco.window
-			for id in ["card_panther", "card_turtle", "card_pheasant", "mirror_card"]:
+			for id in ["card_panther", "card_turtle", "card_pheasant", "card_wolf", "card_centaur"]:
 				check(win.buttons.has("good_" + id), "Учитель Кирк продаёт: %s" % ItemData.item_name(id))
 			for id in ["card_panther", "mirror_card"]:
 				check(not InventoryWindow.goods(game.class_id, "merchant").has(id), "у торговца нет: %s" % id)
-			for id in ["card_wolf", "card_panther_soul", "card_boar", "card_golem"]:
+			check(InventoryWindow.goods(game.class_id, "rare_merchant").has("mirror_card"), "зеркальная — у Торговца редкостями")
+			for id in ["card_panther_soul", "card_boar", "card_golem", "mirror_card"]:
 				check(not win.buttons.has("good_" + id), "не продаётся: %s" % id)
-			game.gold = 100
+			game.gold = 10000
 			_press("good_card_pheasant")
 			_press("act_buy")
-			check(inv.count("card_pheasant") == 1 and game.gold == 100 - int(ItemData.get_item("card_pheasant")["buy"]),
+			check(inv.count("card_pheasant") == 1 and game.gold == 10000 - int(ItemData.get_item("card_pheasant")["buy"]),
 				"куплена карта фазана, золото %d" % game.gold)
 			main.hud.close_window()
 			step = 2
@@ -277,11 +277,11 @@ func _unit_items() -> void:
 	check(ItemData.item_type(ItemData.MIRROR_CARD) == "card" and ItemData.card_species(ItemData.MIRROR_CARD) == "",
 		"зеркальная карта без вида")
 	check(ItemData.frame_color(ItemData.MIRROR_CARD) == ItemData.MIRROR_COLOR, "зеркальная — серебряная рамка")
-	check(int(ItemData.get_item(ItemData.MIRROR_CARD)["buy"]) > int(ItemData.get_item("card_panther")["buy"]),
-		"зеркальная карта дороже базовой")
+	check(int(ItemData.get_item(ItemData.MIRROR_CARD)["buy"]) == 1998 and int(ItemData.get_item("card_panther")["buy"]) == 8000,
+		"цены базы: зеркальная (T-Protect Mirror) 1998, карта пантеры 8000")
 	for sp in ["wolf"]:
 		var c := "card_" + String(sp)
-		check(int(ItemData.get_item(c)["buy"]) == 0, "%s не продаётся" % c)
+		check(int(ItemData.get_item(c)["buy"]) == 20000, "%s — 20 000 у Кирка (база)" % c)
 		var dropped := false
 		for e in LootTable.pool("card", sp, 3):
 			if String((e as Array)[0]) == c:
@@ -311,8 +311,9 @@ func _unit_lines() -> void:
 	t = "\n".join(PackedStringArray(Taming.card_lines("card_wolf_soul")))
 	check(t.contains("Сформируйте существо в окне «Питомцы» или кнопкой «Сформировать»"), "карта с душой: " + t)
 	t = "\n".join(PackedStringArray(Taming.card_lines(ItemData.MIRROR_CARD)))
-	check(t.contains("зеркальная карта") and t.contains("продаётся у Учителя Кирка"), "зеркальная карта: " + t)
-	check(Taming.where_to_get("card_wolf").begins_with("выпадает из волка"), "карта волка — из волка: " + Taming.where_to_get("card_wolf"))
+	check(t.contains("зеркальная карта") and t.contains("продаётся у Саввы Заморского"), "зеркальная карта: " + t)
+	check(Taming.where_to_get("card_wolf").contains("Кирка") and Taming.where_to_get("card_wolf").contains("выпадает из волка"),
+		"карта волка — у Кирка и из волка: " + Taming.where_to_get("card_wolf"))
 
 
 ## Карта с душой при полной сумке: заменяет пустую в той же ячейке; если пустых в стопке больше — ничего не теряется.

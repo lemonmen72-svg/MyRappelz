@@ -279,6 +279,100 @@ func _build_stats(body: VBoxContainer, rec: Dictionary) -> void:
 		g2.add_child(_label(_derived_text(key, st), UiScale.FONT_TEXT, Color.WHITE))
 	body.add_child(_label("★ — главная характеристика и атака роли: от неё считается урон умений%s." %
 		(", лечение — от Мудрости" if PetData.role(sp) == "healer" else ""), UiScale.FONT_BODY, MUTED))
+	_build_gear(body, rec)
+
+
+## Снаряжение питомца (PetGear): ячейки «Оружие» и «Броня» — надетое и «Снять», у пустой — вещи из сумки «Надеть».
+func _build_gear(body: VBoxContainer, rec: Dictionary) -> void:
+	body.add_child(_label("Снаряжение питомца", UiScale.FONT_HEAD, GOLD))
+	var k := PetGear.expert(rec)
+	if k <= 0.0:
+		body.add_child(_label("Нужно умение «Знаток снаряжения» (вкладка «Умения», 1 JP): питомец наденет оружие и доспех.",
+			UiScale.FONT_BODY, MUTED))
+		return
+	body.add_child(_label("Питомец получает %d%% характеристик вещи и всю прибавку заточки. Надеть — «Карта снаряжения» (Кирк), снять — «Мел восстановления»."
+		% roundi(k * 100.0), UiScale.FONT_BODY, MUTED))
+	for slot in PetGear.SLOTS:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", int(UiScale.px(8)))
+		body.add_child(row)
+		var cur := PetGear.gear_in(rec, String(slot))
+		if cur != "":
+			var iv := IconView.new()
+			iv.custom_minimum_size = Vector2(UiScale.px(40), UiScale.px(40))
+			iv.set_spec(IconView.item(cur))
+			row.add_child(iv)
+		var lb := _label(PetGear.slot_text(rec, String(slot)), UiScale.FONT_TEXT, Color.WHITE)
+		lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(lb)
+		if cur != "":
+			var ub := Button.new()
+			ub.text = "Снять (мел)"
+			ub.focus_mode = Control.FOCUS_NONE
+			ub.custom_minimum_size = Vector2(0, UiScale.button_h())
+			ub.disabled = PetGear.unequip_block(rec, String(slot)) != ""
+			ub.tooltip_text = PetGear.unequip_block(rec, String(slot))
+			ub.pressed.connect(_on_gear_off.bind(String(slot)))
+			row.add_child(ub)
+			buttons["gear_off_" + String(slot)] = ub
+			continue
+		var shown := 0
+		for id in Game.inventory.ids():
+			var gid := String(id)
+			if PetGear.slot_for(gid) != String(slot) or Enchant.free_count(gid) <= 0 or shown >= 3:
+				continue
+			var eb := Button.new()
+			eb.text = "Надеть: %s" % ItemData.item_name(gid)
+			eb.focus_mode = Control.FOCUS_NONE
+			eb.custom_minimum_size = Vector2(0, UiScale.button_h())
+			var why := PetGear.equip_block(rec, gid)
+			eb.disabled = why != ""
+			eb.tooltip_text = why
+			eb.pressed.connect(_on_gear_on.bind(gid))
+			body.add_child(eb)
+			buttons["gear_on_" + gid] = eb
+			shown += 1
+		if shown == 0:
+			body.add_child(_label("В сумке нет подходящих вещей (%s)." % ("оружие, не щит" if slot == "weapon" else "доспех на тело"),
+				UiScale.FONT_BODY, MUTED))
+
+
+func _on_gear_on(id: String) -> void:
+	if index < 0 or index >= Game.pets.size():
+		return
+	var rec: Dictionary = Game.pets[index]
+	var err := PetGear.equip(rec, id)
+	_msg(err if err != "" else "Питомец надел «%s»" % ItemData.item_name(id))
+	_pet_restat(rec)
+	refresh()
+
+
+func _on_gear_off(slot: String) -> void:
+	if index < 0 or index >= Game.pets.size():
+		return
+	var rec: Dictionary = Game.pets[index]
+	var id := PetGear.gear_in(rec, slot)
+	var err := PetGear.unequip(rec, slot)
+	_msg(err if err != "" else "«%s» — снова в сумке" % ItemData.item_name(id))
+	_pet_restat(rec)
+	refresh()
+
+
+## Призванный питомец пересчитывает характеристики (снаряжение, умения).
+func _pet_restat(rec: Dictionary) -> void:
+	var pet := _live_pet(rec)
+	if pet != null:
+		pet.refresh_skills()
+
+
+## «Создать» (умения вида "manual": материал, зелье) — питомец должен быть призван (MP — его).
+func _on_create(id: String) -> void:
+	if index < 0 or index >= Game.pets.size():
+		return
+	var rec: Dictionary = Game.pets[index]
+	var r := PetGear.create(rec, id, _live_pet(rec))
+	_msg(r)
+	refresh()
 
 
 func _derived_text(key: String, st: Dictionary) -> String:
@@ -501,7 +595,13 @@ func _tree_item(rec: Dictionary, id: String, pet: Pet) -> Dictionary:
 
 ## Значок умения питомца: res://assets/icons/pets/<вид>/<id умения>.png (у каждого вида свои картинки).
 static func icon_path(species: String, id: String) -> String:
-	return "res://assets/icons/pets/%s/%s.png" % [species, id]
+	var p := "res://assets/icons/pets/%s/%s.png" % [species, id]
+	# Общие умения всех видов («Благословение …») — один значок в assets/icons/pets/common/
+	if not Assets.exists(p):
+		var c := "res://assets/icons/pets/common/%s.png" % id
+		if Assets.exists(c):
+			return c
+	return p
 
 
 ## Карточка умения: название, тип, уровень, эффект сейчас и на следующем, требования, «+ JP», «Вкл/Выкл».
@@ -557,6 +657,9 @@ func _card(rec: Dictionary, id: String, pet: Pet) -> Control:
 		var left := float(pet.skill_cds.get(id, 0.0))
 		if left > 0.0:
 			box.add_child(_label("Перезарядка: %.0f с" % ceilf(left), UiScale.FONT_BODY, MUTED))
+	if kind == "manual" and cur > 0:
+		var why := PetGear.create_block(rec, id, pet)
+		box.add_child(_label(why if why != "" else "Можно создать", UiScale.FONT_BODY, BAD if why != "" else GOOD, w))
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(spacer)
@@ -572,6 +675,15 @@ func _card(rec: Dictionary, id: String, pet: Pet) -> Control:
 		plus.pressed.connect(_on_learn.bind(id))
 		btns.add_child(plus)
 		buttons["learn_" + id] = plus
+	if kind == "manual" and cur > 0:
+		var cb := Button.new()
+		cb.text = "Создать"
+		cb.focus_mode = Control.FOCUS_NONE
+		cb.custom_minimum_size = Vector2(UiScale.px(110), UiScale.button_h())
+		cb.disabled = PetGear.create_block(rec, id, pet) != ""
+		cb.pressed.connect(_on_create.bind(id))
+		btns.add_child(cb)
+		buttons["create_" + id] = cb
 	# Аура в ячейке, выключенная нехваткой MP, — включить сейчас
 	if kind == "toggle" and cur > 0 and slot >= 0 and not on:
 		var tb := Button.new()

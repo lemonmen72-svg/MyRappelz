@@ -8,7 +8,9 @@ extends "res://tests/test_base.gd"
 ## Плечи (_check_shoulders): плечевые суставы в покое, стойках, шаге и беге не позади шеи больше SHOULDER_BACK — как у
 ## исходной модели Meshy (0…−1 см); до исправления ключиц в клипах UAL было −5…−7 см («плечи за головой»).
 ## Бег (_check_loco): носок в переносе не выше RUN_LIFT_MAX роста, колено ниже таза, при 7 м/с не чаще RUN_CADENCE_MAX
-## шагов в секунду (бег спринтера манекена с темпом ×1.2–1.3 поднимал ноги «как по воде»).
+## шагов в секунду (бег спринтера манекена с темпом ×1.2–1.3 поднимал ноги «как по воде»). С 0.31 шаг и бег — живой
+## мокап CMU (tools/bvh_to_glb.py, tools/retarget_mannequin.py MQ_LOCO): пятка в переносе уходит к ягодице (носок до
+## ≈ 0.48 роста — сзади, не колено вперёд), колено ниже таза на 0.1 роста.
 
 const HEROES := [
 	"res://assets/characters/hero_assassin_m.glb",
@@ -49,10 +51,10 @@ const MAX_TRIS := 80000
 ## Walking UAL — 6.2–7.7 см.
 const SHOULDER_BACK := 0.05
 const SHOULDER_CLIPS := ["idle", "sword_idle", "crossbow_idle", "walking", "mq_walking", "mq_running", "mq_cast_hold"]
-## Бег Mq_Running: носок в переносе над своей высотой в покое — не выше доли роста (у манекена 0.47–0.50, у героев
-## после tools/retarget_mannequin.py MQ_LIFT ≈ 0.3), колено ниже тазобедренного сустава хотя бы на долю роста (у
-## манекена — почти вровень), шагов в секунду при 7 м/с (скорость героя) не больше.
-const RUN_LIFT_MAX := 0.38
+## Бег Mq_Running: носок в переносе над своей высотой в покое — не выше доли роста (мокап CMU с размахом ×1.6 —
+## 0.41–0.48: пятка к ягодице сзади), колено ниже тазобедренного сустава хотя бы на долю роста (бедро вперёд не выше
+## таза; у бега манекена-спринтера было почти вровень), шагов в секунду при 7 м/с (скорость героя) не больше.
+const RUN_LIFT_MAX := 0.52
 const RUN_KNEE_MIN := 0.05
 const RUN_CADENCE_MAX := 3.6
 ## Движения манекенов Meshy (tools/retarget_mannequin.py, MQ_CLIPS): у каждого героя все, в .json — длина и удар.
@@ -72,7 +74,7 @@ const MQ_LOOPS := ["mq_cast_hold", "mq_charge_hold", "mq_bow_aim_hold", "mq_cros
 ## Шаг и бег манекенов (CharacterModel.MQ_LOCO): [клип, ход таза по высоте за цикл до, м; длина шага от, до, м].
 ## Своя скорость — clips.<имя>.speed в .json.
 const MQ_LOCO := [["mq_walking", 0.09, 0.5, 1.1], ["mq_running_b", 0.12, 0.9, 1.5],
-	["mq_running", 0.08, 1.7, 2.4], ["mq_sprint", 0.08, 1.4, 2.6]]
+	["mq_running", 0.11, 1.7, 2.4], ["mq_sprint", 0.11, 1.7, 2.8]]
 ## Опорная стопа (носок у земли) едет назад со скоростью клипа: отклонение не больше, м.
 const MQ_LOCO_SLIDE := 0.04
 ## Повороты на месте: угол корпуса за клип (clips.<имя>.turn, °) по модулю не меньше.
@@ -153,19 +155,19 @@ func run_step() -> void:
 			wait = 20
 			step = 20
 		20:
-			# Трусца между шагом и бегом (порог с запасом: с бега вниз — ниже 4.6 × 0.92)
+			# Трусца между шагом и бегом (порог с запасом: с бега вниз — ниже 4.8 × 0.92)
 			for i in models.size():
 				var m := models[i]
 				check(m._anim.current_animation.to_lower() == "mq_running_b", "%s: на 3.6 м/с — трусца (%s)" % [
 					HEROES[i], m._anim.current_animation])
 				# Чуть выше порога бега, но в пределах запаса — вид держится
-				m.set_move_speed(4.8)
+				m.set_move_speed(5.0)
 			wait = 20
 			step = 21
 		21:
 			for i in models.size():
 				var m := models[i]
-				check(m._anim.current_animation.to_lower() == "mq_running_b", "%s: 4.8 м/с — в запасе порога, трусца держится (%s)" % [
+				check(m._anim.current_animation.to_lower() == "mq_running_b", "%s: 5.0 м/с — в запасе порога, трусца держится (%s)" % [
 					HEROES[i], m._anim.current_animation])
 				m.set_move_speed(10.0)
 			wait = 20

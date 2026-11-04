@@ -78,6 +78,9 @@ var evasion := 0.0
 var crit := 3.0
 ## Восстановление HP (всегда, и в бою) и MP в секунду.
 var hp_regen := 0.0
+## «Зализать раны»: восстановление HP в секунду и сколько ещё длится.
+var _lick_regen := 0.0
+var _lick_left := 0.0
 var mp_regen := 1.0
 ## Шанс, что удар питомца переключит зверя на него («Дерзкий вызов»).
 var threat := 0.0
@@ -632,8 +635,12 @@ func _tick_skills(delta: float) -> void:
 			changed = true
 	else:
 		_mp_acc = 0.0
-	if hp_regen > 0.0 and hp < max_hp:
-		_hp_acc += hp_regen * delta
+	var regen_now := hp_regen
+	if _lick_left > 0.0:
+		_lick_left -= delta
+		regen_now += _lick_regen
+	if regen_now > 0.0 and hp < max_hp:
+		_hp_acc += regen_now * delta
 		if _hp_acc >= 1.0:
 			var h := int(_hp_acc)
 			_hp_acc -= h
@@ -859,10 +866,13 @@ func _support_skills() -> void:
 		var buff := String(sk.get("buff", ""))
 		if buff == "" or not skill_ready(id):
 			continue
-		if buff == "heal":
+		if buff == "heal" or buff == "regen":
 			var low_owner := owner_node.hp > 0 and float(owner_node.hp) < float(owner_node.max_hp) * HEAL_SKILL_THRESHOLD
 			var low_self := float(hp) < float(max_hp) * HEAL_SKILL_THRESHOLD
 			if not (low_owner or low_self):
+				continue
+			# «Зализать раны» тратит материал своего вида из сумки
+			if sk.has("needs") and not Game.inventory.has(String(sk["needs"])):
 				continue
 		elif target == null:
 			continue
@@ -1005,6 +1015,17 @@ func _apply_buff(sk: Dictionary, n: int, id: String = "") -> void:
 			if owner_node.hp > 0:
 				owner_node.heal(maxi(1, roundi(float(owner_node.max_hp) * v)) + heal_power)
 			heal(maxi(1, roundi(float(max_hp) * v)))
+		"regen":
+			# «Зализать раны» (Wound Lick базы): восстановление HP хозяину и питомцу на time с, материал вида тратится
+			var need := String(sk.get("needs", ""))
+			if need != "" and not Game.inventory.remove(need):
+				return
+			var t := float(sk.get("time", 30.0))
+			if owner_node.has_method("add_timed_bonus"):
+				owner_node.add_timed_bonus(id, t, {"regen": v}, StatusEffects.source_pet_skill(species, id))
+			_lick_regen = v
+			_lick_left = t
+			Util.float_text(parent, head, "Раны заживают", c)
 	if _asset != null:
 		_asset.play_cast()
 	Vfx.magic_burst(parent, owner_node.global_position + Vector3(0, 1.0, 0), c, 1.6, 0.4)
@@ -1188,6 +1209,7 @@ func _apply_stats() -> void:
 	# Бонусы от героя (ауры, пассивки и усиления «питомцевых» профессий — PetBond): статы — в формулы, остальное поверх
 	var hb := PetBond.pet_bonuses(self)
 	var s := PetStats.derived(species, level, skills, toggles, PetBond.stat_extra(hb), PetData.stage_of(record), PetData.super_bonus(record))
+	PetGear.apply(record, s)
 	PetBond.apply_to_pet(self, s, hb)
 	stats = s
 	max_hp = int(s["max_hp"])

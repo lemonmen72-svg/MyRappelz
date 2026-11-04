@@ -422,6 +422,9 @@ func _check_skill_data() -> void:
 			elif kind == "toggle":
 				if PetSkills.upkeep(String(id), 1) <= 0 or not sk.has("bonus"):
 					bad += " %s: поддержка" % id
+			elif kind == "manual":
+				if not sk.has("creates") or PetSkills.mp_cost(String(id), 1) <= 0:
+					bad += " %s: создание" % id
 			elif not sk.has("bonus"):
 				bad += " %s: бонус" % id
 			if PetSkills.effect_text(String(id), 1) == "" or PetSkills.requirement_text(String(id), 1) == "":
@@ -431,7 +434,8 @@ func _check_skill_data() -> void:
 	check(bad == "", "данные умений в порядке" + bad)
 	for sp in BASIC:
 		var cost := 0
-		for id in PetSkills.list_for(sp):
+		# Прежние 18 умений вида (новые из базы — снаряжение, пояс, благословения — сверху, с 40–51 ур.)
+		for id in PetSkills.SPECIES_SKILLS[sp]:
 			var sk := PetSkills.get_skill(String(id))
 			cost += int(sk["tiers"][0][1]) * int(sk["jp"])
 		var have := PetStats.default_jp(15)
@@ -454,7 +458,8 @@ func _check_tree(cw: CreatureWindow) -> void:
 	check(tr.icons.size() == ids.size(), "древо: значок на каждое умение (%d)" % tr.icons.size())
 	var max_rows := int(floor(tr.custom_minimum_size.y / SkillTree.row_min()))
 	check(tr.rows.size() >= 3 and tr.rows.size() <= max_rows, "ярусов %d — помещаются (до %d)" % [tr.rows.size(), max_rows])
-	check(tr.icon_size >= SkillTree.icon_min(), "значки не мельче %d px: %.0f" % [int(SkillTree.icon_min()), tr.icon_size])
+	# С 0.31 у питомцев до 32 умений — значки мельче, но не меньше 30 px (касание на телефоне)
+	check(tr.icon_size >= UiScale.px(30.0), "значки не мельче 30 px: %.0f" % tr.icon_size)
 	check(tr.row_of("inner_fire") == 0 and tr.row_of("inner_fire") < tr.row_of("shadow_bond")
 		and tr.row_of("shadow_bond") < tr.row_of("midnight_vortex"), "ярусы сверху вниз по требуемому уровню")
 	check(tr.row_of("shadow_rend") < tr.row_of("dusk_rupture") and tr.row_of("shadow_squall") < tr.row_of("midnight_vortex"),
@@ -516,7 +521,7 @@ func press_cw(key: String) -> void:
 ## Прежде у волка было 4 умения на всех стадиях (жалоба Максима).
 func _check_wolf() -> void:
 	var ids: Array = PetSkills.list_for("wolf")
-	check(ids.size() == 18, "у волка 18 умений (%d)" % ids.size())
+	check(ids.size() == 18 + 14, "у волка 18 умений древа и 14 новых из базы (%d)" % ids.size())
 	for id in ids:
 		check(not PetSkills.get_skill(String(id)).is_empty(), "умение волка «%s» описано" % id)
 	for id in ["rending_bite", "chilling_howl", "lunging_bite", "pack_bond", "alpha_call", "fang_flurry", "moon_frenzy",
@@ -527,7 +532,8 @@ func _check_wolf() -> void:
 		for id in ids:
 			if PetSkills.cap_for(String(id), 150, st) > 0:
 				by_stage[st] += 1
-	check(by_stage[0] >= 13 and by_stage[2] == 18, "волк: умений на стадиях %s (на 3-й все 18)" % str(by_stage))
+	check(by_stage[0] >= 13 and by_stage[2] == ids.size(), "волк: умений на стадиях %s (на 3-й все)" % str(by_stage))
+	_check_db_extras()
 	# Страх «Леденящего воя» и уклонение «Уз стаи» хозяину
 	var sk := PetSkills.get_skill("chilling_howl")
 	check(sk.has("fear") and PetSkills.value(sk["fear"], 15) > 4.9, "«Леденящий вой»: страх до 5 с (%.1f)" % PetSkills.value(sk["fear"], 15))
@@ -540,3 +546,51 @@ func _check_wolf() -> void:
 	p.set_pet_aura(null, 0.0, 0, 0.0)
 	check(e1 > e0, "уклонение героя от уз питомца растёт (%.2f → %.2f)" % [e0, e1])
 
+
+## Умения существ из базы (0.31): снаряжение (PetGear), пояс (PetBelt), «Зализать раны», «Создание», «Благословения».
+func _check_db_extras() -> void:
+	for sp in PetSkills.DB_EXTRAS:
+		var ids: Array = PetSkills.list_for(String(sp))
+		for id in ["item_expert_", "vital_unit_", "fighter_unit_", "card_%s_1", "card_%s_2", "wound_lick_", "creation_",
+				"creation_potion_"]:
+			var sid := (String(id) % sp) if String(id).contains("%s") else String(id) + String(sp)
+			check(ids.has(sid) and not PetSkills.get_skill(sid).is_empty(), "%s: есть «%s»" % [sp, sid])
+		for st in PetSkills.BLESS_STATS:
+			check(ids.has("bless_" + String(st)), "%s: «Благословение» %s" % [sp, st])
+	# Снаряжение: волк 90 %, кентавр 100 %; «Знаток» не изучен — надеть нельзя
+	var rec := {"species": "wolf", "level": 40, "skills": {}, "toggles": {}, "stage": 0}
+	PetSkills.ensure_record(rec)
+	check(PetGear.equip_block(rec, "weapon_sword_1h_r1") != "", "без «Знатока снаряжения» питомцу не надеть")
+	rec["skills"]["item_expert_wolf"] = 1
+	check(is_equal_approx(PetGear.expert(rec), 0.9), "волк получает 90 %% характеристик снаряжения")
+	var r0 := PetData.stats_of(rec)
+	rec["gear"] = {"weapon": "weapon_sword_1h_r1+2", "armor": "armor_body_hunter_r1"}
+	var r1 := PetData.stats_of(rec)
+	var want := roundi(27.0 * 0.9) + (ItemData.enchant_value(27, 2) - 27)
+	check(int(r1["patk"]) - int(r0["patk"]) == want, "меч +2: атака волка +%d (ожидалось %d)" % [int(r1["patk"]) - int(r0["patk"]), want])
+	check(int(r1["def"]) > int(r0["def"]) and int(r1["max_hp"]) == int(r0["max_hp"]), "доспех: защита выше, HP без «Живучести» тот же")
+	rec["skills"]["vital_unit_wolf"] = 1
+	var r2 := PetData.stats_of(rec)
+	check(int(r2["max_hp"]) > int(r1["max_hp"]), "«Живучесть: доспех охотника» с охотничьим доспехом — HP выше (%d → %d)" % [int(r1["max_hp"]), int(r2["max_hp"])])
+	# Пояс: карта волка — Ловкость героя +10 %
+	var saved_pets: Array = Game.pets.duplicate()
+	var saved_equip: Dictionary = Game.equip.duplicate()
+	var saved_active := Game.active_pet
+	Game.pets.clear()
+	var wolf := {"species": "wolf", "name": "Тест", "level": 40, "skills": {"card_wolf_1": 1}, "toggles": {}, "stage": 0}
+	Game.pets.append(wolf)
+	check(PetBelt.put(0, 0) == "", "волк со «Способностью карты» — в пояс")
+	check(PetBelt.hero_bonus(Game.class_id, Game.level).is_empty() or PetBelt.belt_worn(), "без пояса бонусов нет")
+	Game.inventory.add("belt_light_r1")
+	Game.equip["belt"] = "belt_light_r1"
+	Game._sync_worn()
+	var hb := PetBelt.hero_bonus(Game.class_id, Game.level)
+	var agi := float(HeroStats.base_stats(Game.class_id, Game.level).get("agi", 0))
+	check(is_equal_approx(float(hb.get("agi", 0.0)), roundf(agi * 0.10)), "карта волка: Ловкость героя +10 %% (%s, база %.0f)" % [hb, agi])
+	check(PetBelt.put_block(0, 3).contains("закрыта") or PetBelt.put_block(0, 3).contains("форм"), "ячейка 4 — закрыта или для 3-й формы")
+	Game.pets.clear()
+	for p in saved_pets:
+		Game.pets.append(p)
+	Game.equip = saved_equip
+	Game.active_pet = saved_active
+	Game._sync_worn()

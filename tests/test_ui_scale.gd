@@ -66,11 +66,11 @@ func before_start() -> void:
 	game.inventory.add("cube_defense_r2", 2)
 	game.inventory.add(ItemData.broken_id("weapon_sword_1h_r1"), 2)
 	# Экипировка: окно героя и сумка с надетыми бронёй и украшениями, карточка доспеха со сравнением
-	for id in ["armor_body_warrior_r1", "armor_body_warrior_r2", "armor_helmet_r1", "armor_boots_r1", "ring_critdmg_r1",
-			"ring_hp_r1", "pendant_mdef_r1", "belt_speed_r1"]:
+	for id in ["armor_body_warrior_r1", "armor_body_warrior_r2", "armor_helmet_r1", "armor_boots_r1", "ring_str_r1",
+			"ring_vit_r1", "pendant_mdef_r1", "belt_light_r1"]:
 		game.inventory.add(String(id))
-	for id in ["armor_body_warrior_r1", "armor_helmet_r1", "armor_boots_r1", "ring_critdmg_r1", "ring_hp_r1", "pendant_mdef_r1",
-			"belt_speed_r1"]:
+	for id in ["armor_body_warrior_r1", "armor_helmet_r1", "armor_boots_r1", "ring_str_r1", "ring_vit_r1", "pendant_mdef_r1",
+			"belt_light_r1"]:
 		game.equip_gear(String(id))
 
 

@@ -225,6 +225,12 @@ func _build_hero(body: VBoxContainer) -> void:
 		UiScale.FONT_BODY, GOOD if gtext != "" else MUTED, UiScale.px(WINDOW_SIZE.x - 60.0))
 	gl.name = "gear_bonus_label"
 	body.add_child(gl)
+	# Карты существ в поясе (PetBelt)
+	if not p.belt_bonus.is_empty():
+		var bl := _label("От карт в поясе: %s" % PetBelt.bonus_text(p.belt_bonus), UiScale.FONT_BODY, GOOD,
+			UiScale.px(WINDOW_SIZE.x - 60.0))
+		bl.name = "belt_bonus_label"
+		body.add_child(bl)
 
 	# Оружие: основная рука, вторая рука (щит или второе такое же одноручное — пара)
 	var wrow := HFlowContainer.new()

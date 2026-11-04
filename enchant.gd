@@ -29,6 +29,16 @@ extends RefCounted
 ## Шанс чарования кубом: [до какого «+N» (получится) включительно, шанс].
 const CHANCES := [1.0, 1.0, 1.0, 1.0, 0.7, 0.6, 0.5, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.12, 0.1, 0.09, 0.08, 0.07, 0.06,
 	0.05]
+## Таблицы шансов по виду куба (ItemData.CUBE_KINDS chances; EnhanceResource базы): normal — Cube - Strike / Defense,
+## ancient — Ancient Cube, acc — Cube-Accessory (только до +5), ancient_acc — Ancient Cube - Accessory.
+const CHANCE_TABLES := {
+	"normal": CHANCES,
+	"ancient": [1.0, 1.0, 1.0, 1.0, 1.0, 0.9, 0.8, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.42, 0.4, 0.39, 0.38, 0.37, 0.36, 0.35],
+	"acc": [0.7, 0.55, 0.4, 0.25, 0.1],
+	"ancient_acc": [1.0, 0.85, 0.7, 0.55, 0.4],
+}
+## Древний элемент (Altered Ancient Element базы): + к шансу попытки (не выше 100 %).
+const ELEMENT_BONUS := 0.1
 ## Пределы чарования кубами: броня и щит — ARMOR_MAX; оружие 1-го ранга — WEAPON_MAX_R1, 2-го и выше — WEAPON_MAX.
 const ARMOR_MAX := 10
 const WEAPON_MAX_R1 := 10
@@ -40,16 +50,25 @@ const SMITH_NPC := "smith"
 const TEMPER_PRICES := {1: [300, 10000], 2: [20000, 100000], 3: [100000, 1000000]}
 
 
-## Шанс получить заточку target (из target − 1) кубом.
-static func chance_for(target: int) -> float:
-	if target < 1 or target > CHANCES.size():
+## Шанс получить заточку target (из target − 1) кубом с таблицей table (CHANCE_TABLES).
+static func chance_for(target: int, table: String = "normal") -> float:
+	var t: Array = CHANCE_TABLES.get(table, CHANCES)
+	if target < 1 or target > t.size():
 		return 0.0
-	return float(CHANCES[target - 1])
+	return float(t[target - 1])
 
 
-## Шанс следующего уровня заточки вещи id кубом.
-static func chance(id: String) -> float:
-	return chance_for(ItemData.enchant_level(id) + 1)
+## Шанс следующего уровня заточки вещи id кубом cube ("" — обычный куб; element — с древним элементом).
+static func chance(id: String, cube: String = "", element: bool = false) -> float:
+	var table := "normal"
+	if cube != "" and ItemData.CUBE_KINDS.has(ItemData.cube_kind(cube)):
+		table = String(ItemData.CUBE_KINDS[ItemData.cube_kind(cube)]["chances"])
+	elif ItemData.enchant_kind(id) == "acc":
+		table = "acc"
+	var ch := chance_for(ItemData.enchant_level(id) + 1, table)
+	if element and ch > 0.0:
+		ch = minf(1.0, ch + ELEMENT_BONUS)
+	return ch
 
 
 ## Предел чарования кубами у вещи id (0 — не точится).
@@ -59,7 +78,27 @@ static func cube_cap(id: String) -> int:
 			return ARMOR_MAX
 		"attack":
 			return WEAPON_MAX_R1 if ItemData.rank(id) <= 1 else WEAPON_MAX
+		"acc":
+			return ItemData.ACC_ENCHANT_MAX
 	return 0
+
+
+## Порошок стабильности для вещи item в сумке ("" — нет): младший подходящий (ранг порошка ≥ ранга вещи).
+static func powder_for(item: String) -> String:
+	for r in range(maxi(1, ItemData.rank(item)), ItemData.CUBE_RANKS + 1):
+		var id := "stab_powder_r%d" % r
+		if Game.inventory.has(id):
+			return id
+	return ""
+
+
+## Древний элемент для куба cube в сумке ("" — нет или куб не атаки / защиты): того же вида и ранга куба.
+static func element_for(cube: String) -> String:
+	var t := ItemData.cube_target(cube)
+	if t != "attack" and t != "defense":
+		return ""
+	var id := "element_%s_r%d" % [t, ItemData.rank(cube)]
+	return id if Game.inventory.has(id) else ""
 
 
 ## Почему вещь item нельзя чаровать кубом cube ("" — можно; cube "" — проверка только вещи).
@@ -70,19 +109,27 @@ static func cube_block(item: String, cube: String = "") -> String:
 		return "Сломанную вещь не чаруют"
 	var kind := ItemData.enchant_kind(item)
 	if kind == "":
-		return "Это не чаруется: только оружие, броня и щит"
+		return "Это не чаруется: только оружие, броня, щит и украшения"
 	var n := ItemData.enchant_level(item)
 	var cap := cube_cap(item)
 	if n >= cap:
-		if ItemData.enchant_kind(item) == "defense":
-			return "Заточка +%d — предел брони и щита" % cap
+		match kind:
+			"defense":
+				return "Заточка +%d — предел брони и щита" % cap
+			"acc":
+				return "Заточка +%d — предел украшений" % cap
 		return "Заточка +%d — предел для оружия %d-го ранга" % [cap, ItemData.rank(item)]
 	if cube == "":
 		return ""
 	if not ItemData.is_cube(cube):
 		return "Положите куб"
-	if ItemData.cube_kind(cube) != kind:
-		return "Нужен %s" % ("куб атаки (для оружия)" if kind == "attack" else "куб защиты (для брони и щита)")
+	if ItemData.cube_target(cube) != kind:
+		match kind:
+			"attack":
+				return "Нужен куб атаки (для оружия)"
+			"acc":
+				return "Нужен куб украшений"
+		return "Нужен куб защиты (для брони и щита)"
 	if ItemData.rank(cube) < ItemData.rank(item):
 		return "Нужен куб %d-го ранга или старше" % ItemData.rank(item)
 	if not Game.inventory.has(cube):
@@ -113,7 +160,7 @@ static func temper_block(item: String) -> String:
 		return "Положите вещь на наковальню"
 	if ItemData.is_broken(item):
 		return "Сломанную вещь не закалить"
-	if not ItemData.is_enchantable(item):
+	if not ItemData.is_enchantable(item) or ItemData.enchant_kind(item) == "acc":
 		return "Закаляют только оружие, броню и щит"
 	if ItemData.enchant_level(item) >= SMITH_MAX:
 		return "Кузнец закаляет до +%d — дальше только кубы" % SMITH_MAX
@@ -214,9 +261,11 @@ static func swap(old: String, new_id: String, where: String = "") -> String:
 ## Чаровать вещь item кубом cube (where — где вещь, как locate). rng — свой генератор (тесты), null — общий.
 ## player — пересчитать героя, если вещь надета. {"ok": удалось, "broke": сломалась, "item": id вещи после,
 ## "chance": шанс, "text": сообщение, "error": причина отказа ("" — попытка была)}.
+## opts: {"powder": true — потратить Порошок стабильности (неудача не ломает вещь), "element": true — потратить
+## Древний элемент (+ELEMENT_BONUS к шансу)}; нет такого предмета в сумке — без него.
 static func use_cube(item: String, cube: String, where: String = "", rng: RandomNumberGenerator = null,
-		player: Node = null) -> Dictionary:
-	var res := {"ok": false, "broke": false, "item": item, "chance": 0.0, "text": "", "error": ""}
+		player: Node = null, opts: Dictionary = {}) -> Dictionary:
+	var res := {"ok": false, "broke": false, "item": item, "chance": 0.0, "text": "", "error": "", "saved": false}
 	var err := cube_block(item, cube)
 	if err == "" and not has_item(item, where):
 		err = "Этой вещи нет"
@@ -225,17 +274,32 @@ static func use_cube(item: String, cube: String, where: String = "", rng: Random
 		res["text"] = err
 		return res
 	var w := locate(item, where)
-	var ch := chance(item)
+	var powder := powder_for(item) if bool(opts.get("powder", false)) else ""
+	var element := element_for(cube) if bool(opts.get("element", false)) else ""
+	var ch := chance(item, cube, element != "")
 	res["chance"] = ch
 	Game.inventory.remove(cube)
+	if powder != "":
+		Game.inventory.remove(powder)
+	if element != "":
+		Game.inventory.remove(element)
 	var roll := rng.randf() if rng != null else Combat.rand()
 	var nm := ItemData.item_name(item)
+	var acc := ItemData.enchant_kind(item) == "acc"
 	if roll < ch:
 		var up := ItemData.enchanted_id(item, ItemData.enchant_level(item) + 1)
 		swap(item, up, w)
 		res["ok"] = true
 		res["item"] = up
 		res["text"] = "Чарование удалось: «%s»" % ItemData.item_name(up)
+	elif powder != "":
+		res["saved"] = true
+		res["text"] = "Чарование не удалось, но Порошок стабильности уберёг «%s». Куб потрачен." % nm
+	elif acc:
+		var zero := ItemData.enchanted_id(item, 0)
+		swap(item, zero, w)
+		res["item"] = zero
+		res["text"] = "Чарование не удалось — заточка «%s» пропала. Куб потрачен." % ItemData.item_name(zero)
 	else:
 		var br := ItemData.broken_id(item)
 		swap(item, br, w)

@@ -172,15 +172,16 @@ const COMBAT_HOLD := 6.0
 ## Прежние шаг и бег (UAL; модели без клипов манекенов — запасные герои старых файлов, жители): по WALK_NATIVE / RUN_NATIVE.
 const ASSET_WALK := [["walking_woman"], ["walking"]]
 const ASSET_RUN := [["running"]]
-## Шаг и бег героя — движения манекенов Максима (клипы Mq_*, tools/retarget_mannequin.py MQ_LOCO) в родном темпе:
+## Шаг и бег героя — живой мокап CMU (с 0.31: шаг, трусца; бег и быстрый бег — трусца с бо́льшим размахом ног и рук;
+## клипы Mq_*, tools/retarget_mannequin.py MQ_LOCO, tools/bvh_to_glb.py) в родном темпе:
 ## своя скорость клипа — clips.<имя>.speed в <модель>.json (опорная стопа едет назад ровно с ней), темп = скорость
 ## героя / speed (MQ_LOCO_SCALE_MIN…MAX) — стопа не скользит. Бег UAL, растянутый под 4.2 м/с, шёл прыжками по 2.5–3 м.
 ## По скорости героя: [вид, клипы (первый, что есть в модели), с какой скорости, м/с].
 ## Порог переходится с запасом MQ_LOCO_HYST в обе стороны — на пороге вид не дёргается туда-обратно.
 const MQ_LOCO := [
 	["walk", ["mq_walking"], 0.3],
-	["jog", ["mq_running_b"], 2.6],
-	["run", ["mq_running"], 4.6],
+	["jog", ["mq_running_b"], 2.2],
+	["run", ["mq_running"], 4.8],
 	["sprint", ["mq_sprint"], 8.6],
 ]
 const MQ_LOCO_HYST := 0.08
@@ -603,6 +604,17 @@ static func merchant_spec() -> Dictionary:
 	}
 
 
+## Савва Заморский, торговец редкостями (0.31; пока без модели Meshy npc_rare_merchant.glb): худощавый, бордовый
+## сюртук с золотом, тёмные волосы с проседью, бородка — отличается от Торговца Гордея издалека.
+static func rare_merchant_spec() -> Dictionary:
+	return {
+		"skin": Color(0.9, 0.76, 0.64), "hair": Color(0.25, 0.22, 0.22), "hair_style": "short",
+		"eyes": Color(0.45, 0.3, 0.2), "eye_style": "smile", "ears": false,
+		"outfit": "merchant", "main": Color(0.45, 0.12, 0.16), "accent": Color(0.98, 0.8, 0.3),
+		"weapon": "", "girth": 1.0, "hat": false, "beard": true,
+	}
+
+
 ## Учитель Кирк, наставник укротителей: седые короткие волосы, длинная седая борода и усы, зелёные глаза,
 ## тёмно-зелёная мантия до пят, дорожный плащ с откинутым капюшоном, сумка с картами существ на боку,
 ## светлый посох со светящимся зелёным камнем.
@@ -768,6 +780,8 @@ static func npc_spec(npc_id: String) -> Dictionary:
 			s = armorer_spec()
 		"jeweler":
 			s = jeweler_spec()
+		"rare_merchant":
+			s = rare_merchant_spec()
 		_:
 			s = merchant_spec()
 	var asset := npc_asset(npc_id)

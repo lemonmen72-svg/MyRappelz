@@ -18,8 +18,8 @@ const LOADOUTS := [
 	["weapon_bow_r1", "", "bow"], ["crossbow_starter", "", "crossbow"],
 ]
 const QUICK_LOADOUTS := [0, 1, 2, 3, 5, 12, 14, 15]
-const GEAR := ["armor_body_warrior_r1", "armor_helmet_r1", "armor_gloves_r1", "armor_boots_r1", "ring_hp_r1", "ring_hp_r1",
-	"earring_crit_r1", "pendant_hp_r1", "belt_speed_r1"]
+const GEAR := ["armor_body_warrior_r1", "armor_helmet_r1", "armor_gloves_r1", "armor_boots_r1", "ring_vit_r1", "ring_vit_r1",
+	"earring_crit_r1", "pendant_hpregen_r1", "belt_light_r1"]
 const CRAFT_ITEM := "weapon_axe_1h_r1"
 const CRAFT_TRIES := 6
 

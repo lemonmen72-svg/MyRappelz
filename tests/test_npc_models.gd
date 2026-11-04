@@ -15,6 +15,8 @@ const NPCS := {
 	"weaponsmith": ["m", 1.84], "armorer": ["f", 1.74], "jeweler": ["f", 1.70],
 }
 ## Клипы жителя (нижний регистр): покой и приветствие обязательны, остальные — общий набор героя.
+## Жители, у которых модели из файла пока нет (модель — по промтам, ждём).
+const NO_MODEL_YET := ["rare_merchant"]
 const CLIPS := ["idle", "wave", "walking", "running", "hit", "cast", "pickup"]
 ## Меш жителя: до 50 тыс. (tools/prepare_npcs.py NPC_TRIS), у большинства исходник целиком (~31 тыс.).
 const MAX_TRIS := 52000
@@ -46,6 +48,11 @@ func run_step() -> void:
 	match step:
 		0:
 			for k in NpcData.NPCS:
+				# Торговец редкостями (0.31) — модель Meshy ещё делается (npc_rare_merchant.glb), пока из примитивов
+				if NO_MODEL_YET.has(String(k)):
+					check(not Assets.exists(CharacterModel.npc_asset(String(k))) or NPCS.has(String(k)),
+						"у жителя %s модели пока нет — из примитивов" % k)
+					continue
 				check(NPCS.has(String(k)), "у жителя %s есть модель из файла (список NPCS)" % k)
 			ids = NPCS.keys()
 			for i in ids.size():

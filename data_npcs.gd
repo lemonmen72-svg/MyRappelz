@@ -45,7 +45,10 @@ const NPCS := {
 	"kirk": {
 		"name": "Учитель Кирк", "gen": "Учителя Кирка", "dat": "Учителю Кирку", "where": "в центре города",
 		"title": "Наставник укротителей", "shop_title": "Лавка Учителя Кирка", "dialog": true, "mark_y": 3.2,
-		"shop": ["card_panther", "card_pheasant", "card_turtle", "mirror_card"],
+		# Карты существ — Creature_card базы: пантера, черепаха, фазан 8000, волк 20 000, кентавр 80 000; карта снаряжения
+		# и мел восстановления (питомцу — снаряжение), пустой флакон (зелья существ) — beginner_etc / gaia_etc базы
+		"shop": ["card_panther", "card_pheasant", "card_turtle", "card_wolf", "card_centaur", "unit_card", "restore_chalk",
+			"empty_bottle"],
 		"no_quests": "Пока поручений нет. Загляни позже — у старого учителя всегда найдётся дело.",
 		"greet": {
 			"ready": "Ну-ка, ну-ка… По глазам вижу — справился! Рассказывай, не томи старика.",
@@ -134,8 +137,8 @@ const NPCS := {
 		"where": "в центре города, у домов на северо-востоке", "title": "Бронник", "shop_title": "Лавка доспехов",
 		"dialog": true, "mark_y": 3.2,
 		"spot": {"poi": "town", "off": Vector2(8.5, -9.5)},
-		"shop": ["armor_body_warrior_r1", "armor_body_mage_r1", "armor_body_summoner_r1", "armor_helmet_r1",
-			"armor_gloves_r1", "armor_boots_r1"],
+		"shop": ["armor_body_warrior_r1", "armor_body_mage_r1", "armor_body_summoner_r1", "armor_body_hunter_r1",
+			"armor_helmet_r1", "armor_gloves_r1", "armor_boots_r1"],
 		"greet": {
 			"young": "Без доспеха — до первого волка. Подбери себе куртку по делу: воину — покрепче, магу — полегче.",
 			"veteran": "Доспех у тебя видавший виды. Ремни подтянуть, пластины сменить — и снова в бой.",
@@ -148,14 +151,34 @@ const NPCS := {
 		"where": "в центре города, на западной стороне площади", "title": "Ювелир", "shop_title": "Ювелирная лавка",
 		"dialog": true, "mark_y": 3.15,
 		"spot": {"poi": "town", "off": Vector2(-11.5, -0.5)},
-		"shop": ["ring_hp_r1", "ring_mp_r1", "ring_crit_r1", "ring_critdmg_r1", "ring_aspd_r1", "ring_cast_r1",
-			"earring_crit_r1", "earring_critdmg_r1", "earring_aspd_r1", "earring_cast_r1",
-			"pendant_hp_r1", "pendant_mp_r1", "pendant_pdef_r1", "pendant_mdef_r1",
-			"belt_pdef_r1", "belt_mdef_r1", "belt_eva_r1", "belt_speed_r1"],
+		# Украшения базы 1-го ранга (ItemData.JEWELRY_DEFS): кольца HP/MP + характеристика, серьги, кулоны, пояс
+		"shop": ["ring_str_r1", "ring_vit_r1", "ring_dex_r1", "ring_agi_r1", "ring_int_r1", "ring_wis_r1", "ring_luck_r1",
+			"ring_warrior_r1", "ring_bowman_r1", "ring_wizard_r1", "earring_atk_r1", "earring_matk_r1", "earring_def_r1",
+			"earring_crit_r1", "earring_speed_r1", "pendant_mdef_r1", "pendant_hpregen_r1", "pendant_mpregen_r1",
+			"belt_light_r1"],
 		"greet": {
 			"young": "Кольцо не заменит меча, милый, но удачи прибавит. Взгляни — у меня есть и для новичков.",
 			"veteran": "Какая выправка! К такой — серьги на удачу и пояс покрепче. Позволь, подберу.",
 			"idle": "Кольца, серьги, подвески, пояса… Каждая вещица что-нибудь да прибавит: здоровья, удачи, проворства.",
+		},
+		"young_below": 5, "veteran_from": 10,
+	},
+	# Торговец редкостями (донатный торговец, задача Максима 0.31; модель — npc_rare_merchant.glb по
+	# tools/Промты_NPC_торговец_редкостями_и_баффер.docx, пока её нет — из примитивов): предметы прокачки по ценам базы оригинала
+	# (кэш-предметы — за золото, решение Максима): порошки стабильности, древние элементы, древние кубы, расширитель
+	# пояса, зеркальная карта (T-Protect Mirror базы)
+	"rare_merchant": {
+		"name": "Савва Заморский", "gen": "Саввы Заморского", "dat": "Савве Заморскому",
+		"where": "в центре города, на площади", "title": "Торговец редкостями", "shop_title": "Лавка редкостей",
+		"dialog": true, "mark_y": 3.1,
+		"spot": {"poi": "town", "off": Vector2(3.0, 10.5)},
+		"shop": ["stab_powder_r1", "stab_powder_r2", "element_attack_r1", "element_attack_r2", "element_defense_r1",
+			"element_defense_r2", "cube_ancient_attack_r1", "cube_ancient_attack_r2", "cube_ancient_defense_r1",
+			"cube_ancient_defense_r2", "cube_ancient_acc_r1", "cube_ancient_acc_r2", "belt_expander", "mirror_card"],
+		"greet": {
+			"young": "Редкие вещицы для тех, кто точит снаряжение всерьёз. Порошок — и вещь цела, элемент — и удача ближе.",
+			"veteran": "Бывалому мастеру — бывалый товар. Древние кубы сами в руки не идут… а у меня идут.",
+			"idle": "Порошки, элементы, древние кубы, расширители поясов. Всё, что бережёт труд кузнеца.",
 		},
 		"young_below": 5, "veteran_from": 10,
 	},

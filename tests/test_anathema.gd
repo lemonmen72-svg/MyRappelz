@@ -125,7 +125,7 @@ func _unit_data() -> void:
 		ic.free()
 	# Описания карт: кабана и стража среди источников больше нет (их нет на острове)
 	var src := Taming.where_to_get("card_wolf")
-	check(src.begins_with("выпадает из волка") and src.contains("Седого Вожака бури"), "карта волка — из волка (и босса волков): " + src)
+	check(src.contains("выпадает из волка") and src.contains("Седого Вожака бури"), "карта волка — из волка (и босса волков): " + src)
 	check(not Taming.lives_in_world("golem") and not Taming.lives_in_world("boar"), "кабан и страж на острове не водятся")
 	check(Taming.lives_in_world("anathema_chief"), "вожак анатем водится на острове")
 

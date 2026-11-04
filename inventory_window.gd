@@ -63,6 +63,23 @@ const BIG_ICON := 72.0
 const BUY_MANY := 5
 ## Панель крафта и наковальня: ширина столбца, ячейки вещи и куба, ячейки надетого.
 const CRAFT_W := 200.0
+## Куб для вида заточки (подсказка «Нужен …»).
+const CUBE_NAMES := {"attack": "куб атаки", "defense": "куб защиты", "acc": "куб украшений"}
+## Рецепты крафта (кнопка «Рецепты» в панели крафта): что с чем соединять.
+const RECIPES := [
+	"Оружие + Куб атаки → заточка +1",
+	"Броня или щит + Куб защиты → +1",
+	"Украшение + Куб украшений → +1 (до +5)",
+	"Древний куб — то же, шанс выше",
+	"Куб ранга N — для вещей ранга N и младше",
+	"+ Древний элемент (вид и ранг куба) → шанс +10 %",
+	"+ Порошок стабильности → при неудаче вещь цела",
+	"Без порошка: оружие и броня ломаются, у украшения пропадает заточка",
+	"Кузнец Гуннар: оружие, броня, щит до +10 за золото, 100 %",
+	"Питомцу: вещь + Карта снаряжения (окно существа); снять — Мел восстановления",
+	"Пояс + Расширитель пояса → +1 ячейка карт (окно «Питомцы»)",
+	"Пустой флакон → зелье у питомца 3-й формы (окно существа)",
+]
 const CRAFT_CELL := 60.0
 const WORN_CELL := 44.0
 ## Надетое, что точится: на панели крафта и наковальне.
@@ -102,6 +119,10 @@ var craft_item := ""
 var craft_where := ""
 var craft_cube := ""
 var craft_confirm := false
+## Порошок стабильности и древний элемент в попытке (если есть в сумке), раскрыт ли список рецептов.
+var craft_powder := true
+var craft_element := true
+var craft_recipes := false
 var craft_result := ""
 var craft_ok := false
 ## Наковальня кузницы: вещь forge_item (где — forge_where), итог последней закалки.
@@ -513,7 +534,9 @@ func _best_cube(item: String) -> String:
 	for k in Game.inventory.ids():
 		var cid := String(k)
 		if ItemData.is_cube(cid) and Enchant.cube_block(item, cid) == "":
-			if best == "" or ItemData.rank(cid) < ItemData.rank(best):
+			# Младший ранг; при равном — обычный раньше древнего (древние дороже)
+			var key := ItemData.rank(cid) * 2 + (1 if ItemData.cube_kind(cid).begins_with("ancient") else 0)
+			if best == "" or key < ItemData.rank(best) * 2 + (1 if ItemData.cube_kind(best).begins_with("ancient") else 0):
 				best = cid
 	return best
 
@@ -537,32 +560,70 @@ func _build_craft(parent: VBoxContainer) -> void:
 	cells.add_child(c1)
 	buttons["craft_1"] = c1
 	if craft_item == "":
-		box.add_child(_text("Положите оружие, броню или щит (перетащите значок или «В крафт» в карточке) и куб: атаки — для оружия, защиты — для брони и щита.",
+		box.add_child(_text("Положите вещь (перетащите значок или «В крафт» в карточке) и куб. Что с чем — «Рецепты».",
 			UiScale.FONT_BODY, MUTED))
 	else:
 		var n := ItemData.enchant_level(craft_item)
 		var cap := Enchant.cube_cap(craft_item)
 		var block := Enchant.cube_block(craft_item, craft_cube)
+		var kind := ItemData.enchant_kind(craft_item)
 		if craft_cube == "" and block == "":
-			block = "Нужен %s %d-го ранга или старше" % ["куб атаки" if ItemData.enchant_kind(craft_item) == "attack"
-				else "куб защиты", ItemData.rank(craft_item)]
+			block = "Нужен %s %d-го ранга или старше" % [String(CUBE_NAMES.get(kind, "куб")), ItemData.rank(craft_item)]
+		var powder := Enchant.powder_for(craft_item)
+		var element := Enchant.element_for(craft_cube) if craft_cube != "" else ""
+		var use_el := craft_element and element != ""
 		if n < cap:
-			box.add_child(_text("+%d → +%d · шанс %s" % [n, n + 1, _pct(Enchant.chance(craft_item))], UiScale.FONT_TEXT,
-				Color.WHITE))
+			box.add_child(_text("+%d → +%d · шанс %s" % [n, n + 1, _pct(Enchant.chance(craft_item, craft_cube, use_el))],
+				UiScale.FONT_TEXT, Color.WHITE))
 		box.add_child(_text("Предел кубами: +%d" % cap, UiScale.FONT_BODY, MUTED))
+		# Добавки из сумки: порошок (без поломки) и элемент (+10 % к шансу)
+		if powder != "" and block == "":
+			var pb := CheckBox.new()
+			pb.text = "%s (не сломается)" % ItemData.item_name(powder)
+			pb.button_pressed = craft_powder
+			pb.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_SMALL))
+			pb.toggled.connect(func(on: bool) -> void:
+				craft_powder = on
+				refresh())
+			box.add_child(pb)
+			buttons["craft_powder"] = pb
+		if element != "" and block == "":
+			var eb := CheckBox.new()
+			eb.text = "%s (+10 %% к шансу)" % ItemData.item_name(element)
+			eb.button_pressed = craft_element
+			eb.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_SMALL))
+			eb.toggled.connect(func(on: bool) -> void:
+				craft_element = on
+				refresh())
+			box.add_child(eb)
+			buttons["craft_element"] = eb
+		var fail := _fail_text(craft_item, powder != "" and craft_powder)
 		if block != "":
 			box.add_child(_text(block, UiScale.FONT_BODY, BAD))
 		else:
-			box.add_child(_text("Неудача — вещь сломается. Куб тратится в любом случае.", UiScale.FONT_BODY, BAD.lerp(MUTED, 0.4)))
+			box.add_child(_text(fail + " Куб тратится в любом случае.", UiScale.FONT_BODY, BAD.lerp(MUTED, 0.4)))
 		if craft_confirm and block == "":
-			box.add_child(_text("Чаровать «%s»? Шанс %s, иначе вещь сломается." % [ItemData.item_name(craft_item),
-				_pct(Enchant.chance(craft_item))], UiScale.FONT_BODY, BAD))
+			box.add_child(_text("Чаровать «%s»? Шанс %s. %s" % [ItemData.item_name(craft_item),
+				_pct(Enchant.chance(craft_item, craft_cube, use_el)), fail], UiScale.FONT_BODY, BAD))
 			box.add_child(_action_grid([["Да, крафт", "act_craft_yes", _on_craft_yes], ["Отмена", "act_craft_no", _on_craft_no]]))
 		else:
 			var g := _action_grid([["Крафт", "act_craft", _on_craft_ask, block != ""],
 				["Очистить", "act_craft_clear", _on_craft_clear]])
 			UiIcons.add_icon(buttons["act_craft"] as Button, "btn_craft")
 			box.add_child(g)
+	# Рецепты: что с чем соединять (по просьбе Максима — кратко и точно)
+	var rb := Button.new()
+	rb.text = "Рецепты ▲" if craft_recipes else "Рецепты ▼"
+	rb.custom_minimum_size = Vector2(0, UiScale.px(32))
+	rb.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_BODY))
+	rb.pressed.connect(func() -> void:
+		craft_recipes = not craft_recipes
+		refresh())
+	box.add_child(rb)
+	buttons["craft_recipes"] = rb
+	if craft_recipes:
+		for line in RECIPES:
+			box.add_child(_text("• " + String(line), UiScale.FONT_SMALL, Color(0.86, 0.88, 0.92)))
 	if craft_result != "":
 		var rl := _text(craft_result, UiScale.FONT_BODY, GOOD if craft_ok else BAD)
 		rl.name = "craft_result"
@@ -628,6 +689,22 @@ func _build_worn_row(parent: VBoxContainer) -> void:
 		buttons["worn_" + slot] = b
 
 
+## Шансы куба id по уровням заточки одной строкой: «+1…+4 — 100 %, +5 — 70 %, …».
+static func _cube_chances(id: String) -> String:
+	var k := ItemData.cube_kind(id)
+	var t: Array = Enchant.CHANCE_TABLES.get(String(ItemData.CUBE_KINDS.get(k, {}).get("chances", "normal")), Enchant.CHANCES)
+	var parts: PackedStringArray = []
+	var i := 0
+	while i < t.size():
+		var j := i
+		while j + 1 < t.size() and is_equal_approx(float(t[j + 1]), float(t[i])):
+			j += 1
+		var lv := "+%d" % (i + 1) if i == j else "+%d…+%d" % [i + 1, j + 1]
+		parts.append("%s — %s" % [lv, _pct(float(t[i]))])
+		i = j + 1
+	return "Шанс: " + ", ".join(parts) + "."
+
+
 ## Шанс процентами: «50 %», «12.5 %», «6.25 %».
 static func _pct(v: float) -> String:
 	var p := v * 100.0
@@ -659,17 +736,27 @@ func _on_craft_no() -> void:
 	refresh()
 
 
+## Что будет при неудаче вещи item (с порошком — ничего).
+static func _fail_text(item: String, powder: bool) -> String:
+	if powder:
+		return "Неудача — вещь цела (порошок)."
+	if ItemData.enchant_kind(item) == "acc":
+		return "Неудача — заточка украшения пропадёт."
+	return "Неудача — вещь сломается."
+
+
 func _on_craft_yes() -> void:
 	craft_confirm = false
 	var cube := craft_cube
-	var r: Dictionary = economy.craft(craft_item, cube, craft_where)
+	var r: Dictionary = economy.craft(craft_item, cube, craft_where, {"powder": craft_powder, "element": craft_element})
 	if String(r.get("error", "")) != "":
 		refresh()
 		return
 	craft_ok = bool(r.get("ok", false))
 	craft_result = String(r.get("text", ""))
-	if craft_ok:
-		craft_item = String(r.get("item", ""))
+	var after := String(r.get("item", ""))
+	if after != "" and not ItemData.is_broken(after):
+		craft_item = after
 		craft_where = Enchant.locate(craft_item, craft_where)
 	else:
 		craft_item = ""
@@ -1042,14 +1129,15 @@ func _card_body(card: VBoxContainer, id: String, cmp: String) -> void:
 		"trophy":
 			card.add_child(_text("Продаётся торговцу в городе.", UiScale.FONT_BODY, MUTED))
 		"cube":
-			card.add_child(_text("Шанс: +1…+4 — 50 %, +5…+10 — 25 %, +11…+15 — 12.5 %, +16…+20 — 6.25 %.", UiScale.FONT_BODY, MUTED))
+			card.add_child(_text(_cube_chances(id), UiScale.FONT_BODY, MUTED))
 	# Заточка и чарование (Enchant)
 	if ItemData.enchant_level(id) > 0:
 		card.add_child(_text(ItemData.enchant_text(id), UiScale.FONT_BODY, GOOD))
 	if ItemData.is_enchantable(id):
-		var cube := "куб атаки" if ItemData.enchant_kind(id) == "attack" else "куб защиты"
-		card.add_child(_text("Улучшение: %s %d-го ранга и старше — до +%d («Крафт» в сумке); закалка у кузнеца — до +%d."
-			% [cube, ItemData.rank(id), Enchant.cube_cap(id), Enchant.SMITH_MAX], UiScale.FONT_SMALL, MUTED))
+		var cube := String(CUBE_NAMES.get(ItemData.enchant_kind(id), "куб"))
+		var smith := "" if ItemData.enchant_kind(id) == "acc" else "; закалка у кузнеца — до +%d" % Enchant.SMITH_MAX
+		card.add_child(_text("Улучшение: %s %d-го ранга и старше — до +%d («Крафт» в сумке)%s."
+			% [cube, ItemData.rank(id), Enchant.cube_cap(id), smith], UiScale.FONT_SMALL, MUTED))
 	if ItemData.is_potion(id) or ItemData.is_equipment(id):
 		var lr := ItemData.rank_level_range(ItemData.rank(id), ItemData.is_potion(id))
 		var need := ItemData.required_level(id)
@@ -1174,7 +1262,7 @@ func _action_grid(acts: Array) -> GridContainer:
 
 
 func _usable(id: String) -> bool:
-	return ItemData.is_potion(id) or id == "revive_scroll"
+	return ItemData.is_potion(id) or id == "revive_scroll" or String(ItemData.get_item(id).get("creature_potion", "")) != ""
 
 
 func _name_color(id: String) -> Color:
@@ -1387,6 +1475,8 @@ func _on_equip() -> void:
 func _on_use() -> void:
 	if ItemData.is_potion(sel_id):
 		economy.drink(sel_id)
+	elif String(ItemData.get_item(sel_id).get("creature_potion", "")) != "":
+		economy.drink_creature_potion(sel_id)
 	elif sel_id == "revive_scroll":
 		main.pets.revive_any()
 	else:

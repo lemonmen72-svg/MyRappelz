@@ -30,7 +30,7 @@ const JP_PER_LEVEL := 3
 const MP_SCALE := 1.0
 ## Поддержка переключаемых умений списывается раз в UPKEEP_PERIOD секунд.
 const UPKEEP_PERIOD := 10.0
-const KIND_NAMES := {"active": "активное", "passive": "пассивное", "toggle": "переключаемое"}
+const KIND_NAMES := {"active": "активное", "passive": "пассивное", "toggle": "переключаемое", "manual": "создание"}
 ## Ячейки умений: «Авто» (активные) и «Ауры» (переключаемые).
 const AUTO_SLOTS := 3
 const AURA_SLOTS := 2
@@ -370,12 +370,115 @@ const SPECIES_SKILLS := {
 }
 
 
+## Умения существ из базы, которых раньше не было (0.31; SkillTreeResource 2101–2903, 1701–1703; задачи Максима
+## «бонус существа», «снаряжение существа»): по виду — DB_EXTRAS, строит _static_init в _extra и _lists.
+##   * «Знаток снаряжения» (Creature Item Expert): питомец получает долю характеристик надетых оружия и доспеха
+##     (80 % у пантеры, черепахи, фазана; 90 % — волк; 100 % — кентавр) и всю прибавку их заточки (PetGear);
+##   * «Живучесть: доспех …» (Vital Unit, 40 ур.): макс. HP + доля, если надет доспех своего варианта (воина или охотника);
+##   * «Боец: …» (Fighter Unit, 90 ур., 2-я форма): атака + доля с оружием ближнего боя (у фазана — крит +5 с кинжалом);
+##   * «Способность карты» ×2 (Card Ability, 40 и 90 ур.): карта питомца встаёт в пояс героя (PetBelt) и даёт герою
+##     долю его характеристики (Сила, Выносливость …) или атаки / защиты / точности / избегания;
+##   * «Зализать раны» (Wound Lick, 2-я и 3-я форма): восстановление HP хозяину и питомцу на 30 с (база: +100 за
+##     уровень — у нас × 0.03, как «Быстрое заживление» ← Meditation), тратит материал вида;
+##   * «Создание: материал» (2-я форма, раз в 12 ч) и «Создание: зелье» (3-я форма, раз в час, нужен пустой флакон) —
+##     вручную в окне существа (вид "manual");
+##   * «Благословение …» ×6 (Blessing of Strength … Wisdom, Basic / Intermediate): +1 к характеристике за уровень,
+##     с 51 ур. (1-я форма) и 101 ур. (2-я форма).
+const DB_EXTRAS := {
+	"panther": {"expert": 0.8, "armor": "warrior", "unit": [0.05, 0.05], "weapon": "melee",
+		"cards": [["str", 0.05], ["atk", 0.05]], "material": "panther_fang"},
+	"turtle": {"expert": 0.8, "armor": "warrior", "unit": [0.05, 0.05], "weapon": "melee",
+		"cards": [["vit", 0.05], ["def", 0.05]], "material": "shell_plate"},
+	"pheasant": {"expert": 0.8, "armor": "hunter", "unit": [0.05, 5.0], "weapon": "dagger",
+		"cards": [["dex", 0.05], ["acc", 0.05]], "material": "pheasant_feather"},
+	"wolf": {"expert": 0.9, "armor": "hunter", "unit": [0.10, 0.10], "weapon": "melee",
+		"cards": [["agi", 0.10], ["avoid", 0.10]], "material": "wolf_claw"},
+	"centaur": {"expert": 1.0, "armor": "warrior", "unit": [0.14, 0.14], "weapon": "melee",
+		"cards": [["str", 0.14], ["atk", 0.14]], "material": "horse_hair"},
+}
+## Подписи характеристик и чисел для «Способности карты».
+const CARD_NAMES := {"str": "Сила", "vit": "Выносливость", "agi": "Ловкость", "dex": "Меткость", "int": "Интеллект",
+	"wis": "Мудрость", "luck": "Удача", "atk": "атака", "def": "защита", "acc": "точность", "avoid": "избегание"}
+const BLESS_STATS := ["str", "int", "agi", "vit", "dex", "wis"]
+static var _extra: Dictionary = {}
+static var _lists: Dictionary = {}
+
+
+static func _static_init() -> void:
+	_extra.clear()
+	_lists.clear()
+	var arm := {"warrior": "доспех воина", "hunter": "доспех охотника"}
+	for stv in BLESS_STATS:
+		var st := String(stv)
+		var nm := String(CARD_NAMES[st])
+		_extra["bless_" + st] = {"name": "Благословение: %s" % nm, "kind": "passive", "glyph": nm.substr(0, 1), "color": GOLD,
+			"jp": 1, "desc": "%s питомца выше на 1 за уровень умения." % nm, "tiers": [[51, 10], [101, 20], [0, 0]],
+			"bonus": "stat_" + st, "value": [1.0, 1.0]}
+	for spv in DB_EXTRAS:
+		var sp := String(spv)
+		var d: Dictionary = DB_EXTRAS[sp]
+		var ids: Array = []
+		var ex := "item_expert_" + sp
+		_extra[ex] = {"name": "Знаток снаряжения", "kind": "passive", "glyph": "С", "color": GRAY, "jp": 1,
+			"desc": "Питомец носит оружие и доспех (окно существа: ячейки «Оружие» и «Броня», нужна карта снаряжения) и получает %d%% их характеристик и всю прибавку заточки." % roundi(float(d["expert"]) * 100.0),
+			"tiers": [[1, 1], [0, 0], [0, 0]], "bonus": "item_expert", "value": [float(d["expert"]), 0.0]}
+		ids.append(ex)
+		var vu := "vital_unit_" + sp
+		var av := String(d["armor"])
+		_extra[vu] = {"name": "Живучесть: %s" % String(arm[av]), "kind": "passive", "glyph": "Ж", "color": Color(0.85, 0.3, 0.35),
+			"jp": 1, "armor": av, "desc": "Макс. HP питомца выше, когда на нём %s." % String(arm[av]),
+			"tiers": [[40, 1], [0, 0], [0, 0]], "bonus": "vital_unit", "value": [float(d["unit"][0]), 0.0]}
+		ids.append(vu)
+		var fu := "fighter_unit_" + sp
+		var dagger := String(d["weapon"]) == "dagger"
+		_extra[fu] = {"name": "Боец: кинжал" if dagger else "Боец: ближний бой", "kind": "passive", "glyph": "Б", "color": RED,
+			"jp": 1, "weapon": String(d["weapon"]),
+			"desc": "Шанс крита питомца выше, когда на нём кинжал." if dagger else "Атака питомца выше, когда на нём оружие ближнего боя.",
+			"tiers": [[0, 0], [90, 1], [0, 0]], "bonus": "fighter_unit", "value": [float(d["unit"][1]), 0.0]}
+		ids.append(fu)
+		for k in 2:
+			var c: Array = d["cards"][k]
+			var cid := "card_%s_%d" % [sp, k + 1]
+			var what := String(CARD_NAMES[String(c[0])])
+			_extra[cid] = {"name": "Способность карты: %s" % what, "kind": "passive", "glyph": "К", "color": VIOLET, "jp": 1,
+				"card": String(c[0]),
+				"desc": "Отозванного питомца можно вставить в пояс героя (окно «Питомцы», блок «Пояс»): %s героя +%d%%." % [what, roundi(float(c[1]) * 100.0)],
+				"tiers": [[40, 1], [0, 0], [0, 0]] if k == 0 else [[0, 0], [90, 1], [0, 0]], "bonus": "card", "value": [float(c[1]), 0.0]}
+			ids.append(cid)
+		var mat := String(d["material"])
+		var wl := "wound_lick_" + sp
+		_extra[wl] = {"name": "Зализать раны", "kind": "active", "glyph": "З", "color": Color(0.4, 0.85, 0.45), "jp": 2,
+			"desc": "Восстановление HP хозяину и питомцу на 30 с. Тратит «%s» из сумки." % ItemData.item_name(mat),
+			"tiers": [[0, 0], [50, 1], [100, 2]], "mp": [30.0, 10.0], "cd": 1200.0, "cast": 0.5, "buff": "regen",
+			"value": [3.0, 3.0], "time": 30.0, "needs": mat, "prio": 5}
+		ids.append(wl)
+		var cm := "creation_" + sp
+		_extra[cm] = {"name": "Создание: %s" % ItemData.item_name(mat), "kind": "manual", "glyph": "+", "color": GOLD, "jp": 1,
+			"desc": "Питомец создаёт «%s» (для «Зализать раны»). Раз в 12 часов." % ItemData.item_name(mat),
+			"tiers": [[0, 0], [50, 1], [0, 0]], "mp": [1000.0, 0.0], "cd": 43200.0, "creates": mat}
+		ids.append(cm)
+		var cp := "creation_potion_" + sp
+		var pot := "potion_" + sp
+		_extra[cp] = {"name": "Создание: зелье", "kind": "manual", "glyph": "+", "color": GOLD, "jp": 2,
+			"desc": "Питомец варит «%s» (герою на 1 час) из пустого флакона. Раз в час." % ItemData.item_name(pot),
+			"tiers": [[0, 0], [0, 0], [100, 1]], "mp": [2000.0, 0.0], "cd": 3600.0, "creates": pot, "needs": "empty_bottle"}
+		ids.append(cp)
+		for st in BLESS_STATS:
+			ids.append("bless_" + st)
+		var base: Array = SPECIES_SKILLS.get(sp, [])
+		_lists[sp] = base + ids
+
+
 static func get_skill(id: String) -> Dictionary:
-	return SKILLS.get(id, {})
+	if SKILLS.has(id):
+		return SKILLS[id]
+	return _extra.get(id, {})
 
 
 ## id умений вида.
 static func list_for(species: String) -> Array:
+	if _lists.has(species):
+		return _lists[species]
 	return SPECIES_SKILLS.get(species, SPECIES_SKILLS["boar"])
 
 
@@ -769,11 +872,30 @@ static func effect_text(id: String, n: int) -> String:
 				parts.append("все характеристики +%s" % _num(v))
 			"threat":
 				parts.append("шанс отвлечь зверя %s" % _pct(v))
+			"item_expert":
+				parts.append("%s характеристик снаряжения, 100%% заточки" % _pct(v))
+			"vital_unit":
+				parts.append("макс. HP +%s с доспехом" % _pct(v))
+			"fighter_unit":
+				if String(sk.get("weapon", "")) == "dagger":
+					parts.append("крит +%s с кинжалом" % _num(v))
+				else:
+					parts.append("атака +%s с оружием ближнего боя" % _pct(v))
+			"card":
+				parts.append("в поясе: %s героя +%s" % [String(CARD_NAMES.get(String(sk.get("card", "")), "")), _pct(v)])
+			_:
+				if String(sk["bonus"]).begins_with("stat_"):
+					parts.append("%s +%s" % [String(CARD_NAMES.get(String(sk["bonus"]).substr(5), "")), _num(v)])
 		if bool(sk.get("owner", false)):
 			parts[parts.size() - 1] = parts[parts.size() - 1] + " (и хозяину)"
 		if kind == "toggle":
 			parts.append("включение %d MP, %d MP / 10 с" % [mp_cost(id, n), upkeep(id, n)])
 		return ", ".join(parts)
+	if kind == "manual":
+		var need := String(sk.get("needs", ""))
+		return "создаёт «%s»%s, MP %d, раз в %s" % [ItemData.item_name(String(sk.get("creates", ""))),
+			(" из «%s»" % ItemData.item_name(need)) if need != "" else "", mp_cost(id, n),
+			("%d ч" % roundi(float(sk["cd"]) / 3600.0))]
 	if sk.has("dmg"):
 		var hits := int(sk.get("hits", 1))
 		var d := _pct(value(sk["dmg"], n))
@@ -801,6 +923,9 @@ static func effect_text(id: String, n: int) -> String:
 			parts.append("урон по хозяину −%s на %s с" % [_pct(value(sk["value"], n)), _num(float(sk["time"]))])
 		"heal":
 			parts.append("лечение %s макс. HP" % _pct(value(sk["value"], n)))
+		"regen":
+			parts.append("восст. HP +%s хозяину и питомцу на %s с, тратит «%s»" % [_num(value(sk["value"], n)),
+				_num(float(sk["time"])), ItemData.item_name(String(sk.get("needs", "")))])
 	parts.append("MP %d" % mp_cost(id, n))
 	parts.append("перезарядка %s с" % _num(float(sk["cd"])))
 	return ", ".join(parts)

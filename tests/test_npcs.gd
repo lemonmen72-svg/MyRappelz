@@ -13,7 +13,7 @@ extends "res://tests/test_base.gd"
 ## Кто где стоит: id → [POI, ближайшая из POI этого вида должна быть она].
 const HOMES := {
 	"sage": "town", "smith": "town", "storekeeper": "town",
-	"weaponsmith": "town", "armorer": "town", "jeweler": "town",
+	"weaponsmith": "town", "armorer": "town", "jeweler": "town", "rare_merchant": "town",
 	"elder_human": "human_village", "elder_light": "light_elf_village", "elder_dark": "dark_elf_village",
 	"hunter": "tent_w1", "merc_chief": "cave",
 }
@@ -30,6 +30,7 @@ const PARTS := {
 	"weaponsmith": ["", ["Scabbard"]],
 	"armorer": ["", ["Axe"]],
 	"jeweler": ["", ["Necklace", "Cape"]],
+	"rare_merchant": ["", []],
 }
 ## Лавки города: житель → ассортимент (ItemData), всё — 1-го ранга.
 const SHOPS := {
@@ -37,11 +38,16 @@ const SHOPS := {
 		"weapon_mace_2h_r1", "weapon_axe_1h_r1", "weapon_axe_2h_r1", "weapon_staff_1h_r1", "weapon_staff_2h_r1",
 		"weapon_spear_r1", "weapon_bow_r1", "crossbow_starter", "weapon_shield_r1", "dagger_steel", "sword_steel",
 		"crossbow_heavy"],
-	"armorer": ["armor_body_warrior_r1", "armor_body_mage_r1", "armor_body_summoner_r1", "armor_helmet_r1",
-		"armor_gloves_r1", "armor_boots_r1"],
-	"jeweler": ["ring_hp_r1", "ring_mp_r1", "ring_crit_r1", "ring_critdmg_r1", "ring_aspd_r1", "ring_cast_r1",
-		"earring_crit_r1", "earring_critdmg_r1", "earring_aspd_r1", "earring_cast_r1", "pendant_hp_r1", "pendant_mp_r1",
-		"pendant_pdef_r1", "pendant_mdef_r1", "belt_pdef_r1", "belt_mdef_r1", "belt_eva_r1", "belt_speed_r1"],
+	"armorer": ["armor_body_warrior_r1", "armor_body_mage_r1", "armor_body_summoner_r1", "armor_body_hunter_r1",
+		"armor_helmet_r1", "armor_gloves_r1", "armor_boots_r1"],
+	"jeweler": ["ring_str_r1", "ring_vit_r1", "ring_dex_r1", "ring_agi_r1", "ring_int_r1", "ring_wis_r1", "ring_luck_r1",
+		"ring_warrior_r1", "ring_bowman_r1", "ring_wizard_r1", "earring_atk_r1", "earring_matk_r1", "earring_def_r1",
+		"earring_crit_r1", "earring_speed_r1", "pendant_mdef_r1", "pendant_hpregen_r1", "pendant_mpregen_r1",
+		"belt_light_r1"],
+	# Торговец редкостями (донатный — за золото): порошки, элементы, древние кубы, расширитель пояса, зеркальная карта
+	"rare_merchant": ["stab_powder_r1", "stab_powder_r2", "element_attack_r1", "element_attack_r2", "element_defense_r1",
+		"element_defense_r2", "cube_ancient_attack_r1", "cube_ancient_attack_r2", "cube_ancient_defense_r1",
+		"cube_ancient_defense_r2", "cube_ancient_acc_r1", "cube_ancient_acc_r2", "belt_expander", "mirror_card"],
 }
 
 ## Порядок разговоров и номер текущего.
@@ -187,7 +193,7 @@ func run_step() -> void:
 			_press("complete")
 			check(q.state("sage_storage") == "done", "«Городской склад» сдано")
 			var rxp := int(QuestData.get_quest("sage_storage")["rewards"]["xp"])
-			check(game.gold == g0 + 15 and _total_xp() == xp0 + rxp, "награда: %d оп., 15 зол." % rxp)
+			check(game.gold == g0 + 300 and _total_xp() == xp0 + rxp, "награда: %d оп., 300 зол." % rxp)
 			check(npcs.reply == QuestData.text("sage_storage", "done"), "слова мудреца при сдаче")
 			check(npcs.npc("sage").mark_text() == "!", "у мудреца остались задания — «!»")
 			check(main.quests.state("kirk_first_card") == "available", "цепочка Кирка не задета")
@@ -268,7 +274,8 @@ func _unit_shops() -> void:
 			# Предметы, которых ещё нет в ItemData, окно торговли пропускает
 			check(goods.has(id) == known, "%s: %s в продаже — %s" % [npc_id, id, known])
 			if known:
-				check(ItemData.rank(id) == 1, "%s: %s — 1-го ранга" % [npc_id, id])
+				# Снаряжение на острове — 1-го ранга; у Торговца редкостями — предметы прокачки обоих рангов
+				check(ItemData.rank(id) == 1 or npc_id == "rare_merchant", "%s: %s — 1-го ранга" % [npc_id, id])
 				check(NpcData.sellers_of(id) == [npc_id], "%s продаёт только %s" % [id, npc_id])
 	# Всё оружие 1-го ранга (что продаётся) — у оружейника, 2-го ранга — ни у кого
 	for key in ItemData.ITEMS:

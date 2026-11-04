@@ -77,6 +77,11 @@ var load_note := ""
 var pets: Array[Dictionary] = []
 ## Индекс призванного питомца в pets, -1: никого.
 var active_pet := -1
+## Ячейки карт существ в поясе (PetBelt; 1…6, «Расширитель пояса»). Питомец в ячейке — запись pets[i]["belt"].
+var belt_slots := 1
+## Золото нового героя: цены у жителей — как в базе оригинала (зелье 200, оружие 500–750), золота хватает на зелья
+## и первые покупки (0.31; раньше 50 при ценах ×20 ниже).
+const START_GOLD := 1000
 ## Задания (QuestData, логика — Quests): взятые {id: {"progress": [число по каждой цели]}} в порядке взятия,
 ## сданные {id: сколько раз сдано}, отслеживаемое на экране ("" — никакое).
 var quests_active: Dictionary = {}
@@ -150,7 +155,7 @@ func new_character(n: String, race: String, cls: String = ClassData.WANDERER, se
 		class_id = ClassData.WANDERER
 	job_changed = ClassData.is_job(class_id)
 	job_level_at_change = 1 if job_changed else 0
-	gold = 50
+	gold = START_GOLD
 	inventory.add(ItemData.potion_id("hp", 1), 3)
 	inventory.add("revive_scroll", 1)
 	hero = HeroSkills.new_record(class_id, 1)
@@ -492,6 +497,12 @@ func add_pet(species: String, pet_name: String, lvl: int = 1) -> int:
 func remove_pet(i: int) -> void:
 	if i < 0 or i >= pets.size():
 		return
+	# Снаряжение отпущенного питомца — обратно в сумку (без мела: питомец уходит, карта снаряжения рвётся)
+	var g: Variant = pets[i].get("gear", {})
+	if g is Dictionary:
+		for k in g:
+			if String(g[k]) != "":
+				inventory.add(String(g[k]))
 	pets.remove_at(i)
 	if active_pet == i:
 		active_pet = -1
@@ -520,6 +531,7 @@ func to_dict() -> Dictionary:
 			"chain": QuestData.CHAIN_VERSION},
 		"storage": {"items": storage.to_dict(), "cells": storage.layout_to_array()},
 		"storage_gold": storage_gold,
+		"belt_slots": belt_slots,
 		"xp_mult": xp_mult,
 	}
 
@@ -642,6 +654,8 @@ func from_dict(d: Dictionary) -> void:
 		storage.from_dict(migrate_items(si as Dictionary) if si is Dictionary else {})
 		storage.load_layout(sd.get("cells", []))
 	storage_gold = maxi(0, int(d.get("storage_gold", 0)))
+	belt_slots = clampi(int(d.get("belt_slots", 1)), 1, PetBelt.MAX_SLOTS)
+	PetBelt.ensure()
 	# Оружие (переведённые герои — стартовый набор Наёмника, см. ensure_hero). Вторая рука — "offhand"
 	# (раньше "shield"); прежняя пара клинков одним предметом (ItemData.PAIRED) — тот же клинок в обеих руках
 	var w := "" if converted else String(d.get("weapon", ""))

@@ -58,7 +58,7 @@ func _windows() -> Array:
 			var nid := String(k)
 			if NpcData.has_dialog(nid):
 				res.append(["_w_dialog", "Диалог: %s" % NpcData.npc_name(nid), nid])
-	for who in ["merchant", "weaponsmith", "armorer", "jeweler", "kirk"]:
+	for who in ["merchant", "weaponsmith", "armorer", "jeweler", "kirk", "rare_merchant"]:
 		res.append(["_w_shop", "Лавка: %s" % NpcData.npc_name(String(who)), String(who)])
 	res.append(["_w_storage", "Склад"])
 	res.append(["_w_forge", "Кузница"])
