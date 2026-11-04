@@ -522,7 +522,11 @@
   покрытия** `AnimResolver.coverage` по `<id>.json` (без GLB): 24 героя × 15 хватов × 9 действий, статусы verified /
   implemented_unverified / missing / not_applicable — `docs/animation/ANIMATION_COVERAGE.csv` пишет тест
   `tests/test_anim_system.gd` (`user://anim_coverage.csv`, печать «ПОКРЫТИЕ»); инвентарь клипов —
-  `python3 -I tools/anim_inventory.py` → `ANIMATION_INVENTORY.csv`. Дальше — жители (фаза E), питомцы и звери (F).
+  `python3 -I tools/anim_inventory.py` → `ANIMATION_INVENTORY.csv`. **Жители, питомцы, звери** (фазы E, F): тип актёра —
+  `CharacterModel.anim_actor` ("hero" / "npc", ставит `Npc`), `CreatureAsset.anim_actor` ("mob" / "pet", ставит `Pet`);
+  учёт с префиксом «npc:», «pet:», «mob:» (сводка — по актёрам); матрица — `npc_coverage` (покой, взмах) и
+  `creature_coverage` (клипы `CreatureAsset.CLIPS` по `creatures.json`; замены `CREATURE_FALLBACK`, овцы `CREATURE_DECOR`).
+  Отсчёт действия существа (`_act_left`) идёт и за кадром / во сне.
 - **Качество текстур и мешей моделей** (слова Максима: «текстуры на максимум от исходного, чтобы модель была
   максимально качественной и красивой», «все модельки максимально к исходному качеству»; 0.26). У всех текстур моделей
   `.png.import` — `compress/mode=2`, **`compress/high_quality=true`** (на телефоне **ASTC 4×4**, 1 байт на пиксель,

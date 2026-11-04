@@ -59,6 +59,7 @@ func _ready() -> void:
 
 	_model = CharacterModel.new()
 	_model.name = "Model"
+	_model.anim_actor = "npc"
 	_model.setup(CharacterModel.npc_spec(npc_id))
 	_model.rotation.y = face_yaw
 	add_child(_model)

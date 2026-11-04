@@ -1293,6 +1293,8 @@ func _build_model() -> void:
 	model_id = CreatureAsset.model_for(species, stage)
 	_mat = CreatureModels.build(_model, species, _color, _scale, PetData.asset_tint(species, stage), stage)
 	_asset = CreatureModels.asset_of(_model)
+	if _asset != null:
+		_asset.anim_actor = "pet"
 	CreatureModels.decorate_pet(_model, species, _scale, stage, role)
 	_col = CreatureModels.add_collision(self, model_id, _scale)
 	_height = CreatureModels.height(model_id, _scale)

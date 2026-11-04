@@ -87,6 +87,8 @@ static var _outline: ShaderMaterial
 var species := ""
 ## Своя модель стадии эволюции (<вид>_2 / <вид>_3): процедурные украшения стадии ей не нужны.
 var stage_model := false
+## Кто это для учёта системы анимаций (AnimResolver): "mob" — зверь мира, "pet" — питомец (ставит Pet).
+var anim_actor := "mob"
 ## Размеры и скорости вида (info_for).
 var info: Dictionary = {}
 var material: StandardMaterial3D
@@ -392,10 +394,14 @@ func update(delta: float, spd: float) -> void:
 	_t += delta
 	_speed = spd
 	_update_decor()
+	# Отсчёт действия идёт и за кадром / во сне (система анимаций 1.0): раньше он замирал, и вернувшийся в кадр зверь
+	# сначала доигрывал старый удар, а реакции на урон до того не играли
+	var acting := _act_left > 0.0
+	if acting:
+		_act_left -= delta
 	if anim == null or _dead or not anim.active:
 		return
-	if _act_left > 0.0:
-		_act_left -= delta
+	if acting:
 		if _act_left > 0.0:
 			return
 		_loco = ""
@@ -427,7 +433,10 @@ func _set_loco(want: String, blend: float) -> void:
 ## Сыграть клип key один раз (не дольше max_len с, если > 0). Возвращает скорость клипа или -1.
 func _act(key: String, max_len: float = 0.0) -> float:
 	if anim == null or _dead or not clips.has(key):
+		if anim != null and not _dead:
+			AnimResolver.note(anim_actor + ":" + key, species, "", "idle", "")
 		return -1.0
+	AnimResolver.note(anim_actor + ":" + key, species, "", "grip", String(clips[key]))
 	var a := anim.get_animation(clips[key])
 	if a == null or a.length <= 0.0:
 		return -1.0
@@ -459,6 +468,10 @@ func play_hit() -> void:
 
 ## Умение (клип Cast, если его нет — Attack). Возвращает, через сколько секунд эффект (0 — сразу).
 func play_cast(max_len: float = 1.2) -> float:
+	if anim != null and not _dead and not clips.has("cast") and clips.has("attack"):
+		# Своего клипа умения нет — удар (уровень legacy в учёте)
+		AnimResolver.note(anim_actor + ":cast", species, "", "legacy", String(clips["attack"]))
+		return play_attack(max_len)
 	var sp := _act("cast", max_len)
 	if sp <= 0.0:
 		return play_attack(max_len)

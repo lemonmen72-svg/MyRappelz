@@ -67,6 +67,7 @@ func run_step() -> void:
 			check(dmg_on > 0 and dmg_on == dmg_off,
 				"урон 10 обычных атак одинаков с системой анимаций и без неё (%d = %d)" % [dmg_on, dmg_off])
 			AnimResolver.enabled = true
+			_creatures_live()
 			print("АНИМАЦИИ: " + AnimResolver.summary_line())
 			models[1]._combat_t = models[1]._t
 			step = 5
@@ -127,6 +128,27 @@ func _coverage() -> void:
 	for k in miss.slice(0, 20):
 		print("ПОКРЫТИЕ missing: " + k)
 	check(miss.is_empty(), "у оружия профессий нет действий без клипа (missing: %d)" % miss.size())
+	# Фазы E, F: жители (npc_<id>.json) и существа (creatures.json) — клипы, которые им включает игра
+	var npc_n := 0
+	for f in dir.get_files():
+		if f.begins_with("npc_") and f.ends_with(".json"):
+			var nc := AnimResolver.rig_clips("res://assets/characters/" + f)
+			rows.append_array(AnimResolver.npc_coverage(String(f).get_basename(), nc))
+			npc_n += 1
+	check(npc_n >= 13, "жителей с .json: %d" % npc_n)
+	var cj: Variant = JSON.parse_string(FileAccess.get_file_as_string(CreatureAsset.INFO_PATH))
+	var cre_n := 0
+	if cj is Dictionary:
+		for mid in cj:
+			rows.append_array(AnimResolver.creature_coverage(String(mid), (cj[mid] as Dictionary).get("clips", {})))
+			cre_n += 1
+	check(cre_n >= 20, "моделей существ в creatures.json: %d" % cre_n)
+	var miss2: Array[String] = []
+	for r in rows:
+		if r["status"] == "missing" and (r["class"] == "npc" or r["class"] == "creature"):
+			miss2.append("%s/%s" % [r["model"], r["action"]])
+	print("ПОКРЫТИЕ жители и существа missing: %s" % str(miss2))
+	check(miss2.is_empty(), "у жителей и существ нет нужных игре действий без клипа (%d)" % miss2.size())
 
 
 ## CSV матрицы: строки, проверенные срезом, — verified.
@@ -219,6 +241,42 @@ func _damage_setup() -> void:
 	mob = main.spawn_mob("turtle", game.level, p.global_position + Vector3(0, 0, 1.6))
 	mob.max_hp = 1000000
 	mob.hp = mob.max_hp
+
+
+## Фазы E, F вживую: зверь бьёт (учёт «mob:»), питомец (учёт «pet:»), житель машет (учёт «npc:»); отсчёт действия
+## зверя идёт и во сне (за кадром) — вернувшись, он не доигрывает старый удар.
+func _creatures_live() -> void:
+	var asset := mob._asset
+	check(asset != null and asset.anim_actor == "mob", "зверь из файла — учёт как «mob»")
+	if asset != null:
+		var n0 := int(AnimResolver.summary()["by_actor"].get("mob", 0))
+		asset.play_attack(1.0)
+		check(int(AnimResolver.summary()["by_actor"].get("mob", 0)) > n0, "удар зверя записан в учёт")
+		asset.set_sleeping(true)
+		asset.play_attack(1.0)
+		for i in 120:
+			asset.update(1.0 / 60.0, 0.0)
+		check(asset._act_left <= 0.0, "во сне отсчёт удара зверя дошёл до конца (%.2f с)" % asset._act_left)
+		asset.set_sleeping(false)
+	game.active_pet = game.add_pet("wolf", PetData.stage_name("wolf", 0), 5)
+	main.pets.summon(game.pets.size() - 1)
+	var pt: Pet = main.pets.active_pet
+	check(pt != null and pt._asset != null and pt._asset.anim_actor == "pet", "питомец из файла — учёт как «pet»")
+	if pt != null and pt._asset != null:
+		pt._asset.play_cast()
+		check(int(AnimResolver.summary()["by_actor"].get("pet", 0)) > 0, "умение питомца записано в учёт")
+	var npc: Npc = null
+	for n in get_tree().get_nodes_in_group("npc"):
+		if n is Npc:
+			npc = n
+			break
+	check(npc != null, "житель найден")
+	if npc != null:
+		check(npc._model.anim_actor == "npc", "житель — учёт как «npc»")
+		npc._wave_cd = 0.0
+		npc.greet()
+		check(int(AnimResolver.summary()["by_actor"].get("npc", 0)) > 0,
+			"приветствие жителя записано в учёт (%s)" % AnimResolver.summary_line())
 
 
 ## Урон 10 обычных атак при заданном флаге (ГСЧ боя — с одного зерна).

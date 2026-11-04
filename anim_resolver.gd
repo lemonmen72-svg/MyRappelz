@@ -35,6 +35,18 @@ const GRIP_WEAPON := {"sword": ["sword_1h"], "sword_shield": ["shield"], "sword_
 	"dual_axes": ["dual_axes"], "mace": ["mace_1h"], "mace_2h": ["mace_2h"], "spear": ["spear"],
 	"staff": ["staff_1h", "staff_2h"], "bow": ["bow"], "crossbow": ["crossbow"]}
 
+## Актёры кроме героя (префикс ключа действия в note): жители, питомцы, звери мира.
+const ACTORS := ["npc", "pet", "mob"]
+const ACTOR_NAMES := {"hero": "герой", "npc": "жители", "pet": "питомцы", "mob": "звери"}
+## Клипы существ (CreatureAsset.CLIPS) и их роли: что обязательно игре, чем заменяется, если нет.
+## pet/mob: idle, walk, run, attack — обязательны (шаг/бег подменяют друг друга), cast → attack, hit / death — без них
+## действие не играет (покой; смерть — тело пропадает по таймеру Mob).
+const CREATURE_FALLBACK := {"walk": "run", "run": "walk", "cast": "attack"}
+## Декоративные существа без боя (овцы в загоне): только покой и шаг.
+const CREATURE_DECOR := ["sheep"]
+## Клипы жителя, которые игра включает (Npc: покой, приветствие; шаг и бег — у жителей не используются).
+const NPC_ACTIONS := ["idle", "wave"]
+
 ## Выключатель системы (откат на прежний выбор клипов).
 static var enabled := true
 ## Боевой покой (CharacterModel.ASSET_IDLE_COMBAT) — отдельный выключатель.
@@ -130,15 +142,26 @@ static func reset_stats() -> void:
 	trace.clear()
 
 
-## Сводка: {total, by_level {уровень: раз}, missing {…}}.
+## Тип актёра по ключу действия: "npc:…", "pet:…", "mob:…" — жители, питомцы, звери; остальное — герой.
+static func actor_of(action: String) -> String:
+	for a in ACTORS:
+		if action.begins_with(a + ":"):
+			return a
+	return "hero"
+
+
+## Сводка: {total, by_level {уровень: раз}, by_actor {актёр: раз}, missing {…}}.
 static func summary() -> Dictionary:
 	var by: Dictionary = {}
+	var actors: Dictionary = {}
 	var total := 0
 	for a in stats:
+		var who := actor_of(String(a))
 		for lv in stats[a]:
 			by[lv] = int(by.get(lv, 0)) + int(stats[a][lv])
+			actors[who] = int(actors.get(who, 0)) + int(stats[a][lv])
 			total += int(stats[a][lv])
-	return {"total": total, "by_level": by, "missing": missing.duplicate()}
+	return {"total": total, "by_level": by, "by_actor": actors, "missing": missing.duplicate()}
 
 
 ## Строка для отчёта: «запросов N: skill a, grip b, shared c, legacy d, idle e; без своего клипа: …».
@@ -147,7 +170,11 @@ static func summary_line() -> String:
 	var parts: Array[String] = []
 	for lv in LEVELS:
 		parts.append("%s %d" % [lv, int(s["by_level"].get(lv, 0))])
-	var line := "запросов %d: %s" % [int(s["total"]), ", ".join(parts)]
+	var who: Array[String] = []
+	for a in ["hero"] + ACTORS:
+		if int(s["by_actor"].get(a, 0)) > 0:
+			who.append("%s %d" % [ACTOR_NAMES[a], int(s["by_actor"][a])])
+	var line := "запросов %d (%s): %s" % [int(s["total"]), ", ".join(who) if not who.is_empty() else "—", ", ".join(parts)]
 	if not s["missing"].is_empty():
 		var miss: Array[String] = []
 		for k in s["missing"]:
@@ -225,3 +252,44 @@ static func coverage(model_id: String, class_id: String, clips: Dictionary) -> A
 				"grip": grip, "action": String(a[0]), "level": r["level"],
 				"clip": ";".join(r["names"]), "status": status})
 	return rows
+
+
+## Строки матрицы покрытия существа (модель из creatures.json): для каждого клипа CreatureAsset.CLIPS — свой,
+## замена (legacy) или нет (missing). Декоративные (овцы) — только покой и шаг, остальное not_applicable.
+static func creature_coverage(model_id: String, clips: Dictionary) -> Array:
+	var rows: Array = []
+	var have: Dictionary = {}
+	for c in clips:
+		have[String(c).to_lower()] = String(c)
+	var decor := CREATURE_DECOR.has(model_id.get_slice("_", 0))
+	for k in CreatureAsset.CLIPS:
+		var row := {"model": model_id, "variant": "-", "class": "creature", "grip": "-", "action": String(k),
+			"level": "grip", "clip": String(have.get(k, "")), "status": "implemented_unverified"}
+		if decor and not ["idle", "walk"].has(k):
+			row["status"] = "not_applicable"
+			row["level"] = "-"
+		elif not have.has(k):
+			var sub := String(CREATURE_FALLBACK.get(k, ""))
+			if sub != "" and have.has(sub):
+				row["level"] = "legacy"
+				row["clip"] = have[sub]
+			else:
+				row["level"] = "idle"
+				row["status"] = "missing"
+		rows.append(row)
+	return rows
+
+
+## Строки матрицы покрытия жителя (npc_<id>.json): покой и приветствие.
+static func npc_coverage(model_id: String, clips: Dictionary) -> Array:
+	var rows: Array = []
+	for a in NPC_ACTIONS:
+		var found := ""
+		for k in clips:
+			if found == "" and String(k).to_lower() == a:
+				found = String(clips[k])
+		rows.append({"model": model_id, "variant": "f" if model_id.ends_with("_f") else "-", "class": "npc", "grip": "-",
+			"action": a, "level": "grip" if found != "" else "idle", "clip": found,
+			"status": "implemented_unverified" if found != "" else "missing"})
+	return rows
+

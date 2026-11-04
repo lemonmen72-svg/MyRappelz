@@ -2660,12 +2660,12 @@ func _asset_act(kind: String, any: bool = false) -> void:
 			a = all[randi() % all.size()]
 	if a.is_empty():
 		if AnimResolver.enabled:
-			AnimResolver.note("act:" + kind, weapon_kind, "", "idle", "")
+			_anote("act:" + kind, weapon_kind, "", "idle", "")
 		return
 	var c := String(a[0])
 	if AnimResolver.enabled:
 		# Клип своего действия из общей таблицы (урон, подбор, уклонение…) или прежний жест вместо атаки
-		AnimResolver.note("act:" + kind, weapon_kind, "", "shared", c)
+		_anote("act:" + kind, weapon_kind, "", "shared", c)
 	_anim.speed_scale = 1.0
 	_anim.play(c, 0.08, float(a[3]))
 	_anim.seek(float(a[1]), true)
@@ -2678,6 +2678,15 @@ func _asset_act(kind: String, any: bool = false) -> void:
 
 
 # ---------- Движения манекенов Meshy (клипы Mq_*) ----------
+
+## Кто это для учёта системы анимаций: "hero" — герой, "npc" — житель (ставит Npc).
+var anim_actor := "hero"
+
+
+## Решение выбора клипа — в учёт AnimResolver (у жителя ключ с префиксом "npc:").
+func _anote(action: String, grip: String, sid: String, level: String, clip: String) -> void:
+	AnimResolver.note(action if anim_actor == "hero" else anim_actor + ":" + action, grip, sid, level, clip)
+
 
 ## Боевой покой сейчас: система включена, недавно было боевое действие, одноручное оружие ближнего боя.
 func in_combat_stance() -> bool:
@@ -2715,13 +2724,13 @@ func _mq_attack(interval: float) -> bool:
 	var names := _mq_names(MQ_ATTACKS.get(mq_grip(), []))
 	if names.is_empty():
 		if AnimResolver.enabled:
-			AnimResolver.note("attack", mq_grip(), "", "legacy", "")
+			_anote("attack", mq_grip(), "", "legacy", "")
 		return false
 	if _t - _mq_last > MQ_COMBO_RESET:
 		_mq_step = 0
 	var c := names[_mq_step % names.size()]
 	if AnimResolver.enabled:
-		AnimResolver.note("attack", mq_grip(), "", "grip", c)
+		_anote("attack", mq_grip(), "", "grip", c)
 	_mq_step += 1
 	_mq_last = _t
 	var sp := 1.0
@@ -2744,10 +2753,10 @@ func play_skill(kind: String, sid: String = "", use: String = "", release: bool 
 		var r := AnimResolver.pick(AnimResolver.skill_chain(kind, sid, use, mq_grip(), _melee()), _mq_clip)
 		var got: Array = r["names"]
 		if got.is_empty():
-			AnimResolver.note("skill:" + kind, mq_grip(), sid, "legacy", "")
+			_anote("skill:" + kind, mq_grip(), sid, "legacy", "")
 			return false
 		var k := absi(hash(sid)) % got.size() if sid != "" else randi() % got.size()
-		AnimResolver.note("skill:" + kind, mq_grip(), sid, String(r["level"]), String(got[k]))
+		_anote("skill:" + kind, mq_grip(), sid, String(r["level"]), String(got[k]))
 		_mq_play(String(got[k]), 1.0)
 		if release:
 			_anim.seek(maxf(0.0, _act_hit - MQ_RELEASE_LEAD), true)
