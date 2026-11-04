@@ -300,8 +300,8 @@ class Zone extends Node3D:
 			Vfx.hit_spark(parent, m.aim_point(), color, 0.6)
 		if kind == "storm" and hits > 0:
 			# Молния бьёт в случайную точку круга
-			var a := randf() * TAU
-			var r := randf() * radius * 0.8
+			var a := Combat.rand() * TAU
+			var r := Combat.rand() * radius * 0.8
 			JobFxNeophyte.lightning(parent, global_position + Vector3(cos(a) * r, 0.0, sin(a) * r), color, 0.12, 5.0)
 
 

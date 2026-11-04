@@ -21,11 +21,16 @@ var _start_state := {}
 
 
 func id() -> String:
-	return "cardinal"
+	return mode_key if mode_key != "" else "cardinal"
+
+
+## Режим «Кардинал: детерминизм» (фаза 2): два ускоренных прогона с одним seed — совпадают ли журналы убийств и итог.
+func is_det() -> bool:
+	return mode_key == "cardinal_det"
 
 
 func title() -> String:
-	return "Кардинал: первый срез"
+	return "Кардинал: детерминизм" if is_det() else "Кардинал: первый срез"
 
 
 func hero() -> Dictionary:
@@ -34,9 +39,14 @@ func hero() -> Dictionary:
 
 func build(bot: TestBot) -> void:
 	bot.do("Кардинал: исходное состояние героя", func() -> void: _save_start(bot))
-	_queue_run(bot, "visual", "С картинкой", 1.0)
-	bot.do("Кардинал: герой и звери — в исходное состояние", func() -> void: _restore_start(bot))
-	_queue_run(bot, "fast", "Ускоренный ×%.0f" % accel, accel)
+	if is_det():
+		_queue_run(bot, "fast_a", "Ускоренный ×%.0f, A" % accel, accel)
+		bot.do("Кардинал: герой и звери — в исходное состояние", func() -> void: _restore_start(bot))
+		_queue_run(bot, "fast_b", "Ускоренный ×%.0f, B" % accel, accel)
+	else:
+		_queue_run(bot, "visual", "С картинкой", 1.0)
+		bot.do("Кардинал: герой и звери — в исходное состояние", func() -> void: _restore_start(bot))
+		_queue_run(bot, "fast", "Ускоренный ×%.0f" % accel, accel)
 	bot.do("Кардинал: сравнение прогонов", func() -> void: _compare(bot))
 
 
@@ -93,6 +103,9 @@ func _compare(bot: TestBot) -> void:
 		bot.check((rd["xp_mismatch"] as Array).is_empty(), "Кардинал «%s»: опыт за каждое убийство = формула игры%s" % [
 			rd["title"], "" if (rd["xp_mismatch"] as Array).is_empty() else ": " + "; ".join(
 			PackedStringArray((rd["xp_mismatch"] as Array).slice(0, 5)))])
+	if is_det():
+		_compare_det(bot, a, b)
+		return
 	# Скорость сравнима только с настоящим рендером (на телефоне): headless с --fixed-fps считает кадры без отрисовки
 	var speed_txt := "Кардинал: ускоренный быстрее (×%.2f против ×%.2f)" % [float(b["speedup"]), float(a["speedup"])]
 	if DisplayServer.get_name() == "headless":
@@ -111,6 +124,47 @@ func _compare(bot: TestBot) -> void:
 
 
 var _last := {}
+
+
+## Детерминизм: журналы убийств (вид, уровень, опыт, уровень героя) и итог (уровень, опыт, золото) двух прогонов с
+## одним seed. В CI (без экрана, ровно 60 кадров/с) — проверка; на телефоне кадры плавают, ГСЧ боя общий
+## (randf) — расхождение пишется как находка, не ошибка.
+func _compare_det(bot: TestBot, a: Dictionary, b: Dictionary) -> void:
+	var la: Array = a["kill_log"]
+	var lb: Array = b["kill_log"]
+	var same := 0
+	var first := ""
+	for i in mini(la.size(), lb.size()):
+		var x: Dictionary = la[i]
+		var y: Dictionary = lb[i]
+		if x["type"] == y["type"] and int(x["level"]) == int(y["level"]) and int(x["xp"]) == int(y["xp"]) \
+				and int(x["hero_level"]) == int(y["hero_level"]):
+			same += 1
+		elif first == "":
+			first = "убийство №%d: %s %d ур. (+%d) против %s %d ур. (+%d)" % [i + 1, x["type"], int(x["level"]), int(x["xp"]),
+				y["type"], int(y["level"]), int(y["xp"])]
+	if first == "" and la.size() != lb.size():
+		first = "убийств %d против %d" % [la.size(), lb.size()]
+	var fa: Dictionary = a["finish"]
+	var fb: Dictionary = b["finish"]
+	var final_same := int(fa.get("level", 0)) == int(fb.get("level", 0)) and int(fa.get("cum_xp", 0)) == int(fb.get("cum_xp", 0)) \
+		and int(fa.get("gold", 0)) == int(fb.get("gold", 0))
+	var ok := first == "" and final_same
+	var txt := "Кардинал: детерминизм — совпало %d из %d убийств, итог %s%s" % [same, maxi(la.size(), lb.size()),
+		"тот же" if final_same else "разный", "" if first == "" else "; первое расхождение — " + first]
+	if DisplayServer.get_name() == "headless":
+		bot.check(ok, txt)
+	else:
+		bot.note(txt + (" (на телефоне кадры плавают — не ошибка)" if not ok else ""))
+	_last = {"version": 1, "scenario": id(), "seed": seed_value, "runs": [a, b], "compare": [],
+		"determinism": {"same_kills": same, "kills_a": la.size(), "kills_b": lb.size(), "final_same": final_same,
+			"first_diff": first, "ok": ok}}
+	var dir := bot.run_dir if bot.run_dir != "" else bot.report_dir
+	DirAccess.make_dir_recursive_absolute(dir)
+	var f := FileAccess.open(dir.path_join("cardinal.json"), FileAccess.WRITE)
+	if f != null:
+		f.store_string(JSON.stringify(_last, "\t"))
+		f.close()
 
 
 func _diff(a: Dictionary, b: Dictionary) -> Array:
@@ -134,6 +188,10 @@ const METRIC_NAMES := {"xp_per_min": "опыт / мин игрового вре�
 func summary(_bot: TestBot) -> String:
 	if _last.is_empty():
 		return "Кардинал: сравнения нет (прогоны не закончились)"
+	if _last.has("determinism"):
+		var dd: Dictionary = _last["determinism"]
+		return "Кардинал: детерминизм — %s (совпало %d из %d убийств)" % ["да" if bool(dd["ok"]) else "нет",
+			int(dd["same_kills"]), maxi(int(dd["kills_a"]), int(dd["kills_b"]))]
 	var bad := 0
 	for d in _last["compare"]:
 		if not bool((d as Dictionary)["ok"]):
@@ -143,7 +201,7 @@ func summary(_bot: TestBot) -> String:
 
 func report_lines(_bot: TestBot) -> PackedStringArray:
 	var out := PackedStringArray()
-	out.append("Кардинал — первый срез (фаза 1)")
+	out.append("Кардинал — проверка детерминизма (фаза 2)" if is_det() else "Кардинал — первый срез (фазы 1–2)")
 	out.append("  Профиль «Обычный игрок» v2 (брошенную цель минуту не выбирает; фаза 2 — игровые часы физики, перемотка отдыха), seed %d, зона «Окрестности деревни людей», герой — Бродяга 1 ур." % seed_value)
 	for r in runs:
 		var d := r.result()
@@ -167,7 +225,15 @@ func report_lines(_bot: TestBot) -> PackedStringArray:
 				", ".join(errs) if not errs.is_empty() else "отдыха не было"])
 		if not (d["xp_mismatch"] as Array).is_empty():
 			out.append("    ! опыт не по формуле: " + "; ".join(PackedStringArray((d["xp_mismatch"] as Array).slice(0, 5))))
-	if not _last.is_empty():
+	if _last.has("determinism"):
+		var dd: Dictionary = _last["determinism"]
+		out.append("  Детерминизм (одинаковый seed, оба ×%.0f): %s — совпало %d из %d убийств, итог %s%s" % [accel,
+			"да" if bool(dd["ok"]) else "нет", int(dd["same_kills"]), maxi(int(dd["kills_a"]), int(dd["kills_b"])),
+			"тот же" if bool(dd["final_same"]) else "разный",
+			"" if String(dd["first_diff"]) == "" else "; первое расхождение — " + String(dd["first_diff"])])
+		out.append("  Без экрана (CI) кадры ровные — прогоны обязаны совпасть; на телефоне время кадра плавает, а ГСЧ боя")
+		out.append("  общий (randf), поэтому расхождение там — находка для фазы «свой ГСЧ боя», не ошибка.")
+	elif not _last.is_empty():
 		out.append("  Сравнение «ускоренный / с картинкой» (допуск %.1f–%.1f; смерти — ±1):" % [RATIO_LO, RATIO_HI])
 		for e in _last["compare"]:
 			var c: Dictionary = e

@@ -154,7 +154,7 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 							targets.append(m)
 				for m in targets:
 					var c := chance * Combat.skill_hit_chance(Game.level, m.level)
-					if c >= 1.0 or randf() < c:
+					if c >= 1.0 or Combat.rand() < c:
 						status(m, String(e.get("status", "")), HeroSkills.value_at(e.get("time", 0.0), n),
 							HeroSkills.value_at(e.get("value", 0.0), n), src)
 			"dot":
@@ -194,8 +194,8 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 func roll(e: Dictionary, n: int, sid: String = "") -> int:
 	var power := float(p.cur_matk()) if String(e.get("power", "atk")) == "matk" else float(p.cur_atk())
 	var base := power * HeroSkills.value_at(e.get("mult", 1.0), n) + HeroSkills.value_at(e.get("flat", 0.0), n)
-	base = base * skill_factor(sid) + float(randi_range(-2, 3))
-	p._last_crit = bool(e.get("crit", false)) or randf() < p.crit_rate()
+	base = base * skill_factor(sid) + float(Combat.rand_int(-2, 3))
+	p._last_crit = bool(e.get("crit", false)) or Combat.rand() < p.crit_rate()
 	p._last_magic = String(e.get("power", "atk")) == "matk"
 	if p._last_crit:
 		base *= p.crit_mult

@@ -82,8 +82,8 @@ static func _rain_hit(p: Player, m: Mob, raw: float) -> void:
 		p._miss_text(m)
 		return
 	p._last_magic = true
-	p._last_crit = randf() < p.crit_rate()
-	var dmg := raw + float(randi_range(-2, 3))
+	p._last_crit = Combat.rand() < p.crit_rate()
+	var dmg := raw + float(Combat.rand_int(-2, 3))
 	if p._last_crit:
 		dmg *= p.crit_mult
 	if p.is_inside_tree():
@@ -143,7 +143,7 @@ static func sp_abyss_howl(fx: HeroSkillFx, _sid: String, n: int, _t: Mob, e: Dic
 			continue
 		p._last_magic = true
 		p._last_crit = false
-		var dealt := p.mitigate(m, maxi(1, roundi(raw + float(randi_range(-2, 3)))))
+		var dealt := p.mitigate(m, maxi(1, roundi(raw + float(Combat.rand_int(-2, 3)))))
 		if pet.is_inside_tree():
 			Vfx.hit_spark(pet.get_parent(), m.aim_point(), ABYSS, 1.2)
 		m.take_damage(dealt, pet)

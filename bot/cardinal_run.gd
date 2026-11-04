@@ -100,6 +100,7 @@ static func cumulative_xp(lvl: int, xp: int) -> int:
 func begin() -> void:
 	var p := bot.player()
 	seed(seed_value)
+	Combat.reseed(seed_value)
 	_saved = {"time_scale": Engine.time_scale, "steps": Engine.max_physics_steps_per_frame, "fps": Engine.max_fps,
 		"no3d": bot.get_viewport().disable_3d}
 	if accel > 1.0:
@@ -117,7 +118,9 @@ func begin() -> void:
 	bot.teleport(Vector2(_center.x, _center.z), "Кардинал: %s" % title)
 	# Одинаковое начало прогонов: звери зоны на месте (пустой участок у деревни — тоже находка, пишется в отчёт)
 	zone_mobs_start = _zone_alive()
-	respawned = AdminPanel.respawn_all(bot.main)
+	# Фаза 2: все звери мира заново на своих местах, прежние таймеры возрождения погашены (main.reset_mobs) — оба
+	# прогона начинаются с одинакового мира
+	respawned = int(bot.main.call("reset_mobs")) if bot.main.has_method("reset_mobs") else AdminPanel.respawn_all(bot.main)
 	if zone_mobs_start == 0:
 		bot.note("Кардинал: в зоне «%s» в начале прогона живых зверей нет — возрождено по миру %d" % [zone_id, respawned])
 	p.hp = p.max_hp

@@ -79,13 +79,13 @@ static func on_basic_hit(fx: HeroSkillFx, t: Mob, _dealt: int) -> void:
 		return
 	var src: Dictionary = StatusEffects.source_hero_skill(sid) if sid != "" else {}
 	var st := float(p.skill_bonus.get("edge_stun", 0.0))
-	if st > 0.0 and randf() < st:
+	if st > 0.0 and Combat.rand() < st:
 		t.stun(STUN_TIME, src)
 	var po := float(p.skill_bonus.get("edge_poison", 0.0))
-	if po > 0.0 and randf() < po:
+	if po > 0.0 and Combat.rand() < po:
 		t.add_dot("stone_edge", float(p.cur_matk()) * POISON_DPS * p.damage_factor(t, true), POISON_TIME, p, false, src)
 	var wm := float(p.skill_bonus.get("edge_mp", 0.0))
-	if wm > 0.0 and randf() < wm:
+	if wm > 0.0 and Combat.rand() < wm:
 		p._gain_mp(float(p.max_mp) * WATER_MP)
 		fx.state["edge_mp_hits"] = int(fx.state.get("edge_mp_hits", 0)) + 1
 

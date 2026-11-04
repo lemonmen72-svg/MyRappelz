@@ -11,6 +11,7 @@ test_bot_game
 test_branding
 test_bridge
 test_cardinal
+test_cardinal_det
 test_centaur
 test_character_model
 test_combat

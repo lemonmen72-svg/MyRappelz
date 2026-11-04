@@ -545,7 +545,7 @@ func skill_hits(t: Mob) -> bool:
 	if t == null:
 		return true
 	var c := Combat.skill_hit_chance(Game.level, t.level)
-	return c >= 1.0 or randf() < c
+	return c >= 1.0 or Combat.rand() < c
 
 
 ## Доля «сырого» урона, что пройдёт по зверю t: защита (физ. или маг.) и разница уровней (Combat).
@@ -567,7 +567,7 @@ func crit_rate() -> float:
 ## Попала ли обычная атака по зверю t (бросок по hit_chance).
 func _basic_hits(t: Mob) -> bool:
 	var c := hit_chance(t)
-	return c >= 1.0 or randf() < c
+	return c >= 1.0 or Combat.rand() < c
 
 
 func _miss_text(t: Mob) -> void:
@@ -836,7 +836,7 @@ func try_attack() -> bool:
 	var dmg := _roll(basic_mult, false)
 	_anim_attack()
 	var hit := _basic_hits(target)
-	var twice := double_chance > 0.0 and randf() < double_chance
+	var twice := double_chance > 0.0 and Combat.rand() < double_chance
 	if attack_kind == "melee":
 		if hit:
 			_fx.on_basic_hit(target, _deal(target, dmg))
@@ -941,8 +941,8 @@ func _forward() -> Vector3:
 ## «Сырой» урон с разбросом и критом (до защиты зверя). mult: множитель атаки, flat: прибавка. Результат крита —
 ## в _last_crit; урон магический (посох) — _last_magic.
 func _roll(mult: float, force_crit: bool, flat: float = 0.0) -> int:
-	var base := float(cur_atk()) * mult + flat + float(randi_range(-2, 3))
-	_last_crit = force_crit or randf() < crit_rate()
+	var base := float(cur_atk()) * mult + flat + float(Combat.rand_int(-2, 3))
+	_last_crit = force_crit or Combat.rand() < crit_rate()
 	_last_magic = attack_kind == "magic"
 	if _last_crit:
 		base *= crit_mult
@@ -1471,13 +1471,13 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 	if AdminPanel.god:
 		return
 	# Уклонение — только от ударов зверей
-	if attacker is Mob and cur_eva() > 0.0 and randf() < cur_eva():
+	if attacker is Mob and cur_eva() > 0.0 and Combat.rand() < cur_eva():
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "Уклонение", Color(0.7, 0.95, 1.0))
 		if _has_model():
 			_model.play_dodge()
 		return
 	# Блок щитом: удар зверя приходится в щит
-	if attacker is Mob and block > 0.0 and randf() < block:
+	if attacker is Mob and block > 0.0 and Combat.rand() < block:
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "Блок", Color(0.75, 0.85, 1.0))
 		if _has_model():
 			_model.play_block()

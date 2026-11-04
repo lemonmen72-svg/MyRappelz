@@ -560,7 +560,7 @@ static func sp_cleanse_pet(fx: HeroSkillFx, _sid: String, n: int, _t: Mob, e: Di
 	if pet == null:
 		return
 	var removed := 0
-	if randf() < HeroSkills.value_at(e.get("chance", 1.0), n):
+	if Combat.rand() < HeroSkills.value_at(e.get("chance", 1.0), n):
 		removed = pet.cleanse_debuffs()
 	if pet.is_inside_tree():
 		Vfx.heal_sparkles(pet.get_parent(), pet.global_position, 0.8)

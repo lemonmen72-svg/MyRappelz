@@ -187,7 +187,7 @@ func _ready() -> void:
 	_height = CreatureModels.height(model_id, body_scale)
 	if MobData.flying(type_id):
 		hover_y = CreatureAsset.hover_for(model_id, body_scale)
-	_anim_t = randf() * 10.0
+	_anim_t = Combat.rand() * 10.0
 
 	_build_overhead()
 	_wander_to = home
@@ -335,9 +335,9 @@ func _physics_process(delta: float) -> void:
 		else:
 			_wander_wait -= delta
 			if _wander_wait <= 0.0:
-				_wander_wait = randf_range(2.0, 5.0)
-				var a := randf() * TAU
-				_wander_to = home + Vector3(cos(a), 0.0, sin(a)) * randf_range(1.0, 6.0)
+				_wander_wait = Combat.rand_range(2.0, 5.0)
+				var a := Combat.rand() * TAU
+				_wander_to = home + Vector3(cos(a), 0.0, sin(a)) * Combat.rand_range(1.0, 6.0)
 		_heal(delta, 0.1)
 
 	if dir == Vector3.ZERO:
@@ -375,8 +375,8 @@ func _land_hit() -> void:
 
 ## Готовый урон удара по цели t (Combat): атака × mult с разбросом, крит, ослабление, защита цели и уровни.
 func _hit_damage(t: Node3D, mult: float) -> int:
-	var raw := float(atk) * mult * randf_range(0.92, 1.08)
-	_last_crit = randf() < Combat.crit_chance(crit / 100.0, level, Combat.level_of(t))
+	var raw := float(atk) * mult * Combat.rand_range(0.92, 1.08)
+	_last_crit = Combat.rand() < Combat.crit_chance(crit / 100.0, level, Combat.level_of(t))
 	if _last_crit:
 		raw *= Combat.MOB_CRIT_MULT
 	raw = float(_weakened(maxi(1, roundi(raw))))
@@ -620,9 +620,9 @@ func _tick_debuffs(delta: float) -> void:
 ## Удар мимо (морок, сбитый прицел или промах по точности против избегания цели и уровням — Combat):
 ## над целью «Промах», урона нет.
 func _missed(t: Node3D) -> bool:
-	var miss := blind_time > 0.0 or (miss_time > 0.0 and randf() < miss_frac)
+	var miss := blind_time > 0.0 or (miss_time > 0.0 and Combat.rand() < miss_frac)
 	if not miss and is_instance_valid(t):
-		miss = randf() >= Combat.hit_chance(float(acc), Combat.avoid_of(t), level, Combat.level_of(t))
+		miss = Combat.rand() >= Combat.hit_chance(float(acc), Combat.avoid_of(t), level, Combat.level_of(t))
 	if miss and is_inside_tree() and is_instance_valid(t):
 		Util.float_text(get_parent(), t.global_position + Vector3(0, 2.2, 0), "Промах", Color(0.8, 0.85, 1.0))
 	return miss
@@ -752,7 +752,7 @@ func _keeps_target(attacker: Node3D) -> bool:
 	if target == null or not is_instance_valid(target) or target == attacker or not target.is_in_group("pets"):
 		return false
 	var st := _stealth_of(attacker)
-	return st > 0.0 and randf() < clampf(st * 2.0, 0.0, 0.9)
+	return st > 0.0 and Combat.rand() < clampf(st * 2.0, 0.0, 0.9)
 
 
 func _die() -> void:

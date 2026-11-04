@@ -456,7 +456,7 @@ func _do_attack(t: Mob) -> void:
 		_blast(t.global_position, float(sk["radius"]), maxi(1, roundi(atk * float(sk["power"]))), fx)
 		return
 	# Обычная атака: точность против избегания зверя и разница уровней (Combat), крит
-	if randf() >= Combat.hit_chance(float(accuracy), float(t.avoid), level, t.level):
+	if Combat.rand() >= Combat.hit_chance(float(accuracy), float(t.avoid), level, t.level):
 		_miss_text(t)
 		_bump()
 		return
@@ -481,8 +481,8 @@ func _mitigate(m: Mob, raw: int) -> int:
 
 ## «Сырой» урон от главной атаки × mult с разбросом и критом (результат крита — в _last_crit).
 func _roll(mult: float) -> int:
-	var base := float(atk) * mult + float(randi_range(-1, 2))
-	_last_crit = randf() * 100.0 < crit
+	var base := float(atk) * mult + float(Combat.rand_int(-1, 2))
+	_last_crit = Combat.rand() * 100.0 < crit
 	if _last_crit:
 		base *= PetStats.CRIT_MULT
 	return maxi(1, roundi(base))
@@ -607,7 +607,7 @@ func _mobs_near(center: Vector3, radius: float) -> Array[Mob]:
 func _threat_hit(m: Mob) -> void:
 	if threat <= 0.0 or not is_instance_valid(m) or m.is_dead or m.target != owner_node:
 		return
-	if randf() < threat:
+	if Combat.rand() < threat:
 		m.taunt(self, 3.0, StatusEffects.source_pet_skill(species, "provoke"))
 
 
@@ -928,7 +928,7 @@ func _apply_skill(id: String, t: Mob) -> void:
 	var src := StatusEffects.source_pet_skill(species, id)
 	for m in victims:
 		var sure := Combat.skill_hit_chance(level, m.level)
-		if sure < 1.0 and randf() >= sure:
+		if sure < 1.0 and Combat.rand() >= sure:
 			_miss_text(m)
 			continue
 		_skill_fx(m, fx, mult > 1.5)
@@ -1044,7 +1044,7 @@ func take_damage(amount: int, attacker: Node3D) -> void:
 	if is_down or bond_mode != "":
 		return
 	# Уклонение — только от ударов зверей (урон без источника не уклоняется)
-	if attacker != null and randf() * 100.0 < evasion:
+	if attacker != null and Combat.rand() * 100.0 < evasion:
 		if is_inside_tree():
 			Util.float_text(get_parent(), global_position + Vector3(0, _height + 0.5, 0), "Уклон", Color(0.8, 0.95, 1.0))
 		return

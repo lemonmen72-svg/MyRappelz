@@ -228,7 +228,7 @@ static func use_cube(item: String, cube: String, where: String = "", rng: Random
 	var ch := chance(item)
 	res["chance"] = ch
 	Game.inventory.remove(cube)
-	var roll := rng.randf() if rng != null else randf()
+	var roll := rng.randf() if rng != null else Combat.rand()
 	var nm := ItemData.item_name(item)
 	if roll < ch:
 		var up := ItemData.enchanted_id(item, ItemData.enchant_level(item) + 1)

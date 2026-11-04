@@ -33,6 +33,8 @@ const MODES := [
 	{"id": "sections", "name": "По разделам", "ready": true, "script": "res://bot/bot_scenario_sections.gd", "minutes": 10},
 	{"id": "cardinal", "name": "Кардинал: первый срез", "ready": true, "script": "res://bot/bot_scenario_cardinal.gd",
 		"minutes": 12},
+	{"id": "cardinal_det", "name": "Кардинал: детерминизм", "ready": true, "script": "res://bot/bot_scenario_cardinal.gd",
+		"minutes": 6},
 ]
 
 

@@ -395,7 +395,30 @@ func _on_mob_gone(mob: Mob, killed: bool) -> void:
 			player.play_emote("boss")
 	# Звери, поставленные админ-панелью (slot -1), не возрождаются
 	if mob.slot >= 0:
-		get_tree().create_timer(MobData.respawn_time(mob.type_id)).timeout.connect(_spawn_slot.bind(mob.slot))
+		get_tree().create_timer(MobData.respawn_time(mob.type_id)).timeout.connect(_respawn_slot.bind(mob.slot, _spawn_gen))
+
+
+## Поколение зверей мира: reset_mobs увеличивает — таймеры возрождения прежних зверей ничего не делают.
+var _spawn_gen := 0
+
+
+func _respawn_slot(i: int, gen: int) -> void:
+	if gen == _spawn_gen:
+		_spawn_slot(i)
+
+
+## Все звери мира заново на своих местах (слоты острова), прежние таймеры возрождения гасятся; звери, поставленные
+## вручную (slot −1), убираются. Кардинал — одинаковое начало прогонов (детерминизм). Возвращает число зверей.
+func reset_mobs() -> int:
+	_spawn_gen += 1
+	for n in get_tree().get_nodes_in_group("mobs"):
+		var m := n as Mob
+		if m != null and m.get_parent() == self:
+			m.remove_from_group("mobs")
+			m.queue_free()
+	for i in _slots.size():
+		_spawn_slot(i)
+	return _slots.size()
 
 
 func _on_action(id: String) -> void:

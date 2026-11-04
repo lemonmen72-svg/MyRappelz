@@ -121,7 +121,7 @@ static func on_basic_hit(fx: HeroSkillFx, t: Mob, _dealt: int) -> void:
 				add_sparks(fx, 1)
 		fx.state["spark_hits"] = h
 	var pc := float(p.skill_bonus.get("poison", 0.0))
-	if pc > 0.0 and p.attack_kind == "ranged" and not t.is_dead and randf() < pc:
+	if pc > 0.0 and p.attack_kind == "ranged" and not t.is_dead and Combat.rand() < pc:
 		var dps := float(p.cur_atk()) * POISON_DPS * p.damage_factor(t, false)
 		t.add_dot("venom_tip", dps, POISON_TIME, p, false, StatusEffects.source_hero_skill("venom_tip"))
 		fx.state["poisoned"] = int(fx.state.get("poisoned", 0)) + 1

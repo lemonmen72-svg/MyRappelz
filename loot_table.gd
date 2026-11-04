@@ -211,13 +211,13 @@ static func roll(type_id: String, lvl: int, dungeon: bool = false, rng: RandomNu
 
 ## Золото за зверя: с шансом MobData.GOLD_CHANCE (80 %, как в оригинале) — случайное в MobData.gold_range, иначе 0.
 static func gold(type_id: String, lvl: int, rng: RandomNumberGenerator = null) -> int:
-	var roll := rng.randf() if rng != null else randf()
+	var roll := rng.randf() if rng != null else Combat.rand()
 	if roll >= MobData.GOLD_CHANCE:
 		return 0
 	var g: Array = MobData.gold_range(type_id, lvl)
 	var lo := int(g[0])
 	var hi := maxi(lo, int(g[1]))
-	return rng.randi_range(lo, hi) if rng != null else randi_range(lo, hi)
+	return rng.randi_range(lo, hi) if rng != null else Combat.rand_int(lo, hi)
 
 
 ## Категория предмета добычи (для статистики и тестов): potion, card, weapon, material, special, "" — иное.
@@ -336,10 +336,10 @@ static func _pairs(d: Dictionary) -> Array:
 
 
 static func _rand(rng: RandomNumberGenerator) -> float:
-	return rng.randf() if rng != null else randf()
+	return rng.randf() if rng != null else Combat.rand()
 
 
 static func _randi(rng: RandomNumberGenerator, n: int) -> int:
 	if n <= 1:
 		return 0
-	return rng.randi_range(0, n - 1) if rng != null else randi_range(0, n - 1)
+	return rng.randi_range(0, n - 1) if rng != null else Combat.rand_int(0, n - 1)

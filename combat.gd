@@ -35,6 +35,34 @@ const CRIT_MAX := 0.75
 const MOB_CRIT_MULT := 1.8
 
 
+# ---------- Свой ГСЧ игровых бросков ----------
+## Все броски правил игры (попадание, крит, урон, ИИ зверей и питомцев, добыча, умения, приручение, заточка) — из
+## этого генератора, украшения мира (овцы, анимации построек, модели) — из общего randf. Кардинал задаёт seed
+## (reseed) — бой повторяется при одинаковом начале (фаза 2, проверка детерминизма).
+static var rng := RandomNumberGenerator.new()
+
+
+static func _static_init() -> void:
+	rng.randomize()
+
+
+static func reseed(s: int) -> void:
+	rng.seed = s
+	rng.state = 0
+
+
+static func rand() -> float:
+	return rng.randf()
+
+
+static func rand_range(a: float, b: float) -> float:
+	return rng.randf_range(a, b)
+
+
+static func rand_int(a: int, b: int) -> int:
+	return rng.randi_range(a, b)
+
+
 # ---------- Попадание ----------
 
 ## Множитель уровней в шансе попасть (d = уровень цели − уровень атакующего), в процентах на единицу «точность /
