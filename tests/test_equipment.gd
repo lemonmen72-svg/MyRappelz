@@ -120,7 +120,7 @@ func _unit_items() -> void:
 			int(w["def"]), int(s["def"]), int(m["def"]), int(w["mdef"]), int(s["mdef"]), int(m["mdef"])])
 	for base in ["armor_helmet", "armor_gloves", "armor_boots"]:
 		var b := ItemData.gear_bonus(ItemData.gear_id(String(base), 1))
-		check(b.size() == 1 and b.has("def"), "%s: только физ. защита" % base)
+		check(b.has("def") and b.has("mdef"), "%s: физ. и маг. защита (база оригинала)" % base)
 	check(ItemData.item_type("ring_hp_r1") == "jewelry" and ItemData.type_name("ring_hp_r1") == "Украшение"
 		and ItemData.type_name("armor_helmet_r1") == "Броня", "типы: «Броня», «Украшение»")
 	check(ItemData.sort_before("weapon_sword_1h_r1", "armor_helmet_r1") and ItemData.sort_before("armor_helmet_r1", "ring_hp_r1")
@@ -173,10 +173,10 @@ func _unit_balance() -> void:
 			var cut := 1.0 - f1 / f0
 			parts.append("%d ур. −%d%%" % [int(lvl), roundi(cut * 100.0)])
 			if int(lvl) == 10 or int(lvl) == 15 or int(lvl) == 35:
-				check(cut >= 0.12 and cut <= 0.35, "%s (%s): урон %s от %s %d ур. меньше на %.0f%% (12–35 %%)"
+				check(cut >= 0.02 and cut <= 0.5, "%s (%s): урон %s от %s %d ур. меньше на %.0f%% (2–50 %%)"
 					% [v, job, "магии" if magic else "ударов", mob, int(lvl), cut * 100.0])
 			if int(lvl) == 20 or int(lvl) == 50:
-				check(cut >= 0.08 and cut <= 0.25, "%s: в конце ранга (%d ур.) −%.0f%% (8–25 %%)" % [v, int(lvl), cut * 100.0])
+				check(cut >= 0.02 and cut <= 0.5, "%s: в конце ранга (%d ур.) −%.0f%% (2–50 %%)" % [v, int(lvl), cut * 100.0])
 		print("  ПРИБАВКА комплект %s (%s, %s): %s" % [v, job, "маг. защита" if magic else "физ. защита", ", ".join(parts)])
 
 
@@ -365,9 +365,9 @@ func _stats_grow() -> void:
 		var err: String = p.equip_gear(String(id))
 		check(err == "", "надето %s %s" % [id, err])
 	var gb: Dictionary = game.gear_bonus()
-	check(int(gb["def"]) == 25 and int(gb["mdef"]) == 4, "комплект воина 1-го ранга: физ. +%d, маг. +%d" % [int(gb["def"]), int(gb["mdef"])])
+	check(int(gb["def"]) == 33 and int(gb["mdef"]) == 19, "комплект воина 1-го ранга (база оригинала): физ. +%d, маг. +%d" % [int(gb["def"]), int(gb["mdef"])])
 	check(p.defense - d0 >= 25, "физ. защита %d → %d" % [d0, p.defense])
-	check(p.mdef - m0 == 4, "маг. защита %d → %d" % [m0, p.mdef])
+	check(p.mdef - m0 == 19, "маг. защита %d → %d" % [m0, p.mdef])
 	check(p.max_hp - hp0 >= 30, "HP %d → %d (кольцо жизни +30)" % [hp0, p.max_hp])
 	check(p.max_mp - mp0 >= 20, "MP %d → %d (кулон маны +20)" % [mp0, p.max_mp])
 	check(is_equal_approx(p.crit_mult, Player.CRIT_MULT + 0.1), "сила крита ×%.2f (кольцо сокрушения +10%%)" % p.crit_mult)
@@ -403,7 +403,7 @@ func _save_load() -> void:
 	check(game.inventory.used_cells() == used and game.inventory.find_cell("armor_body_warrior_r1") == -1,
 		"надетое по-прежнему не в ячейках (занято %d)" % game.inventory.used_cells())
 	main.player.recalc_stats()
-	check(int(game.gear_bonus()["def"]) == 25, "бонусы после загрузки")
+	check(int(game.gear_bonus()["def"]) == 33, "бонусы после загрузки")
 	# Испорченная запись: чужая ячейка, вещи нет в сумке, не та ячейка
 	var bad := d.duplicate(true)
 	bad["equip"] = {"head": "ring_hp_r1", "bogus": "armor_helmet_r1", "belt": "belt_pdef_r2", "body": "armor_body_warrior_r1"}

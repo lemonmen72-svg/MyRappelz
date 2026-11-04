@@ -217,7 +217,7 @@ func _check_rarity() -> void:
 		and MobData.RARITY_TIER["rare"] < MobData.RARITY_TIER["unique"], "ранги: базовый < обычный < редкий < уникальный")
 	check(MobData.rarity_tier("wolf") > MobData.rarity_tier("panther"), "волк по рангу выше пантеры")
 	check(MobData.card_tier("wolf") == "rare" and ItemData.card_tier("card_wolf") == "rare", "карта волка — синяя")
-	check(is_equal_approx(Taming.CHANCE["rare"], 0.45), "шанс синей карты 45%")
+	check(is_equal_approx(Taming.CHANCE["rare"], 0.25), "шанс синей карты 25% (база оригинала)")
 	check(ItemData.grade_name("card_wolf") == "Синяя (обычная)", "подпись карты волка: " + ItemData.grade_name("card_wolf"))
 	check(not MobData.rarity_color("uncommon").is_equal_approx(MobData.rarity_color("common")), "у «Обычного» свой цвет подписи")
 	for sp in ["panther", "pheasant", "turtle", "boar", "golem"]:
@@ -226,15 +226,9 @@ func _check_rarity() -> void:
 	check(MobData.RARITY_POWER["common"] < MobData.RARITY_POWER["uncommon"]
 		and MobData.RARITY_POWER["uncommon"] < MobData.RARITY_POWER["rare"]
 		and MobData.RARITY_POWER["rare"] < MobData.RARITY_POWER["unique"], "сила растёт с редкостью")
-	# Питомец: прежние числа базовых видов на 1 ур. (PetData.SPECIES), у волка — ×сила редкости
-	for sp in ["panther", "pheasant", "turtle", "boar"]:
-		var d := PetStats.derived(sp, 1)
-		var s := PetData.get_species(sp)
-		check(int(d["max_hp"]) == int(s["hp"]) and int(d["atk"]) == int(s["atk"]), "%s ур.1: HP %d, атака %d — как прежде"
-			% [sp, int(d["max_hp"]), int(d["atk"])])
-	var wd := PetStats.derived("wolf", 1)
-	var ws := PetData.get_species("wolf")
-	check(int(wd["max_hp"]) == roundi(float(ws["hp"]) * MobData.power("wolf")), "волк ур.1: HP ×сила редкости (%d)" % int(wd["max_hp"]))
+	# Питомец — база оригинала: пантера 1 ур. Вын 14 + 0.334 → HP 30·14·0.7 + 20 = 314
+	var pd := PetStats.derived("panther", 1)
+	check(int(pd["max_hp"]) == 314, "пантера ур.1: HP %d (база оригинала)" % int(pd["max_hp"]))
 	# «Существо ловкости»: Ловкость — самый высокий стат на всех стадиях
 	for lvl in [1, 14, 15, 29, 30, 50]:
 		var st := PetStats.base_stats("wolf", lvl)

@@ -88,7 +88,7 @@ func run_step() -> void:
 			tm.cooldown = 0.0
 			main._on_action("tame")
 			check(tm.marked == mob and mob.tame_marked, "метка на фазане")
-			check(hud._msg_label.text.contains("шанс 70%"), "в сообщении шанс базовой карты: " + hud._msg_label.text)
+			check(hud._msg_label.text.contains("шанс 80%"), "в сообщении шанс базовой карты: " + hud._msg_label.text)
 			tm.force_roll = 0.0
 			mob.take_damage(mob.hp + 5, player)
 			tm.force_roll = -1.0
@@ -299,12 +299,12 @@ func _unit_items() -> void:
 func _unit_lines() -> void:
 	var t := "\n".join(PackedStringArray(Taming.card_lines("card_panther")))
 	check(t.contains("Пантера") and t.contains("Пещера (ур. 10–13)"), "где водится пантера: " + t)
-	check(t.contains("коричневая (базовая)") and t.contains("70%"), "тир и шанс: " + t)
+	check(t.contains("коричневая (базовая)") and t.contains("80%"), "тир и шанс: " + t)
 	check(t.contains("продаётся у Учителя Кирка в центре города"), "где взять карту пантеры: " + t)
 	check(t.contains("Примените «Приручить» к зверю, затем победите его"), "что делать с картой")
 	t = "\n".join(PackedStringArray(Taming.card_lines("card_wolf")))
 	check(t.contains("Восточный лагерь") and t.contains("выпадает из волка"), "карта волка: " + t)
-	check(t.contains("синяя (обычная)") and t.contains("45%"), "карта волка — синяя, 45%: " + t)
+	check(t.contains("синяя (обычная)") and t.contains("25%"), "карта волка — синяя, 25%: " + t)
 	t = "\n".join(PackedStringArray(Taming.card_lines("card_turtle")))
 	check(t.contains("Мёртвая роща (ур. 3–5)") and t.contains("коричневая (базовая)"), "карта черепахи: " + t)
 	check(Taming.card_lines("card_golem").is_empty() and Taming.card_lines("card_boar").is_empty(), "карт стража и кабана нет")

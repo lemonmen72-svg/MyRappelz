@@ -118,7 +118,7 @@ func run_step() -> void:
 			var g0: int = game.gold
 			_press_dialog("complete")
 			check(q.state("kirk_first_card") == "done" and q.times_done("kirk_first_card") == 1, "задание сдано")
-			check(_total_xp() == xp0 + 35 and game.gold == g0 + 10, "награда: 35 оп., 10 зол. (опыт %d → %d)"
+			check(_total_xp() == xp0 + int(QuestData.get_quest("kirk_first_card")["rewards"]["xp"]) and game.gold == g0 + 10, "награда: опыт и 10 зол. (опыт %d → %d)"
 				% [xp0, _total_xp()])
 			check(npcs.reply == String(QuestData.get_quest("kirk_first_card")["done"]), "слова Кирка при сдаче")
 			check(last_hud_text().contains("«Первая карта» выполнено"), "сообщение о сдаче: " + last_hud_text())
@@ -180,8 +180,9 @@ func run_step() -> void:
 			var xp0 := _total_xp()
 			check(q.complete("kirk_new_friend"), "«Новый друг» сдано")
 			check(int(game.hero["jp"]) >= jp0 + 5, "JP героя +5: %d → %d" % [jp0, int(game.hero["jp"])])
-			check(inv.count("potion_hp_r1") == potions + 3 + _bonus("potion_hp_r1") and _total_xp() == xp0 + 70,
-				"награда: 3 зелья и 70 оп. (+ случайная %s)" % [q.last_bonus])
+			var rxp := int(QuestData.get_quest("kirk_new_friend")["rewards"]["xp"])
+			check(inv.count("potion_hp_r1") == potions + 3 + _bonus("potion_hp_r1") and _total_xp() == xp0 + rxp,
+				"награда: 3 зелья и %d оп. (+ случайная %s)" % [rxp, q.last_bonus])
 			_check_bonus("kirk_new_friend")
 			# «Испытание связи» — с 3 уровня (за фазана и награды герой мог уже подрасти)
 			if game.level < 3:
@@ -244,7 +245,7 @@ func run_step() -> void:
 			check(_has_text("Победить зверей вместе с питомцем") and _has_text("5/5"), "цель с прогрессом")
 			check(_has_text("Все цели выполнены — вернитесь к Учителю Кирку"), "подсказка, кому сдавать")
 			check(_find_live(hud._window, "reward_revive_scroll") != null, "награда-предмет со значком")
-			check(_has_text("Золото: 40") and _has_text("Опыт: 100"), "награда: опыт и золото")
+			check(_has_text("Золото: 40") and _has_text("Опыт: %d" % int(QuestData.get_quest("kirk_bond_trial")["rewards"]["xp"])), "награда: опыт и золото")
 			check(_find_live(hud._window, "reward_random") != null and _has_text("Случайная награда: 1–2 предмета"),
 				"в журнале — «Случайная награда: 1–2 предмета»")
 			_press_journal("tab_done")

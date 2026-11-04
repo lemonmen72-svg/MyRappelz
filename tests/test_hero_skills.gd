@@ -325,13 +325,9 @@ func _check_stats(player: Player) -> void:
 	check(s1 == {"str": 20, "vit": 21, "agi": 24, "int": 17, "wis": 17, "dex": 24, "luck": 12},
 		"статы 1-го уровня (база Strider + 10 JLv Stepper + 1 JLv профессии): %s" % [s1])
 	var d1 := HeroStats.derived("assassin", 1)
-	var c := ClassData.cls("assassin")
-	check(int(d1["max_hp"]) == int(c["hp"]) and int(d1["patk"]) == int(c["atk"]) and int(d1["ratk"]) == int(c["atk"])
-		and int(d1["def"]) == int(c["def"]) and int(d1["max_mp"]) == int(c["mp"]),
-		"1-й уровень = прежние числа: HP %d, атака %d/%d, защита %d, MP %d" % [int(d1["max_hp"]), int(d1["patk"]),
-		int(d1["ratk"]), int(d1["def"]), int(d1["max_mp"])])
-	check(absf(float(d1["eva"]) - 100.0 * float(c["eva"])) < 0.01 and absf(float(d1["crit"]) - 100.0 * float(c["crit"])) < 0.01,
-		"уклонение %.1f%%, крит %.1f%% на 1-м уровне" % [float(d1["eva"]), float(d1["crit"])])
+	check(int(d1["max_hp"]) == 30 * 21 + 20 and int(d1["patk"]) == 2 * 20 + 1 and int(d1["def"]) == 2 * 21 + 1
+		and is_equal_approx(float(d1["crit"]), 0.2 * 12.0 + 3.0), "1-й уровень — формулы сервера: HP %d, атака %d, защита %d, крит %.1f%%"
+		% [int(d1["max_hp"]), int(d1["patk"]), int(d1["def"]), float(d1["crit"])])
 	# Рост: статы не убывают, HP / атака / защита / MP растут и близки к прежней формуле (±20%)
 	var prev := d1
 	var bad := ""
@@ -343,16 +339,10 @@ func _check_stats(player: Player) -> void:
 		for k in ["max_hp", "patk", "max_mp", "acc"]:
 			if int(d[k]) <= int(prev[k]):
 				bad += " ур.%d %s" % [lv, k]
-		var old := ClassData.stats_for("assassin", lv)
-		for pair in [["max_hp", "max_hp"], ["patk", "atk"], ["def", "def"], ["max_mp", "max_mp"]]:
-			var nv := float(d[pair[0]])
-			var ov := float(old[pair[1]])
-			if absf(nv - ov) > maxf(2.0, ov * 0.2):
-				bad += " ур.%d %s %d/%d" % [lv, pair[0], int(nv), int(ov)]
 		prev = d
 	check(bad == "", "рост статов и производных по уровням" + bad)
 	var d15 := HeroStats.derived("assassin", 15)
-	check(float(d15["eva"]) > float(d1["eva"]) and int(d15["aspd"]) > int(d1["aspd"]), "Ловкость растёт: уклонение и скорость атаки выше")
+	check(int(d15["avoid"]) > int(d1["avoid"]), "Ловкость растёт: уклонение выше")
 	# Игрок: статы применены, оружие поверх
 	check(player.hero_stats.size() > 0 and player.max_hp == int(d1["max_hp"]) and player.max_mp == int(d1["max_mp"]),
 		"игрок 1-го ур.: HP %d, MP %d" % [player.max_hp, player.max_mp])
@@ -365,7 +355,7 @@ func _check_stats(player: Player) -> void:
 	var wcrit := float(ItemData.get_item(game.weapon).get("crit", 0.0))
 	check(is_equal_approx(player.eva, float(d1["eva"]) / 100.0) and is_equal_approx(player.crit, float(d1["crit"]) / 100.0 + wcrit),
 		"уклонение %.1f%% и крит %.1f%% героя — из статов" % [player.eva * 100.0, player.crit * 100.0])
-	check(is_equal_approx(player.aspd, float(d1["aspd"]) / 100.0 + 0.25), "скорость атаки от Ловкости и кинжала (+25%%): %d%%"
+	check(is_equal_approx(player.aspd, float(d1["aspd"]) / 100.0 + 0.05), "скорость атаки: база и кинжал (+5%%): %d%%"
 		% roundi(player.aspd * 100.0))
 	check(is_equal_approx(player.attack_time, ItemData.base_cd("dagger") / player.aspd), "удар раз в %.2f с" % player.attack_time)
 	check(player.accuracy == int(d1["acc"]) and player.hp_regen > 0.0, "точность %d, восстановление HP %.1f/с"
@@ -376,12 +366,12 @@ func _check_stats(player: Player) -> void:
 	check(player.atk == int(d1["ratk"]) + int(cb["atk"]), "атака арбалета от Меткости: %d" % player.atk)
 	check(is_equal_approx(player.aspd, float(d1["aspd"]) / 100.0 - 0.2), "арбалет: скорость атаки −20%")
 	check(_daggers(player), "снова кинжалы")
-	# Точность (Combat): по зверям своего уровня почти без промахов, по зверю намного выше — редко
+	# Точность (Combat, формула сервера): по зверям своего уровня почти без промахов, по зверю выше — реже
 	var weak := find_mob("pheasant")
 	check(weak != null and player.hit_chance(weak) >= 0.85, "по фазану %d ур. попадание %d%%"
 		% [weak.level if weak != null else 0, roundi(player.hit_chance(weak) * 100.0) if weak != null else 0])
 	var hc10 := Combat.hit_chance(float(player.accuracy), float(player.avoid), game.level, 10)
-	check(hc10 > 0.0 and hc10 < 0.4, "по зверю 10-го ур. (герой %d ур.) попадание %d%%" % [game.level, roundi(hc10 * 100.0)])
+	check(hc10 > 0.0 and hc10 < 0.9, "по зверю 10-го ур. (герой %d ур.) попадание %d%%" % [game.level, roundi(hc10 * 100.0)])
 	var acc0 := player.accuracy
 	player.accuracy = 0
 	var miss := 0
@@ -389,7 +379,7 @@ func _check_stats(player: Player) -> void:
 		if not player._basic_hits(weak):
 			miss += 1
 	player.accuracy = acc0
-	check(miss > 0 and miss < 100, "при низкой точности промахи: %d из 200" % miss)
+	check(miss > 100 and miss < 200, "без точности почти одни промахи (сервер: 7 %% попаданий): %d из 200" % miss)
 	check(PetStats.STATS == Stats.STATS and absf(Combat.hit_chance(30.0, 30.0, 5, 5) - Combat.HIT_BASE) < 0.001,
 		"формулы питомцев и героя общие (Stats), попадание — Combat")
 

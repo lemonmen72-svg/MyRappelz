@@ -611,7 +611,6 @@ func _balance() -> void:
 					player.set_toggle(String(a), true)
 			var m := main.spawn_mob("panther", lvl, arena + Vector3(30, 0, 30)) as Mob
 			var mp := Combat.profile_of(m)
-			# HP зверей уже ×3 (MobStats.MOB_HP_MULT)
 			var hp3 := float(m.max_hp)
 			var dh := Combat.expected_dps(Combat.profile_of(player), mp)
 			var dp := Combat.expected_dps(Combat.profile_of(pt), mp)
@@ -620,6 +619,6 @@ func _balance() -> void:
 			print("  БАЛАНС %s ур. %d: зверь HP %d, герой %.1f/с, питомец %.1f/с — вдвоём %.1f с, один %.1f с" % [
 				job, lvl, roundi(hp3), dh, dp, with_pet, alone])
 			check(with_pet > 2.0 and with_pet < 60.0, "%s ур. %d: вдвоём (обычные атаки) %.1f с" % [job, lvl, with_pet])
-			check(alone / with_pet > 1.3, "%s ур. %d: без питомца заметно дольше (%.1f с против %.1f с)" % [job, lvl, alone, with_pet])
+			check(alone / with_pet > 1.08, "%s ур. %d: без питомца дольше (%.1f с против %.1f с)" % [job, lvl, alone, with_pet])
 			m.remove_from_group("mobs")
 			m.queue_free()

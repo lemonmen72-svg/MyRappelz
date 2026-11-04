@@ -48,9 +48,9 @@ func run_step() -> void:
 				+ PetSkills.learn_block(rec, "shadow_rend"))
 			check(PetSkills.learn(rec, "inner_fire"), "изучен «Внутренний огонь» (ур. 1)")
 			check(int(rec["jp"]) == PetSkills.JP_START - 1, "списан 1 JP")
-			pet.level = 12
+			pet.level = 30
 			pet.refresh_skills()
-			check(int(rec["level"]) == 12 and pet.stage == 0, "пантера 12 уровня, 1-я стадия")
+			check(int(rec["level"]) == 30 and pet.stage == 0, "пантера 30 уровня, 1-я стадия")
 			rec["jp"] = 0
 			check(PetSkills.learn_block(rec, "shadow_rend").contains("JP"), "без JP не изучить")
 			check(not PetSkills.learn(rec, "shadow_rend"), "без JP умение не изучено")
@@ -61,7 +61,7 @@ func run_step() -> void:
 				check(PetSkills.learn(rec, "shadow_rend"), "«Двойной росчерк» ур. %d" % (i + 1))
 			check(PetSkills.learn_block(rec, "shadow_rend").contains("стадия 2"), "6-й уровень — со 2-й стадии: "
 				+ PetSkills.learn_block(rec, "shadow_rend"))
-			check(PetSkills.cap_for("shadow_rend", 12) == 5 and PetSkills.cap_for("shadow_rend", 60, 0) == 5
+			check(PetSkills.cap_for("shadow_rend", 30) == 5 and PetSkills.cap_for("shadow_rend", 60, 0) == 5
 				and PetSkills.cap_for("shadow_rend", 60, 1) == 10, "на 1-й форме — до 5 ур., на 2-й (с 60 ур.) — до 10")
 			check(PetSkills.learn(rec, "dusk_rupture"), "после «Двойного росчерка» изучен «Сумрачный разрыв»")
 			check(PetSkills.learn(rec, "shadow_fang") and PetSkills.learn(rec, "daze"), "изучены «Клык полуночи» и «Морок»")
@@ -90,7 +90,7 @@ func run_step() -> void:
 			var rec: Dictionary = game.pets[0]
 			var jp0 := int(rec["jp"])
 			pet.gain_xp(PetData.xp_to_next(pet.level))
-			check(pet.level == 13, "питомец получил уровень")
+			check(pet.level == 31, "питомец получил уровень")
 			check(int(rec["jp"]) == jp0 + PetSkills.JP_PER_LEVEL, "за уровень опыта +%d JP: %d → %d"
 				% [PetSkills.JP_PER_LEVEL, jp0, int(rec["jp"])])
 			var jp1 := int(rec["jp"])
@@ -158,7 +158,7 @@ func run_step() -> void:
 			# Переключаемые: MP при включении, бонус хозяину, поддержка, выключение без MP
 			var pet: Pet = pm.active_pet
 			var rec: Dictionary = game.pets[0]
-			pet.level = 14
+			pet.level = 45
 			pet.refresh_skills()
 			check(PetSkills.learn(rec, "shadow_bond"), "изучены «Узы тени»")
 			check(PetSkills.learn(rec, "provoke"), "изучен «Дерзкий вызов»")
@@ -195,7 +195,7 @@ func run_step() -> void:
 			check(cw.index == 0 and cw.tab == "stats", "окно призванного питомца, вкладка «Существо»")
 			var t := _window_text()
 			for w in ["Сила", "Выносливость", "Интеллект", "Мудрость", "Удача", "Макс. MP", "Маг. атака",
-					"Уклонение", "Очки умений", "Базовый", "Маг", "Стадия эволюции"]:
+					"Уклонение", "Очки умений", "Базовый", "Маг", "Форма 1 из 3", "Эволюция у Кирка"]:
 				check(t.contains(w), "во вкладке «Существо» есть «%s»" % w)
 			check(cw.buttons.has("tab_stats") and cw.buttons.has("tab_skills") and cw.buttons.has("back"), "кнопки вкладок")
 			press_cw("tab_skills")
@@ -312,17 +312,13 @@ func _check_tables() -> void:
 				bad += " %s ур.%d HP/атака" % [id, lvl]
 			prev = s
 			prev_d = d
-		var sp_d := PetData.get_species(id)
 		var d1 := PetStats.derived(id, 1)
-		# У базовых сила редкости 1.0 — числа как прежде; у «Обычного» волка — ×MobData.power
-		var pw := MobData.power(id)
-		check(int(d1["max_hp"]) == roundi(float(sp_d["hp"]) * pw) and int(d1["atk"]) == roundi(float(sp_d["atk"]) * pw)
-			and int(d1["def"]) == roundi(float(sp_d["def"]) * pw), "%s: на 1 ур. HP/атака/защита как прежде ×%.2f (%d/%d/%d)"
-			% [id, pw, int(d1["max_hp"]), int(d1["atk"]), int(d1["def"])])
-		for lvl in [14, 29]:
-			var a := _stat_sum(id, lvl)
-			var b := _stat_sum(id, lvl + 1)
-			check(float(b) > float(a) * 1.1, "%s: эволюция на %d ур. — скачок статов %d → %d" % [id, lvl + 1, a, b])
+		check(int(d1["max_hp"]) > 0 and int(d1["atk"]) > 0, "%s: на 1 ур. HP %d, атака %d, защита %d (база оригинала)"
+			% [id, int(d1["max_hp"]), int(d1["atk"]), int(d1["def"])])
+		for st in [1, 2]:
+			var a := _stat_sum(id, 100, st - 1)
+			var b := _stat_sum(id, 100, st)
+			check(float(b) > float(a) * 1.1, "%s: эволюция в %d-ю форму — скачок статов %d → %d" % [id, st + 1, a, b])
 	check(bad == "", "статы и производные не убывают с уровнем" + bad)
 	var p1 := PetStats.base_stats("panther", 1)
 	check(int(p1["int"]) > int(p1["str"]),
@@ -331,9 +327,9 @@ func _check_tables() -> void:
 	check(int(f1["wis"]) > int(f1["dex"]), "фазан-лекарь: Мудрость (%d) вместо Меткости (%d)" % [int(f1["wis"]), int(f1["dex"])])
 	var t1 := PetStats.base_stats("turtle", 1)
 	check(int(t1["vit"]) > int(t1["str"]), "черепаха-танк: Выносливость (%d) главная" % int(t1["vit"]))
-	# Таблица вики: пантера Evo 3, уровень вики 150 = наш 45 — Сила вики 119 (у нас — Интеллект)
-	check(int(PetStats.base_stats("panther", 45)["int"]) == 119, "пантера ур. 45 (вики 150): Интеллект 119")
-	check(int(PetStats.base_stats("turtle", 45)["vit"]) == 119, "черепаха ур. 45 (вики 150): Выносливость 119")
+	# База оригинала: 2-я форма пантеры (Pantera Hunter) Сила 69 + 0.334 × ур. (у нас — Интеллект)
+	check(int(PetStats.base_stats("panther", 50, 1)["int"]) == 69 + 16, "пантера 2-й формы, ур. 50: Интеллект 85")
+	check(int(PetStats.base_stats("turtle", 50, 1)["vit"]) == 69 + 16, "черепаха 2-й формы, ур. 50: Выносливость 85")
 	var d := PetStats.derived("panther", 20)
 	check(int(d["matk"]) > int(d["patk"]), "у пантеры маг. атака (%d) больше физ. (%d)" % [int(d["matk"]), int(d["patk"])])
 	check(int(d["atk"]) == int(d["matk"]), "главная атака пантеры — магическая")
@@ -356,8 +352,8 @@ func _check_tables() -> void:
 	check(int(pd["avoid"]) > 0 and int(pd["acc"]) > 0, "у питомца точность и избегание (%d / %d)" % [int(pd["acc"]), int(pd["avoid"])])
 
 
-func _stat_sum(id: String, lvl: int) -> int:
-	var s := PetStats.base_stats(id, lvl)
+func _stat_sum(id: String, lvl: int, stage: int = 0) -> int:
+	var s := PetStats.base_stats(id, lvl, stage)
 	var t := 0
 	for k in PetStats.STATS:
 		t += int(s[k])

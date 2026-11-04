@@ -211,13 +211,13 @@ func _build_stats(body: VBoxContainer, rec: Dictionary) -> void:
 	info.add_child(_label("%s · %s · %s" % [String(MobData.get_type(sp)["name"]), PetData.role_name(sp),
 		MobData.rarity_name(sp)], UiScale.FONT_HEAD, MUTED))
 	var stage := PetData.stage_of(rec)
-	var stage_line := "Стадия эволюции %d из 3: %s" % [stage + 1, PetData.stage_name(sp, stage)]
-	if stage < PetData.EVOLVE_LEVELS.size():
-		stage_line += " (эволюция у Учителя Кирка — с ур. %d, сверх-эволюция — на %d)" % [int(PetData.EVOLVE_LEVELS[stage]),
-			int(PetData.SUPER_LEVELS[stage])]
+	var stage_line := "Форма %d из 3: %s" % [stage + 1, PetData.stage_name(sp, stage)]
 	if PetData.super_bonus(rec) > 0.0:
-		stage_line += " · сверх-эволюция +%d%% к статам" % roundi(PetData.super_bonus(rec) * 100.0)
+		stage_line += " · сверх +%d%%" % roundi(PetData.super_bonus(rec) * 100.0)
 	info.add_child(_label(stage_line, UiScale.FONT_HEAD, Color.WHITE))
+	if stage < PetData.EVOLVE_LEVELS.size():
+		info.add_child(_label("Эволюция у Кирка: с %d ур. (сверх — на %d)" % [int(PetData.EVOLVE_LEVELS[stage]),
+			int(PetData.SUPER_LEVELS[stage])], UiScale.FONT_SMALL, MUTED))
 	var status := "погиб — воскресите свитком" if dead else ("призван" if pet != null else "отдыхает")
 	info.add_child(_label("Уровень %d / %d  ·  %s" % [lvl, PetData.MAX_LEVEL, status], UiScale.FONT_HEAD,
 		BAD if dead else Color.WHITE))

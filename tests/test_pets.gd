@@ -234,7 +234,7 @@ func run_step() -> void:
 			step = 11
 		11:
 			check(pm.active_pet != null and is_same(pm.active_pet.record, game.pets[0]), "питомец привязан к загруженной записи")
-			check(pm.active_pet.hp == hp_saved and pm.active_pet.level == 15, "питомец в мире с сохранёнными HP и уровнем")
+			check(pm.active_pet.hp == hp_saved and pm.active_pet.level == 50, "питомец в мире с сохранёнными HP и уровнем")
 			ok_done()
 
 

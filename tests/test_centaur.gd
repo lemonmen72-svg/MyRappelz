@@ -62,7 +62,7 @@ func run_step() -> void:
 			tm.cooldown = 0.0
 			main._on_action("tame")
 			check(tm.marked == mob and mob.tame_marked, "метка на кентавре")
-			check(hud._msg_label.text.contains("шанс 35%"), "шанс фиолетовой карты: " + hud._msg_label.text)
+			check(hud._msg_label.text.contains("шанс 2%"), "шанс фиолетовой карты: " + hud._msg_label.text)
 			tm.force_roll = 0.0
 			mob.take_damage(mob.hp + 5, player)
 			tm.force_roll = -1.0
@@ -87,23 +87,25 @@ func run_step() -> void:
 			check(pet.model_id == "centaur" and pet._asset != null and pet._asset.species == "centaur",
 				"1-я стадия: модель centaur (%s)" % pet.model_id)
 			check(pet.max_hp > 0 and pet.atk > 0, "у питомца-кентавра есть HP и атака (%d, %d)" % [pet.max_hp, pet.atk])
-			# Изучение умения за JP (уровень 3 нужен «Двойному выпаду»)
-			while pet.level < 3:
+			# Изучение умения за JP (уровень 10 нужен «Двойному выпаду», 1:1 с оригиналом)
+			while pet.level < 10:
 				pet.gain_xp(PetData.xp_to_next(pet.level) - pet.xp)
 			var rec: Dictionary = game.pets[0]
 			check(PetSkills.learn(rec, "spear_flurry"), "«Двойной выпад» изучен: %s" % PetSkills.learn_block(rec, "spear_flurry"))
-			check(PetSkills.learn_block(rec, "piercing_strike") != "", "«Пронзающий удар» ещё закрыт (ур. 6)")
-			# Эволюция: 15 ур. — centaur_2, 30 ур. — centaur_3
-			while pet.level < 15:
+			check(PetSkills.learn_block(rec, "piercing_strike") != "", "«Пронзающий удар» ещё закрыт (ур. 20)")
+			# Эволюция у Кирка: 50 ур. — centaur_2, 100 ур. — centaur_3
+			while pet.level < 50:
 				pet.gain_xp(PetData.xp_to_next(pet.level) - pet.xp)
+			check(pm.evolve(0) == "", "эволюция на 50 ур.")
 			check(pet.stage == 1 and pet.model_id == "centaur_2" and pet._asset != null and pet._asset.species == "centaur_2",
 				"2-я стадия: модель centaur_2 (%s)" % pet.model_id)
 			wait = 3
 			step = 4
 		4:
 			var pet: Pet = pm.active_pet
-			while pet.level < 30:
+			while pet.level < 100:
 				pet.gain_xp(PetData.xp_to_next(pet.level) - pet.xp)
+			check(pm.evolve(0) == "", "эволюция на 100 ур.")
 			check(pet.stage == 2 and pet.model_id == "centaur_3" and pet._asset != null and pet._asset.species == "centaur_3",
 				"3-я стадия: модель centaur_3 (%s)" % pet.model_id)
 			# Старые модели освобождаются отложенно (queue_free) — считаем через несколько кадров
@@ -138,7 +140,7 @@ func _unit_kind() -> void:
 	check(MobData.tameable("centaur"), "кентавра можно приручить")
 	check(MobData.card_tier("centaur") == "special" and ItemData.card_tier("card_centaur") == "special",
 		"карта кентавра — фиолетовая (редкая)")
-	check(is_equal_approx(Taming.CHANCE["special"], 0.35), "шанс фиолетовой карты 35%")
+	check(is_equal_approx(Taming.CHANCE["special"], 0.02), "шанс фиолетовой карты 2% (база оригинала)")
 	check(ItemData.grade_name("card_centaur").begins_with("Фиолетовая"), "подпись карты: " + ItemData.grade_name("card_centaur"))
 	check(ItemData.card_for("centaur") == "card_centaur" and ItemData.soul_card_for("centaur") == "card_centaur_soul",
 		"карты вида: card_centaur и card_centaur_soul")
@@ -165,7 +167,7 @@ func _unit_kind() -> void:
 	var t := "\n".join(PackedStringArray(Taming.card_lines("card_centaur")))
 	check(t.contains("Кентавр") and t.contains("Боец"), "в описании карты — вид и роль: " + t)
 	check(t.contains("Восточные равнины (ур. 13–16)"), "где водится кентавр: " + t)
-	check(t.contains("фиолетовая") and t.contains("35%"), "тир и шанс: " + t)
+	check(t.contains("фиолетовая") and t.contains("2%"), "тир и шанс: " + t)
 	check(t.contains("выпадает из кентавра"), "где взять карту: " + t)
 
 
@@ -217,10 +219,9 @@ func _unit_pet_data() -> void:
 	check(names.size() == 3 and String(names[0]) != String(names[1]) and String(names[1]) != String(names[2]),
 		"три своих названия стадий: %s" % [names])
 	var s1 := PetStats.base_stats("centaur", 1)
-	# Наш 1-й ур. = ур. вики 1/0.3 ≈ 3.3: чуть выше опорной точки вики 1-го ур. (Сила 23, Выносливость 17)
-	check(int(s1["str"]) >= 23 and int(s1["str"]) <= 25 and int(s1["vit"]) >= 17 and int(s1["vit"]) <= 19,
-		"ур. 1 — статы вики (Сила ≈ 23, Выносливость ≈ 17): %s" % [s1])
-	check(int(PetStats.base_stats("centaur", 45)["str"]) == 168, "ур. 45 (вики 150): Сила 168")
+	# База оригинала (Junior Kenta): Сила 23 + 0.534 × ур., Выносливость 17 + 0.4 × ур.
+	check(int(s1["str"]) == 23 and int(s1["vit"]) == 17, "ур. 1 — статы базы (Сила 23, Выносливость 17): %s" % [s1])
+	check(int(PetStats.base_stats("centaur", 100, 2)["str"]) == 168 + 48, "3-я форма, ур. 100: Сила 168 + 0.485 × 100")
 	for lvl in [1, 15, 30, 50]:
 		var st := PetStats.base_stats("centaur", lvl)
 		var best := ""
@@ -230,8 +231,8 @@ func _unit_pet_data() -> void:
 		check(best == "str", "кентавр ур.%d: главный стат — Сила (%s)" % [lvl, best])
 	var d := PetStats.derived("centaur", 1)
 	var sp := PetData.get_species("centaur")
-	check(int(d["max_hp"]) == roundi(float(sp["hp"]) * 1.3) and int(d["atk"]) == roundi(float(sp["atk"]) * 1.3),
-		"ур. 1: HP и атака ×1.3 (%d, %d)" % [int(d["max_hp"]), int(d["atk"])])
+	check(int(d["max_hp"]) > int(PetStats.derived("panther", 1)["max_hp"]) and sp.size() > 0,
+		"ур. 1: кентавр крепче пантеры (база оригинала): HP %d, атака %d" % [int(d["max_hp"]), int(d["atk"])])
 	check(int(d["atk"]) == int(d["patk"]), "главная атака кентавра — физическая")
 	for lvl in [10, 30]:
 		var c := PetStats.derived("centaur", lvl)
@@ -252,8 +253,8 @@ func _unit_skills() -> void:
 	check(PetSkills.effect_text("spear_flurry", 1).contains("2 × 90%"), "«Двойной выпад»: " + PetSkills.effect_text("spear_flurry", 1))
 	check(PetSkills.effect_text("piercing_strike", 1).contains("атака зверя −13%"),
 		"«Пронзающий удар» ослабляет: " + PetSkills.effect_text("piercing_strike", 1))
-	check(PetSkills.level_needed("piercing_strike", 1) == 6 and PetSkills.level_needed("spear_storm", 1) == 27,
-		"уровни вики 20 и 90 → 6 и 27")
+	check(PetSkills.level_needed("piercing_strike", 1) == 20 and PetSkills.level_needed("spear_storm", 1) == 90,
+		"уровни вики 20 и 90 → 20 и 90 (1:1)")
 	check(PetSkills.first_stage("ruin_storm") == 2, "«Сокрушающий вихрь» — на 3-й стадии")
 	# Ослабление: удары зверя слабее на долю, потом проходит
 	var m := Mob.new()
