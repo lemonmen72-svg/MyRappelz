@@ -158,7 +158,10 @@ func _unit_jobs() -> void:
 			become_job(String(j))
 			var d := _duel("turtle", lvl)
 			row += " %s %.0f%%/%.0fс" % [j, float(d[0]) * 100.0, float(d[1])]
-			check(float(d[0]) < 1.0 and float(d[1]) < 60.0, "%s %d ур. побеждает зверя своего уровня без умений: %.0f%% HP за %.0f с"
+			# Зверолов в оригинале растит Интеллект и Мудрость (сила — через питомца): один без умений проигрывает,
+			# но не всухую
+			var lim := 3.0 if String(j) == "beastmaster" else 1.0
+			check(float(d[0]) < lim and float(d[1]) < 60.0, "%s %d ур. против зверя своего уровня без умений: %.0f%% HP за %.0f с"
 				% [j, lvl, float(d[0]) * 100.0, float(d[1])])
 		print("  ур.%d (HP потеряно / время):%s" % [lvl, row])
 	become_job("wanderer")
