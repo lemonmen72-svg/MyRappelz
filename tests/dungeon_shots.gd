@@ -20,8 +20,8 @@ const SHOTS := [
 	["12_sokrovish_blizko", -66.0, 22.0, 160.0, 26.0, 10.0],
 	["13_prichal", -36.0, 21.0, 270.0, 42.0, 20.0],
 	["14_mostki", -10.0, 33.0, 270.0, 38.0, 20.0],
-	["15_korabl_obshiy", 40.0, 23.6, 340.0, 62.0, 22.0],
-	["16_korabl_blizko", 33.0, 27.0, 298.0, 24.0, 12.0],
+	["15_korabl_obshiy", 41.0, 23.2, 340.0, 62.0, 22.0],
+	["16_korabl_blizko", 36.0, 25.6, 298.0, 30.0, 11.0],
 ]
 
 var idx := 0
@@ -69,6 +69,10 @@ func run_step() -> void:
 			wait = 30
 			step = 3
 		3:
+			# SHOTS_ONLY=13,14 — только кадры с этими номерами
+			var only := OS.get_environment("SHOTS_ONLY")
+			while idx < SHOTS.size() and only != "" and not only.split(",").has(String((SHOTS[idx] as Array)[0]).left(2)):
+				idx += 1
 			if idx >= SHOTS.size():
 				ok_done()
 				return

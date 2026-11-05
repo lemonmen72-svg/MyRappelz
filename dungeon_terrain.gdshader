@@ -110,7 +110,7 @@ void fragment() {
 
 	// --- Скальный край: крутые склоны и всё выше пола — порода слоями, мох наверху
 	float steep = 1.0 - smoothstep(0.55, 0.8, ny);
-	float rim = max(steep, smoothstep(floor_y + 0.35, floor_y + 0.9, v_pos.y) * step(0.2, fsd));
+	float rim = max(steep, smoothstep(floor_y + 0.35, floor_y + 0.9, v_pos.y) * step(0.2, fsd)) * (kind >= 0.75 ? 0.0 : 1.0);
 	if (rim > 0.001) {
 		float s = fract(v_pos.y * 0.9 + n2 * 0.9);
 		float band = rich ? smoothstep(0.42, 0.48, s) * (1.0 - smoothstep(0.86, 0.92, s)) : 0.5;

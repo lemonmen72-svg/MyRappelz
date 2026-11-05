@@ -39,7 +39,7 @@
 		{"id": "pool_right", "shape": "ellipse", "center": [-34.5, -40.5], "radius": [6.0, 4.2]}
 	],
 	"decks": [
-		{"id": "ship", "shape": "ellipse", "center": [40.3, 23.6], "radius": [17.0, 6.2], "rot": -28.0, "height": 0.8},
+		{"id": "ship", "shape": "ellipse", "center": [41.2, 23.1], "radius": [15.5, 2.9], "rot": -28.0, "height": 0.8},
 		{"id": "pier_a", "shape": "ellipse", "center": [-19.7, 21.1], "radius": [2.3, 2.3], "height": 0.25},
 		{"id": "pier_b", "shape": "ellipse", "center": [-17.3, 30.8], "radius": [2.3, 2.3], "height": 0.25},
 		{"id": "pier_c", "shape": "ellipse", "center": [-2.9, 34.4], "radius": [2.3, 2.3], "height": 0.25}
@@ -50,7 +50,7 @@
 		{"a": [-32.6, 21.2], "b": [-21.2, 21.1], "width": 3.2},
 		{"a": [-19.4, 22.6], "b": [-17.6, 29.3], "width": 3.2},
 		{"a": [-15.7, 31.2], "b": [-4.4, 34.0], "width": 3.2},
-		{"a": [-1.5, 33.5], "b": [25.6, 28.4], "width": 3.4}
+		{"a": [-1.5, 33.5], "b": [29.7, 29.2], "width": 3.4}
 	],
 	"spawn_points": {"default": [-70.0, -17.0]},
 	"portal": {"center": [-76.5, -1.0], "yaw": 162.0, "to": "island"},
@@ -65,7 +65,7 @@
 		{"id": "mine", "type": "dungeon_room", "name": "Обвал в шахте", "center": [44.0, -16.0], "radius": 5.0},
 		{"id": "treasury", "type": "dungeon_room", "name": "Сокровищница", "center": [-62.0, 20.0], "radius": 8.0},
 		{"id": "pier", "type": "dungeon_room", "name": "Причал", "center": [-36.0, 21.4], "radius": 3.0},
-		{"id": "ship", "type": "dungeon_room", "name": "Затонувший корабль", "center": [40.3, 23.6], "radius": 8.0}
+		{"id": "ship", "type": "dungeon_room", "name": "Затонувший корабль", "center": [41.2, 23.1], "radius": 2.0}
 	],
 	"mob_zones": [],
 	"transitions": [],
@@ -189,9 +189,9 @@
 		["dg_dripstone", 58.0, 42.0, 0, 1.0],
 		["dg_tidepool", -14.0, 15.0, 0, 1.0],
 
-		["dg_ship_deck", 40.3, 23.6, 28, 1.0],
-		["dg_ship_bow", 27.1, 30.6, 28, 1.0],
-		["dg_wreck", 53.0, 17.0, 28, 1.0],
+		["dg_ship_deck", 40.3, 23.6, 28, 1.0, -0.13],
+		["dg_ship_bow", 27.6, 30.4, 28, 1.0, -0.2],
+		["dg_wreck", 55.0, 16.0, 28, 1.0, -2.5],
 		["dg_mast", 37.0, 24.5, 0, 1.0],
 		["dg_crows_nest", 47.5, 21.0, 30, 1.0],
 		["dg_helm", 51.5, 20.0, 250, 1.0],
@@ -199,6 +199,9 @@
 		["dg_siren", 19.5, 32.5, 250, 1.0],
 		["dg_candles", 38.0, 26.0, 0, 0.8],
 		["dg_candles", 43.0, 21.5, 0, 0.8],
-		["dg_spiral", 40.5, 23.6, 28, 1.0]
+		["dg_spiral", 40.5, 23.6, 28, 1.0],
+		["dg_pier", -19.7, 21.1, 0, 1.0, -0.68],
+		["dg_pier", -17.3, 30.8, 15, 1.0, -0.68],
+		["dg_pier", -2.9, 34.4, 0, 1.0, -0.68]
 	]
 }

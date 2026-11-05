@@ -24,7 +24,7 @@ const RIM_ROCKS := [["dg_crag", 4], ["dg_moss_stones", 4], ["dg_amethyst_spires"
 const MAX_LIGHTS := 10
 ## Модель моста на настил мостов и мостков, насколько опустить её (доски модели — у её основания), м.
 const BRIDGE_PROP := "dg_rope_bridge"
-const BRIDGE_SINK := 0.12
+const BRIDGE_SINK := 0.33
 ## Огни: id объекта → [цвет, энергия, радиус, высота над основанием (доля высоты модели)].
 const LIGHTS := {
 	"dg_brazier": [Color(1.0, 0.62, 0.3), 1.4, 7.5, 0.92],
@@ -65,7 +65,9 @@ static func build(world: DungeonWorld, rng: RandomNumberGenerator) -> void:
 		var z := float(a[2])
 		var yaw := deg_to_rad(float(a[3]) if a.size() > 3 else 0.0)
 		var s := float(a[4]) if a.size() > 4 else 1.0
-		var pos := Vector3(x, world.height_at(x, z) - 0.04, z)
+		# 6-е поле — сдвиг по высоте (корабль и причалы: их палуба — вровень с палубой-островом, где ходит герой)
+		var dy := float(a[5]) if a.size() > 5 else 0.0
+		var pos := Vector3(x, world.height_at(x, z) - 0.04 + dy, z)
 		_place(world, holder, fallback, zones, id, pos, yaw, s, SOLID.has(id))
 		placed += 1
 		if LIGHTS.has(id) and lights < MAX_LIGHTS:
@@ -201,6 +203,12 @@ static func _bridge_decks(world: DungeonWorld, holder: Node3D, fallback: Node3D,
 			zone.items[pg] = []
 		(zone.items[pg] as Array).append([PropAsset.mesh(BRIDGE_PROP), Transform3D(Basis.IDENTITY, -zone.origin) * xf])
 		n += 1
+	# Свой настил (светлые доски) под моделью не виден: коллизия остаётся
+	for node in world.get_children():
+		if node is StaticBody3D and node.is_in_group("bridges"):
+			for c in node.get_children():
+				if c is MeshInstance3D:
+					(c as MeshInstance3D).visible = false
 	return n
 
 
