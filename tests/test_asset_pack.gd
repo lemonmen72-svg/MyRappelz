@@ -651,7 +651,7 @@ func _check_files() -> void:
 			want_part = "world"
 		check(Assets.part_of(p) == want_part and Assets.part_of(p.get_basename() + ".png") == want_part,
 			"%s — в части %s (%s)" % [f, want_part, Assets.part_of(p)])
-	var dirs := {"res://assets/props/": "world|world_b", "res://assets/textures/": "world",
+	var dirs := {"res://assets/props/": "world|world_b|dungeon", "res://assets/textures/": "world",
 		"res://assets/handheld/": "handheld|handheld_r2",
 		"res://assets/icons/items/": "icons", "res://assets/icons/skills/": "icons", "res://assets/icons/ui/": "icons",
 		"res://assets/icons/pets/wolf/": "icons"}
