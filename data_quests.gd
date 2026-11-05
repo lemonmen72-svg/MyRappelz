@@ -593,7 +593,7 @@ const QUESTS := {
 		"goals": [
 			{"type": "enter", "location": "dungeon", "n": 1, "text": "Спуститься в подземелье через портал у пещеры"},
 		],
-		"rewards": {"xp": 3200, "gold": 2400, "items": {"potion_hp_r3": 5}},
+		"rewards": {"xp": 17000, "gold": 2400, "items": {"potion_hp_r3": 5}},
 	},
 	"merc_cave_soon": {
 		"name": "Пещера откроется", "giver": "merc_chief", "turn_in": "merc_chief", "level": 23, "prev": "merc_guardian",
@@ -960,7 +960,7 @@ const DAY := 86400
 const STATE_GOALS := ["collect", "level", "skill", "equip", "upgrade", "pet_gear", "gather", "quest"]
 ## Все виды целей.
 const GOAL_TYPES := ["kill", "tame", "form", "summon", "pet_kill", "buy", "sell", "use", "store", "collect", "level",
-	"skill", "talk", "equip", "upgrade", "pet_skill", "pet_gear", "gather", "quest"]
+	"skill", "talk", "equip", "upgrade", "pet_skill", "pet_gear", "gather", "quest", "enter"]
 ## Поля текста, которые бывают у задания по расе (by_race).
 const TEXT_FIELDS := ["name", "desc", "offer", "progress", "done"]
 ## Подписи ячеек оружия (броня и украшения — ItemData.GEAR_SLOTS).
