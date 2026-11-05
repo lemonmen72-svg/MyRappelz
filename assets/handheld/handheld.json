@@ -1639,6 +1639,48 @@
 			"tex": 1024,
 			"flipped": 32,
 			"src": "Sun_Grimoire"
+		},
+		"npc_sun_altar": {
+			"kind": "npc",
+			"frame": "blade",
+			"length": 1.6,
+			"size": [
+				1.0664,
+				1.6,
+				0.8718
+			],
+			"min": [
+				-0.5332,
+				0.0,
+				-0.44
+			],
+			"max": [
+				0.5332,
+				1.6,
+				0.4318
+			],
+			"grip": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"grip2": null,
+			"tip": [
+				-0.0033,
+				1.598,
+				-0.2886
+			],
+			"butt": [
+				0.0,
+				0.002,
+				0.0
+			],
+			"tris": 11994,
+			"verts": 17016,
+			"src_tris": 14134,
+			"tex": 2048,
+			"flipped": 36,
+			"src": "Sun_Altar"
 		}
 	},
 	"about": "tools/prepare_handheld.py: начало координат — точка хвата; frame blade — ось +Y, лезвие к +X, плоскость клинка XY; bow — плечи ±Y, тетива +Z; crossbow — вперёд −Z, верх +Y; shield — лицо +Z, верх +Y; book — обложка +Z, верх +Y, корешок −X"

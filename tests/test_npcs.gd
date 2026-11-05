@@ -110,8 +110,10 @@ func run_step() -> void:
 					# Пункт-окно: «Склад» у кладовщика, «Закалка» у кузнеца
 					_press(key)
 					if String(d["action"]) == "bless":
-						# Благословение — без окна: усиление сразу, диалог остаётся (подробно — _blessing)
-						check(Blessing.active(main.player) and npcs.is_dialog_open(), "%s: «%s» — усиление" % [id, d["label"]])
+						# Благословения — своя страница диалога (подробно — _blessing)
+						check(npcs.is_dialog_open() and npcs.page == "bless" and npcs.buttons.has("bless_might")
+							and npcs.buttons.has("bless_all"), "%s: «%s» — страница благословений" % [id, d["label"]])
+						_press("back")
 						continue
 					var opened: bool = main.economy.is_forge_open() if String(d["action"]) == "forge" \
 						else main.economy.is_storage_open()
@@ -212,31 +214,48 @@ func run_step() -> void:
 
 # ---------- Проверки ----------
 
-## Сестра Аделина (баффер): «Благословение» — даром до 20 ур., дальше 100 зол. за уровень; усиление на 30 мин.
+## Сестра Аделина (баффер): «Благословения» — семь усилений по базе оригинала (+19.5 %, скорость атаки +18 %) на
+## час, герою и призванному питомцу, по 3000 зол.; «Все сразу»; без золота — отказ.
 func _blessing() -> void:
 	var p: Player = main.player
 	var npcs: Npcs = main.npcs
+	var bn: Node3D = npcs.npc("buffer")
+	check(is_instance_valid(npcs.altar) and npcs.altar.is_in_group("blessing_altar")
+		and npcs.altar.global_position.distance_to(bn.global_position) < 2.6, "святилище рядом с жрицей")
+	check(npcs.altar.get_child_count() >= 2, "святилище: модель и коллизия")
 	_stand_by("buffer", 1.8)
 	npcs.talk_to("buffer")
-	check(npcs.dialog_npc == "buffer" and npcs.buttons.has("opt_bless"), "у Сестры Аделины — «Благословение»")
-	check((npcs.buttons["opt_bless"] as Button).text.contains("даром"), "новичку даром: " + (npcs.buttons["opt_bless"] as Button).text)
-	p.timed_bonus.erase(Blessing.ID)
+	check(npcs.dialog_npc == "buffer" and npcs.buttons.has("opt_bless"), "у Сестры Аделины — «Благословения»")
+	_press("opt_bless")
+	check(npcs.page == "bless" and npcs.buttons.size() >= 9, "страница: 7 благословений, «Все сразу», «Назад»")
+	for id in Blessing.ORDER:
+		p.timed_bonus.erase(Blessing.sid(String(id)))
 	p.recalc_stats()
 	var atk0: float = p.atk
+	var spd0: float = p.speed
 	var g0: int = game.gold
-	_press("opt_bless")
-	check(Blessing.active(p) and game.gold == g0 and p.atk > atk0, "благословение даром: атака %.1f → %.1f" % [atk0, p.atk])
-	check(p.effects.has("buff:" + Blessing.ID), "значок благословения у полоски HP")
-	check(Blessing.price(19) == 0 and Blessing.price(30) == 3000 and Blessing.label(30).contains("3000"), "цена: с 20 ур. — 100 зол. за уровень")
-	var lvl0: int = game.level
-	game.level = 30
 	game.gold = 100
-	check(Blessing.give(p).contains("Не хватает золота") and game.gold == 100, "без золота — отказ")
-	game.gold = 5000
-	check(Blessing.give(p) == "" and game.gold == 2000, "на 30 ур. — за 3000 зол.")
-	game.level = lvl0
+	_press("bless_might")
+	check(not Blessing.active(p, "might") and game.gold == 100, "без золота — отказ: " + last_hud_text())
+	game.gold = 50000
+	_press("bless_might")
+	check(Blessing.active(p, "might") and game.gold == 47000, "сила за 3000 зол.")
+	check(absf(float(p.atk) / atk0 - 1.195) < 0.02, "атака +19.5 %%: %.0f → %d" % [atk0, p.atk])
+	check(p.effects.has("buff:" + Blessing.sid("might")), "значок благословения у полоски HP")
+	check(absf(Blessing.amount("fury") - 0.18) < 0.001 and absf(Blessing.amount("wind") - 0.195) < 0.001,
+		"по базе: скорость атаки +18 %, бег +19.5 %")
+	check(absf(Blessing.left(p, "might") - Blessing.DURATION) < 2.0, "на час")
+	_press("bless_all")
+	check(game.gold == 47000 - 7 * Blessing.PRICE, "«Все сразу» — 21000 зол.")
+	var all_on := true
+	for id in Blessing.ORDER:
+		all_on = all_on and Blessing.active(p, String(id))
+	check(all_on and p.speed > spd0 * 1.15, "все семь на герое, бег %.2f → %.2f" % [spd0, p.speed])
+	check(npcs.buttons.has("bless_might") and (npcs.buttons["bless_might"] as Button).text.contains("мин"),
+		"на кнопке — сколько осталось")
 	game.gold = g0
 	npcs.close_dialog()
+
 
 
 func _unit_data() -> void:

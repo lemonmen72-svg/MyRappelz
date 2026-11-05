@@ -53,11 +53,17 @@ const SOON := Color(0.62, 0.66, 0.78)
 
 ## Житель, рядом с которым стоит доска объявлений (заказы писаря), и отступ доски от него, м.
 const BOARD_NPC := "scribe"
+## Житель со святилищем благословений рядом (модель assets/handheld/npc_sun_altar.glb, без пакета — из примитивов).
+const ALTAR_NPC := "buffer"
+const ALTAR_ITEM := "npc_sun_altar"
+const ALTAR_GAP := 1.8
 const BOARD_GAP := 1.9
 
 var main: Node
 ## Доска объявлений у писаря (null — писаря нет в мире).
 var board: Node3D
+## Святилище благословений рядом с Сестрой Аделиной (build_altar).
+var altar: Node3D
 ## NPC по id: Npc (Учитель Кирк, торговец, жители из NpcData.placed_ids).
 var nodes: Dictionary = {}
 var kirk: Npc
@@ -138,6 +144,9 @@ func npc(id: String) -> Npc:
 func place_all(w: IslandWorld, avoid: Array) -> void:
 	for k in NpcData.placed_ids():
 		var id := String(k)
+		# Баффер — всем только на время тестирования (Blessing.PUBLIC), потом — только у админа
+		if id == ALTAR_NPC and not Blessing.available():
+			continue
 		var info := spot_info(w, id)
 		var want: Vector2 = info["want"]
 		var area_c: Vector2 = info["area_c"]
@@ -156,6 +165,8 @@ func place_all(w: IslandWorld, avoid: Array) -> void:
 		avoid.append(p)
 		if id == BOARD_NPC:
 			board = build_board(w, n, avoid)
+		if id == ALTAR_NPC:
+			altar = build_altar(w, n, avoid)
 
 
 ## Доска объявлений рядом с писарем (из примитивов, без коллизии): сбоку или позади жителя npc на ровной свободной
@@ -189,6 +200,57 @@ func build_board(w: IslandWorld, npc_node: Npc, avoid: Array) -> Node3D:
 	main.add_child(b)
 	b.position = Vector3(pos.x, w.height_at(pos.x, pos.y) if w != null else 0.0, pos.y)
 	b.rotation.y = yaw
+	return b
+
+
+## Святилище благословений сбоку от жителя npc_node (справа, иначе слева, позади), лицом туда же, куда смотрит он;
+## коллизия — столб (Util.pillar). Модель — Handheld ALTAR_ITEM (начало — середина основания у передней ступени),
+## нет файла — из примитивов. Группа "blessing_altar".
+func build_altar(w: IslandWorld, npc_node: Npc, avoid: Array) -> Node3D:
+	var b := StaticBody3D.new()
+	b.name = "BlessingAltar"
+	b.add_to_group("blessing_altar")
+	var c := Vector2(npc_node.position.x, npc_node.position.z)
+	var yaw := npc_node.face_yaw
+	var fwd := Vector2(-sin(yaw), -cos(yaw))
+	var pos := c + fwd.rotated(-PI * 0.5) * ALTAR_GAP
+	var others: Array = avoid.duplicate()
+	others.erase(c)
+	for a in [-PI * 0.5, PI * 0.5, -PI * 0.75, PI * 0.75, PI]:
+		var q := c + fwd.rotated(float(a)) * ALTAR_GAP
+		if w == null or Npcs.spot_ok(w, q, others, NPC_GAP - 1.5, 0.6):
+			pos = q
+			break
+	var model := Handheld.make(ALTAR_ITEM)
+	if model != null:
+		# Начало модели — у передней ступени: середина основания на месте pos
+		var bb := model.mesh.get_aabb()
+		model.position = Vector3(0.0, 0.0, -(bb.position.z + bb.end.z) * 0.5)
+		b.add_child(model)
+	else:
+		var stone := Util.mat(Color(0.9, 0.88, 0.84))
+		var gold := Util.mat(Color(0.95, 0.75, 0.3))
+		b.add_child(_box(Vector3(1.0, 0.18, 0.8), Vector3(0, 0.09, 0), stone))
+		b.add_child(_box(Vector3(0.75, 0.18, 0.6), Vector3(0, 0.27, 0), stone))
+		b.add_child(_box(Vector3(0.28, 0.8, 0.28), Vector3(0, 0.76, 0), stone))
+		var disk := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.3
+		cm.bottom_radius = 0.3
+		cm.height = 0.06
+		disk.mesh = cm
+		disk.material_override = gold
+		disk.position = Vector3(0, 1.38, 0)
+		disk.rotation.x = PI * 0.5
+		b.add_child(disk)
+	b.collision_layer = 1
+	b.collision_mask = 0
+	b.add_child(Util.pillar(0.45, 1.6))
+	main.add_child(b)
+	b.position = Vector3(pos.x, w.height_at(pos.x, pos.y) if w != null else 0.0, pos.y)
+	# Модель смотрит в +Z, житель — в −Z: святилище лицом туда же, куда смотрит житель
+	b.rotation.y = yaw + PI
+	avoid.append(pos)
 	return b
 
 
@@ -436,6 +498,8 @@ func _build() -> void:
 			reply = _quest_reply(page_quest)
 		"info":
 			reply = String(NpcData.talk_entry(dialog_npc, page_info).get("text", ""))
+		"bless":
+			reply = _say_next if _say_next != "" else String(NpcData.talk_entry(dialog_npc, "bless").get("text", ""))
 		_:
 			reply = greeting(dialog_npc)
 	_say_next = ""
@@ -447,6 +511,8 @@ func _build() -> void:
 			_page_quest()
 		"info":
 			_page_info()
+		"bless":
+			_page_bless()
 		_:
 			_page_main()
 
@@ -591,6 +657,42 @@ func _on_back() -> void:
 	open_dialog(dialog_npc, "main")
 
 
+## Страница благословений баффера (Blessing): семь усилений по кнопке (в две колонки), «Все сразу», «Назад».
+## Действующее — с оставшимися минутами.
+func _page_bless() -> void:
+	var p: Player = main.player
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", int(UiScale.px(6)))
+	grid.add_theme_constant_override("v_separation", int(UiScale.px(6)))
+	_body.add_child(grid)
+	for id in Blessing.ORDER:
+		var t := "%s\n%s · %d зол." % [Blessing.title(id), Blessing.effect_text(id), Blessing.PRICE]
+		var left := Blessing.left(p, id)
+		if left > 0.0:
+			t += " · ещё %d мин" % ceili(left / 60.0)
+		grid.add_child(_option(t, "bless_" + String(id), _on_bless.bind([id])))
+	grid.add_child(_option(Blessing.label_all(), "bless_all", _on_bless.bind(Blessing.ORDER.duplicate())))
+	_body.add_child(_option("Назад", "back", _on_info_back.bind("")))
+
+
+func _on_bless(ids: Array) -> void:
+	var pet: Node = null
+	if main.get("pets") != null and is_instance_valid(main.pets.active_pet):
+		pet = main.pets.active_pet
+	var err := Blessing.give_many(main.player, ids, pet) if Blessing.available() else "Благословения — только для админа"
+	if err != "":
+		_msg(err)
+		_say_next = err
+	else:
+		var names: PackedStringArray = []
+		for id in ids:
+			names.append(Blessing.effect_text(String(id)))
+		_msg("Благословение света на час: " + ", ".join(names) + (" (и питомцу)" if pet != null else ""))
+		_say_next = "Да пребудет с тобой свет." if ids.size() == 1 else "Весь свет храма — с тобой. Иди смело."
+	open_dialog(dialog_npc, "bless")
+
+
 func _on_info(path: String) -> void:
 	open_dialog(dialog_npc, "info", path)
 
@@ -622,8 +724,7 @@ func _on_npc_action(action: String) -> void:
 			if main.get("pets") != null:
 				main.pets.open_evolve()
 		"bless":
-			var err := Blessing.give(main.player)
-			_msg(err if err != "" else "%s: %s — 30 мин" % [Blessing.TITLE, Blessing.bonus_text()])
+			open_dialog(dialog_npc, "bless")
 
 
 func _on_trade() -> void:

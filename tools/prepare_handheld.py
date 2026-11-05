@@ -159,7 +159,9 @@ ITEMS = {
 	"npc_sun_lantern": dict(src="Sun_Lantern", kind="npc", frame="blade", length=0.45, tris=8500, tex=TEX_ONE,
 		grip=0.94),
 	"npc_sun_grimoire": dict(src="Sun_Grimoire", kind="npc", frame="book", length=0.26, tris=8500, tex=TEX_ONE,
-		grip=0.5),
+		grip=0.5),	# Святилище благословений у Сестры Аделины — объект, не в руки (Npcs.build_altar): начало — середина основания,
+	# высота 1.6 м (в промте 1.8 м при ширине 1.2; у модели пропорции 0.63 × 0.95)
+	"npc_sun_altar": dict(src="Sun_Altar", kind="npc", frame="blade", length=1.6, tris=12000, tex=TEX_BIG, grip=0.0),
 }
 
 # Арбалет: ложе на столько выше точки хвата (кулак под ложем, как у процедурного _crossbow_mesh)

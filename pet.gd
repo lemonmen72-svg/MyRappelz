@@ -1414,11 +1414,13 @@ var _spirit_acc := 0.0
 
 ## Усиление от умения героя sid на sec секунд: bonus — {ключ: число} (атака, крит, скорость атаки, защита…).
 ## Значок "hero_buff:<sid>" у полоски HP питомца. Повтор продлевает.
-func apply_hero_buff(sid: String, sec: float, bonus: Dictionary) -> void:
+func apply_hero_buff(sid: String, sec: float, bonus: Dictionary, src: Dictionary = {}) -> void:
 	if is_down or sec <= 0.0:
 		return
 	hero_buffs[sid] = {"left": sec, "bonus": bonus.duplicate()}
-	effects.add("hero_buff:" + sid, sec, StatusEffects.effect_info("buff", StatusEffects.source_hero_skill(sid)))
+	effects.remove("hero_buff:" + sid)
+	effects.add("hero_buff:" + sid, sec, StatusEffects.effect_info("buff",
+		src if not src.is_empty() else StatusEffects.source_hero_skill(sid)))
 	refresh_skills()
 	if is_inside_tree():
 		var c: Color = HeroSkills.get_skill(sid).get("color", Color(1.0, 0.85, 0.4))

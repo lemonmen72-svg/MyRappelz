@@ -3,7 +3,7 @@ extends "res://tests/test_base.gd"
 ## каждый файл грузится (одна поверхность, текстура), размер — как в handheld.json, длина — как у вида, оси по
 ## контракту (начало — хват внутри рукояти, ось +Y, лезвие топора к +X, тетива к +Z, арбалет вперёд −Z, щит лицом
 ## +Z за ручкой, книги корешком к −X); у двуручных — точка второй руки ниже хвата; у каждого вида оружия ItemData
-## и у каждого оружия-предмета есть модель из файла; у жителей — все 13 предметов (id — договорённость с моделями
+## и у каждого оружия-предмета есть модель из файла; у жителей — все 14 предметов (святилище баффера — тоже здесь) (id — договорённость с моделями
 ## жителей). В руке героя из файла — меш из файла (не процедурный), пары — один файл в обеих руках, щит — в левой
 ## с поворотом рамки; без файлов (Handheld.force_missing) — прежние процедурные меши. У игрока в руках — модель
 ## надетого предмета.
@@ -19,11 +19,14 @@ const LENGTHS := {
 	"weapon_shield_r2": 0.8,
 	"npc_longbow": 1.4, "npc_grimoire": 0.3, "npc_tome": 0.3, "npc_cane": 0.95, "npc_wand": 0.45,
 	"npc_hammer": 0.6, "npc_antlerstaff": 1.7, "npc_quiver": 0.7, "npc_keys": 0.2, "npc_scroll": 0.3,
-	"npc_sun_staff": 1.7, "npc_sun_lantern": 0.45, "npc_sun_grimoire": 0.26,
+	"npc_sun_staff": 1.7, "npc_sun_lantern": 0.45, "npc_sun_grimoire": 0.26, "npc_sun_altar": 1.6,
 }
 ## Предметы жителей (договорённость с моделями жителей: id не менять).
 const NPC_IDS := ["npc_grimoire", "npc_cane", "npc_wand", "npc_longbow", "npc_hammer", "npc_quiver", "npc_keys",
-	"npc_scroll", "npc_tome", "npc_antlerstaff", "npc_sun_staff", "npc_sun_lantern", "npc_sun_grimoire"]
+	"npc_scroll", "npc_tome", "npc_antlerstaff", "npc_sun_staff", "npc_sun_lantern", "npc_sun_grimoire",
+	"npc_sun_altar"]
+## Объекты, а не предметы в руках (начало — середина основания): святилище баффера (Npcs.build_altar).
+const GROUND_OBJECTS := ["npc_sun_altar"]
 ## Двуручные (у них точка второй руки grip2).
 const TWO_HANDED := ["weapon_sword_2h_r1", "weapon_mace_2h_r1", "weapon_axe_2h_r1", "weapon_staff_2h_r1",
 	"weapon_spear_r1", "weapon_sword_2h_r2", "weapon_mace_2h_r2", "weapon_axe_2h_r2", "weapon_staff_2h_r2",
@@ -117,6 +120,10 @@ func _check_files() -> void:
 			check(bb.size.y >= bb.size.x and bb.size.y >= bb.size.z, "%s: ось предмета +Y (%s)" % [id, bb.size])
 		# Хват внутри предмета (у щита — за ним, у книг — у корешка, у арбалета — под ложем)
 		check(bb.grow(0.07).has_point(Vector3.ZERO), "%s: хват у предмета (рамка %s)" % [id, bb])
+		if GROUND_OBJECTS.has(id):
+			check(absf(bb.position.y) < 0.01 and bb.end.y > 0.5, "%s: объект стоит основанием в начале (%.3f…%.3f)" % [
+				id, bb.position.y, bb.end.y])
+			continue
 		match fr:
 			"blade":
 				check(bb.position.y < -0.005 and bb.end.y > 0.01, "%s: хват между концами (%.3f…%.3f)" % [

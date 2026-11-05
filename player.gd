@@ -323,6 +323,7 @@ func recalc_stats() -> void:
 	matk = roundi(float(matk) * (1.0 + _bv(b, "matk_pct")))
 	defense = roundi(float(defense + roundi(_bv(b, "def_flat"))) * (1.0 + _bv(b, "def_pct")))
 	mdef += roundi(_bv(b, "mdef_flat"))
+	mdef = roundi(float(mdef) * (1.0 + _bv(b, "mdef_pct")))
 	eva = clampf(eva + _bv(b, "eva") + float(gb.get("eva", 0.0)), 0.0, 0.6)
 	crit += _bv(b, "crit")
 	speed *= 1.0 + _bv(b, "speed_pct") + float(gb.get("speed", 0.0))
