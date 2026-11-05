@@ -1438,6 +1438,9 @@ func _step() -> bool:
 	# 3. Самое дешёвое по пути: сдать готовое, взять доступное, цель взятого задания (цена — путь; сдать и взять —
 	# со скидкой: открывают цепочки; Бродяге задания пути к профессии — вчетверо дешевле). Раньше сдача и взятие шли
 	# первыми — герой метался через весь остров за каждым «=» и «!» (в пути 55 % игрового времени)
+	q = _q()
+	if q == null:
+		return false
 	var turn := _nearest_npc_cost(func(id: String) -> bool: return q.state(id) == "ready", true)
 	var take := _nearest_npc_cost(func(id: String) -> bool: return q.state(id) == "available" and _want(id), false)
 	var task := _pick_goal()
@@ -2065,7 +2068,11 @@ func _do_goal(t: Dictionary) -> bool:
 			ok = await _pet_gear(int(t["pet"]), String(t["item"]))
 	if not _alive():
 		return false
-	# Опрос заданий (цели-состояния) — как раз в 0.5 с; не ждём его, считаем по факту
+	# Опрос заданий (цели-состояния) — как раз в 0.5 с; не ждём его, считаем по факту. Узел заданий — заново:
+	# портал перестраивает сцену, прежний освобождён (вызов на нём ронял Godot 4.3)
+	q = _q()
+	if q == null:
+		return false
 	q.poll(0.0)
 	var after := q.goal_progress(id, gi)
 	var st: Dictionary = _goal_state.get(key, {"tries": 0})
