@@ -408,7 +408,7 @@ def feminize(rt, style: str, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray) 
 	F = len(times)
 	rad = math.pi / 180.0
 	Gq0, Gp0 = rt.fk(Lq, Lt)
-	loco = style in ("walk", "run")
+	loco = P.get("loco", style in ("walk", "run"))
 	if loco:
 		phi = step_phase(rt, times, Gp0)
 		c, s = np.cos(phi), np.sin(phi)

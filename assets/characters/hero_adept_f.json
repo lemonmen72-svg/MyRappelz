@@ -616,19 +616,19 @@
 			"length": 0.733,
 			"loop": true,
 			"source": "mannequin c1:jog@0-999 + женская пластика",
-			"speed": 5.925
+			"speed": 5.901
 		},
 		"Mq_Running_B": {
 			"length": 0.733,
 			"loop": true,
 			"source": "mannequin c1:jog@0-999 + женская пластика",
-			"speed": 3.733
+			"speed": 3.736
 		},
 		"Mq_Sprint": {
 			"length": 0.733,
 			"loop": true,
 			"source": "mannequin c1:jog@0-999 + женская пластика",
-			"speed": 6.098
+			"speed": 6.017
 		}
 	}
 }

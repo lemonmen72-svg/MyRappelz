@@ -11,6 +11,7 @@ extends "res://tests/test_base.gd"
 ## шагов в секунду (бег спринтера манекена с темпом ×1.2–1.3 поднимал ноги «как по воде»). С 0.31 шаг и бег — живой
 ## мокап CMU (tools/bvh_to_glb.py, tools/retarget_mannequin.py MQ_LOCO): пятка в переносе уходит к ягодице (носок до
 ## ≈ 0.48 роста — сзади, не колено вперёд), колено ниже таза на 0.1 роста.
+## Колени (_check_knees): в шаге и беге колено — шарнир, плоскость ноги смотрит вперёд (вид спереди и сзади).
 
 const HEROES := [
 	"res://assets/characters/hero_assassin_m.glb",
@@ -56,7 +57,13 @@ const SHOULDER_CLIPS := ["idle", "sword_idle", "crossbow_idle", "walking", "mq_w
 ## таза; у бега манекена-спринтера было почти вровень), шагов в секунду при 7 м/с (скорость героя) не больше.
 const RUN_LIFT_MAX := 0.52
 const RUN_KNEE_MIN := 0.05
-const RUN_CADENCE_MAX := 3.6
+## (3.7: после размаха бега только сгибом (0.31, «ноги в стороны») у hero_human_m_starter своя скорость бега
+## 5.33 → 5.27 м/с — 3.62 шаг/с при 7 м/с; «мельтешение» бега спринтера было 3.8–4.1.)
+const RUN_CADENCE_MAX := 3.7
+## Колени в шаге и беге (_check_knees): голень вне плоскости сгиба бедра и плоскость ноги от продольной плоскости таза, °.
+const KNEE_CLIPS := ["mq_walking", "mq_running_b", "mq_running", "mq_sprint"]
+const KNEE_SIDE_MAX := 8.0
+const KNEE_TURN_MAX := 12.0
 ## Движения манекенов Meshy (tools/retarget_mannequin.py, MQ_CLIPS): у каждого героя все, в .json — длина и удар.
 const MQ_CLIPS := ["mq_sword_a1", "mq_sword_a2", "mq_sword_a3", "mq_combo_b1", "mq_combo_b2", "mq_combo_b3",
 	"mq_dual_a1", "mq_dual_a2", "mq_left_slash", "mq_thrust", "mq_heavy_swing", "mq_axe_spin", "mq_axe_chop",
@@ -422,6 +429,7 @@ func _check_model(m: CharacterModel, who: String) -> void:
 		skel.get_bone_count()])
 	_check_mq(m, who, skel, rig)
 	_check_loco(m, who, skel, rig)
+	_check_knees(m, who, skel, rig)
 	_check_shoulders(m, who, skel, rig)
 
 
@@ -570,6 +578,14 @@ func _check_loco(m: CharacterModel, who: String, skel: Skeleton3D, rig: Dictiona
 ## Позиции кости (в пространстве скелета) в n + 1 точках клипа: позы костей от корня — треки клипа, иначе поза покоя.
 func _bone_points(skel: Skeleton3D, a: Animation, bone: int, n: int) -> Array[Vector3]:
 	var pts: Array[Vector3] = []
+	for xf in _bone_xforms(skel, a, bone, n):
+		pts.append(xf.origin)
+	return pts
+
+
+## Глобальные трансформы кости (в пространстве скелета) в n + 1 точках клипа — как _bone_points.
+func _bone_xforms(skel: Skeleton3D, a: Animation, bone: int, n: int) -> Array[Transform3D]:
+	var pts: Array[Transform3D] = []
 	if bone < 0:
 		return pts
 	var chain: Array[int] = []
@@ -598,8 +614,60 @@ func _bone_points(skel: Skeleton3D, a: Animation, bone: int, n: int) -> Array[Ve
 			if pos.has(bn):
 				o = a.position_track_interpolate(int(pos[bn]), tm)
 			xf = xf * Transform3D(Basis(q), o)
-		pts.append(xf.origin)
+		pts.append(xf)
 	return pts
+
+
+## Колени в шаге и беге (жалоба Максима: «при виде спереди или сзади ноги неестественно изгибаются в стороны»).
+## Колено — шарнир: голень не выходит из плоскости сгиба бедра (его поперечная ось — X позы покоя без составляющей
+## вдоль бедра) больше KNEE_SIDE_MAX; плоскость ноги (куда сгибается колено, вокруг линии «бедро → лодыжка») — не дальше
+## KNEE_TURN_MAX от продольной плоскости таза. До исправления (tools/retarget_mannequin.py: amp_scale умножал весь
+## поворот бедра и голени, IK опоры и колеи брал плоскость сгиба из смещения почти прямого колена): колено вбок до
+## 20–46°, плоскость ноги до 19–28°; после (leg_hinge) — 0° и до 6°.
+func _check_knees(m: CharacterModel, who: String, skel: Skeleton3D, rig: Dictionary) -> void:
+	var bones: Dictionary = rig.get("bones", {})
+	var legs: Dictionary = bones.get("legs", {})
+	var hips := skel.find_bone(String(bones.get("hips", "")))
+	if legs.is_empty() or hips < 0:
+		return
+	var lat_l := skel.get_bone_global_rest(hips).basis.inverse() * Vector3.RIGHT
+	var report := PackedStringArray()
+	for cn0 in KNEE_CLIPS:
+		var cn := String(m._clips.get(String(cn0), ""))
+		if cn == "":
+			continue
+		var a := m._anim.get_animation(cn)
+		var hx := _bone_xforms(skel, a, hips, 90)
+		var side_max := 0.0
+		var turn_max := 0.0
+		for side in ["L", "R"]:
+			var leg: Array = legs.get(side, [])
+			if leg.size() < 3:
+				continue
+			var tb := skel.find_bone(String(leg[0]))
+			var kb := skel.find_bone(String(leg[1]))
+			var ab := skel.find_bone(String(leg[2]))
+			var r0 := skel.get_bone_global_rest(tb)
+			var t0 := (skel.get_bone_global_rest(kb).origin - r0.origin).normalized()
+			var hinge_l := r0.basis.inverse() * (Vector3.RIGHT - t0 * t0.x).normalized()
+			var tx := _bone_xforms(skel, a, tb, 90)
+			var kp := _bone_points(skel, a, kb, 90)
+			var ap := _bone_points(skel, a, ab, 90)
+			for k in tx.size():
+				var hinge := (tx[k].basis * hinge_l).normalized()
+				var calf := (ap[k] - kp[k]).normalized()
+				side_max = maxf(side_max, rad_to_deg(absf(asin(clampf(calf.dot(hinge), -1.0, 1.0)))))
+				var u := (ap[k] - tx[k].origin).normalized()
+				var lat := hx[k].basis * lat_l
+				lat.y = 0.0
+				var fw := u.cross(lat.normalized()).normalized()
+				var bend := u.cross(hinge - u * u.dot(hinge)).normalized()
+				turn_max = maxf(turn_max, rad_to_deg(absf(atan2(fw.cross(bend).dot(u), fw.dot(bend)))))
+		check(side_max <= KNEE_SIDE_MAX, "%s: %s — колено гнётся вбок на %.1f° (до %.0f)" % [who, cn, side_max, KNEE_SIDE_MAX])
+		check(turn_max <= KNEE_TURN_MAX, "%s: %s — плоскость ноги повёрнута от таза на %.1f° (до %.0f)" % [who, cn, turn_max,
+			KNEE_TURN_MAX])
+		report.append("%s %.1f°/%.1f°" % [cn, side_max, turn_max])
+	print("  %s: колени (вбок / плоскость ноги) — %s" % [who, ", ".join(report)])
 
 
 ## Шов петли: наибольший угол (рад) между первым и последним ключом поворота у всех костей.

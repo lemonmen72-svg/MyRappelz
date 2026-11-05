@@ -616,7 +616,7 @@
 			"length": 0.733,
 			"loop": true,
 			"source": "mannequin c1:jog@0-999",
-			"speed": 5.372
+			"speed": 5.412
 		},
 		"Mq_Running_B": {
 			"length": 0.733,
@@ -628,7 +628,7 @@
 			"length": 0.733,
 			"loop": true,
 			"source": "mannequin c1:jog@0-999",
-			"speed": 6.08
+			"speed": 6.128
 		}
 	}
 }

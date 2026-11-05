@@ -193,6 +193,8 @@ MQ_CLIPS = {
 ## человека, по одному ровному циклу). Трусца — как есть (3.6 м/с), бег и быстрый бег — та же трусца с бо́льшим
 ## размахом бедра, колена и рук (MQ_AMP), а не растянутым выносом стоп (прежний бег манекена m1 под 7 м/с давал
 ## «шпагат» и прямые ноги). Пальцы — средняя поза из бега манекена (у CMU пальцев нет, MQ_FINGERS).
+## Ноги при виде спереди и сзади (жалоба Максима на 0.31: «ноги неестественно изгибаются в стороны»): размах — только
+## сгибом (amp_scale, AMP_HINGE), колено в конце — шарнир с плоскостью ноги не дальше LOCO_KNEE_LIM от таза (leg_hinge).
 MQ_LOCO = {"Mq_Walking": ("walk", "c1:walk@0-999", 1),
 	"Mq_Running": ("run", "c1:jog@0-999", 1), "Mq_Running_B": ("jog", "c1:jog@0-999", 1),
 	"Mq_Sprint": ("sprint", "c1:jog@0-999", 1)}
@@ -213,6 +215,15 @@ MQ_LOCO_TARGET = {}
 ## Размах (amp_scale): ноги, руки — × вокруг средней позы цикла (только у мокапа CMU, MQ_AMP_SRC).
 MQ_AMP = {"run": (1.6, 1.25), "sprint": (1.85, 1.3)}
 MQ_AMP_SRC = ("c1",)
+## Размах ног — только сгиб вперёд-назад (amp_scale); False — весь поворот, как до исправления (сравнение).
+AMP_HINGE = True
+## Колено — шарнир (leg_hinge) в конце make_loco: плоскость сгиба — как в исходном клипе (до IK), но не дальше
+## LOCO_KNEE_LIM (°) от продольной плоскости таза (в мокапе CMU колени смотрят до 15° внутрь и 12° наружу — при виде
+## спереди пятка в махе уходит вбок).
+LOCO_HINGE = True
+LOCO_KNEE_LIM = 6.0
+## «Вперёд» для колена: 1 — по тазу (колено поворачивается с ним), 0 — по направлению хода (сравнение; на вид почти то же).
+LOCO_KNEE_PELVIS = 1.0
 MQ_STRIDE_MAX = 1.3
 MQ_LIFT = {"walk": 1.0, "jog": 1.0, "run": 1.0, "sprint": 1.0}
 MQ_FEM = {"walk": "walk", "jog": "mq_run", "run": "mq_run", "sprint": "mq_sprint"}
@@ -220,11 +231,13 @@ MQ_FEM = {"walk": "walk", "jog": "mq_run", "run": "mq_run", "sprint": "mq_sprint
 ## (MQ_FEM_RUN_STRIDE = 1: раньше 0.9, при 7 м/с выходило больше 4 шагов в секунду — семенила; длину шага задаёт
 ## MQ_LOCO_TARGET).
 MQ_FEM_RUN_STRIDE = 1.0
-ph.FEM_STYLES["mq_run"] = dict(ph.FEM_STYLES["run"], stride=MQ_FEM_RUN_STRIDE)
+## loco — покачивание таза в такт шагу (как у стилей walk/run): без него у стилей mq_* таз всю пробежку стоял
+## повёрнутым на 4° и наклонённым на 3° (feminize узнавал шаг только по имени стиля).
+ph.FEM_STYLES["mq_run"] = dict(ph.FEM_STYLES["run"], stride=MQ_FEM_RUN_STRIDE, loco=True)
 ## Быстрый бег героини — как до переделки бега (вынос 0.9): с выносом 1 у hero_assassin_f своя скорость выросла
 ## 6.54 → 7.29 м/с, и в Godot (после импорта ключей) опорный носок «скользил» на 0.062 м (здесь — 0.006): бег на носках,
 ## носок в опоре на 2.5–4.4 см над покоем — у самой границы «у земли» теста (4 см); с 0.9 тест проходил.
-ph.FEM_STYLES["mq_sprint"] = dict(ph.FEM_STYLES["run"], stride=0.9)
+ph.FEM_STYLES["mq_sprint"] = dict(ph.FEM_STYLES["run"], stride=0.9, loco=True)
 ## Проверка шага и бега: опорная стопа (носок у земли) едет назад со скоростью клипа с ошибкой не больше LOCO_SLIDE,
 ## м; вертикальный ход таза за цикл не больше LOCO_BOB, м; длина шага (скорость × полцикла) в пределах LOCO_STEP, м.
 LOCO_SLIDE = 0.03
@@ -232,7 +245,8 @@ LOCO_BOB = {"walk": 0.09, "jog": 0.12, "run": 0.11, "sprint": 0.11}
 LOCO_STEP = {"walk": (0.5, 1.1), "jog": (0.9, 1.5), "run": (1.7, 2.4), "sprint": (1.7, 2.8)}
 ## Перенос стопы: наибольший подъём носка над покоем не больше LOCO_LIFT_MAX × рост (у манекена m1 Running —
 ## 0.47–0.50 роста, после MQ_LIFT 0.62 — 0.28–0.32; трусца m2 как есть — 0.34–0.39, быстрый бег — 0.32–0.42, шаг — 0.10).
-LOCO_LIFT_MAX = {"walk": 0.14, "jog": 0.42, "run": 0.52, "sprint": 0.58}
+## Быстрый бег — 0.60: после размаха только сгибом (amp_scale) пятка у hero_light_elf_f_starter — 0.59 роста (было 0.58).
+LOCO_LIFT_MAX = {"walk": 0.14, "jog": 0.42, "run": 0.52, "sprint": 0.60}
 ## Опору, до которой прямая нога не достаёт дальше LOCO_REACH (м), достаёт таз ниже (не больше LOCO_DROP_MAX, м).
 LOCO_REACH = 0.004
 LOCO_DROP_MAX = 0.08
@@ -657,15 +671,33 @@ def stride_scale(rt, times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, k: float
 	return short
 
 
+def _swing_twist_scale(d: np.ndarray, axis: np.ndarray, k: float) -> np.ndarray:
+	"""d = swing · twist (twist — поворот вокруг axis); угол twist × k, swing — как был. d (F, 4), axis (3,)."""
+	a = axis / np.linalg.norm(axis)
+	va = d[:, :3] @ a
+	th = 2.0 * np.arctan2(va, d[:, 3])
+	tw = np.concatenate([a[None] * np.sin(th * 0.5)[:, None], np.cos(th * 0.5)[:, None]], 1)
+	sw = ra.qmul(d, ra.qconj(tw))
+	tk = np.concatenate([a[None] * np.sin(th * k * 0.5)[:, None], np.cos(th * k * 0.5)[:, None]], 1)
+	return ra.qnorm(ra.qmul(sw, tk))
+
+
 def amp_scale(rt, Lq: np.ndarray, k_leg: float, k_arm: float) -> None:
 	"""Размах шага и рук × k вокруг средней позы цикла (локальные повороты бедра, голени и стопы; плеча и предплечья):
-	быстрее человек бежит не «растянутыми» ногами, а бо́льшим махом бедра и сгибом колена — поза остаётся живой."""
+	быстрее человек бежит не «растянутыми» ногами, а бо́льшим махом бедра и сгибом колена — поза остаётся живой.
+	У ног × k только сгиб вперёд-назад (AMP_HINGE): отклонение от средней позы в координатах родителя раскладывается на
+	поворот вокруг оси сгиба (у бедра — поперечная ось таза, у голени и стопы — ось колена) и остальное; × k — только
+	первый, отведение, скручивание и боковой наклон голени — как в исходнике. Раньше умножался весь
+	поворот: отведение бедра −14…+8° → −19…+18°, наколенник от «вперёд» таза ±11° → −18…+23° — при виде спереди и
+	сзади колени и голени уходили в стороны."""
 	bones = []
+	legs_of = {}
 	for c in rt.roles["legs"].values():
-		bones += [(b, k_leg) for b in c[:3]]
+		bones += [(b, k_leg, True) for b in c[:3]]
+		legs_of.update({b: c for b in c[:3]})
 	for c in rt.roles["arms"].values():
-		bones += [(b, k_arm) for b in c[1:3]]
-	for b, k in bones:
+		bones += [(b, k_arm, False) for b in c[1:3]]
+	for b, k, hinge in bones:
 		if abs(k - 1.0) < 1e-6:
 			continue
 		q = ra.continuous(Lq[:, b].copy())
@@ -673,11 +705,150 @@ def amp_scale(rt, Lq: np.ndarray, k_leg: float, k_arm: float) -> None:
 		m = m / np.linalg.norm(m)
 		d = ra.qmul(np.broadcast_to(ra.qconj(m), q.shape), q)
 		d = d * np.where(d[:, 3:4] < 0.0, -1.0, 1.0)
+		if hinge and AMP_HINGE:
+			# Отклонение от средней позы в координатах родителя (Lq = d · m), ось сгиба там же: у бедра — поперечная
+			# ось таза (X позы покоя), у голени и стопы — ось колена (X без составляющей вдоль бедра, _hinge_local)
+			c = legs_of[b]
+			hw = np.array([1.0, 0.0, 0.0])
+			if b != c[0]:
+				hw = ra.qrot(rt.rest_q[c[0]], _hinge_local(rt, c[0], c[1]))
+			axis = ra.qrot(ra.qconj(rt.rest_q[rt.rig.parent[b]]), hw)
+			dp = ra.qmul(q, np.broadcast_to(ra.qconj(m), q.shape))
+			dp = dp * np.where(dp[:, 3:4] < 0.0, -1.0, 1.0)
+			Lq[:, b] = ra.qnorm(ra.qmul(_swing_twist_scale(dp, axis, k), np.broadcast_to(m, q.shape)))
+			continue
 		ang = 2.0 * np.arccos(np.clip(d[:, 3], -1.0, 1.0))
 		s = np.sin(ang * 0.5)
 		axis = np.where(s[:, None] > 1e-8, d[:, :3] / np.maximum(s[:, None], 1e-8), np.array([1.0, 0.0, 0.0]))
 		d2 = np.concatenate([axis * np.sin(ang * k * 0.5)[:, None], np.cos(ang * k * 0.5)[:, None]], 1)
 		Lq[:, b] = ra.qnorm(ra.qmul(np.broadcast_to(m, q.shape), d2))
+
+
+def _frame(t: np.ndarray, c: np.ndarray) -> np.ndarray:
+	"""Ортонормальная тройка (t, c', t × c') столбцами: c' — c без составляющей вдоль t."""
+	c = c - t * float(np.dot(c, t))
+	c = c / np.linalg.norm(c)
+	return np.stack([t, c, np.cross(t, c)], 1)
+
+
+def _pelvis_fwd(rt, Gq: np.ndarray) -> np.ndarray:
+	"""Поперечная ось таза по кадрам: +X позы покоя, повёрнутая с костью таза, по горизонтали (F, 3)."""
+	h = rt.roles["hips"]
+	rel = ra.qmul(Gq[:, h], ra.qconj(rt.rest_q[h])[None])
+	f = ra.qrot(rel, np.repeat(np.array([[1.0, 0.0, 0.0]]), len(Gq), axis=0))
+	f[:, 1] = 0.0
+	f = f / np.maximum(np.linalg.norm(f, axis=1, keepdims=True), 1e-9)
+	# Доля поворота таза (LOCO_KNEE_PELVIS): 0 — поперечная ось мира (направление хода +Z), 1 — таза
+	f = LOCO_KNEE_PELVIS * f + (1.0 - LOCO_KNEE_PELVIS) * np.array([[1.0, 0.0, 0.0]])
+	return f / np.maximum(np.linalg.norm(f, axis=1, keepdims=True), 1e-9)
+
+
+def _swivel_frame(u: np.ndarray, lat: np.ndarray) -> np.ndarray:
+	"""«Вперёд» для колена: в плоскости, перпендикулярной оси ноги u (бедро → лодыжка), и в продольной плоскости таза
+	(u × поперечная ось): у прямой ноги — вперёд, у стопы за спиной у таза — вниз-вперёд; не вырождается, пока нога
+	не смотрит вбок."""
+	fw = np.cross(u, lat)
+	return fw / max(float(np.linalg.norm(fw)), 1e-9)
+
+
+def _hinge_local(rt, a: int, kn: int) -> np.ndarray:
+	"""Ось сгиба колена в локальных координатах бедра: поперечная ось X позы покоя без составляющей вдоль бедра (у ног,
+	расставленных в позе покоя, X не перпендикулярна бедру — иначе прямая нога покоя считалась бы согнутой вбок)."""
+	t0 = rt.rig.gpos[kn] - rt.rig.gpos[a]
+	t0 = t0 / np.linalg.norm(t0)
+	h = np.array([1.0, 0.0, 0.0]) - t0 * t0[0]
+	return ra.qrot(ra.qconj(rt.rest_q[a]), h / np.linalg.norm(h))
+
+
+def _bend_dir(u: np.ndarray, hinge: np.ndarray) -> np.ndarray:
+	"""Куда сгибается колено: перпендикуляр к оси ноги u в плоскости сгиба (её нормаль — поперечная ось бедра hinge).
+	По оси сгиба, а не по наколеннику: при сгибе колена больше ~120° бедро почти перпендикулярно линии «бедро →
+	лодыжка», наколенник смотрит вдоль неё, и его проекция — шум."""
+	b = np.cross(u, hinge - u * float(np.dot(hinge, u)))
+	return b / max(float(np.linalg.norm(b)), 1e-9)
+
+
+def knee_swivel(rt, Lq: np.ndarray, Lt: np.ndarray) -> dict:
+	"""Плоскость сгиба колена по кадрам: угол направления сгиба (_bend_dir) вокруг оси «бедро → лодыжка» от «вперёд»
+	продольной плоскости таза (_swivel_frame; рад, правый поворот вокруг оси). {сторона: (F,)}."""
+	Gq, Gp = rt.fk(Lq, Lt)
+	pf = _pelvis_fwd(rt, Gq)
+	out = {}
+	for side, c in sorted(rt.roles["legs"].items()):
+		a, an = c[0], c[2]
+		hin_l = _hinge_local(rt, a, c[1])
+		ang = np.zeros(len(Gq))
+		for f in range(len(Gq)):
+			u = Gp[f, an] - Gp[f, a]
+			u = u / np.linalg.norm(u)
+			fw = _swivel_frame(u, pf[f])
+			bd = _bend_dir(u, ra.qrot(Gq[f, a], hin_l))
+			ang[f] = math.atan2(float(np.dot(np.cross(fw, bd), u)), float(np.dot(fw, bd)))
+		out[side] = np.unwrap(ang)
+	return out
+
+
+def leg_hinge(rt, Lq: np.ndarray, Lt: np.ndarray, ref: dict = None, lim: float = None) -> dict:
+	"""Колено — шарнир: по кадрам бедро и голень строятся заново так, что голень гнётся только в плоскости сгиба бедра
+	(вокруг его поперечной оси), а тазобедренный сустав, лодыжка и мировой поворот стопы — те же (опора, скорость
+	и шаг не меняются). Плоскость ноги (куда сгибается колено) — ref {сторона: угол по кадрам} от «вперёд» таза
+	(knee_swivel исходного клипа до IK), без ref — по поперечной оси бедра сейчас; lim (°) — не дальше lim в любую сторону.
+	Зачем: IK опоры (two_bone в plant_loco, колея героинь в feminize) поворачивает бедро кратчайшим поворотом, плоскость
+	сгиба берёт из смещения колена, а у почти прямой ноги оно — миллиметры в любую сторону: колено «ломалось» вбок на
+	20–46° (и в шаге), наколенник бедра у героинь в быстром беге доворачивался до 170° внутрь. Возвращает наибольшие
+	поправки: varus — колено вбок до исправления, swivel — поворот плоскости ноги, °."""
+	gp = rt.rig.gpos
+	F = Lq.shape[0]
+	Gq, Gp = rt.fk(Lq, Lt)
+	pf = _pelvis_fwd(rt, Gq)
+	X = np.array([1.0, 0.0, 0.0])
+	worst = {"varus": 0.0, "swivel": 0.0}
+	for side, c in sorted(rt.roles["legs"].items()):
+		a, kn, an = c[0], c[1], c[2]
+		par = rt.rig.parent[a]
+		t0 = gp[kn] - gp[a]
+		l1 = float(np.linalg.norm(t0))
+		t0 = t0 / l1
+		s0 = gp[an] - gp[kn]
+		l2 = float(np.linalg.norm(s0))
+		s0 = s0 / l2
+		M0 = _frame(t0, X)
+		hin_l = _hinge_local(rt, a, kn)
+		for f in range(F):
+			Pa, Pk, Ph = Gp[f, a], Gp[f, kn], Gp[f, an]
+			dv = Ph - Pa
+			d = float(np.linalg.norm(dv))
+			u = dv / d
+			hin = ra.qrot(Gq[f, a], hin_l)
+			sd = (Ph - Pk) / max(np.linalg.norm(Ph - Pk), 1e-9)
+			worst["varus"] = max(worst["varus"], abs(math.degrees(math.asin(float(np.clip(np.dot(sd, hin), -1.0, 1.0))))))
+			fw = _swivel_frame(u, pf[f])
+			bd = _bend_dir(u, hin)
+			now = math.atan2(float(np.dot(np.cross(fw, bd), u)), float(np.dot(fw, bd)))
+			ang = float(ref[side][f]) if ref is not None else now
+			if lim is not None:
+				ang = max(-math.radians(lim), min(math.radians(lim), ang))
+			dif = abs((ang - now + math.pi) % (2.0 * math.pi) - math.pi)
+			worst["swivel"] = max(worst["swivel"], math.degrees(dif))
+			bend = ra.qrot(ra.q_axis_angle(u, ang), fw)
+			dd = min(max(d, abs(l1 - l2) + 1e-4), (l1 + l2) * 0.9999)
+			x = (l1 * l1 - l2 * l2 + dd * dd) / (2.0 * dd)
+			y = math.sqrt(max(l1 * l1 - x * x, 0.0))
+			K2 = Pa + u * x + bend * y
+			H2 = Pa + u * dd
+			t1 = (K2 - Pa) / l1
+			# Поперечная ось бедра после поворота — нормаль плоскости ноги (бедро и голень в ней)
+			n = np.cross(bend, u)
+			qt = ra.qnorm(pc.m_to_q(_frame(t1, n / np.linalg.norm(n)) @ M0.T))
+			Gt = ra.qnorm(ra.qmul(qt, rt.rest_q[a]))
+			s1 = (H2 - K2) / max(np.linalg.norm(H2 - K2), 1e-9)
+			qk = ra.q_between(ra.qrot(qt, s0), s1)
+			Gk = ra.qnorm(ra.qmul(qk, ra.qmul(qt, rt.rest_q[kn])))
+			Lq[f, a] = ra.qnorm(ra.qmul(ra.qconj(Gq[f, par]), Gt))
+			Lq[f, kn] = ra.qnorm(ra.qmul(ra.qconj(Gt), Gk))
+			Lq[f, an] = ra.qnorm(ra.qmul(ra.qconj(Gk), Gq[f, an]))
+	Lq[:] = ra.continuous(Lq)
+	return worst
 
 
 def loco_upsample(times: np.ndarray, Lq: np.ndarray, Lt: np.ndarray, k_up: int) -> tuple:
@@ -783,6 +954,9 @@ def make_loco(rts: dict, hero: Hero, name: str, kind: str, src_clip: str, female
 					Lq[:, b] = q / np.linalg.norm(q)
 	if kind in MQ_AMP and sid in MQ_AMP_SRC:
 		amp_scale(rt, Lq, *MQ_AMP[kind])
+	# Куда смотрят колени в исходнике (после размаха, до IK колеи и опоры) — leg_hinge вернёт их в конце
+	swivel = knee_swivel(rt, Lq, Lt) if LOCO_HINGE else None
+	t_sw = times.copy()
 	fem = 0.0
 	if female:
 		fem = ph.feminize(rt, MQ_FEM[kind], times, Lq, Lt)
@@ -844,13 +1018,17 @@ def make_loco(rts: dict, hero: Hero, name: str, kind: str, src_clip: str, female
 			break
 		drop = min(LOCO_DROP_MAX, drop + short + 0.002)
 	Lq, Lt = tq, tl
+	hinge = {"varus": 0.0, "swivel": 0.0}
+	if LOCO_HINGE:
+		ref = {sd: np.interp(times * (t_sw[-1] / times[-1]), t_sw, a) for sd, a in swivel.items()}
+		hinge = leg_hinge(rt, Lq, Lt, ref, LOCO_KNEE_LIM)
 	ph.pin_xz(rt, Lt)
 	lift = pc.biped_ground(rt, hero.mesh, Lq, Lt, False)
 	src = "%s%s" % (src_clip, " + женская пластика" if female else "")
 	return {"name": name, "src": src, "kind": kind, "times": times, "src_times": times, "rot": ra.continuous(Lq),
 		"trans": Lt, "hit": 0.0, "T": float(times[-1]), "travel": 0.0, "short": short, "lift": lift,
 		"stance": {}, "speed": float(v), "drop": drop + max(0.0, ground), "cycles": cycles, "stride": k,
-		"shape_short": max(fem, shape)}
+		"shape_short": max(fem, shape), "hinge": hinge}
 
 
 def loco_stats(hero: Hero, cl: dict, n: int = 96) -> dict:
@@ -1202,16 +1380,20 @@ def process(path: str, srcs: dict, check: bool, prev: str, only: list = None) ->
 		ls = cl["loco"]
 		print("   %-18s %5.2f с, своя скорость %.2f м/с: шаг %.2f м (×%.2f), %.2f шаг/с (при 7 м/с — темп ×%.2f, %.2f шаг/с), "
 			"носок в переносе до %.2f роста, колено ниже таза на %.2f роста, "
-			"таз ниже на %.3f, по высоте %.3f м, полёт %.0f %%, скольжение опоры %.3f, IK не достал %.3f, подъём %.3f%s" % (
+			"таз ниже на %.3f, по высоте %.3f м, полёт %.0f %%, скольжение опоры %.3f, IK не достал %.3f, подъём %.3f; "
+			"колено-шарнир (до него вбок %.0f°, плоскость ноги довёрнута до %.0f°)%s" % (
 			name, cl["T"], cl["speed"], ls["step"], cl["stride"], ls["cadence"], 7.0 / cl["speed"], ls["cadence"] * 7.0 / cl["speed"],
 			ls["lift"], ls["knee"], cl["drop"], ls["bob"], 100.0 * ls["flight"], ls["slide"], cl["short"], cl["lift"],
+			cl["hinge"]["varus"], cl["hinge"]["swivel"],
 			("  ПЛОХО: " + "; ".join(bad)) if bad else ""))
 		clips.append(cl)
 	size0 = os.path.getsize(path)
 	if not check:
 		glb = ra.Glb(path)
 		names = {cl["name"] for cl in clips}
-		glb.json["animations"] = [a for a in glb.json.get("animations", []) if TAG not in a.get("extras", {})]
+		# С --only заменяются только эти клипы, остальные свои (Mq_*) остаются
+		glb.json["animations"] = [a for a in glb.json.get("animations", []) if TAG not in a.get("extras", {})
+			or (only and a.get("name") not in names)]
 		clash = names & {a["name"] for a in glb.json["animations"]}
 		if clash:
 			raise SystemExit("%s: уже есть свои клипы %s" % (path, sorted(clash)))
@@ -1222,7 +1404,7 @@ def process(path: str, srcs: dict, check: bool, prev: str, only: list = None) ->
 			(os.path.getsize(path) - size0) / 1e6, nkeys, frames))
 		if hero.meta is not None:
 			cm = hero.meta.setdefault("clips", {})
-			for k in [k for k, v in cm.items() if str(v.get("source", "")).startswith("mannequin ")]:
+			for k in [k for k, v in cm.items() if str(v.get("source", "")).startswith("mannequin ") and (not only or k in names)]:
 				del cm[k]
 			for cl in clips:
 				loop = cl["kind"] in ("walk", "jog", "run", "sprint", "loop")
@@ -1252,7 +1434,8 @@ def main() -> None:
 	ap.add_argument("--check", action="store_true", help="без записи")
 	ap.add_argument("--preview", default="", help="папка для картинок-проверок")
 	ap.add_argument("--survey", default="", help="папка: исходные клипы целиком на первом герое")
-	ap.add_argument("--only", default="", help="клипы через запятую (для --survey; с --check — проверить только эти)")
+	ap.add_argument("--only", default="", help="клипы через запятую (для --survey; с --check — проверить только эти; "
+		"без --check — переписать только эти, остальные Mq_* не трогать)")
 	args = ap.parse_args()
 	srcs = {k: MixamoSource(ra.Glb(p)) for k, p in (("m1", args.m1), ("m2", args.m2), ("m3", args.m3), ("c1", args.cmu))}
 	heroes = args.heroes or sorted(glob.glob(os.path.join(ROOT, "assets", "characters", "hero_*.glb"))) + [
@@ -1264,8 +1447,9 @@ def main() -> None:
 	tb, ta = 0, 0
 	for h in heroes:
 		only = [x for x in args.only.split(",") if x]
-		if only and not args.check:
-			raise SystemExit("--only без --check: запись заменяет все клипы Mq_* — запускайте без --only")
+		bad = [x for x in only if x not in MQ_CLIPS and x not in MQ_LOCO]
+		if bad:
+			raise SystemExit("--only: нет таких клипов: %s" % ", ".join(bad))
 		r = process(h, srcs, args.check, args.preview, only)
 		ok = ok and r["ok"]
 		tb += r["before"]
