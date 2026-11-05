@@ -7,15 +7,33 @@ extends IslandWorld
 ## админ-панель работают без особых случаев. Конфиг — world/dungeon.json (карта Максима, 0.12 м на пиксель):
 ## залы (rooms) и коридоры (corridors) — пол, вода (water: канал, озеро, озёра у алтаря), палубы (decks) — острова
 ## пола своей высоты (корабль, площадки мостков), мосты (bridges), объекты (props — DungeonProps).
-## Рельеф: пол на floor_y, вокруг пола и воды — скальный край высотой rim_h шириной rim_w (невысокий: камера
-## от третьего лица смотрит сверху, как на карте), за краем — тёмная пустота (void_y). Край рваный (edge_noise).
-## Свет — тёмный, изумрудный и фиолетовый: окружение без неба, слабый «лунный» свет сверху, свечение объектов.
+## Рельеф (0.35.1, просьба Максима «спуски, подъёмы»): у залов свой уровень пола (rooms[].level, м) — между залами
+## пол плавно поднимается и опускается по коридорам (_level_field: два ближайших зала по пути вдоль пола, взвешено
+## по расстоянию, вода — уровень floor_y), внутри залов — пологие волны (FLOOR_WAVE, у воды затухают) и холмы
+## (mounds), лестницы и пандусы (ramps), уступы (decks с "kind": "stone"). Вокруг пола и воды — скальная стена
+## высотой rim_h над местным полом (≈ 4 роста героя) шириной rim_w, за ней тёмная пустота (void_y, не рисуется).
+## Край рваный (edge_noise). Свет — тёмный, изумрудный и фиолетовый: без неба, слабый «лунный» свет сверху, огни.
 
 const DUNGEON_CONFIG := "res://world/dungeon.json"
 ## Край пола: от границы пола вглубь скалы — подъём до rim_h за RIM_RISE м, дальше спуск в пустоту.
-const RIM_RISE := 1.2
+const RIM_RISE := 1.6
 ## Пол чуть неровный (шум), м.
 const FLOOR_BUMP := 0.12
+## Пологие волны пола в залах: высота, частота шума; у воды (ближе WAVE_WATER м) — ровно.
+const FLOOR_WAVE := 0.45
+const WAVE_FREQ := 0.9
+const WAVE_WATER := 5.0
+## Уровни залов: сетка расчёта (шаг, клеток основной сетки), ядро зала (уровень ровно его) — глубже LEVEL_CORE м
+## от края (не больше доли радиуса), цена пути по скале (не пол и не вода), проходов сглаживания.
+const LEVEL_STEP := 2
+const LEVEL_CORE := 3.5
+const ROCK_COST := 4.0
+const LEVEL_BLUR := 3
+## Настил мостов над водой — не ниже воды + столько, м (вровень с площадками мостков).
+const BRIDGE_OVER_WATER := 0.7
+## Берег без стены: пол и вода ближе SHORE_GAP м друг к другу — между ними пологий спуск к воде, а не скала (иначе
+## узкая полоска края между залом и водой становилась стеной поперёк моста).
+const SHORE_GAP := 5.0
 ## Дно воды: от кромки до полной глубины, м.
 const BANK := 2.0
 
@@ -24,6 +42,8 @@ var floor_sd := PackedFloat32Array()
 var water_sd := PackedFloat32Array()
 var deck_of := PackedInt32Array()
 var water_y := -0.45
+## Уровень пола в узле (_level_field), м.
+var level := PackedFloat32Array()
 
 
 func location() -> String:
@@ -42,6 +62,7 @@ func build(rng: RandomNumberGenerator) -> void:
 	_rim_unwalkable()
 	_dungeon_environment()
 	_build_collision()
+	_deck_collision()
 	_build_bridges()
 	var t2 := Time.get_ticks_msec()
 	DungeonWater.build(self)
@@ -151,17 +172,19 @@ func _rasterize() -> void:
 
 func _dungeon_heights() -> void:
 	var fy := float(cfg.get("floor_y", 0.0))
-	var rim_h := float(cfg.get("rim_h", 2.6))
-	var rim_w := float(cfg.get("rim_w", 2.4))
+	var rim_h := float(cfg.get("rim_h", 7.0))
+	var rim_w := float(cfg.get("rim_w", 3.0))
 	var void_y := float(cfg.get("void_y", -14.0))
 	var bed := float(cfg.get("water_bed", -1.9))
 	var decks: Array = cfg.get("decks", [])
+	level = _level_field(fy)
 	for j in nz:
 		for i in nx:
 			var k := _idx(i, j)
 			var p := _pos(i, j)
 			var fs := floor_sd[k]
 			var ws := water_sd[k]
+			var lv := level[k]
 			var h: float
 			# Вода — поверх пола залов (озёра у алтаря внутри зала), палубы — поверх воды
 			if deck_of[k] >= 0:
@@ -170,13 +193,21 @@ func _dungeon_heights() -> void:
 				# Дно: от кромки (уровень воды − 0.15) к глубине за BANK м
 				h = lerpf(water_y - 0.15, bed, smoothstep(0.0, BANK, -ws))
 			elif fs <= 0.0:
-				h = fy + _noise.get_noise_2d(p.x * 2.3 + 17.0, p.y * 2.3) * FLOOR_BUMP
+				h = lv + _noise.get_noise_2d(p.x * 2.3 + 17.0, p.y * 2.3) * FLOOR_BUMP
+				# Волны пола: от края пола внутрь и от воды
+				var wave := smoothstep(0.0, 3.0, -fs) * smoothstep(1.0, WAVE_WATER, ws) * _room_wave(p)
+				h += _noise.get_noise_2d(p.x * WAVE_FREQ + 211.0, p.y * WAVE_FREQ - 97.0) * FLOOR_WAVE * wave
+				h += _mound_at(p)
+			elif fs + ws < SHORE_GAP:
+				# Узкая полоса между полом и водой — берег: от пола к кромке воды
+				h = lerpf(lv, water_y - 0.1, smoothstep(0.0, 1.0, fs / maxf(fs + ws, 0.01)))
 			else:
-				# Скальный край вокруг пола и воды, за ним пустота
+				# Скальная стена вокруг пола и воды (над местным уровнем пола), за ней пустота
 				var d := minf(fs, ws)
-				var top := fy + rim_h * (0.8 + 0.4 * (_noise.get_noise_2d(p.x * 0.7 + 50.0, p.y * 0.7) * 0.5 + 0.5))
+				var base := lv if fs <= ws else maxf(lv, fy)
+				var top := base + rim_h * (0.88 + 0.24 * (_noise.get_noise_2d(p.x * 0.7 + 50.0, p.y * 0.7) * 0.5 + 0.5))
 				if d < RIM_RISE:
-					h = lerpf(fy, top, smoothstep(0.0, RIM_RISE, d))
+					h = lerpf(base, top, smoothstep(0.0, RIM_RISE, d))
 				elif d < rim_w:
 					h = top
 				else:
@@ -186,6 +217,210 @@ func _dungeon_heights() -> void:
 			if ws < 1.5 and deck_of[k] < 0:
 				water_level[k] = water_y
 				water_d[k] = maxf(0.0, ws + 1.5)
+	_apply_ramps()
+
+
+## Уровень пола в каждом узле: залы с "level" — ядро зала (глубже LEVEL_CORE от края) ровно на уровне зала, вода —
+## floor_y; между ними — по двум ближайшим (по пути вдоль пола и воды, через скалу — дороже ROCK_COST) с весом
+## 1/расстояние², затем сглаживание. Считается на сетке крупнее (LEVEL_STEP) и раскладывается билинейно.
+func _level_field(fy: float) -> PackedFloat32Array:
+	var anchors: Array[float] = [fy]
+	var rooms: Array = cfg.get("rooms", [])
+	var room_anchor: Array[int] = []
+	for r in rooms:
+		var d: Dictionary = r
+		if d.has("level"):
+			room_anchor.append(anchors.size())
+			anchors.append(fy + float(d["level"]))
+		else:
+			room_anchor.append(-1)
+	var cs := LEVEL_STEP
+	var cx := int(ceilf(float(nx - 1) / cs)) + 1
+	var cz := int(ceilf(float(nz - 1) / cs)) + 1
+	var n := cx * cz
+	var d1 := PackedFloat32Array()
+	var d2 := PackedFloat32Array()
+	var i1 := PackedInt32Array()
+	var i2 := PackedInt32Array()
+	var cost := PackedFloat32Array()
+	d1.resize(n)
+	d2.resize(n)
+	i1.resize(n)
+	i2.resize(n)
+	cost.resize(n)
+	var big := 1.0e9
+	for cj in cz:
+		for ci in cx:
+			var c := cj * cx + ci
+			var i := mini(ci * cs, nx - 1)
+			var j := mini(cj * cs, nz - 1)
+			var k := _idx(i, j)
+			var p := _pos(i, j)
+			d1[c] = big
+			d2[c] = big
+			i1[c] = -1
+			i2[c] = -1
+			cost[c] = 1.0 if (floor_sd[k] <= 0.0 or water_sd[k] <= 0.0) else ROCK_COST
+			if water_sd[k] <= 0.0 and floor_sd[k] > -1.0:
+				d1[c] = 0.0
+				i1[c] = 0
+				continue
+			for ri in rooms.size():
+				if room_anchor[ri] < 0:
+					continue
+				var room: Dictionary = rooms[ri]
+				var rr: Array = room.get("radius", [5, 5])
+				var core := minf(LEVEL_CORE, minf(float(rr[0]), float(rr[1])) * 0.35)
+				if shape_sd(room, p) < -core:
+					d1[c] = 0.0
+					i1[c] = room_anchor[ri]
+					break
+	var st := float(cs) * step
+	var diag := st * 1.41421
+	for _pass in 5:
+		for cj in cz:
+			for ci in cx:
+				var c := cj * cx + ci
+				if ci > 0:
+					_level_relax(c, c - 1, st * cost[c], d1, d2, i1, i2)
+				if cj > 0:
+					_level_relax(c, c - cx, st * cost[c], d1, d2, i1, i2)
+					if ci > 0:
+						_level_relax(c, c - cx - 1, diag * cost[c], d1, d2, i1, i2)
+					if ci < cx - 1:
+						_level_relax(c, c - cx + 1, diag * cost[c], d1, d2, i1, i2)
+		for cj in range(cz - 1, -1, -1):
+			for ci in range(cx - 1, -1, -1):
+				var c := cj * cx + ci
+				if ci < cx - 1:
+					_level_relax(c, c + 1, st * cost[c], d1, d2, i1, i2)
+				if cj < cz - 1:
+					_level_relax(c, c + cx, st * cost[c], d1, d2, i1, i2)
+					if ci < cx - 1:
+						_level_relax(c, c + cx + 1, diag * cost[c], d1, d2, i1, i2)
+					if ci > 0:
+						_level_relax(c, c + cx - 1, diag * cost[c], d1, d2, i1, i2)
+	var lv := PackedFloat32Array()
+	lv.resize(n)
+	for c in n:
+		if i1[c] < 0:
+			lv[c] = fy
+		elif d1[c] <= 0.0 or i2[c] < 0:
+			lv[c] = anchors[i1[c]]
+		else:
+			var w1 := 1.0 / (d1[c] * d1[c])
+			var w2 := 1.0 / (d2[c] * d2[c])
+			lv[c] = (anchors[i1[c]] * w1 + anchors[i2[c]] * w2) / (w1 + w2)
+	# Сглаживание (стык зон, где меняется второй ближайший зал); ядра залов и вода остаются на месте
+	for _b in LEVEL_BLUR:
+		var sm := lv.duplicate()
+		for cj in range(1, cz - 1):
+			for ci in range(1, cx - 1):
+				var c := cj * cx + ci
+				if d1[c] <= 0.0:
+					continue
+				var acc := 0.0
+				for dj in range(-1, 2):
+					for di in range(-1, 2):
+						acc += lv[c + dj * cx + di]
+				sm[c] = acc / 9.0
+		lv = sm
+	var out := PackedFloat32Array()
+	out.resize(nx * nz)
+	for j in nz:
+		var fj := float(j) / cs
+		var cj0 := mini(int(fj), cz - 1)
+		var cj1 := mini(cj0 + 1, cz - 1)
+		var tj := fj - float(cj0)
+		for i in nx:
+			var fi := float(i) / cs
+			var ci0 := mini(int(fi), cx - 1)
+			var ci1 := mini(ci0 + 1, cx - 1)
+			var ti := fi - float(ci0)
+			var a := lerpf(lv[cj0 * cx + ci0], lv[cj0 * cx + ci1], ti)
+			var b := lerpf(lv[cj1 * cx + ci0], lv[cj1 * cx + ci1], ti)
+			out[_idx(i, j)] = lerpf(a, b, tj)
+	return out
+
+
+## Узел c: два ближайших якоря (разных) — с учётом соседа nc и цены шага.
+static func _level_relax(c: int, nc: int, w: float, d1: PackedFloat32Array, d2: PackedFloat32Array,
+		i1: PackedInt32Array, i2: PackedInt32Array) -> void:
+	if i1[nc] >= 0:
+		_level_put(c, d1[nc] + w, i1[nc], d1, d2, i1, i2)
+	if i2[nc] >= 0:
+		_level_put(c, d2[nc] + w, i2[nc], d1, d2, i1, i2)
+
+
+static func _level_put(c: int, d: float, id: int, d1: PackedFloat32Array, d2: PackedFloat32Array,
+		i1: PackedInt32Array, i2: PackedInt32Array) -> void:
+	if id == i1[c]:
+		if d < d1[c]:
+			d1[c] = d
+		return
+	if id == i2[c]:
+		if d < d2[c]:
+			d2[c] = d
+			if d2[c] < d1[c]:
+				var td := d1[c]
+				d1[c] = d2[c]
+				d2[c] = td
+				var ti := i1[c]
+				i1[c] = i2[c]
+				i2[c] = ti
+		return
+	if d < d1[c]:
+		d2[c] = d1[c]
+		i2[c] = i1[c]
+		d1[c] = d
+		i1[c] = id
+	elif d < d2[c]:
+		d2[c] = d
+		i2[c] = id
+
+
+## Сила волн пола в точке: у зала с полем "wave" — оно (вход — ровный, у подножия лестницы), иначе 1.
+func _room_wave(p: Vector2) -> float:
+	for r in cfg.get("rooms", []):
+		var d: Dictionary = r
+		if d.has("wave") and shape_sd(d, p) < 2.0:
+			return float(d["wave"])
+	return 1.0
+
+
+## Холмы и впадины пола (mounds: center, radius, height; height < 0 — впадина): плавный купол.
+func _mound_at(p: Vector2) -> float:
+	var h := 0.0
+	for m in cfg.get("mounds", []):
+		var d: Dictionary = m
+		var r := float(d.get("radius", 5.0))
+		var t := clampf(1.0 - p.distance_to(v2(d["center"])) / r, 0.0, 1.0)
+		h += float(d.get("height", 1.0)) * t * t * (3.0 - 2.0 * t)
+	return h
+
+
+## Лестницы и пандусы (ramps: a, b, width; ha, hb — высоты концов, нет — пол в этой точке): ровный уклон от a к b,
+## по ширине целиком. Под моделью лестницы — пандус (по нему ходят), края — обрыв.
+func _apply_ramps() -> void:
+	for r in cfg.get("ramps", []):
+		var d: Dictionary = r
+		var a := v2(d["a"])
+		var b := v2(d["b"])
+		var ha := float(d["ha"]) if d.has("ha") else height_at(a.x, a.y)
+		var hb := float(d["hb"]) if d.has("hb") else height_at(b.x, b.y)
+		var half := float(d.get("width", 3.0)) * 0.5
+		var ab := b - a
+		var len2 := maxf(ab.length_squared(), 0.0001)
+		var lo := Vector2(minf(a.x, b.x), minf(a.y, b.y)) - Vector2(half, half)
+		var hi := Vector2(maxf(a.x, b.x), maxf(a.y, b.y)) + Vector2(half, half)
+		for j in range(clampi(int((lo.y - origin.y) / step), 0, nz - 1), clampi(int((hi.y - origin.y) / step) + 2, 0, nz)):
+			for i in range(clampi(int((lo.x - origin.x) / step), 0, nx - 1), clampi(int((hi.x - origin.x) / step) + 2, 0, nx)):
+				var p := _pos(i, j)
+				var t := (p - a).dot(ab) / len2
+				if t < 0.0 or t > 1.0:
+					continue
+				if p.distance_to(a + ab * t) <= half:
+					heights[_idx(i, j)] = lerpf(ha, hb, t)
 
 
 func _find_dungeon_bridges() -> void:
@@ -195,22 +430,64 @@ func _find_dungeon_bridges() -> void:
 		var pa := v2(d["a"])
 		var pb := v2(d["b"])
 		var br := {
-			"a": Vector3(pa.x, height_at(pa.x, pa.y), pa.y),
-			"b": Vector3(pb.x, height_at(pb.x, pb.y), pb.y),
+			"a": Vector3(pa.x, _ground_or_deck(pa), pa.y),
+			"b": Vector3(pb.x, _ground_or_deck(pb), pb.y),
 			"width": float(d.get("width", 3.2)),
 		}
-		br["deck"] = _deck_profile(br)
-		# Над водой настил не ниже уровня воды + запас (концы — вровень с землёй)
-		var deck: PackedFloat32Array = br["deck"]
+		# Настил — прямо от конца к концу (концы вровень с полом), над водой не ниже воды + запас. Профиль острова
+		# (_deck_profile) берёт высоту земли по ширине моста — у края пола это скальная стена: настил у начала
+		# мостков к кораблю вздымался на 2 м (0.35, «до босса не добраться»)
+		var deck := PackedFloat32Array()
+		deck.resize(BRIDGE_SAMPLES + 1)
+		var ya := _ground_or_deck(pa) - 0.03
+		var yb := _ground_or_deck(pb) - 0.03
+		for i in BRIDGE_SAMPLES + 1:
+			deck[i] = lerpf(ya, yb, float(i) / float(BRIDGE_SAMPLES))
+		# Над водой — не ниже BRIDGE_OVER_WATER: верёвочная модель провисает, и середина пролёта уходила под воду
 		for i in range(1, deck.size() - 1):
-			deck[i] = maxf(deck[i], water_y + 0.35)
+			deck[i] = maxf(deck[i], water_y + BRIDGE_OVER_WATER)
 		for _pass in 2:
 			var sm := deck.duplicate()
 			for i in range(1, deck.size() - 1):
-				sm[i] = maxf(deck[i - 1] * 0.25 + deck[i] * 0.5 + deck[i + 1] * 0.25, water_y + 0.3)
+				sm[i] = maxf(deck[i - 1] * 0.25 + deck[i] * 0.5 + deck[i + 1] * 0.25, water_y + BRIDGE_OVER_WATER - 0.05)
 			deck = sm
 		br["deck"] = deck
 		bridges.append(br)
+
+
+## Высота земли, а на палубе-острове — ровно высота палубы (конец моста встаёт вровень с площадкой, без ступеньки).
+func _ground_or_deck(p: Vector2) -> float:
+	for d in cfg.get("decks", []):
+		if shape_sd(d, p) < 0.0:
+			return float((d as Dictionary).get("height", 0.3))
+	return height_at(p.x, p.y)
+
+
+## Палубы-острова (площадки мостков, корабль, уступ у портала): своя ровная коллизия — призма по эллипсу палубы
+## (у сетки рельефа 1 м край площадки 2.3 м — ступеньки и скосы, герой на ней спотыкался и съезжал в воду).
+func _deck_collision() -> void:
+	var decks: Array = cfg.get("decks", [])
+	for d in decks:
+		var dk: Dictionary = d
+		var c := v2(dk["center"])
+		var r: Array = dk.get("radius", [2, 2])
+		var top := float(dk.get("height", 0.3))
+		var rot := deg_to_rad(float(dk.get("rot", 0.0)))
+		var pts := PackedVector3Array()
+		for k in 16:
+			var a := TAU * float(k) / 16.0
+			var q := Vector2(cos(a) * float(r[0]), sin(a) * float(r[1])).rotated(rot)
+			pts.append(Vector3(q.x, 0.0, q.y))
+			pts.append(Vector3(q.x, -1.2, q.y))
+		var shape := ConvexPolygonShape3D.new()
+		shape.points = pts
+		var body := StaticBody3D.new()
+		body.name = "Deck_" + String(dk.get("id", ""))
+		body.position = Vector3(c.x, top, c.y)
+		var col := CollisionShape3D.new()
+		col.shape = shape
+		body.add_child(col)
+		add_child(body)
 
 
 ## Плоский верх скального края и дно пустоты проходимы по уклону, но туда не попасть — закрыты (звери не встают
@@ -261,6 +538,7 @@ func _build_dungeon_mesh() -> void:
 	mat.set_shader_parameter("rich", Quality.rich_shaders())
 	mat.set_shader_parameter("water_y", water_y)
 	mat.set_shader_parameter("floor_y", float(cfg.get("floor_y", 0.0)))
+	mat.set_shader_parameter("rim_w", float(cfg.get("rim_w", 3.0)))
 	WorldTextures.register_terrain(mat)
 	terrain_material = mat
 	var holder := Node3D.new()
@@ -305,6 +583,11 @@ func _dungeon_chunk(i0: int, j0: int, i1: int, j1: int) -> ArrayMesh:
 			# Квадрат целиком в пустоте — не рисуем
 			if maxf(maxf(verts[a].y, verts[a + 1].y), maxf(verts[b].y, verts[b + 1].y)) <= void_y + 0.5:
 				continue
+			# Палуба-остров из досок (площадки мостков, корабль): видна модель, свой рельеф под ней не рисуется (был
+			# тёмной коробкой под площадкой); ходят по призме _deck_collision
+			if _plank_deck(j0 + j, i0 + i) or _plank_deck(j0 + j, i0 + i + 1) or _plank_deck(j0 + j + 1, i0 + i) \
+					or _plank_deck(j0 + j + 1, i0 + i + 1):
+				continue
 			idx.append_array([a, a + 1, b, a + 1, b + 1, b])
 	if idx.is_empty():
 		return null
@@ -320,11 +603,19 @@ func _dungeon_chunk(i0: int, j0: int, i1: int, j1: int) -> ArrayMesh:
 	return m
 
 
+## Узел — палуба из досок (не каменный уступ).
+func _plank_deck(j: int, i: int) -> bool:
+	var dk := deck_of[_idx(i, j)]
+	if dk < 0:
+		return false
+	return String(((cfg.get("decks", []) as Array)[dk] as Dictionary).get("kind", "")) != "stone"
+
+
 ## Вид пола в точке: 1 — утоптанная земля (лагерь гоблинов, шахта, сокровищница), 2 — доски (палубы), 0 — камень.
 func _floor_kind(p: Vector2) -> float:
 	var decks: Array = cfg.get("decks", [])
 	for d in decks:
-		if shape_sd(d, p) < 0.3:
+		if String((d as Dictionary).get("kind", "")) != "stone" and shape_sd(d, p) < 0.3:
 			return 1.0
 	for r in cfg.get("rooms", []):
 		var room: Dictionary = r

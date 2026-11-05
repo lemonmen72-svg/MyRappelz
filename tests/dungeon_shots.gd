@@ -36,6 +36,18 @@ func hero_level() -> int:
 	return 20
 
 
+## Свои кадры: SHOTS_LIST="имя,x,z,поворот,наклон,расстояние;…" — вместо SHOTS (и без кадра острова).
+func _shots() -> Array:
+	var env := OS.get_environment("SHOTS_LIST")
+	if env == "":
+		return SHOTS
+	var out := []
+	for part in env.split(";", false):
+		var f := part.split(",")
+		out.append([f[0], float(f[1]), float(f[2]), float(f[3]), float(f[4]), float(f[5])])
+	return out
+
+
 func before_start() -> void:
 	Dungeon.force_open = true
 	AdminPanel.god = true
@@ -59,7 +71,8 @@ func run_step() -> void:
 			wait = 90
 			step = 1
 		1:
-			_save("00_ostrov_portal_u_peshery")
+			if OS.get_environment("SHOTS_LIST") == "":
+				_save("00_ostrov_portal_u_peshery")
 			main.travel("dungeon")
 			step = 2
 		2:
@@ -71,12 +84,13 @@ func run_step() -> void:
 		3:
 			# SHOTS_ONLY=13,14 — только кадры с этими номерами
 			var only := OS.get_environment("SHOTS_ONLY")
-			while idx < SHOTS.size() and only != "" and not only.split(",").has(String((SHOTS[idx] as Array)[0]).left(2)):
+			var list := _shots()
+			while idx < list.size() and only != "" and not only.split(",").has(String((list[idx] as Array)[0]).left(2)):
 				idx += 1
-			if idx >= SHOTS.size():
+			if idx >= list.size():
 				ok_done()
 				return
-			var s: Array = SHOTS[idx]
+			var s: Array = list[idx]
 			main.player.global_position = main.world.ground(float(s[1]), float(s[2]), 0.2)
 			main.cam_yaw = deg_to_rad(float(s[3]))
 			main.cam_pitch = deg_to_rad(float(s[4]))
@@ -85,7 +99,7 @@ func run_step() -> void:
 			wait = 45
 			step = 4
 		4:
-			_save(String((SHOTS[idx] as Array)[0]))
+			_save(String((_shots()[idx] as Array)[0]))
 			idx += 1
 			step = 3
 

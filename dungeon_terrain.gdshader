@@ -1,6 +1,6 @@
 // Пол и стены подземелья (DungeonWorld) в том же рисованном стиле, что земля острова: каменный пол в сиренево-серых
 // тонах с пятнами мха и светящейся изумрудной плесени, утоптанная земля лагеря и шахты, мокрая кромка у воды,
-// скальный край (слои породы, triplanar) с мхом наверху, тёмное дно под водой. Свет toon, как у island_terrain.
+// скальная стена (слои породы, triplanar) с мхом наверху, тёмное дно под водой. Свет toon, как у island_terrain.
 //
 // Вершинные данные (DungeonWorld._dungeon_chunk): COLOR.r — вид пола (0 камень, 0.5 земля, 1 палуба / мостки);
 // UV.x — расстояние до пола (< 0 — пол), м; UV.y — расстояние до воды (< 0 — вода), м.
@@ -20,6 +20,7 @@ uniform vec3 bed_deep : source_color = vec3(0.04, 0.16, 0.16);
 uniform vec3 shadow_tint : source_color = vec3(0.30, 0.30, 0.52);
 uniform float water_y = -0.45;
 uniform float floor_y = 0.0;
+uniform float rim_w = 3.0;
 uniform bool rich = true;
 uniform bool textures = false;
 uniform sampler2D tex_dirt : hint_default_white, filter_linear_mipmap, repeat_enable;
@@ -106,11 +107,12 @@ void fragment() {
 
 	// --- Мокрая кромка у воды: темнее
 	float wet = 1.0 - smoothstep(0.0, 1.6, wsd);
-	col *= mix(1.0, 0.62, wet * step(water_y - 0.05, v_pos.y));
+	col *= mix(1.0, 0.62, wet * step(water_y - 0.05, v_pos.y) * step(-2.0, v_pos.y - water_y));
 
 	// --- Скальный край: крутые склоны и всё выше пола — порода слоями, мох наверху
 	float steep = 1.0 - smoothstep(0.55, 0.8, ny);
-	float rim = max(steep, smoothstep(floor_y + 0.35, floor_y + 0.9, v_pos.y) * step(0.2, fsd)) * (kind >= 0.75 ? 0.0 : 1.0);
+	// (у залов свой уровень пола — край узнаётся по расстоянию до пола, не по высоте)
+	float rim = max(steep, smoothstep(0.2, 0.9, fsd) * step(0.3, wsd)) * (kind >= 0.75 ? 0.0 : 1.0);
 	if (rim > 0.001) {
 		float s = fract(v_pos.y * 0.9 + n2 * 0.9);
 		float band = rich ? smoothstep(0.42, 0.48, s) * (1.0 - smoothstep(0.86, 0.92, s)) : 0.5;
@@ -123,12 +125,12 @@ void fragment() {
 		col = mix(col, rc, rim);
 		glow *= 1.0 - rim;
 	}
-	// Ниже пола у края пустоты — в темноту
-	col *= mix(0.25, 1.0, smoothstep(floor_y - 8.0, floor_y - 1.0, v_pos.y) + step(0.0, -wsd));
+	// За стеной, где она обрывается в пустоту, — в темноту
+	col *= mix(1.0, 0.25, smoothstep(rim_w + 0.5, rim_w + 3.0, min(fsd, wsd)));
 
-	// --- Под водой: дно темнеет с глубиной
+	// --- Под водой: дно темнеет с глубиной (только у воды: пол залов бывает ниже уровня воды — склеп, тайник)
 	float depth = water_y - v_pos.y;
-	col = mix(col, bed_deep, smoothstep(0.05, 1.2, depth) * 0.85);
+	col = mix(col, bed_deep, smoothstep(0.05, 1.2, depth) * 0.85 * (1.0 - smoothstep(0.0, 1.5, wsd)));
 
 	ALBEDO = col;
 	EMISSION = glow_moss * glow * 0.9;

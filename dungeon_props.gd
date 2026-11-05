@@ -1,8 +1,8 @@
 class_name DungeonProps
 extends RefCounted
 ## Объекты подземелья (DungeonWorld): модели Максима из папки «ДАНЖ» (assets/props/dg_*.glb, атласы props_dg_*.png —
-## tools/prepare_props.py) по списку world/dungeon.json "props" ([id, x, z, поворот°, масштаб]) и камни по скальному
-## краю (rim_rocks: по одному на клетку RIM_CELL м вдоль края пола и воды, без коллизии — край и так непроходим).
+## tools/prepare_props.py) по списку world/dungeon.json "props" ([id, x, z, поворот°, масштаб, сдвиг по высоте]) и
+## верёвочные мосты пролётами по настилу мостов. Камней на скальной стене нет (0.35.1, Максим: «камни со стен убрать»).
 ## Экземпляры склеиваются в меши участков ZONE м по странице атласа (один материал страницы — prop.gdshader), как
 ## постройки острова (IslandPois). Коллизия — коробка по габаритам модели × COLLIDE_K у крупных (SOLID), мелочь и
 ## лежащее на полу (ковры, кости, золото) — без коллизии. Огни — OmniLight3D у главных источников (LIGHTS, не больше
@@ -10,17 +10,14 @@ extends RefCounted
 ## из примитивов (FALLBACK_COLORS), подземелье проходимо и узнаваемо.
 
 const ZONE := 40.0
-const RIM_CELL := 7.0
 const COLLIDE_K := 0.8
 ## Крупное и твёрдое — с коллизией (коробка).
 const SOLID := ["dg_spire", "dg_crag", "dg_moss_stones", "dg_amethyst_spires", "dg_crystal_purple", "dg_crystal_blue",
 	"dg_tent", "dg_cauldron", "dg_chest", "dg_chest_open", "dg_crates", "dg_barrel", "dg_bell", "dg_palisade",
 	"dg_barricade", "dg_spikes", "dg_barricade_moss", "dg_totem", "dg_table", "dg_prison", "dg_armory", "dg_obelisk",
 	"dg_monolith", "dg_crypt_altar", "dg_witch_brazier", "dg_throne", "dg_oracle", "dg_coral_altar", "dg_mine",
-	"dg_cannon", "dg_relics", "dg_hoard", "dg_brazier", "dg_harbor_post", "dg_siren", "dg_mast", "dg_crows_nest",
+	"dg_cannon", "dg_relics", "dg_hoard", "dg_brazier", "dg_siren", "dg_mast", "dg_crows_nest",
 	"dg_helm", "dg_leviathan", "dg_cavern", "dg_cliffs", "dg_dripstone"]
-## Камни скального края: id и вес (чаще низкие — камера смотрит сверху через край).
-const RIM_ROCKS := [["dg_crag", 4], ["dg_moss_stones", 4], ["dg_amethyst_spires", 1]]
 const MAX_LIGHTS := 10
 ## Модель моста на настил мостов и мостков, насколько опустить её (доски модели — у её основания), м.
 const BRIDGE_PROP := "dg_rope_bridge"
@@ -48,7 +45,7 @@ class Zone:
 	var items := {}
 
 
-static func build(world: DungeonWorld, rng: RandomNumberGenerator) -> void:
+static func build(world: DungeonWorld, _rng: RandomNumberGenerator) -> void:
 	var holder := Node3D.new()
 	holder.name = "DungeonProps"
 	world.add_child(holder)
@@ -73,7 +70,6 @@ static func build(world: DungeonWorld, rng: RandomNumberGenerator) -> void:
 		if LIGHTS.has(id) and lights < MAX_LIGHTS:
 			_light(holder, id, pos, s)
 			lights += 1
-	placed += _rim_rocks(world, holder, fallback, zones, rng)
 	placed += _bridge_decks(world, holder, fallback, zones)
 	for key in zones:
 		_zone_mesh(holder, zones[key])
@@ -137,48 +133,9 @@ static func _zone_mesh(holder: Node3D, zone: Zone) -> void:
 	holder.add_child(mi)
 
 
-## Камни по скальному краю: узлы края (расстояние до пола 1.8–2.8 м, не у воды со стороны пола) — по одному
-## на клетку RIM_CELL м, случайный камень RIM_ROCKS, поворот и масштаб случайные (rng — общий генератор мира).
-static func _rim_rocks(world: DungeonWorld, holder: Node3D, fallback: Node3D, zones: Dictionary,
-		rng: RandomNumberGenerator) -> int:
-	var cells := {}
-	for j in world.nz:
-		for i in world.nx:
-			var k := j * world.nx + i
-			var fs := world.floor_sd[k]
-			var ws := world.water_sd[k]
-			var d := minf(fs, ws)
-			if d < 1.8 or d > 2.8 or world.deck_of[k] >= 0:
-				continue
-			var p := world.origin + Vector2(i, j) * world.step
-			var key := Vector2i(floori(p.x / RIM_CELL), floori(p.y / RIM_CELL))
-			if cells.has(key):
-				continue
-			cells[key] = p
-	var total := 0
-	for r in RIM_ROCKS:
-		total += int((r as Array)[1])
-	var keys := cells.keys()
-	keys.sort()
-	var n := 0
-	for key in keys:
-		var p: Vector2 = cells[key]
-		var pick := rng.randi_range(0, total - 1)
-		var id := String((RIM_ROCKS[0] as Array)[0])
-		for r in RIM_ROCKS:
-			pick -= int((r as Array)[1])
-			if pick < 0:
-				id = String((r as Array)[0])
-				break
-		var s := rng.randf_range(0.8, 1.25)
-		_place(world, holder, fallback, zones, id, Vector3(p.x, world.height_at(p.x, p.y) - 0.3, p.y),
-			rng.randf() * TAU, s, false)
-		n += 1
-	return n
-
-
-## Мосты и мостки — модель верёвочного моста вдоль настила (растянута по длине и ширине; настил и коллизия — свои,
-## IslandWorld._build_bridges).
+## Мосты и мостки — модель верёвочного моста вдоль настила (растянута по длине и ширине, наклон — от конца к концу
+## по профилю настила IslandWorld.bridge_point).
+## Настил и коллизия — свои (IslandWorld._build_bridges), их доски скрыты.
 static func _bridge_decks(world: DungeonWorld, holder: Node3D, fallback: Node3D, zones: Dictionary) -> int:
 	if not PropAsset.has(BRIDGE_PROP):
 		return 0
@@ -188,21 +145,33 @@ static func _bridge_decks(world: DungeonWorld, holder: Node3D, fallback: Node3D,
 		var a: Vector3 = br["a"]
 		var b: Vector3 = br["b"]
 		var flat := Vector2(b.x - a.x, b.z - a.z)
-		var mid := IslandWorld.bridge_point(br, 0.5)
+		var length := flat.length()
+		# Одна модель на мост: модель верёвочного моста провисает и у неё на концах столбы без досок — пролётами
+		# выходила пила с щелями (проверено на скриншотах 0.35.1)
+		var spans := 1
 		var yaw := atan2(flat.x, flat.y)
-		var sc := Vector3(float(br["width"]) / sz.x * 1.05, 1.0, flat.length() / sz.z * 1.02)
-		var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(sc), Vector3(mid.x, mid.y - BRIDGE_SINK, mid.z))
-		var key := Vector2i(floori(mid.x / ZONE), floori(mid.z / ZONE))
-		if not zones.has(key):
-			var zn := Zone.new()
-			zn.origin = Vector3((float(key.x) + 0.5) * ZONE, 0.0, (float(key.y) + 0.5) * ZONE)
-			zones[key] = zn
-		var zone: Zone = zones[key]
-		var pg := PropAsset.page(BRIDGE_PROP)
-		if not zone.items.has(pg):
-			zone.items[pg] = []
-		(zone.items[pg] as Array).append([PropAsset.mesh(BRIDGE_PROP), Transform3D(Basis.IDENTITY, -zone.origin) * xf])
-		n += 1
+		var seg := length / float(spans)
+		for si in spans:
+			var t0 := float(si) / float(spans)
+			var t1 := float(si + 1) / float(spans)
+			var p0 := IslandWorld.bridge_point(br, t0)
+			var p1 := IslandWorld.bridge_point(br, t1)
+			var mid := (p0 + p1) * 0.5
+			var pitch := -atan2(p1.y - p0.y, seg)
+			var basis := Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, pitch)
+			var sc := Vector3(float(br["width"]) / sz.x * 1.05, 1.0, seg / sz.z * 1.04)
+			var xf := Transform3D(basis * Basis.from_scale(sc), Vector3(mid.x, mid.y - BRIDGE_SINK, mid.z))
+			var key := Vector2i(floori(mid.x / ZONE), floori(mid.z / ZONE))
+			if not zones.has(key):
+				var zn := Zone.new()
+				zn.origin = Vector3((float(key.x) + 0.5) * ZONE, 0.0, (float(key.y) + 0.5) * ZONE)
+				zones[key] = zn
+			var zone: Zone = zones[key]
+			var pg := PropAsset.page(BRIDGE_PROP)
+			if not zone.items.has(pg):
+				zone.items[pg] = []
+			(zone.items[pg] as Array).append([PropAsset.mesh(BRIDGE_PROP), Transform3D(Basis.IDENTITY, -zone.origin) * xf])
+			n += 1
 	# Свой настил (светлые доски) под моделью не виден: коллизия остаётся
 	for node in world.get_children():
 		if node is StaticBody3D and node.is_in_group("bridges"):

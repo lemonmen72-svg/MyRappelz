@@ -37,6 +37,10 @@ const CAM_SNAP := 4.0
 ## а не каждая кочка под камерой).
 const CAM_GROUND := 1.0
 const CAM_GROUND_R := 1.5
+## Подземелье: камера не заходит за стену (луч к ней проверяется по CAM_WALL_STEPS точкам, зазор над землёй, м).
+const CAM_WALL_STEPS := 16
+const CAM_WALL_GAP := 0.6
+const CAM_WALL_MIN := 2.5
 ## Круглые кнопки HUD: центр от правого нижнего угла и радиус — для «Среднего» размера интерфейса
 ## (HUD умножает на UiScale.k()). Атака в углу, умения дугой вокруг неё (зазоры ≥ 10 px), выше — «Приручить»,
 ## левее — «Зелье», «Торговец», «Говорить». Было: атака r 85, умения r 50–55, остальные r 45–50.
@@ -611,6 +615,9 @@ func _process(delta: float) -> void:
 
 	_update_cam_focus(delta)
 	var want := cam_focus + _cam_offset()
+	# Подземелье: стены выше камеры — камера подходит к герою, а не уходит за стену
+	if world is DungeonWorld:
+		want = _cam_unblock(want)
 	# Не прятать камеру в холм
 	var ground := _cam_ground(want) + CAM_GROUND
 	if want.y < ground:
@@ -692,6 +699,22 @@ func _cam_ground(p: Vector3) -> float:
 		var a := float(k) * PI * 0.5
 		h = maxf(h, world.height_at(p.x + cos(a) * CAM_GROUND_R, p.z + sin(a) * CAM_GROUND_R))
 	return h
+
+
+## Луч от героя к камере над рельефом: первый отрезок, где земля (стена) выше луча − CAM_WALL_GAP, — камера встаёт
+## перед ним (не ближе CAM_WALL_MIN м от героя).
+func _cam_unblock(want: Vector3) -> Vector3:
+	var from := cam_focus + Vector3(0.0, _cam_look_y(), 0.0)
+	var dist := from.distance_to(want)
+	if dist < 0.01:
+		return want
+	var t_min := clampf(CAM_WALL_MIN / dist, 0.0, 1.0)
+	for s in range(1, CAM_WALL_STEPS + 1):
+		var t := float(s) / float(CAM_WALL_STEPS)
+		var q := from.lerp(want, t)
+		if world.height_at(q.x, q.z) + CAM_WALL_GAP > q.y:
+			return from.lerp(want, maxf(t_min, float(s - 1) / float(CAM_WALL_STEPS)))
+	return want
 
 
 func _cam_offset() -> Vector3:

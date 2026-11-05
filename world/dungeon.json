@@ -4,20 +4,20 @@
 	"bounds": [-92.0, -70.0, 92.0, 70.0],
 	"grid_step": 1.0,
 	"floor_y": 0.0,
-	"rim_h": 2.6,
-	"rim_w": 2.4,
+	"rim_h": 7.0,
+	"rim_w": 3.0,
 	"void_y": -14.0,
 	"water_level": -0.45,
 	"water_bed": -1.9,
 	"edge_noise": 1.1,
 	"rooms": [
-		{"id": "entrance", "name": "Вход в подземелье", "shape": "ellipse", "center": [-72.5, -14.0], "radius": [10.6, 15.4]},
-		{"id": "boss_room", "name": "Зал изумрудного алтаря", "shape": "ellipse", "center": [-45.5, -46.0], "radius": [21.0, 16.2]},
-		{"id": "crypt", "name": "Склеп", "shape": "ellipse", "center": [7.9, -39.4], "radius": [27.0, 19.8]},
-		{"id": "goblin_camp", "name": "Лагерь гоблинов", "shape": "ellipse", "center": [60.7, -45.4], "radius": [23.4, 15.0]},
-		{"id": "mine", "name": "Обвал в шахте", "shape": "ellipse", "center": [51.0, -17.8], "radius": [14.4, 6.6]},
-		{"id": "treasury", "name": "Сокровищница", "shape": "ellipse", "center": [-64.0, 21.2], "radius": [13.8, 11.4]},
-		{"id": "pier", "name": "Причал", "shape": "ellipse", "center": [-36.0, 21.4], "radius": [4.6, 4.2]}
+		{"id": "entrance", "name": "Вход в подземелье", "shape": "ellipse", "center": [-72.5, -14.0], "radius": [10.6, 15.4], "level": 1.5, "wave": 0.0},
+		{"id": "boss_room", "name": "Зал изумрудного алтаря", "shape": "ellipse", "center": [-45.5, -46.0], "radius": [21.0, 16.2], "level": 0.0},
+		{"id": "crypt", "name": "Склеп", "shape": "ellipse", "center": [7.9, -39.4], "radius": [27.0, 19.8], "level": -2.0},
+		{"id": "goblin_camp", "name": "Лагерь гоблинов", "shape": "ellipse", "center": [60.7, -45.4], "radius": [23.4, 15.0], "level": 1.5},
+		{"id": "mine", "name": "Обвал в шахте", "shape": "ellipse", "center": [51.0, -17.8], "radius": [14.4, 6.6], "level": 3.0},
+		{"id": "treasury", "name": "Сокровищница", "shape": "ellipse", "center": [-64.0, 21.2], "radius": [13.8, 11.4], "level": -1.5},
+		{"id": "pier", "name": "Причал", "shape": "ellipse", "center": [-36.0, 21.4], "radius": [4.6, 4.2], "level": 0.0}
 	],
 	"corridors": [
 		{"id": "upper_hall", "points": [[-64.0, -19.0], [-14.9, -19.0]], "width": 8.0},
@@ -42,7 +42,8 @@
 		{"id": "ship", "shape": "ellipse", "center": [41.2, 23.1], "radius": [15.5, 2.9], "rot": -28.0, "height": 0.8},
 		{"id": "pier_a", "shape": "ellipse", "center": [-19.7, 21.1], "radius": [2.3, 2.3], "height": 0.25},
 		{"id": "pier_b", "shape": "ellipse", "center": [-17.3, 30.8], "radius": [2.3, 2.3], "height": 0.25},
-		{"id": "pier_c", "shape": "ellipse", "center": [-2.9, 34.4], "radius": [2.3, 2.3], "height": 0.25}
+		{"id": "pier_c", "shape": "ellipse", "center": [-2.9, 34.4], "radius": [2.3, 2.3], "height": 0.25},
+		{"id": "portal_ledge", "shape": "ellipse", "center": [-73.5, -1.6], "radius": [3.6, 3.4], "height": 5.0, "kind": "stone"}
 	],
 	"bridges": [
 		{"a": [-48.5, -9.2], "b": [-48.5, 5.0], "width": 4.0},
@@ -53,7 +54,7 @@
 		{"a": [-1.5, 33.5], "b": [29.7, 29.2], "width": 3.4}
 	],
 	"spawn_points": {"default": [-70.0, -17.0]},
-	"portal": {"center": [-76.5, -1.0], "yaw": 162.0, "to": "island"},
+	"portal": {"center": [-73.5, 0.2], "yaw": 180.0, "to": "island"},
 	"safe_zones": [
 		{"id": "dungeon_entrance", "center": [-72.5, -12.0], "radius": 9.0}
 	],
@@ -70,7 +71,6 @@
 	"mob_zones": [],
 	"transitions": [],
 	"props": [
-		["dg_ascent", -81.5, -8.5, 90, 1.0],
 		["dg_stone_ring", -69.0, -9.5, 0, 1.0],
 		["dg_tent", -76.0, -25.5, 30, 1.0],
 		["dg_bedroll", -72.0, -26.5, 10, 1.0],
@@ -80,12 +80,10 @@
 		["dg_brazier", -64.5, -24.0, 0, 1.0],
 		["dg_brazier", -65.0, -6.0, 0, 1.0],
 		["dg_lantern", -66.0, -28.0, 0, 1.0],
-
 		["dg_torch", -56.0, -23.4, 0, 1.0],
 		["dg_torch", -32.0, -23.4, 0, 1.0],
 		["dg_torch", -22.0, -15.0, 180, 1.0],
 		["dg_torch", -38.0, -15.0, 180, 1.0],
-
 		["dg_coral_altar", -45.5, -55.5, 0, 1.0],
 		["dg_crypt_altar", -51.5, -50.0, 0, 1.0],
 		["dg_crypt_altar", -39.5, -50.0, 0, 1.0],
@@ -103,7 +101,6 @@
 		["dg_coral", -29.5, -37.5, 90, 1.2],
 		["dg_amethyst_spires", -63.0, -41.0, 0, 0.9],
 		["dg_prayer_rug", -45.5, -45.0, 0, 1.0],
-
 		["dg_spire", -1.5, -39.0, 0, 1.0],
 		["dg_spire", 16.5, -39.0, 40, 1.0],
 		["dg_cannon", 7.0, -35.5, 160, 1.0],
@@ -123,7 +120,6 @@
 		["dg_banner", 18.0, -58.0, 0, 1.0],
 		["dg_obelisk", 29.5, -35.0, 0, 1.0],
 		["dg_torch", -9.0, -55.0, 0, 1.0],
-
 		["dg_nest", 58.0, -48.5, 0, 1.0],
 		["dg_nest", 69.0, -47.0, 60, 1.0],
 		["dg_tent", 74.0, -52.5, 200, 1.0],
@@ -140,18 +136,15 @@
 		["dg_spikes", 40.0, -35.5, 0, 1.0],
 		["dg_torch", 50.0, -57.5, 0, 1.0],
 		["dg_brazier", 53.0, -41.0, 0, 1.0],
-
-		["dg_mine", 56.0, -18.5, 270, 1.0],
+		["dg_mine", 52.0, -10.6, 180, 1.0],
 		["dg_moss_stones", 44.0, -21.5, 0, 1.0],
 		["dg_crag", 60.0, -12.5, 30, 0.9],
 		["dg_torch", 20.0, -15.5, 0, 1.0],
 		["dg_torch", 0.0, -14.5, 0, 1.0],
-
 		["dg_kelp", -40.0, -2.0, 0, 1.0],
 		["dg_kelp", -24.0, -1.5, 40, 1.0],
 		["dg_crystal_blue", -6.0, -2.5, 0, 0.9],
 		["dg_amethyst_spires", -56.0, -1.0, 0, 0.8],
-
 		["dg_chest_open", -70.5, 26.5, 30, 1.0],
 		["dg_gold", -67.0, 29.0, 0, 1.0],
 		["dg_hoard", -73.5, 20.5, 60, 1.0],
@@ -163,14 +156,12 @@
 		["dg_moss_stones", -57.0, 17.5, 0, 0.9],
 		["dg_glowcaps", -55.0, 26.0, 0, 1.0],
 		["dg_relics", -62.5, 31.0, 0, 1.0],
-
 		["dg_barrel", -38.5, 18.0, 0, 1.0],
 		["dg_barrel", -38.5, 24.6, 30, 1.0],
 		["dg_crates", -40.0, 21.0, 90, 0.9],
 		["dg_harbor_post", -32.5, 18.6, 0, 1.0],
 		["dg_harbor_post", -32.5, 23.8, 0, 1.0],
 		["dg_bell", -36.0, 25.0, 0, 0.9],
-
 		["dg_coral", -10.0, 46.0, 0, 1.3],
 		["dg_coral", 2.0, 56.0, 60, 1.2],
 		["dg_coral", 32.0, 57.0, 0, 1.3],
@@ -188,7 +179,6 @@
 		["dg_anchor", 24.0, 12.0, 10, 1.0],
 		["dg_dripstone", 58.0, 42.0, 0, 1.0],
 		["dg_tidepool", -14.0, 15.0, 0, 1.0],
-
 		["dg_ship_deck", 40.3, 23.6, 28, 1.0, -0.13],
 		["dg_ship_bow", 27.6, 30.4, 28, 1.0, -0.2],
 		["dg_wreck", 55.0, 16.0, 28, 1.0, -2.5],
@@ -202,6 +192,17 @@
 		["dg_spiral", 40.5, 23.6, 28, 1.0],
 		["dg_pier", -19.7, 21.1, 0, 1.0, -0.68],
 		["dg_pier", -17.3, 30.8, 15, 1.0, -0.68],
-		["dg_pier", -2.9, 34.4, 0, 1.0, -0.68]
+		["dg_pier", -2.9, 34.4, 0, 1.0, -0.68],
+		["dg_ascent", -73.5, -7.9, 180, 1.0, -1.75]
+	],
+	"ramps": [
+		{"id": "entrance_stairs", "a": [-73.5, -4.9], "b": [-73.5, -10.9], "width": 3.4, "ha": 5.0, "hb": 1.5}
+	],
+	"mounds": [
+		{"id": "altar_dais", "center": [-45.5, -54.0], "radius": 7.5, "height": 0.9},
+		{"id": "crypt_rise", "center": [8.0, -48.0], "radius": 9.0, "height": 1.2},
+		{"id": "crypt_hollow", "center": [-2.0, -34.0], "radius": 7.0, "height": -0.6},
+		{"id": "camp_hill", "center": [66.0, -52.0], "radius": 8.0, "height": 1.3},
+		{"id": "treasury_mound", "center": [-72.0, 21.0], "radius": 5.5, "height": 0.7}
 	]
 }
