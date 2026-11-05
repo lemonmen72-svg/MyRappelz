@@ -161,7 +161,23 @@ ITEMS = {
 	"npc_sun_grimoire": dict(src="Sun_Grimoire", kind="npc", frame="book", length=0.26, tris=8500, tex=TEX_ONE,
 		grip=0.5),	# Святилище благословений у Сестры Аделины — объект, не в руки (Npcs.build_altar): начало — середина основания,
 	# высота 1.6 м (в промте 1.8 м при ширине 1.2; у модели пропорции 0.63 × 0.95)
-	"npc_sun_altar": dict(src="Sun_Altar", kind="npc", frame="blade", length=1.6, tris=12000, tex=TEX_BIG, grip=0.0),
+	"npc_sun_altar": dict(src="Sun_Altar", kind="npc", frame="blade", length=1.6, tris=12000, tex=TEX_BIG, grip=0.0),	# Предметы жителей 0.32 (папка «НПС и объекты», 05.11): удочка и острога рыбака, меч в ножнах и щит ветерана, серп
+	# травницы; доска поручений писаря (объект, Npcs.build_board) и куст серебролиста (находка, QuestFind) — объекты
+	"npc_fishing_rod": dict(src="Vintage_Fishing_Rod", kind="npc", frame="blade", length=1.9, tris=8500, tex=TEX_ONE,
+		grip=0.12, thin=True),
+	"npc_harpoon": dict(src="Tidepiercer", kind="npc", frame="blade", length=1.7, tris=8500, tex=TEX_ONE, grip=0.45),
+	# Меч в ножнах: навершие к +Y (у Meshy остриё внизу) — хват у рукояти, на поясе висит остриём вниз
+	"npc_veteran_sword": dict(src="Starbound_Blade", kind="npc", frame="blade", length=1.0, tris=8500, tex=TEX_ONE,
+		grip=0.8),
+	"npc_veteran_shield": dict(src="Crimson_Bulwark", kind="npc", frame="shield", length=0.85, tris=8500, tex=TEX_BIG,
+		grip=0.58),
+	"npc_herb_sickle": dict(src="Verdant_Moon_Sickle", kind="npc", frame="blade", length=0.5, tris=8500, tex=TEX_ONE,
+		grip=0.22),
+	"npc_quill": dict(src="Radiant_Quill", kind="npc", frame="blade", length=0.32, tris=8500, tex=TEX_ONE, grip=0.25),
+	"npc_notice_board": dict(src="Adventure_Notice_Board", kind="npc", frame="blade", length=2.3, tris=8500,
+		tex=TEX_BIG, grip=0.0),
+	"npc_herb_bush": dict(src="Moonlit_Whisper_Lilies", kind="npc", frame="blade", length=0.75, tris=6000, tex=TEX_ONE,
+		grip=0.0),
 }
 
 # Арбалет: ложе на столько выше точки хвата (кулак под ложем, как у процедурного _crossbow_mesh)

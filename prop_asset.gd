@@ -26,6 +26,13 @@ const KINDS := {
 	"well": ["well", 1.0],
 	"notice_board": ["notice_board", 1.0],
 	"merchant_stall": ["merchant_stall", 1.0],
+	# Постройки главной деревни у жителей (0.32): своей процедурной модели нет — без файла на их месте прежние дома
+	# (IslandPois._town), кузни и склада нет
+	"shop_weapons": ["shop_weapons", 1.0],
+	"shop_armor": ["shop_armor", 1.0],
+	"shop_jewelry": ["shop_jewelry", 1.0],
+	"smithy": ["smithy", 1.0],
+	"warehouse": ["warehouse", 1.0],
 	"lantern_town": ["lantern_town", 1.0],
 	"weapon_rack": ["weapon_rack", 1.0],
 	"dummy": ["training_dummy", 1.0],

@@ -55,6 +55,22 @@ const ITEMS := {
 		{"item": "npc_quiver", "at": "chest", "pos": Vector3(-0.04, 1.08, -0.15), "up": Vector3(-0.4, 1.0, -0.12),
 			"front": Vector3(0, 0, -1)},
 	],
+	# Жители 0.32: удочка в правой руке и острога за спиной у рыбака, меч в ножнах на левом бедре и щит за спиной у
+	# ветерана, серп в правой руке у травницы
+	"fisher": [
+		{"item": "npc_fishing_rod", "at": "hand_r", "up": Vector3(0.12, 1.0, 0.45), "front": Vector3(1, 0, 0)},
+		{"item": "npc_harpoon", "at": "chest", "pos": Vector3(0.05, 1.12, -0.17), "up": Vector3(0.45, 1.0, -0.1),
+			"front": Vector3(0, 0, -1)},
+	],
+	"veteran": [
+		{"item": "npc_veteran_sword", "at": "hips", "pos": Vector3(0.24, 0.98, 0.04), "up": Vector3(0.1, 1.0, 0.5),
+			"front": Vector3(1, 0, 0)},
+		{"item": "npc_veteran_shield", "at": "chest", "pos": Vector3(0.0, 1.2, -0.24), "up": Vector3(0, 1.0, 0),
+			"front": Vector3(0, 0, -1)},
+	],
+	"herbalist": [
+		{"item": "npc_herb_sickle", "at": "hand_r", "up": Vector3(0, 1.0, 0.25), "front": Vector3(-1, 0, 0)},
+	],
 	"buffer": [
 		{"item": "npc_sun_staff", "at": "hand_r", "up": Vector3(0.06, 1.0, 0.05), "front": Vector3(0, 0, 1), "ground": true},
 		{"item": "npc_sun_lantern", "at": "hand_l", "up": Vector3(0, 1.0, 0), "front": Vector3(0, 0, 1)},

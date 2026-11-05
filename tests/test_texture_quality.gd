@@ -81,12 +81,13 @@ func _check_sizes() -> void:
 	# Атласы построек: размер страницы как в props.json, клетки домов 2048, остальные 1024
 	var pr := _json("res://assets/props/props.json")
 	var pages: Dictionary = pr.get("pages", {})
-	check(pages.size() == 6, "страниц атласа построек %d" % pages.size())
+	check(pages.size() == 8, "страниц атласа построек %d" % pages.size())
 	for pg in pages.keys():
 		var info: Dictionary = pages[pg]
 		var want: Array = info.get("size", [0, 0])
 		var s := _png_size("res://assets/props/" + String(info.get("file", "")))
-		check(s == Vector2i(int(want[0]), int(want[1])) and s.x >= 4096,
+		# shops_b — одна клетка 2048 (ювелирная лавка), остальные 4096
+		check(s == Vector2i(int(want[0]), int(want[1])) and s.x >= (2048 if String(pg) == "shops_b" else 4096),
 			"атлас %s: %d×%d (по props.json %s)" % [pg, s.x, s.y, want])
 	var big := 0
 	var props: Dictionary = pr.get("props", {})

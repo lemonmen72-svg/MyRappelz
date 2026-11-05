@@ -13,12 +13,15 @@ const IDS := ["town_house", "town_house_b", "town_hall", "well", "notice_board",
 	"light_elf_house", "light_elf_tower", "dark_elf_house", "dark_elf_tower", "lighthouse", "ship", "cave_entrance",
 	"tent_bell", "tent_ridge", "campfire", "dock_crates", "lantern_town", "lantern_elf", "weapon_rack",
 	"training_dummy", "bollard", "crate", "barrel", "brazier_dark", "dark_spire", "crystal_blue", "crystal_gold",
-	"crystal_purple", "tree_oak", "tree_pine", "tree_elf", "tree_dead", "bush", "rock", "rock_dark"]
+	"crystal_purple", "tree_oak", "tree_pine", "tree_elf", "tree_dead", "bush", "rock", "rock_dark",
+	"shop_weapons", "shop_armor", "smithy", "warehouse", "shop_jewelry"]
 ## Модели, у которых основание не на y = 0: крылья мельницы (ступица в центре), корабль (ватерлиния).
 const NOT_ON_GROUND := ["windmill_sails", "ship"]
 ## Постройки: стены проверяются лучами (_check_walls).
 const BUILDINGS := ["town_house", "town_house_b", "town_hall", "human_house_thatch", "human_house_red",
-	"windmill_tower", "light_elf_house", "light_elf_tower", "dark_elf_house", "dark_elf_tower", "lighthouse"]
+	"windmill_tower", "light_elf_house", "light_elf_tower", "dark_elf_house", "dark_elf_tower", "lighthouse",
+	"shop_weapons", "shop_armor", "warehouse", "shop_jewelry"]
+## Кузня (smithy) — без проверки стен: навес над горном открыт спереди по промту (2 луча из 48 — под навес).
 ## Дома и башни эльфов: свечение ограничено (_check_glow).
 const ELF_BUILDINGS := ["light_elf_house", "light_elf_tower", "dark_elf_house", "dark_elf_tower"]
 ## Процедурные модели, с которыми сравнивается размер (вид PoiModels → id).

@@ -85,6 +85,10 @@ PAGES = {
 	"port": (4096, 4096),
 	"small": (4096, 3072),
 	"nature": (4096, 2048),
+	# Постройки главной деревни у своих жителей (0.32, tools/Промты_постройки_главной_деревни.docx): 4 клетки 2048 и
+	# ювелирная — на своей странице 2048
+	"shops": (4096, 4096),
+	"shops_b": (2048, 2048),
 }
 
 # id → src (часть имени файла Meshy), fit — рамка X×Y×Z (м) после поворота (масштаб общий, наибольший, при
@@ -106,6 +110,13 @@ PROPS = {
 	"notice_board": dict(src="Village_Notice_Board", fit=(2.4, 2.8, 1.0), tris=4500, tex=CELL_SMALL, rot=0, page="town"),
 	"town_gate": dict(src="Rustic_Garden_Gatehou", fit=(6.2, 6.0, 2.6), tris=4500, tex=CELL_SMALL, rot=0, page="town"),
 	"merchant_stall": dict(src="Harvest_Market_Stall", fit=(3.0, 2.8, 2.6), tris=4500, tex=CELL_SMALL, rot=0, page="town"),
+	# Лавки и кузня, склад (у оружейника, бронницы, ювелира, кузнеца, кладовщика; IslandPois._town)
+	"shop_weapons": dict(src="The_Hearthside_Armory", fit=(6.5, 7.0, 5.5), tris=12000, tex=CELL_BIG, rot=0, page="shops"),
+	"shop_armor": dict(src="The_Armorer_s_Hearth", fit=(6.5, 7.0, 5.5), tris=12000, tex=CELL_BIG, rot=0, page="shops"),
+	"smithy": dict(src="Hearthforge_Cottage", fit=(8.0, 7.0, 6.5), tris=12000, tex=CELL_BIG, rot=0, page="shops"),
+	"warehouse": dict(src="The_Golden_Key_Inn", fit=(10.0, 7.5, 7.5), tris=12000, tex=CELL_BIG, rot=0, page="shops"),
+	"shop_jewelry": dict(src="The_Gilded_Gemstone_Boutique", fit=(5.0, 7.5, 5.0), tris=12000, tex=CELL_BIG, rot=0,
+		page="shops_b"),
 	# Деревня людей
 	"human_house_thatch": dict(src="Thatchwood_Cottage", fit=(6.0, 6.6, 5.2), tris=9000, tex=CELL_BIG, rot=0,
 		page="village"),
@@ -859,7 +870,8 @@ def read_built(path: str) -> dict:
 
 # Постройки, у которых тест tests/test_props.gd (_check_walls) пускает лучи в стены — та же проверка в --check.
 WALL_CHECK = ("town_house", "town_house_b", "town_hall", "human_house_thatch", "human_house_red", "windmill_tower",
-	"light_elf_house", "light_elf_tower", "dark_elf_house", "dark_elf_tower", "lighthouse")
+	"light_elf_house", "light_elf_tower", "dark_elf_house", "dark_elf_tower", "lighthouse", "shop_weapons", "shop_armor",
+	"warehouse", "shop_jewelry")
 
 
 def wall_holes(pos: np.ndarray, tris: np.ndarray) -> tuple:

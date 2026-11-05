@@ -3,7 +3,7 @@ extends "res://tests/test_base.gd"
 ## каждый файл грузится (одна поверхность, текстура), размер — как в handheld.json, длина — как у вида, оси по
 ## контракту (начало — хват внутри рукояти, ось +Y, лезвие топора к +X, тетива к +Z, арбалет вперёд −Z, щит лицом
 ## +Z за ручкой, книги корешком к −X); у двуручных — точка второй руки ниже хвата; у каждого вида оружия ItemData
-## и у каждого оружия-предмета есть модель из файла; у жителей — все 14 предметов (святилище баффера — тоже здесь) (id — договорённость с моделями
+## и у каждого оружия-предмета есть модель из файла; у жителей — все 22 предмета (объекты: святилище баффера, доска писаря, куст серебролиста — тоже здесь) (id — договорённость с моделями
 ## жителей). В руке героя из файла — меш из файла (не процедурный), пары — один файл в обеих руках, щит — в левой
 ## с поворотом рамки; без файлов (Handheld.force_missing) — прежние процедурные меши. У игрока в руках — модель
 ## надетого предмета.
@@ -20,13 +20,16 @@ const LENGTHS := {
 	"npc_longbow": 1.4, "npc_grimoire": 0.3, "npc_tome": 0.3, "npc_cane": 0.95, "npc_wand": 0.45,
 	"npc_hammer": 0.6, "npc_antlerstaff": 1.7, "npc_quiver": 0.7, "npc_keys": 0.2, "npc_scroll": 0.3,
 	"npc_sun_staff": 1.7, "npc_sun_lantern": 0.45, "npc_sun_grimoire": 0.26, "npc_sun_altar": 1.6,
+	"npc_fishing_rod": 1.9, "npc_harpoon": 1.7, "npc_veteran_sword": 1.0, "npc_veteran_shield": 0.85,
+	"npc_herb_sickle": 0.5, "npc_quill": 0.32, "npc_notice_board": 2.3, "npc_herb_bush": 0.75,
 }
 ## Предметы жителей (договорённость с моделями жителей: id не менять).
 const NPC_IDS := ["npc_grimoire", "npc_cane", "npc_wand", "npc_longbow", "npc_hammer", "npc_quiver", "npc_keys",
 	"npc_scroll", "npc_tome", "npc_antlerstaff", "npc_sun_staff", "npc_sun_lantern", "npc_sun_grimoire",
-	"npc_sun_altar"]
+	"npc_sun_altar", "npc_fishing_rod", "npc_harpoon", "npc_veteran_sword", "npc_veteran_shield", "npc_herb_sickle",
+	"npc_quill", "npc_notice_board", "npc_herb_bush"]
 ## Объекты, а не предметы в руках (начало — середина основания): святилище баффера (Npcs.build_altar).
-const GROUND_OBJECTS := ["npc_sun_altar"]
+const GROUND_OBJECTS := ["npc_sun_altar", "npc_notice_board", "npc_herb_bush"]
 ## Двуручные (у них точка второй руки grip2).
 const TWO_HANDED := ["weapon_sword_2h_r1", "weapon_mace_2h_r1", "weapon_axe_2h_r1", "weapon_staff_2h_r1",
 	"weapon_spear_r1", "weapon_sword_2h_r2", "weapon_mace_2h_r2", "weapon_axe_2h_r2", "weapon_staff_2h_r2",
@@ -116,7 +119,7 @@ func _check_files() -> void:
 		check(absf(bb.size[axis] - L) < 0.03 * L and absf(float(inf.get("length", 0.0)) - L) < 0.001,
 			"%s: длина %.3f м (%.2f)" % [id, bb.size[axis], L])
 		# Главная ось — самая длинная (у щита и книг высота, у лука — плечи)
-		if fr == "blade" or fr == "bow":
+		if (fr == "blade" or fr == "bow") and not GROUND_OBJECTS.has(id):
 			check(bb.size.y >= bb.size.x and bb.size.y >= bb.size.z, "%s: ось предмета +Y (%s)" % [id, bb.size])
 		# Хват внутри предмета (у щита — за ним, у книг — у корешка, у арбалета — под ложем)
 		check(bb.grow(0.07).has_point(Vector3.ZERO), "%s: хват у предмета (рамка %s)" % [id, bb])
@@ -140,7 +143,8 @@ func _check_files() -> void:
 				# Щит перед кулаком (ручки-скобы сзади щита могут заходить за кулак на несколько сантиметров)
 				check(bb.position.z > -0.05 and bb.position.z + bb.end.z > 0.0,
 					"%s: щит перед ручкой, лицом к +Z (%.3f…%.3f)" % [id, bb.position.z, bb.end.z])
-				check(bb.size.y > bb.size.x and bb.size.z < 0.2, "%s: верх +Y, тонкий по Z (%s)" % [id, bb.size])
+				# Круглый щит (щит ветерана) — высота и ширина равны, тонкий по Z с умбоном
+				check(bb.size.y > bb.size.x * 0.97 and bb.size.z < 0.22, "%s: верх +Y, тонкий по Z (%s)" % [id, bb.size])
 			"book":
 				check(bb.position.x > -0.01, "%s: корешок у хвата (−X; %.3f)" % [id, bb.position.x])
 	# Топоры и молот: лезвие / боёк к +X (как у процедурного хвата: +X — к костяшкам)

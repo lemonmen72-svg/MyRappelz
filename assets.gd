@@ -180,6 +180,12 @@ const PACKS := {
 		"assets/props/tent_*.glb",
 		"assets/props/campfire.glb",
 		"assets/props/dock_crates.glb",
+		# Лавки, кузня и склад главной деревни (0.32): страницы shops / shops_b
+		"assets/props/props_shops.png",
+		"assets/props/props_shops_b.png",
+		"assets/props/shop_*.glb",
+		"assets/props/smithy.glb",
+		"assets/props/warehouse.glb",
 	],
 	# Оружие 2-го ранга (на острове не продаётся; текстуры 2048 у двуручного — часть handheld была ≈ 131 МБ).
 	"handheld_r2": [

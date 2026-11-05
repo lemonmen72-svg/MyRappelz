@@ -103,7 +103,7 @@ const NPCS := {
 		"name": "Кузнец Гуннар", "gen": "Кузнеца Гуннара", "dat": "Кузнецу Гуннару",
 		"where": "в центре города, у тренировочной площадки", "title": "Городской кузнец", "dialog": true,
 		"mark_y": 3.2,
-		"spot": {"poi": "town", "off": Vector2(6.9, 5.8)},
+		"spot": {"poi": "town", "off": Vector2(6.9, 5.8), "building": "smithy"},
 		"greet": {
 			"young": "Новичок? Держи клинок остриём от себя, а остальному научит дорога. Ха!",
 			"veteran": "Твоё оружие повидало дело — зазубрины не врут. Неси на наковальню — закалю как следует.",
@@ -121,7 +121,7 @@ const NPCS := {
 		"name": "Оружейник Бранд", "gen": "Оружейника Бранда", "dat": "Оружейнику Бранду",
 		"where": "в центре города, на восточной стороне площади", "title": "Оружейник", "shop_title": "Оружейная лавка",
 		"dialog": true, "mark_y": 3.2,
-		"spot": {"poi": "town", "off": Vector2(9.0, -1.5)},
+		"spot": {"poi": "town", "off": Vector2(9.0, -1.5), "building": "shop_weapons"},
 		"shop": ["weapon_sword_1h_r1", "weapon_sword_2h_r1", "weapon_dagger_r1", "weapon_mace_1h_r1", "weapon_mace_2h_r1",
 			"weapon_axe_1h_r1", "weapon_axe_2h_r1", "weapon_staff_1h_r1", "weapon_staff_2h_r1", "weapon_spear_r1",
 			"weapon_bow_r1", "crossbow_starter", "weapon_shield_r1", "dagger_steel", "sword_steel", "crossbow_heavy"],
@@ -137,7 +137,7 @@ const NPCS := {
 		"name": "Бронница Хельга", "gen": "Бронницы Хельги", "dat": "Броннице Хельге",
 		"where": "в центре города, у домов на северо-востоке", "title": "Бронник", "shop_title": "Лавка доспехов",
 		"dialog": true, "mark_y": 3.2,
-		"spot": {"poi": "town", "off": Vector2(8.5, -9.5)},
+		"spot": {"poi": "town", "off": Vector2(8.5, -9.5), "building": "shop_armor"},
 		"shop": ["armor_body_warrior_r1", "armor_body_mage_r1", "armor_body_summoner_r1", "armor_body_hunter_r1",
 			"armor_helmet_r1", "armor_gloves_r1", "armor_boots_r1"],
 		"greet": {
@@ -151,7 +151,7 @@ const NPCS := {
 		"name": "Ювелир Лиора", "gen": "Ювелира Лиоры", "dat": "Ювелиру Лиоре",
 		"where": "в центре города, на западной стороне площади", "title": "Ювелир", "shop_title": "Ювелирная лавка",
 		"dialog": true, "mark_y": 3.15,
-		"spot": {"poi": "town", "off": Vector2(-11.5, -0.5)},
+		"spot": {"poi": "town", "off": Vector2(-11.5, -0.5), "building": "shop_jewelry"},
 		# Украшения базы 1-го ранга (ItemData.JEWELRY_DEFS): кольца HP/MP + характеристика, серьги, кулоны, пояс
 		"shop": ["ring_str_r1", "ring_vit_r1", "ring_dex_r1", "ring_agi_r1", "ring_int_r1", "ring_wis_r1", "ring_luck_r1",
 			"ring_warrior_r1", "ring_bowman_r1", "ring_wizard_r1", "earring_atk_r1", "earring_matk_r1", "earring_def_r1",
@@ -187,7 +187,7 @@ const NPCS := {
 		"name": "Кладовщик Тобин", "gen": "Кладовщика Тобина", "dat": "Кладовщику Тобину",
 		"where": "в центре города, у колодца", "title": "Хранитель городского склада", "dialog": true,
 		"mark_y": 3.15,
-		"spot": {"poi": "town", "off": Vector2(-7.0, 4.9)},
+		"spot": {"poi": "town", "off": Vector2(-7.0, 4.9), "building": "warehouse"},
 		"greet": {
 			"full_bag": "Батюшки, сумка-то трещит по швам! Сложи лишнее на склад — у меня под замком надёжнее, чем на плече.",
 			"veteran": "О, постоянный посетитель! В гроссбухе у тебя уже целая страница. Почти целая.",
@@ -373,9 +373,9 @@ const NPCS := {
 	# Баффер (0.32; модель npc_buffer.glb): благословения — Blessing (7 усилений на час герою и питомцу, как баффер
 	# оригинала), страница диалога Npcs "bless"
 	"buffer": {
-		"name": "Сестра Аделина", "gen": "Сестры Аделины", "dat": "Сестре Аделине", "where": "в центре города, на площади",
+		"name": "Сестра Аделина", "gen": "Сестры Аделины", "dat": "Сестре Аделине", "where": "в городе, у тренировочной площадки",
 		"title": "Благословляющая", "dialog": true, "mark_y": 3.1,
-		"spot": {"poi": "town", "off": Vector2(-3.0, 9.5)},
+		"spot": {"poi": "town", "off": Vector2(13.5, 6.5)},
 		"greet": {
 			"young": "Свет с тобой, путник. Дорога у тебя только начинается — пусть храм её осветит.",
 			"veteran": "Сколько дорог ты прошёл… Позволь свету храма пройти с тобой ещё одну.",

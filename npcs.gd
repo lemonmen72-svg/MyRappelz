@@ -54,10 +54,14 @@ const SOON := Color(0.62, 0.66, 0.78)
 ## Житель, рядом с которым стоит доска объявлений (заказы писаря), и отступ доски от него, м.
 const BOARD_NPC := "scribe"
 ## Житель со святилищем благословений рядом (модель assets/handheld/npc_sun_altar.glb, без пакета — из примитивов).
+## Доска поручений писаря из файла (assets/handheld/npc_notice_board.glb); нет — из примитивов.
+const BOARD_ITEM := "npc_notice_board"
 const ALTAR_NPC := "buffer"
 const ALTAR_ITEM := "npc_sun_altar"
 const ALTAR_GAP := 1.8
-const BOARD_GAP := 1.9
+## Житель лавки стоит перед её фасадом на столько, м.
+const DOOR_GAP := 1.6
+const BOARD_GAP := 2.3
 
 var main: Node
 ## Доска объявлений у писаря (null — писаря нет в мире).
@@ -148,6 +152,10 @@ func place_all(w: IslandWorld, avoid: Array) -> void:
 		if id == ALTAR_NPC and not Blessing.available():
 			continue
 		var info := spot_info(w, id)
+		# Лавка жителя из файла (IslandPois._town) — встать у её входа
+		var door := shop_door(id)
+		if door.is_finite():
+			info["want"] = door
 		var want: Vector2 = info["want"]
 		var area_c: Vector2 = info["area_c"]
 		var p := find_spot(w, want, avoid, NPC_GAP, area_c, float(info["area_r"]), float(info["flat"]))
@@ -186,6 +194,25 @@ func build_board(w: IslandWorld, npc_node: Npc, avoid: Array) -> Node3D:
 		if w == null or Npcs.spot_ok(w, q, others, NPC_GAP - 1.5, 0.6):
 			pos = q
 			break
+	var model := Handheld.make(BOARD_ITEM) if Handheld.exists(BOARD_ITEM) else null
+	if model != null:
+		# Доска поручений Максима (лицом к +Z, как и житель смотрит в −Z узла — разворот на пол-оборота)
+		model.rotation.y = PI
+		b.add_child(model)
+		var body := StaticBody3D.new()
+		body.collision_mask = 0
+		var col := CollisionShape3D.new()
+		var bs := BoxShape3D.new()
+		var mb := model.mesh.get_aabb()
+		bs.size = Vector3(mb.size.x * 0.9, mb.size.y, maxf(0.3, mb.size.z * 0.6))
+		col.shape = bs
+		col.position = Vector3(0, mb.size.y * 0.5, 0)
+		body.add_child(col)
+		b.add_child(body)
+		main.add_child(b)
+		b.position = Vector3(pos.x, w.height_at(pos.x, pos.y) if w != null else 0.0, pos.y)
+		b.rotation.y = yaw
+		return b
 	var wood := Util.mat(Color(0.5, 0.34, 0.2))
 	var dark := Util.mat(Color(0.36, 0.24, 0.14))
 	for x in [-0.72, 0.72]:
@@ -201,6 +228,20 @@ func build_board(w: IslandWorld, npc_node: Npc, avoid: Array) -> Node3D:
 	b.position = Vector3(pos.x, w.height_at(pos.x, pos.y) if w != null else 0.0, pos.y)
 	b.rotation.y = yaw
 	return b
+
+
+## Точка у входа в лавку жителя id (NpcData spot "building" — вид постройки IslandPois, узел с этим именем): перед
+## фасадом (+Z модели) на DOOR_GAP м; постройки нет (без файла модели) — Vector2.INF.
+func shop_door(id: String) -> Vector2:
+	var kind := String(NpcData.spot(id).get("building", ""))
+	if kind == "" or main == null or PropAsset.for_kind(kind) == "":
+		return Vector2.INF
+	var b := main.find_child(kind, true, false) as Node3D
+	if b == null:
+		return Vector2.INF
+	var depth := PropAsset.size(PropAsset.for_kind(kind)).z * PropAsset.kind_scale(kind)
+	var front := b.global_transform.basis.z.normalized() * (depth * 0.5 + DOOR_GAP)
+	return Vector2(b.global_position.x + front.x, b.global_position.z + front.z)
 
 
 ## Святилище благословений сбоку от жителя npc_node (справа, иначе слева, позади), лицом туда же, куда смотрит он;

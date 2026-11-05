@@ -759,14 +759,20 @@ func _town(h: Node3D, poi: Dictionary) -> void:
 	for g in gates:
 		_gate_arch(h, c, fence_r, g, gate_half * fence_r - 0.2)
 	var inner := fence_r - 0.4
-	# Ратуша на севере, дома по краю (угол — от востока, −90° — север)
+	# Ратуша на севере, дома по краю (угол — от востока, −90° — север). Лавки жителей (0.32, модели Максима): у
+	# оружейника — на месте дома на востоке, у бронницы — на северо-востоке, у ювелира — на западе (нет файла —
+	# прежние дома); кузня — у тренировочной площадки, склад — у колодца (только из файла)
 	var plan := [
 		["town_hall", -92.5, 15.5, Vector3(9.0, 7.0, 6.4), 4.0],
 		["town_house", -122.0, 16.3, Vector3(5.6, 5.4, 4.8), 2.9],
-		["town_house_b", -63.0, 16.3, Vector3(6.4, 5.4, 4.8), 2.9],
-		["town_house", -14.0, 16.3, Vector3(5.6, 5.4, 4.8), 2.9],
-		["town_house_b", 197.0, 16.3, Vector3(6.4, 5.4, 4.8), 2.9],
+		[_shop_or("shop_armor", "town_house_b"), -63.0, 16.3, Vector3(6.4, 5.4, 4.8), 2.9],
+		[_shop_or("shop_weapons", "town_house"), -14.0, 16.3, Vector3(5.6, 5.4, 4.8), 2.9],
+		[_shop_or("shop_jewelry", "town_house_b"), 197.0, 16.3, Vector3(6.4, 5.4, 4.8), 2.9],
 	]
+	if PropAsset.for_kind("smithy") != "":
+		plan.append(["smithy", 78.0, 15.6, Vector3(8.0, 7.0, 6.5), 3.6])
+	if PropAsset.for_kind("warehouse") != "":
+		plan.append(["warehouse", 150.0, 15.8, Vector3(10.0, 7.5, 7.5), 4.2])
 	for e in plan:
 		var p := _spot(c, float(e[1]), float(e[2]), float(e[4]), inner)
 		if p.is_finite():
@@ -811,6 +817,11 @@ func _town(h: Node3D, poi: Dictionary) -> void:
 			_lantern(h, "lantern_town", lp, PoiModels.WIN_WARM)
 	# Немного бочек и ящиков у домов
 	_scatter(h, c, ["barrel", "crate", "barrel", "crate"], 12.0, inner - 1.0, 0.6)
+
+
+## Лавка жителя из файла kind, нет файла — прежний дом города fallback.
+static func _shop_or(kind: String, fallback: String) -> String:
+	return kind if PropAsset.for_kind(kind) != "" else fallback
 
 
 func _lantern(parent: Node3D, kind: String, p: Vector2, glow: Color) -> void:

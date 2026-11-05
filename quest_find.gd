@@ -9,6 +9,9 @@ extends Node3D
 const PICK_RANGE := 2.5
 const LEAF := Color(0.62, 0.95, 0.74)
 const GLOW := Color(0.85, 1.0, 0.9)
+## Модель куста (assets/handheld/npc_herb_bush.glb, начало — середина основания) и высота огонька над ним.
+const MODEL := "npc_herb_bush"
+const MODEL_GLOW_Y := 0.85
 
 ## Ключ цели ("<предмет>@<зона>"), предмет и модуль заданий — задаются до добавления в дерево.
 var key := ""
@@ -26,6 +29,16 @@ func _ready() -> void:
 	add_to_group("quest_finds")
 	name = "QuestFind"
 	_t = randf() * TAU
+	# Модель куста из файла (Handheld MODEL, лилии Максима): есть — вместо стебля и листьев из примитивов
+	var bush := Handheld.make(MODEL) if Handheld.exists(MODEL) else null
+	if bush != null:
+		bush.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		bush.rotation.y = _t
+		add_child(bush)
+		_leaves = Node3D.new()
+		add_child(_leaves)
+		_add_glow(MODEL_GLOW_Y)
+		return
 	var stem := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
 	cm.top_radius = 0.015
@@ -56,6 +69,11 @@ func _ready() -> void:
 		l.scale = Vector3(0.24, 0.04, 0.1)
 		l.rotation = Vector3(0.0, -a, 0.35)
 		_leaves.add_child(l)
+	_add_glow(0.42)
+
+
+## Огонёк над находкой на высоте y и искорки вокруг.
+func _add_glow(y: float) -> void:
 	_glow = MeshInstance3D.new()
 	var gm := SphereMesh.new()
 	gm.radius = 0.09
@@ -63,7 +81,7 @@ func _ready() -> void:
 	gm.radial_segments = 8
 	gm.rings = 4
 	_glow.mesh = gm
-	_glow.position.y = 0.42
+	_glow.position.y = y
 	var gmat := _mat(GLOW, 2.2)
 	gmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	gmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -73,7 +91,7 @@ func _ready() -> void:
 	add_child(_glow)
 	var sp := Vfx.ambient_sparkles(self, GLOW, 0.35, 4)
 	if sp != null:
-		sp.position.y = 0.35
+		sp.position.y = y - 0.07
 
 
 func _process(delta: float) -> void:

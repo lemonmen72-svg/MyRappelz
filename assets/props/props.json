@@ -41,6 +41,20 @@
 				4096,
 				2048
 			]
+		},
+		"shops": {
+			"file": "props_shops.png",
+			"size": [
+				4096,
+				4096
+			]
+		},
+		"shops_b": {
+			"file": "props_shops_b.png",
+			"size": [
+				2048,
+				2048
+			]
 		}
 	},
 	"props": {
@@ -314,6 +328,201 @@
 					0.017,
 					0.072,
 					1.256
+				]
+			}
+		},
+		"shop_weapons": {
+			"page": "shops",
+			"slot": [
+				0,
+				0,
+				2048
+			],
+			"src": "Meshy_AI_The_Hearthside_Armory_20261105_texture_d091cc1f.glb",
+			"size": [
+				4.693,
+				6.247,
+				5.49
+			],
+			"min": [
+				-2.347,
+				0.0,
+				-2.745
+			],
+			"max": [
+				2.347,
+				6.247,
+				2.745
+			],
+			"tris": 11976,
+			"verts": 20094,
+			"src_tris": 2067288,
+			"open_edges": 0,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 21,
+			"markers": {
+				"front": [
+					1.945,
+					2.97,
+					2.615
+				]
+			}
+		},
+		"shop_armor": {
+			"page": "shops",
+			"slot": [
+				2048,
+				0,
+				2048
+			],
+			"src": "Meshy_AI_The_Armorer_s_Hearth_20261105_texture_dad6a581.glb",
+			"size": [
+				4.65,
+				5.887,
+				5.487
+			],
+			"min": [
+				-2.325,
+				0.0,
+				-2.743
+			],
+			"max": [
+				2.325,
+				5.887,
+				2.743
+			],
+			"tris": 11962,
+			"verts": 20096,
+			"src_tris": 2193164,
+			"open_edges": 0,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 31,
+			"markers": {
+				"front": [
+					1.821,
+					2.61,
+					2.573
+				]
+			}
+		},
+		"smithy": {
+			"page": "shops",
+			"slot": [
+				0,
+				2048,
+				2048
+			],
+			"src": "Meshy_AI_Hearthforge_Cottage_20261105_texture_52581b33.glb",
+			"size": [
+				5.7,
+				6.039,
+				6.479
+			],
+			"min": [
+				-2.85,
+				0.0,
+				-3.239
+			],
+			"max": [
+				2.85,
+				6.039,
+				3.239
+			],
+			"tris": 11934,
+			"verts": 19571,
+			"src_tris": 3170300,
+			"open_edges": 0,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 47,
+			"markers": {
+				"front": [
+					2.314,
+					2.398,
+					3.047
+				]
+			}
+		},
+		"warehouse": {
+			"page": "shops",
+			"slot": [
+				2048,
+				2048,
+				2048
+			],
+			"src": "Meshy_AI_The_Golden_Key_Inn_20261105_texture_a2e0df8e.glb",
+			"size": [
+				6.166,
+				5.098,
+				7.484
+			],
+			"min": [
+				-3.083,
+				0.0,
+				-3.742
+			],
+			"max": [
+				3.083,
+				5.098,
+				3.742
+			],
+			"tris": 11986,
+			"verts": 18735,
+			"src_tris": 2054586,
+			"open_edges": 0,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 15,
+			"markers": {
+				"front": [
+					0.875,
+					3.008,
+					3.484
+				]
+			}
+		},
+		"shop_jewelry": {
+			"page": "shops_b",
+			"slot": [
+				0,
+				0,
+				2048
+			],
+			"src": "Meshy_AI_The_Gilded_Gemstone_Boutique_20261105_texture_6942cef3.glb",
+			"size": [
+				3.982,
+				6.567,
+				4.99
+			],
+			"min": [
+				-1.991,
+				0.0,
+				-2.495
+			],
+			"max": [
+				1.991,
+				6.567,
+				2.495
+			],
+			"tris": 11720,
+			"verts": 21152,
+			"src_tris": 2571642,
+			"open_edges": 0,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 102,
+			"markers": {
+				"front": [
+					1.551,
+					3.217,
+					2.364
 				]
 			}
 		},
