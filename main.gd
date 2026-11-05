@@ -112,6 +112,9 @@ var _slots: Array = []
 ## Звери вокруг (Quality.mob_range): живой зверь слота (или null) и ждёт ли слот возрождения после смерти.
 var _slot_mob: Array = []
 var _slot_wait: Array = []
+## Слот пуст из-за дальности (зверь не поставлен или убран «зверями вокруг») — его заполнит _mob_stream. Зверя,
+## убранного иначе (тест, consume без возрождения), «звери вокруг» не ставят — как раньше.
+var _slot_away: Array = []
 var _stream_t := 0.0
 ## Проверка «звери вокруг» — раз в столько секунд игрового времени (по тикам физики: Кардинал детерминирован).
 const MOB_STREAM_STEP := 0.5
@@ -365,6 +368,8 @@ func _build_slots() -> void:
 	_slot_mob.fill(null)
 	_slot_wait.resize(_slots.size())
 	_slot_wait.fill(false)
+	_slot_away.resize(_slots.size())
+	_slot_away.fill(false)
 
 
 func _spawn_slot(i: int) -> void:
@@ -377,7 +382,11 @@ func _spawn_slot(i: int) -> void:
 			return
 	# Звери вокруг: слот дальше дальности — зверя нет, появится, когда герой подойдёт (_mob_stream)
 	if not _slot_in_range(i):
+		if i < _slot_away.size():
+			_slot_away[i] = true
 		return
+	if i < _slot_away.size():
+		_slot_away[i] = false
 	var s: Dictionary = _slots[i]
 	spawn_mob(String(s["type"]), int(s.get("level", -1)), s["pos"], i)
 
@@ -457,7 +466,8 @@ func _mob_stream(delta: float) -> void:
 		var m: Variant = _slot_mob[i]
 		if m == null or not is_instance_valid(m) or (m as Mob).is_dead:
 			_slot_mob[i] = null
-			_spawn_slot(i)
+			if _slot_away[i]:
+				_spawn_slot(i)
 			continue
 		if r <= 0.0:
 			continue
@@ -472,6 +482,7 @@ func _mob_stream(delta: float) -> void:
 func _despawn_slot(i: int) -> void:
 	var mob := _slot_mob[i] as Mob
 	_slot_mob[i] = null
+	_slot_away[i] = true
 	if mob == null or not is_instance_valid(mob):
 		return
 	if mob.gone.is_connected(_on_mob_gone):
@@ -500,6 +511,7 @@ func reset_mobs() -> int:
 			m.queue_free()
 	_slot_mob.fill(null)
 	_slot_wait.fill(false)
+	_slot_away.fill(false)
 	_stream_t = 0.0
 	for i in _slots.size():
 		_spawn_slot(i)
