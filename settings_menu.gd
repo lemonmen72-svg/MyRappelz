@@ -16,7 +16,7 @@ extends RefCounted
 ## Открытие: SettingsMenu.open(hud) (действие HUD "settings_window"), SettingsMenu.open(hud, "ui") — на вкладке.
 ## Кнопки открытого окна для тестов (buttons): вкладки "tab_<graphics|ui|other>", "ui_<0..2>", "quality_<0..3>"
 ## (пресеты), "<настройка>_<вариант>" (например "shadows_2", "aa_1" — Quality.OPTIONS), "fps_<30|45|60>",
-## "guard_<0|1>" (беречь телефон от перегрева), "renderer_<auto|vulkan|compat>" (рендерер), "renderer_restart"
+## "mobs_<0..3>" (звери вокруг: 40 / 60 / 90 м / все), "guard_<0|1>" (беречь телефон от перегрева), "renderer_<auto|vulkan|compat>" (рендерер), "renderer_restart"
 ## (выйти для перезапуска — есть, только если рендерер изменится после перезапуска),
 ## "admin" (AdminPanel,
 ## только у аккаунта Dedok_max), "account" (сменить персонажа / выйти из аккаунта — main.back_to_menu).
@@ -146,6 +146,7 @@ static func _build_graphics(hud: HUD, page: VBoxContainer) -> void:
 		if key == "render":
 			_fps_row(hud, page)
 
+	_mob_rows(hud, page)
 	_guard_rows(hud, page)
 	_renderer_rows(hud, page)
 
@@ -178,6 +179,27 @@ static func _fps_row(hud: HUD, page: VBoxContainer) -> void:
 		_choice(row, "fps_%d" % fps, str(fps), fps == Quality.fps_limit(), func() -> void: SettingsMenu._select_fps(hud, fps))
 	page.add_child(_wrap_label("Не больше стольких кадров. Меньше — телефон меньше греется и дольше держит батарея. "
 		+ "Пресет ставит свой предел (Низкое 30, Среднее 60, Высокое и Максимальное 45).", UiScale.FONT_SMALL, HINT_COLOR))
+
+
+## «Звери вокруг»: дальше выбранного звери острова не существуют, подошёл ближе — появляются (main.mob_stream).
+static func _mob_rows(hud: HUD, page: VBoxContainer) -> void:
+	var row := _row(page)
+	row.add_child(_side_label("Звери вокруг"))
+	var cur := Quality.mob_range_level()
+	for v in Quality.MOB_RANGES.size():
+		var val := v
+		_choice(row, "mobs_%d" % v, String(Quality.MOB_RANGE_LABELS[v]), v == cur,
+			func() -> void: SettingsMenu._select_mobs(hud, val))
+	page.add_child(_wrap_label("Звери дальше этого от героя не просто скрыты — их нет совсем: меньше работы процессору " \
+		+ "и памяти. Подходите ближе — звери появляются на своих местах. «Все» — все звери острова сразу.",
+		UiScale.FONT_SMALL, HINT_COLOR))
+
+
+static func _select_mobs(hud: HUD, v: int) -> void:
+	if hud == null or not is_instance_valid(hud):
+		return
+	Quality.set_mob_range_level(v)
+	open(hud, "graphics", true)
 
 
 ## «Беречь телефон от перегрева» (авто-снижение ThermalGuard).

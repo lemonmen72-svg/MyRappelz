@@ -38,7 +38,10 @@ static func stop(p: Player, h: HUD) -> void:
 ## Возвращает прежние настройки (для restore).
 static func speed_up(bot: TestBot, accel: float) -> Dictionary:
 	var saved := {"time_scale": Engine.time_scale, "steps": Engine.max_physics_steps_per_frame, "fps": Engine.max_fps,
-		"no3d": bot.get_viewport().disable_3d, "ticks": Engine.physics_ticks_per_second, "jitter": Engine.physics_jitter_fix}
+		"no3d": bot.get_viewport().disable_3d, "ticks": Engine.physics_ticks_per_second, "jitter": Engine.physics_jitter_fix,
+		"mob_range": Quality.mob_range_override}
+	# «Звери вокруг» — все звери острова: Кардинал ищет цели по всему острову и сравнивает прогоны
+	Quality.mob_range_override = 3
 	if accel > 1.0:
 		Engine.physics_ticks_per_second = int(saved["ticks"]) * int(round(accel))
 		Engine.physics_jitter_fix = 0.0
@@ -56,6 +59,7 @@ static func restore(bot: TestBot, saved: Dictionary) -> void:
 	Engine.physics_jitter_fix = float(saved.get("jitter", 0.5))
 	Engine.max_physics_steps_per_frame = int(saved.get("steps", 8))
 	Engine.max_fps = int(saved.get("fps", 0))
+	Quality.mob_range_override = int(saved.get("mob_range", -1))
 	if bot != null and is_instance_valid(bot) and bot.is_inside_tree():
 		bot.get_viewport().disable_3d = bool(saved.get("no3d", false))
 

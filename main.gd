@@ -109,6 +109,14 @@ var cam_focus := Vector3.INF
 var screen: Node = null
 
 var _slots: Array = []
+## Звери вокруг (Quality.mob_range): живой зверь слота (или null) и ждёт ли слот возрождения после смерти.
+var _slot_mob: Array = []
+var _slot_wait: Array = []
+var _stream_t := 0.0
+## Проверка «звери вокруг» — раз в столько секунд игрового времени (по тикам физики: Кардинал детерминирован).
+const MOB_STREAM_STEP := 0.5
+## Зверь убирается, когда он дальше дальности + столько (не мигает на границе).
+const MOB_STREAM_HYST := 12.0
 var _rng := RandomNumberGenerator.new()
 var _started := false
 var _autosave := 0.0
@@ -353,6 +361,10 @@ func _build_modules() -> void:
 
 func _build_slots() -> void:
 	_slots = world.mob_slots(_rng)
+	_slot_mob.resize(_slots.size())
+	_slot_mob.fill(null)
+	_slot_wait.resize(_slots.size())
+	_slot_wait.fill(false)
 
 
 func _spawn_slot(i: int) -> void:
@@ -363,6 +375,9 @@ func _spawn_slot(i: int) -> void:
 		var o := n as Mob
 		if o != null and o.slot == i and o.get_parent() == self:
 			return
+	# Звери вокруг: слот дальше дальности — зверя нет, появится, когда герой подойдёт (_mob_stream)
+	if not _slot_in_range(i):
+		return
 	var s: Dictionary = _slots[i]
 	spawn_mob(String(s["type"]), int(s.get("level", -1)), s["pos"], i)
 
@@ -375,6 +390,8 @@ func spawn_mob(type_id: String, lvl: int, pos: Vector3, slot: int = -1) -> Mob:
 	m.setup(type_id, slot, pos, lvl)
 	m.gone.connect(_on_mob_gone)
 	add_child(m)
+	if slot >= 0 and slot < _slot_mob.size():
+		_slot_mob[slot] = m
 	return m
 
 
@@ -393,8 +410,12 @@ func _on_mob_gone(mob: Mob, killed: bool) -> void:
 		# Победа над боссом — эмоция героя
 		if mob.is_boss:
 			player.play_emote("boss")
+	if mob.slot >= 0 and mob.slot < _slot_mob.size() and _slot_mob[mob.slot] == mob:
+		_slot_mob[mob.slot] = null
 	# Звери, поставленные админ-панелью (slot -1), не возрождаются
 	if mob.slot >= 0:
+		if mob.slot < _slot_wait.size():
+			_slot_wait[mob.slot] = true
 		# По тикам физики (process_in_physics): при ускорении Кардинала (×8) кадров отрисовки меньше, чем тиков, и
 		# таймер кадров возрождал зверя на разном тике в двух прогонах — детерминизм расходился
 		get_tree().create_timer(MobData.respawn_time(mob.type_id), true, true).timeout.connect(_respawn_slot.bind(mob.slot, _spawn_gen))
@@ -406,7 +427,66 @@ var _spawn_gen := 0
 
 func _respawn_slot(i: int, gen: int) -> void:
 	if gen == _spawn_gen:
+		if i < _slot_wait.size():
+			_slot_wait[i] = false
 		_spawn_slot(i)
+
+
+## Слот i ближе дальности «Звери вокруг» к герою (или дальность — все звери).
+func _slot_in_range(i: int) -> bool:
+	var r := Quality.mob_range()
+	if r <= 0.0 or player == null or not is_instance_valid(player):
+		return true
+	var sp: Vector3 = (_slots[i] as Dictionary)["pos"]
+	return Vector2(sp.x - player.global_position.x, sp.z - player.global_position.z).length() < r
+
+
+## Звери вокруг (раз в MOB_STREAM_STEP): пустой слот (не ждёт возрождения) ближе дальности — зверь появляется;
+## спокойный зверь (без цели, не идёт домой, не помечен приручением, не цель героя) дальше дальности + MOB_STREAM_HYST
+## — убирается совсем (узел удаляется, слот пуст, возрождения не ждёт). Дальность «Все» — пустые слоты заполняются.
+func _mob_stream(delta: float) -> void:
+	_stream_t -= delta
+	if _stream_t > 0.0 or player == null or not is_instance_valid(player):
+		return
+	_stream_t = MOB_STREAM_STEP
+	var r := Quality.mob_range()
+	var pp := Vector2(player.global_position.x, player.global_position.z)
+	for i in _slots.size():
+		if _slot_wait[i]:
+			continue
+		var m: Variant = _slot_mob[i]
+		if m == null or not is_instance_valid(m) or (m as Mob).is_dead:
+			_slot_mob[i] = null
+			_spawn_slot(i)
+			continue
+		if r <= 0.0:
+			continue
+		var mob := m as Mob
+		var d := Vector2(mob.global_position.x, mob.global_position.z).distance_to(pp)
+		if d > r + MOB_STREAM_HYST and mob.target == null and not mob.returning and not mob.tame_marked \
+				and mob != player.current_target:
+			_despawn_slot(i)
+
+
+## Убрать зверя слота i без смерти и без возрождения (звери вокруг): появится снова, когда герой подойдёт.
+func _despawn_slot(i: int) -> void:
+	var mob := _slot_mob[i] as Mob
+	_slot_mob[i] = null
+	if mob == null or not is_instance_valid(mob):
+		return
+	if mob.gone.is_connected(_on_mob_gone):
+		mob.gone.disconnect(_on_mob_gone)
+	mob.remove_from_group("mobs")
+	mob.queue_free()
+
+
+## Сколько зверей слотов острова сейчас в мире (звери вокруг — для тестов и отчёта).
+func live_slot_mobs() -> int:
+	var n := 0
+	for m in _slot_mob:
+		if m != null and is_instance_valid(m) and not (m as Mob).is_dead:
+			n += 1
+	return n
 
 
 ## Все звери мира заново на своих местах (слоты острова), прежние таймеры возрождения гасятся; звери, поставленные
@@ -418,6 +498,9 @@ func reset_mobs() -> int:
 		if m != null and m.get_parent() == self:
 			m.remove_from_group("mobs")
 			m.queue_free()
+	_slot_mob.fill(null)
+	_slot_wait.fill(false)
+	_stream_t = 0.0
 	for i in _slots.size():
 		_spawn_slot(i)
 	return _slots.size()
@@ -453,6 +536,8 @@ func _physics_process(delta: float) -> void:
 	Util.clock += delta
 	# Спящие дальние звери — проснуться, если игрок подошёл (Mob._set_asleep: сами они шаг физики не делают)
 	Mob.wake_tick(delta)
+	if _started:
+		_mob_stream(delta)
 
 
 func _process(delta: float) -> void:

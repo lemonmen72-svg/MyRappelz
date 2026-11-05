@@ -153,9 +153,12 @@ const VIEW_LEVELS := [
 		"veg_outline": 40.0},
 	{"grass": 38.0, "detail": 65.0, "trees": 125.0, "props": 90.0, "decor": 100.0, "lod": 1.5, "outline": 30.0,
 		"veg_outline": 45.0},
-	{"grass": 50.0, "detail": 85.0, "trees": 150.0, "props": 100.0, "decor": 110.0, "lod": 1.25, "outline": 40.0,
+	# «Далеко» / «Макс.»: отчёт тест-бота 0.33.0 (S24 Ultra, Vulkan) — сцена «Даль» на «Высоком» 29.8 к/с, на
+	# «Максимальном» 25 (3.4 / 4.1 млн треуг., ГП 33 / 39 мс): порог LOD 1.25 → 1.5 и 1.0 → 1.4 px, деревья 150 → 140
+	# и 180 → 165 м — дальние модели проще раньше, вблизи без изменений
+	{"grass": 50.0, "detail": 85.0, "trees": 140.0, "props": 100.0, "decor": 110.0, "lod": 1.5, "outline": 40.0,
 		"veg_outline": 55.0},
-	{"grass": 60.0, "detail": 100.0, "trees": 180.0, "props": 120.0, "decor": 130.0, "lod": 1.0, "outline": 50.0,
+	{"grass": 60.0, "detail": 100.0, "trees": 165.0, "props": 120.0, "decor": 130.0, "lod": 1.4, "outline": 50.0,
 		"veg_outline": 65.0},
 ]
 ## Густота травы по уровню: доля полной густоты, травинок в пучке, доля цветов.
@@ -411,6 +414,41 @@ static func in_background() -> bool:
 	return _background
 
 
+# ---------- Звери вокруг (дальность появления зверей) ----------
+
+## «Звери вокруг» (просьба Максима: «на определённом расстоянии их вообще нет, появляются, когда игрок подходит»):
+## звери слотов острова дальше этого от героя не существуют (main: узлы удаляются, слот пуст), подошёл ближе — зверь
+## создаётся на своём месте слота. Номер варианта — ключ mobs секции [graphics]; 0 м — все звери острова (как раньше).
+const MOB_RANGES := [40.0, 60.0, 90.0, 0.0]
+const MOB_RANGE_LABELS := ["40 м", "60 м", "90 м", "Все"]
+const MOB_RANGE_DEFAULT := 1
+static var _mob_range := -1
+## Тесты: номер варианта поверх выбранного (−1 — нет; test_base ставит 3 — все звери, как ждут прежние тесты).
+static var mob_range_override := -1
+
+
+static func mob_range_level() -> int:
+	if mob_range_override >= 0:
+		return mob_range_override
+	if _mob_range < 0:
+		_mob_range = MOB_RANGE_DEFAULT
+		var cf := ConfigFile.new()
+		if cf.load(PATH) == OK:
+			_mob_range = clampi(int(cf.get_value(SECTION, "mobs", MOB_RANGE_DEFAULT)), 0, MOB_RANGES.size() - 1)
+	return _mob_range
+
+
+## Дальность, м (0 — все звери).
+static func mob_range() -> float:
+	return float(MOB_RANGES[mob_range_level()])
+
+
+static func set_mob_range_level(v: int, save: bool = true) -> void:
+	_mob_range = clampi(v, 0, MOB_RANGES.size() - 1)
+	if save:
+		_save({"mobs": _mob_range})
+
+
 # ---------- Авто-снижение (ThermalGuard) ----------
 
 ## «Беречь телефон от перегрева» (по умолчанию включено; ключ guard секции [graphics]).
@@ -469,6 +507,7 @@ static func reload() -> void:
 	_level = -1
 	_fps = -1
 	_guard = -1
+	_mob_range = -1
 
 
 static func level_name(l: int = -1) -> String:

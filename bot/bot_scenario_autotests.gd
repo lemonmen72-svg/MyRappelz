@@ -433,6 +433,7 @@ func reset_env() -> void:
 	if _settings_moved and FileAccess.file_exists(Quality.PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(Quality.PATH))
 	Quality.reload()
+	Quality.mob_range_override = -1
 	UiScale.reload()
 	Util.refresh_theme()
 	Quality.set_throttle(0)

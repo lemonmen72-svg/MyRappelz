@@ -68,6 +68,8 @@ func _ready() -> void:
 	if lvl > 1:
 		game.level = lvl
 		game.hero["jp"] = HeroSkills.default_jp(lvl)
+	# «Звери вокруг» — все звери острова (тесты ждут их на местах); тест дальности ставит свою в before_start
+	Quality.mob_range_override = 3
 	before_start()
 	main = load("res://main.tscn").instantiate()
 	get_tree().root.add_child.call_deferred(main)

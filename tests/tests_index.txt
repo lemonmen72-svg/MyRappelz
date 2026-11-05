@@ -34,6 +34,7 @@ test_island
 test_jobs
 test_loot
 test_mob_aggro
+test_mob_range
 test_monster_stats
 test_movement_smooth
 test_npc_models
