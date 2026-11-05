@@ -99,6 +99,11 @@ func _process(delta: float) -> void:
 	_leaves.rotation.y = _t * 0.6
 	var k := 1.0 + 0.18 * sin(_t * 3.0)
 	_glow.scale = Vector3(k, k, k)
+
+
+## Подбор — в тике физики, как и движение героя: на телефоне при ускорении Кардинала (×32) в один кадр
+## отрисовки укладывается до 128 тиков — герой успевал подойти и уйти между двумя _process, трава не срывалась.
+func _physics_process(delta: float) -> void:
 	if full_cd > 0.0:
 		full_cd -= delta
 		return

@@ -11,6 +11,9 @@ const INFLATE := 0.55
 ## Препятствие ниже этого над землёй не мешает (ступенька), выше этого основанием — над головой (арка ворот), м.
 const LOW := 0.35
 const HIGH := 2.1
+## Мост: полоса у перил, закрытая для пути (сверх INFLATE), и сколько метров за концом моста середина ещё открыта, м.
+const BRIDGE_RAIL := 0.4
+const BRIDGE_END := 1.0
 
 static var _world_id := 0
 static var _astar: AStarGrid2D = null
@@ -49,7 +52,45 @@ static func ensure(w: IslandWorld, tree: SceneTree) -> void:
 		if body == null or (body.collision_layer & 1) == 0:
 			continue
 		_stamp(a, w, cs)
+	for br in w.bridges:
+		_bridge_lane(a, w, br)
 	_astar = a
+
+
+## Мост — только по середине настила, как идёт игрок: клетки у краёв настила (перила) и склон берега под концом
+## моста закрыты, середина открыта. Без этого путь срезал угол у конца моста по краю настила — герой съезжал
+## на склон русла под настил и застревал в клине между склоном и настилом (отчёт 0.34.0: переносы у (−62, 10),
+## (−53, 2), (−43, −14), (−30, −28) — все у концов мостов).
+static func _bridge_lane(a: AStarGrid2D, w: IslandWorld, br: Dictionary) -> void:
+	var p0: Vector3 = br["a"]
+	var p1: Vector3 = br["b"]
+	var axis := Vector2(p1.x - p0.x, p1.z - p0.z)
+	var length := axis.length()
+	if length < 0.5:
+		return
+	var dir := axis / length
+	var half := float(br.get("width", 4.0)) * 0.5
+	var lane := maxf(0.6, half - INFLATE - BRIDGE_RAIL)
+	var side := half + INFLATE
+	var ext := length * 0.5 + side
+	var mid := Vector2(p0.x + p1.x, p0.z + p1.z) * 0.5
+	var i0 := clampi(int(floorf((mid.x - ext - w.origin.x) / w.step)), 0, w.nx - 1)
+	var i1 := clampi(int(ceilf((mid.x + ext - w.origin.x) / w.step)), 0, w.nx - 1)
+	var j0 := clampi(int(floorf((mid.y - ext - w.origin.y) / w.step)), 0, w.nz - 1)
+	var j1 := clampi(int(ceilf((mid.y + ext - w.origin.y) / w.step)), 0, w.nz - 1)
+	for j in range(j0, j1 + 1):
+		for i in range(i0, i1 + 1):
+			var q := Vector2(w.origin.x + float(i) * w.step, w.origin.y + float(j) * w.step) - Vector2(p0.x, p0.z)
+			var t := q.dot(dir)
+			var s := absf(q.x * dir.y - q.y * dir.x)
+			if t < -BRIDGE_END or t > length + BRIDGE_END or s > side:
+				continue
+			var c := Vector2i(i, j)
+			if s <= lane:
+				a.set_point_solid(c, false)
+			elif t > 0.0 and t < length and not a.is_point_solid(c):
+				a.set_point_solid(c, true)
+				blocked_cells += 1
 
 
 static func _stamp(a: AStarGrid2D, w: IslandWorld, cs: CollisionShape3D) -> void:
