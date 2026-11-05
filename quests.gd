@@ -273,6 +273,27 @@ func npc_mark(npc_id: String) -> String:
 	return best
 
 
+## Значки над всеми NPC сразу: {npc_id: "ready" | "offer" | "active"} (как npc_mark, но состояние каждого задания
+## считается один раз — Npcs.refresh_marks зовёт это раз в MARK_PERIOD: по npc_mark для каждого из 17 жителей
+## выходило 1000 вызовов state(), ≈ 7.5 мс на ПК — заминка каждые 0.3 с).
+func npc_marks() -> Dictionary:
+	var res: Dictionary = {}
+	for k in QuestData.all_ids():
+		var id := String(k)
+		var st := state(id)
+		if st == "ready":
+			res[QuestData.turn_in(id)] = "ready"
+		elif st == "available":
+			var g := QuestData.giver(id)
+			if String(res.get(g, "")) != "ready":
+				res[g] = "offer"
+		elif st == "active":
+			var t := QuestData.turn_in(id)
+			if String(res.get(t, "")) == "":
+				res[t] = "active"
+	return res
+
+
 ## Звери — цели взятых заданий: {вид зверя: наименьший уровень} по невыполненным целям kill (вид задан, с min_level)
 ## и collect с drop_from (квестовая добыча). Цели «любой зверь» (target "") и pet_kill не в счёт — иначе значок
 ## был бы над каждым зверем.

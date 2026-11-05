@@ -425,13 +425,14 @@ func nearest_talker() -> String:
 func refresh_marks() -> void:
 	if main == null or main.get("quests") == null:
 		return
+	var marks: Dictionary = main.quests.npc_marks()
 	for k in nodes:
 		var v: Variant = nodes[k]
 		if not is_instance_valid(v):
 			continue
 		var n := v as Npc
 		if n != null:
-			n.set_mark(main.quests.npc_mark(String(k)))
+			n.set_mark(String(marks.get(String(k), "")))
 	# Красные значки над зверями — целями взятых заданий (новые звери появляются — тоже здесь)
 	main.quests.refresh_mob_marks()
 

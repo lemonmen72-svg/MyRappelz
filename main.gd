@@ -451,6 +451,8 @@ func _on_action(id: String) -> void:
 ## Игровые часы (Util.game_time): шаг физики уже со шкалой времени.
 func _physics_process(delta: float) -> void:
 	Util.clock += delta
+	# Спящие дальние звери — проснуться, если игрок подошёл (Mob._set_asleep: сами они шаг физики не делают)
+	Mob.wake_tick(delta)
 
 
 func _process(delta: float) -> void:

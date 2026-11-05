@@ -45,6 +45,7 @@ const CI_ONLY := {
 	"test_branding": "читает export_presets.cfg и папку данных проекта сборки — в APK их нет",
 	"test_texture_quality": "читает .import и заголовки PNG исходников — в APK их нет (только сжатые текстуры)",
 	"test_movement_smooth": "мерит дрожь движения при ровно 60 кадрах/с (CI: --fixed-fps 60 без экрана)",
+	"test_cardinal_story": "сам запускает тест-бота на долгое прохождение (режим «Кардинал: прохождение острова» есть на вкладке)",
 }
 ## Проверяют модели и текстуры из пакета ресурсов: без всех частей — пропуск.
 const NEED_PACK := ["test_hero_models", "test_npc_models", "test_props", "test_handheld", "test_pet_stages",

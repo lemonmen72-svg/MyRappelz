@@ -14,6 +14,7 @@ test_branding
 test_bridge
 test_cardinal
 test_cardinal_det
+test_cardinal_story
 test_centaur
 test_character_model
 test_combat

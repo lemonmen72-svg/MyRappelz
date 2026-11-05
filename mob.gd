@@ -26,6 +26,9 @@ signal gone(mob: Mob, killed: bool)
 ## Удар по площади каменного стража: перезарядка, замах, радиус, множитель атаки.
 ## Дальше этого расстояния от игрока зверь «спит»: не думает, не анимируется и не рисуется.
 const SLEEP_DIST := 55.0
+## Дальность сна сейчас (Кардинал «Прохождение острова» на время прогона ставит меньше — дальние звери не бродят,
+## шаг физики дешевле; обычная игра — SLEEP_DIST).
+static var sleep_dist := SLEEP_DIST
 const SLAM_CD := 8.0
 const SLAM_WINDUP := 0.9
 const SLAM_RADIUS := 4.5
@@ -121,6 +124,12 @@ var _route := IslandWorld.Route.new()
 ## клипы шага и покоя переключались, зверь у героя дёргался.
 const CHASE_SLACK := 0.35
 var _closing := false
+## Путь домой: ближе всего к дому за этот возврат и сколько секунд без продвижения (застрял — домой сразу).
+var _ret_best := INF
+var _ret_t := 0.0
+const RETURN_STUCK := 4.0
+## Где зверь остановился на земле (стоит без движения — шаг физики пропускается; INF — идёт или в воздухе).
+var _settled_at := Vector3.INF
 var _model: Node3D
 ## Модель из файла (или null — модель из примитивов).
 var _asset: CreatureAsset = null
@@ -208,16 +217,68 @@ func _update_sleep(delta: float) -> void:
 	if _sleep_check > 0.0:
 		return
 	_sleep_check = 0.5
-	var far := false
-	if target == null and not returning and not tame_marked:
-		var p := get_tree().get_first_node_in_group("player") as Node3D
-		if p != null:
-			far = global_position.distance_squared_to(p.global_position) > SLEEP_DIST * SLEEP_DIST
-	if far != _asleep:
-		_asleep = far
-		visible = not far
-		if _asset != null:
-			_asset.set_sleeping(far)
+	_set_asleep(_far_from_player())
+
+
+## Спать ли: игрок дальше sleep_dist, зверь не в погоне, не идёт домой, без метки приручения.
+func _far_from_player() -> bool:
+	if target != null or returning or tame_marked or not is_inside_tree():
+		return false
+	var p := get_tree().get_first_node_in_group("player") as Node3D
+	return p != null and global_position.distance_squared_to(p.global_position) > sleep_dist * sleep_dist
+
+
+## Уснуть / проснуться. Спящий выключен целиком (process_mode DISABLED: ни своих _process и _physics_process, ни
+## узлов модели, тело вынуто из физического пространства — disable_mode REMOVE; на острове ≈ 190 спящих из 198:
+## ≈ 1 мс на тик физики на ПК, замер Кардинала 0.33); будит его wake_tick раз в 0.5 с. Со зверями слоя 2 ничто не
+## сталкивается (маска героя, питомцев и зверей — 1), так что вынутое тело ничего не меняет.
+func _set_asleep(on: bool) -> void:
+	if on == _asleep:
+		return
+	_asleep = on
+	visible = not on
+	if _asset != null:
+		_asset.set_sleeping(on)
+	process_mode = Node.PROCESS_MODE_DISABLED if on else Node.PROCESS_MODE_INHERIT
+	if on:
+		_sleepers.append(self)
+	else:
+		_sleepers.erase(self)
+
+
+## Спящие звери (будит wake_tick).
+static var _sleepers: Array[Mob] = []
+
+
+## Шаг физики мира (main._physics_process): у каждого спящего зверя свой отсчёт _sleep_check, как у бодрствующего
+## (раз в 0.5 с от того тика, когда он уснул: прогоны Кардинала с одним seed совпадают), — подошёл игрок (или у зверя
+## появилась цель — ударили издалека) — проснулся.
+static func wake_tick(delta: float) -> void:
+	var woke: Array[Mob] = []
+	for m in _sleepers:
+		if not is_instance_valid(m) or m.is_queued_for_deletion():
+			woke.append(m)
+			continue
+		m._sleep_check -= delta
+		if m._sleep_check > 0.0:
+			continue
+		m._sleep_check = 0.5
+		if m.is_dead or not m._far_from_player():
+			woke.append(m)
+	for m in woke:
+		if is_instance_valid(m) and not m.is_queued_for_deletion():
+			m._set_asleep(false)
+		else:
+			_sleepers.erase(m)
+
+
+func _enter_tree() -> void:
+	if _asleep and not _sleepers.has(self):
+		_sleepers.append(self)
+
+
+func _exit_tree() -> void:
+	_sleepers.erase(self)
 
 
 func _process(delta: float) -> void:
@@ -276,15 +337,34 @@ func _physics_process(delta: float) -> void:
 	if slow_time > 0.0:
 		spd *= 1.0 - slow_frac
 
+	if not returning:
+		_ret_best = INF
+		_ret_t = 0.0
 	if returning:
 		# Возвращается домой и лечится
 		var to_home := home - global_position
 		to_home.y = 0.0
 		if to_home.length() < 1.5:
 			returning = false
+			_ret_best = INF
 		else:
 			dir = _route.dir_to(global_position, home, delta)
 			spd = speed * 1.5
+			# Застрял по пути домой (скала, ограда: Route обходит только реку) — RETURN_STUCK с без продвижения —
+			# сразу дома. Раньше такой зверь лечился 25 %/с и не отвечал на удары, пока не вернётся, — то есть
+			# навсегда (Кардинал 0.33: Вожак анатем у (−73, 33), в 15 м от логова, — задание «Страж логова» не сдать)
+			if to_home.length() < _ret_best - 0.3:
+				_ret_best = to_home.length()
+				_ret_t = 0.0
+			else:
+				_ret_t += delta
+				if _ret_t > RETURN_STUCK:
+					global_position = home
+					velocity = Vector3.ZERO
+					returning = false
+					_ret_best = INF
+					_ret_t = 0.0
+					dir = Vector3.ZERO
 		_heal(delta, 0.25)
 	elif target != null:
 		var to := target.global_position - global_position
@@ -349,9 +429,16 @@ func _physics_process(delta: float) -> void:
 		velocity.y = -1.0
 	else:
 		velocity.y -= 25.0 * delta
-	var prev := global_position
-	move_and_slide()
-	IslandWorld.constrain(self, prev)
+	# Стоит на земле на том же месте, где его оставил прошлый шаг, и не идёт — шаг физики ничего не изменил бы
+	# (скорость только вниз, в землю): move_and_slide коробки зверя по рельефу — ≈ 0.25 мс, а стоят ⅔ бодрствующих
+	# зверей (замер Кардинала 0.33: 30 бодрствующих — 9 мс на тик физики)
+	if dir == Vector3.ZERO and is_on_floor() and global_position == _settled_at:
+		velocity = Vector3(0.0, -1.0, 0.0)
+	else:
+		var prev := global_position
+		move_and_slide()
+		IslandWorld.constrain(self, prev)
+		_settled_at = global_position if dir == Vector3.ZERO and is_on_floor() else Vector3.INF
 
 	if face.length() < 0.01:
 		face = dir

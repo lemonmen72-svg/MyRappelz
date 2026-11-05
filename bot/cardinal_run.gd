@@ -116,18 +116,8 @@ func begin() -> void:
 	var p := bot.player()
 	seed(seed_value)
 	Combat.reseed(seed_value)
-	_saved = {"time_scale": Engine.time_scale, "steps": Engine.max_physics_steps_per_frame, "fps": Engine.max_fps,
-		"no3d": bot.get_viewport().disable_3d, "ticks": Engine.physics_ticks_per_second, "jitter": Engine.physics_jitter_fix}
-	if accel > 1.0:
-		# Точность как при ×1: тиков физики в accel раз больше, шаг тика тот же 1/60 с (time_scale / ticks). Раньше
-		# (×4) рос сам шаг — тик был вчетверо крупнее
-		Engine.physics_ticks_per_second = int(_saved["ticks"]) * int(round(accel))
-		# Без «сглаживания» числа тиков в кадре: оно зависит от накопленной фазы, а она у второго прогона другая
-		Engine.physics_jitter_fix = 0.0
-		Engine.time_scale = accel
-		Engine.max_physics_steps_per_frame = maxi(8, int(ceil(accel * 4.0)))
-		Engine.max_fps = 0
-		bot.get_viewport().disable_3d = true
+	# Точность как при ×1: тиков физики в accel раз больше, шаг тика тот же 1/60 с (CardinalMove.speed_up)
+	_saved = CardinalMove.speed_up(bot, accel)
 	var w := IslandWorld.current
 	for z in w.cfg.get("mob_zones", []):
 		var zd: Dictionary = z
@@ -328,7 +318,7 @@ func _alive(m: Mob) -> bool:
 
 
 func _flat(a: Vector3, b: Vector3) -> float:
-	return Vector2(a.x - b.x, a.z - b.z).length()
+	return CardinalMove.flat(a, b)
 
 
 func _need_rest(p: Player) -> bool:
@@ -364,23 +354,11 @@ func _pick_target(p: Player) -> Mob:
 
 
 func _walk(p: Player, h: HUD, to: Vector3, dt: float) -> void:
-	var pos := p.global_position
-	var dir := _nav.dir_to(pos, to, dt)
-	if dir.length() < 0.01:
-		dir = Vector3(to.x - pos.x, 0.0, to.z - pos.z).normalized()
-	var yaw := float(bot.main.get("cam_yaw"))
-	var mv := Vector3(dir.x, 0.0, dir.z).rotated(Vector3.UP, -yaw)
-	h.move_vec = Vector2(mv.x, mv.z)
-	# Сразу и герою — в этом же тике физики (main._process переносит джойстик в героя раз в кадр отрисовки: на
-	# ускорении ×8 это разные тики, и два прогона с одним seed расходились)
-	p.move_input = Vector2(dir.x, dir.z) if dir.length() >= 0.15 else Vector2.ZERO
+	CardinalMove.walk(bot, _nav, p, h, to, dt)
 
 
 func _stop_move(h: HUD) -> void:
-	h.move_vec = Vector2.ZERO
-	var p := bot.player()
-	if p != null:
-		p.move_input = Vector2.ZERO
+	CardinalMove.stop(bot.player(), h)
 
 
 func _on_kill(p: Player) -> void:
@@ -437,12 +415,7 @@ func _end(reason: String) -> void:
 	var p := bot.player()
 	if p != null and p.message.is_connected(_on_message):
 		p.message.disconnect(_on_message)
-	Engine.time_scale = float(_saved.get("time_scale", 1.0))
-	Engine.physics_ticks_per_second = int(_saved.get("ticks", 60))
-	Engine.physics_jitter_fix = float(_saved.get("jitter", 0.5))
-	Engine.max_physics_steps_per_frame = int(_saved.get("steps", 8))
-	Engine.max_fps = int(_saved.get("fps", 0))
-	bot.get_viewport().disable_3d = bool(_saved.get("no3d", false))
+	CardinalMove.restore(bot, _saved)
 	finish = _snapshot()
 	# Где закончил: состояние, цель, звери рядом (для разбора прогонов без убийств)
 	var near := _zone_alive()
@@ -461,16 +434,7 @@ func _end(reason: String) -> void:
 ## Сколько игровых секунд отдыхать до profile.rest_until по формуле восстановления Player: статы и питомец (hp_regen,
 ## aura_regen) всегда, отдых — max_hp × REST_REGEN после regen_delay.
 func rest_predict(p: Player) -> float:
-	var target := float(p.max_hp) * float(profile["rest_until"])
-	var h0 := float(p.hp)
-	if h0 >= target:
-		return 0.0
-	var stat := maxf(0.0, p.hp_regen + p.aura_regen)
-	var delay := maxf(0.0, p.regen_delay)
-	var h1 := h0 + stat * delay
-	if h1 >= target:
-		return (target - h0) / maxf(stat, 0.001)
-	return delay + (target - h1) / (float(p.max_hp) * Player.REST_REGEN + stat)
+	return CardinalMove.rest_predict(p, float(profile["rest_until"]))
 
 
 ## Кадр отдыха: буст при безопасности, откат при опасности.

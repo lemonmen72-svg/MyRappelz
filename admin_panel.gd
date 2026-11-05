@@ -977,6 +977,8 @@ static func _build_bot(main: Node, body: VBoxContainer) -> void:
 		(buttons["bot_mode_" + mid] as Button).disabled = not avail
 	if bot_mode == "sections":
 		_build_bot_sections(main, body)
+	elif bot_mode == "cardinal_story":
+		_build_bot_accel(main, body)
 	var running := TestBot.is_running()
 	_head(body, "Состояние: " + TestBot.status_text())
 	var r := _row(body)
@@ -1018,6 +1020,22 @@ static func _build_bot_sections(main: Node, body: VBoxContainer) -> void:
 		var sid := String(sd["id"])
 		_choice(g, "bot_sec_" + sid, "%s · %s" % [String(sd["name"]), TestBot.clock(float(sd.get("full", 30)))], cur.has(sid),
 			func() -> void: AdminPanel.toggle_bot_section(main, sid))
+
+
+## «Кардинал: прохождение острова»: ускорение прогона ×8 / ×16 / ×32 (BotScenarioCardinalStory.accel).
+static func _build_bot_accel(main: Node, body: VBoxContainer) -> void:
+	_head(body, "Ускорение прохождения (шаг физики тот же 1/60 с, без 3D)")
+	var r := _row(body)
+	for k in BotScenarioCardinalStory.ACCEL_CHOICES:
+		var kk := int(k)
+		_choice(r, "bot_accel_%d" % kk, "×%d" % kk, roundi(BotScenarioCardinalStory.accel) == kk,
+			func() -> void: AdminPanel.set_bot_accel(main, kk))
+
+
+static func set_bot_accel(main: Node, k: int) -> void:
+	BotScenarioCardinalStory.accel = float(k)
+	if is_open(main):
+		open(main)
 
 
 static func toggle_bot_section(main: Node, sec_id: String) -> void:
