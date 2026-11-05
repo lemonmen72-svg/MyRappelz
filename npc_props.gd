@@ -55,6 +55,12 @@ const ITEMS := {
 		{"item": "npc_quiver", "at": "chest", "pos": Vector3(-0.04, 1.08, -0.15), "up": Vector3(-0.4, 1.0, -0.12),
 			"front": Vector3(0, 0, -1)},
 	],
+	"buffer": [
+		{"item": "npc_sun_staff", "at": "hand_r", "up": Vector3(0.06, 1.0, 0.05), "front": Vector3(0, 0, 1), "ground": true},
+		{"item": "npc_sun_lantern", "at": "hand_l", "up": Vector3(0, 1.0, 0), "front": Vector3(0, 0, 1)},
+		{"item": "npc_sun_grimoire", "at": "hips", "pos": Vector3(0.2, 0.93, 0.03), "up": Vector3(0, 1.0, 0),
+			"front": Vector3(1, 0, 0)},
+	],
 }
 
 

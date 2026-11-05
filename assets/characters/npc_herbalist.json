@@ -1,0 +1,210 @@
+{
+	"source": "Meshy_AI_Herbalist_Elf_Character_Design_20261105_animated_mixamo_All_animation.glb",
+	"height": 1.72,
+	"bounds": [
+		[
+			-0.4139,
+			0.0,
+			-0.2191
+		],
+		[
+			0.4139,
+			1.72,
+			0.2187
+		]
+	],
+	"tris": 49999,
+	"verts": 45891,
+	"bones": {
+		"root": "mixamorig_Hips",
+		"hips": "mixamorig_Hips",
+		"chest": "mixamorig_Spine2",
+		"neck": "mixamorig_Neck",
+		"head": "mixamorig_Head",
+		"head_end": "mixamorig_HeadTop_End",
+		"hand_r": "mixamorig_RightHand",
+		"hand_l": "mixamorig_LeftHand",
+		"foot_r": "mixamorig_RightFoot",
+		"foot_l": "mixamorig_LeftFoot",
+		"spine": [
+			"mixamorig_Spine",
+			"mixamorig_Spine1",
+			"mixamorig_Spine2"
+		],
+		"arms": {
+			"L": [
+				"mixamorig_LeftShoulder",
+				"mixamorig_LeftArm",
+				"mixamorig_LeftForeArm",
+				"mixamorig_LeftHand",
+				"mixamorig_LeftHandMiddle4"
+			],
+			"R": [
+				"mixamorig_RightShoulder",
+				"mixamorig_RightArm",
+				"mixamorig_RightForeArm",
+				"mixamorig_RightHand",
+				"mixamorig_RightHandMiddle4"
+			]
+		},
+		"legs": {
+			"L": [
+				"mixamorig_LeftUpLeg",
+				"mixamorig_LeftLeg",
+				"mixamorig_LeftFoot",
+				"mixamorig_LeftToeBase",
+				"mixamorig_LeftToe_End"
+			],
+			"R": [
+				"mixamorig_RightUpLeg",
+				"mixamorig_RightLeg",
+				"mixamorig_RightFoot",
+				"mixamorig_RightToeBase",
+				"mixamorig_RightToe_End"
+			]
+		},
+		"fingers": {
+			"L": {},
+			"R": {}
+		}
+	},
+	"grip_r": {
+		"pos": [
+			-0.0185,
+			0.1289,
+			-0.0119
+		],
+		"dir": [
+			-0.5348,
+			0.1483,
+			0.8318
+		]
+	},
+	"grip_l": {
+		"pos": [
+			0.0184,
+			0.1234,
+			-0.0121
+		],
+		"dir": [
+			0.5424,
+			0.1483,
+			0.827
+		]
+	},
+	"crossbow_rot": [
+		0.597,
+		-0.235,
+		0.1769,
+		0.7464
+	],
+	"face": [
+		0.0007,
+		0.0937,
+		0.0873
+	],
+	"walk_speed": 1.4,
+	"run_speed": 4.2,
+	"clips": {
+		"Idle": {
+			"length": 2.5,
+			"loop": true,
+			"source": "ual1:Idle_Loop + женская пластика (idle)"
+		},
+		"Walking": {
+			"length": 0.82,
+			"loop": true,
+			"source": "ual1:Walk_Loop + женская пластика (walk)"
+		},
+		"Running": {
+			"length": 0.959,
+			"loop": true,
+			"source": "ual1:Jog_Fwd_Loop + женская пластика (run)"
+		},
+		"Sword_Idle": {
+			"length": 1.667,
+			"loop": true,
+			"source": "ual1:Sword_Idle + женская пластика (stance)"
+		},
+		"Crossbow_Idle": {
+			"length": 1.667,
+			"loop": true,
+			"source": "ual1:Pistol_Idle_Loop + женская пластика (stance)"
+		},
+		"Wave": {
+			"length": 2.2,
+			"loop": false,
+			"source": "процедурный (поверх ual1:Idle_Loop + женская пластика (idle))"
+		},
+		"Sword_Slash": {
+			"length": 1.4,
+			"loop": false,
+			"source": "ual2:Sword_Regular_A+Sword_Regular_A_Rec"
+		},
+		"Sword_Attack": {
+			"length": 1.533,
+			"loop": false,
+			"source": "ual1:Sword_Attack"
+		},
+		"Sword_Combo": {
+			"length": 3.0,
+			"loop": false,
+			"source": "ual2:Sword_Regular_Combo"
+		},
+		"Sword_Heavy_Combo": {
+			"length": 4.333,
+			"loop": false,
+			"source": "ual2:Sword_Heavy_Combo"
+		},
+		"Sword_Dash": {
+			"length": 1.567,
+			"loop": false,
+			"source": "ual2:Sword_Dash"
+		},
+		"Sword_Block": {
+			"length": 1.233,
+			"loop": false,
+			"source": "ual2:Sword_Block"
+		},
+		"Dodge": {
+			"length": 1.467,
+			"loop": false,
+			"source": "ual1:Roll"
+		},
+		"Hit": {
+			"length": 0.333,
+			"loop": false,
+			"source": "ual1:Hit_Chest"
+		},
+		"Death": {
+			"length": 2.4,
+			"loop": false,
+			"source": "ual1:Death01"
+		},
+		"Cast": {
+			"length": 1.467,
+			"loop": false,
+			"source": "ual1:Spell_Simple_Enter+Spell_Simple_Shoot+Spell_Simple_Exit"
+		},
+		"Pickup": {
+			"length": 2.5,
+			"loop": false,
+			"source": "ual2:Farm_Harvest"
+		},
+		"Sword_Slash_B": {
+			"length": 1.567,
+			"loop": false,
+			"source": "ual2:Sword_Regular_B+Sword_Regular_B_Rec"
+		},
+		"Sword_Slash_C": {
+			"length": 2.0,
+			"loop": false,
+			"source": "ual2:Sword_Regular_C"
+		},
+		"Crossbow_Shoot": {
+			"length": 0.633,
+			"loop": false,
+			"source": "ual1:Pistol_Shoot"
+		}
+	}
+}

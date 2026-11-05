@@ -639,7 +639,7 @@ func _check_files() -> void:
 		check(Assets.part_of(p.get_basename() + ".png") == Assets.part_of(p), "%s: текстура в той же части" % f)
 		check(not Assets.is_packed(p.get_basename() + ".json"), "%s: роли костей (.json) — в APK" % f)
 		if String(f).begins_with("npc_"):
-			check(Assets.part_of(p) == "npcs", "%s — в части npcs" % f)
+			check(["npcs", "npcs_b"].has(Assets.part_of(p)), "%s — в части жителей (%s)" % [f, Assets.part_of(p)])
 		if not fallback:
 			heroes += 1
 	check(heroes >= 33, "в пакете моделей героев и жителей: %d" % heroes)

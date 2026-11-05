@@ -153,6 +153,13 @@ ITEMS = {
 		grip=0.9),
 	"npc_scroll": dict(src="Sealed_Shadow_Scroll", kind="npc", frame="blade", length=0.3, tris=8500, tex=TEX_ONE,
 		grip=0.5),
+	# Сестра Аделина (баффер, 0.32): посох с солнечным диском, фонарь благословения (держат за кольцо сверху),
+	# молитвенник на поясе
+	"npc_sun_staff": dict(src="Sun_Staff", kind="npc", frame="blade", length=1.7, tris=8500, tex=TEX_BIG, grip=0.5),
+	"npc_sun_lantern": dict(src="Sun_Lantern", kind="npc", frame="blade", length=0.45, tris=8500, tex=TEX_ONE,
+		grip=0.94),
+	"npc_sun_grimoire": dict(src="Sun_Grimoire", kind="npc", frame="book", length=0.26, tris=8500, tex=TEX_ONE,
+		grip=0.5),
 }
 
 # Арбалет: ложе на столько выше точки хвата (кулак под ложем, как у процедурного _crossbow_mesh)

@@ -17,6 +17,7 @@ const HOMES := {
 	"elder_human": "human_village", "elder_light": "light_elf_village", "elder_dark": "dark_elf_village",
 	"hunter": "tent_w1", "merc_chief": "cave",
 	"fisher": "port", "veteran": "tent_e", "herbalist": "light_elf_village", "scribe": "town",
+	"buffer": "town",
 }
 ## Особые детали модели: id → [вид оружия, узлы].
 const PARTS := {
@@ -33,6 +34,7 @@ const PARTS := {
 	"jeweler": ["", ["Necklace", "Cape"]],
 	"rare_merchant": ["", []],
 	"fisher": ["", []], "veteran": ["", []], "herbalist": ["", []], "scribe": ["", []],
+	"buffer": ["", []],
 }
 ## Лавки города: житель → ассортимент (ItemData), всё — 1-го ранга.
 const SHOPS := {
@@ -107,6 +109,10 @@ func run_step() -> void:
 				if d.has("action"):
 					# Пункт-окно: «Склад» у кладовщика, «Закалка» у кузнеца
 					_press(key)
+					if String(d["action"]) == "bless":
+						# Благословение — без окна: усиление сразу, диалог остаётся (подробно — _blessing)
+						check(Blessing.active(main.player) and npcs.is_dialog_open(), "%s: «%s» — усиление" % [id, d["label"]])
+						continue
 					var opened: bool = main.economy.is_forge_open() if String(d["action"]) == "forge" \
 						else main.economy.is_storage_open()
 					check(opened and not npcs.is_dialog_open(), "%s: «%s» открывает окно (%s)" % [id, d["label"], d["action"]])
@@ -200,10 +206,38 @@ func run_step() -> void:
 			check(npcs.npc("sage").mark_text() == "!", "у мудреца остались задания — «!»")
 			check(main.quests.state("kirk_first_card") == "available", "цепочка Кирка не задета")
 			npcs.close_dialog()
+			_blessing()
 			ok_done()
 
 
 # ---------- Проверки ----------
+
+## Сестра Аделина (баффер): «Благословение» — даром до 20 ур., дальше 100 зол. за уровень; усиление на 30 мин.
+func _blessing() -> void:
+	var p: Player = main.player
+	var npcs: Npcs = main.npcs
+	_stand_by("buffer", 1.8)
+	npcs.talk_to("buffer")
+	check(npcs.dialog_npc == "buffer" and npcs.buttons.has("opt_bless"), "у Сестры Аделины — «Благословение»")
+	check((npcs.buttons["opt_bless"] as Button).text.contains("даром"), "новичку даром: " + (npcs.buttons["opt_bless"] as Button).text)
+	p.timed_bonus.erase(Blessing.ID)
+	p.recalc_stats()
+	var atk0: float = p.atk
+	var g0: int = game.gold
+	_press("opt_bless")
+	check(Blessing.active(p) and game.gold == g0 and p.atk > atk0, "благословение даром: атака %.1f → %.1f" % [atk0, p.atk])
+	check(p.effects.has("buff:" + Blessing.ID), "значок благословения у полоски HP")
+	check(Blessing.price(19) == 0 and Blessing.price(30) == 3000 and Blessing.label(30).contains("3000"), "цена: с 20 ур. — 100 зол. за уровень")
+	var lvl0: int = game.level
+	game.level = 30
+	game.gold = 100
+	check(Blessing.give(p).contains("Не хватает золота") and game.gold == 100, "без золота — отказ")
+	game.gold = 5000
+	check(Blessing.give(p) == "" and game.gold == 2000, "на 30 ур. — за 3000 зол.")
+	game.level = lvl0
+	game.gold = g0
+	npcs.close_dialog()
+
 
 func _unit_data() -> void:
 	var names := {}
@@ -236,7 +270,7 @@ func _unit_data() -> void:
 		# Дела, которых ещё нет, — с пометкой «скоро» (кузница, подземелье); у мудреца, кладовщика (склад), старост
 		# и охотницы (задания) пункты рабочие
 		check(soon >= 1 or ["sage", "storekeeper", "smith", "elder_human", "elder_light", "elder_dark", "hunter", "fisher",
-			"veteran", "herbalist", "scribe"].has(id)
+			"veteran", "herbalist", "scribe", "buffer"].has(id)
 			or SHOPS.has(id), "%s: будущее дело с пометкой «скоро»" % id)
 		check(NpcData.is_trader(id) == SHOPS.has(id), "%s: торгует — только лавка" % id)
 	check(String(NpcData.talk_entry("sage", "profession").get("text", "")).contains("десятого уровня")

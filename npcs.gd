@@ -621,6 +621,9 @@ func _on_npc_action(action: String) -> void:
 			close_dialog()
 			if main.get("pets") != null:
 				main.pets.open_evolve()
+		"bless":
+			var err := Blessing.give(main.player)
+			_msg(err if err != "" else "%s: %s — 30 мин" % [Blessing.TITLE, Blessing.bonus_text()])
 
 
 func _on_trade() -> void:

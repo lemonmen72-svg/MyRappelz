@@ -3,7 +3,7 @@ extends "res://tests/test_base.gd"
 ## каждый файл грузится (одна поверхность, текстура), размер — как в handheld.json, длина — как у вида, оси по
 ## контракту (начало — хват внутри рукояти, ось +Y, лезвие топора к +X, тетива к +Z, арбалет вперёд −Z, щит лицом
 ## +Z за ручкой, книги корешком к −X); у двуручных — точка второй руки ниже хвата; у каждого вида оружия ItemData
-## и у каждого оружия-предмета есть модель из файла; у жителей — все 10 предметов (id — договорённость с моделями
+## и у каждого оружия-предмета есть модель из файла; у жителей — все 13 предметов (id — договорённость с моделями
 ## жителей). В руке героя из файла — меш из файла (не процедурный), пары — один файл в обеих руках, щит — в левой
 ## с поворотом рамки; без файлов (Handheld.force_missing) — прежние процедурные меши. У игрока в руках — модель
 ## надетого предмета.
@@ -19,10 +19,11 @@ const LENGTHS := {
 	"weapon_shield_r2": 0.8,
 	"npc_longbow": 1.4, "npc_grimoire": 0.3, "npc_tome": 0.3, "npc_cane": 0.95, "npc_wand": 0.45,
 	"npc_hammer": 0.6, "npc_antlerstaff": 1.7, "npc_quiver": 0.7, "npc_keys": 0.2, "npc_scroll": 0.3,
+	"npc_sun_staff": 1.7, "npc_sun_lantern": 0.45, "npc_sun_grimoire": 0.26,
 }
 ## Предметы жителей (договорённость с моделями жителей: id не менять).
 const NPC_IDS := ["npc_grimoire", "npc_cane", "npc_wand", "npc_longbow", "npc_hammer", "npc_quiver", "npc_keys",
-	"npc_scroll", "npc_tome", "npc_antlerstaff"]
+	"npc_scroll", "npc_tome", "npc_antlerstaff", "npc_sun_staff", "npc_sun_lantern", "npc_sun_grimoire"]
 ## Двуручные (у них точка второй руки grip2).
 const TWO_HANDED := ["weapon_sword_2h_r1", "weapon_mace_2h_r1", "weapon_axe_2h_r1", "weapon_staff_2h_r1",
 	"weapon_spear_r1", "weapon_sword_2h_r2", "weapon_mace_2h_r2", "weapon_axe_2h_r2", "weapon_staff_2h_r2",

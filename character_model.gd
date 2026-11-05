@@ -788,6 +788,17 @@ static func scribe_spec() -> Dictionary:
 	}
 
 
+## Сестра Аделина, Благословляющая (баффер, город; запасная модель — без пакета ресурсов): светло-русая коса,
+## ряса цвета слоновой кости с золотом, обруч.
+static func buffer_spec() -> Dictionary:
+	return {
+		"skin": Color(0.98, 0.86, 0.76), "hair": Color(0.82, 0.68, 0.46), "hair_style": "braid",
+		"eyes": Color(0.5, 0.34, 0.2), "eye_style": "smile", "ears": false,
+		"outfit": "lady", "main": Color(0.95, 0.91, 0.8), "second": Color(0.86, 0.68, 0.3),
+		"accent": Color(0.95, 0.75, 0.3), "weapon": "", "girth": 0.92, "circlet": true,
+	}
+
+
 ## Путь модели NPC из файла (Meshy с родным скелетом, tools/prepare_npcs.py → prepare_hero.py: клипы Idle, Wave и
 ## другие, роли костей в npc_<id>.json; в пакете ресурсов — Assets.exists): есть — грузится вместо примитивов,
 ## предметы в руках вешает NpcProps.
@@ -834,6 +845,8 @@ static func npc_spec(npc_id: String) -> Dictionary:
 			s = herbalist_spec()
 		"scribe":
 			s = scribe_spec()
+		"buffer":
+			s = buffer_spec()
 		_:
 			s = merchant_spec()
 	var asset := npc_asset(npc_id)

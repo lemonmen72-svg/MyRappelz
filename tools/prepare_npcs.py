@@ -42,6 +42,12 @@ NPCS = {
 	"npc_weaponsmith": ("m", 1.84),
 	"npc_armorer": ("f", 1.74),
 	"npc_jeweler": ("f", 1.70),
+	# 0.32: жители заданий (рыбак — вязаная шапка, ветеран — латы на плечах, травница — эльфийские уши) и баффер
+	# «Сестра Аделина» (жрица храма света, коса на затылке)
+	"npc_fisher": ("m", 1.82),
+	"npc_veteran": ("m", 1.84),
+	"npc_herbalist": ("f", 1.72),
+	"npc_buffer": ("f", 1.70),
 }
 ## Бюджет меша жителя (у героев — prepare_hero.TRIS 70 тыс.): исходник меньше — целиком.
 NPC_TRIS = 50000
@@ -52,6 +58,22 @@ def _load(name: str):
 	mod = importlib.util.module_from_spec(spec)
 	spec.loader.exec_module(mod)
 	return mod
+
+
+def sanitize_names(out: str, cid: str) -> None:
+	"""Двоеточие в именах костей (риг Mixamo из Meshy: «mixamorig:Hips») импорт Godot заменяет на «_» — роли костей
+	в <id>.json не нашлись бы. Замена байт в байт (длина JSON-блока GLB та же)."""
+	for ext in (".glb", ".json"):
+		p = os.path.join(out, cid + ext)
+		if not os.path.exists(p):
+			continue
+		with open(p, "rb") as f:
+			b = f.read()
+		nb = b.replace(b"mixamorig:", b"mixamorig_")
+		if nb != b:
+			with open(p, "wb") as f:
+				f.write(nb)
+			print("   имена костей: «mixamorig:» → «mixamorig_» (%s)" % os.path.basename(p))
 
 
 def main() -> None:
@@ -74,6 +96,7 @@ def main() -> None:
 		sex, h = NPCS[cid]
 		if sex == "m":
 			ok = ph.build(cid, path, h, args.out, args.preview, NPC_TRIS)["ok"] and ok
+			sanitize_names(args.out, cid)
 			continue
 		# Женщина: id с «_f» (женская пластика), затем переименование в npc_<id>
 		tmp = tempfile.mkdtemp(prefix=".tmp_npc_", dir=args.out)
@@ -89,6 +112,7 @@ def main() -> None:
 				if ext == ".png.import" or not os.path.exists(p):
 					with open(p, "w") as f:
 						f.write(tpl.format(name=cid))
+			sanitize_names(args.out, cid)
 		finally:
 			shutil.rmtree(tmp, ignore_errors=True)
 	print("ИТОГ (жители): %s" % ("всё в порядке" if ok else "есть замечания (см. ПЛОХО выше)"))
