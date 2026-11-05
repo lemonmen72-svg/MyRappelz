@@ -501,6 +501,8 @@ func _close() -> void:
 func _go(to: Vector3, near: float, what: String, defend: bool = true) -> bool:
 	_close()
 	_nav.reset()
+	# Сцена сменилась по пути (портал перенёс в другую локацию) — цель из прежнего мира, идти дальше некуда
+	var scene0: Node = bot.main
 	var best := INF
 	var best_t := game_t
 	var t0 := game_t
@@ -520,6 +522,9 @@ func _go(to: Vector3, near: float, what: String, defend: bool = true) -> bool:
 		var h := _h()
 		if p == null:
 			return false
+		if bot.main != scene0:
+			CardinalMove.stop(p, h)
+			return false
 		var d := _flat(p.global_position, to)
 		if d <= near:
 			CardinalMove.stop(p, h)
@@ -535,6 +540,7 @@ func _go(to: Vector3, near: float, what: String, defend: bool = true) -> bool:
 			_nav.reset()
 			best = INF
 			best_t = game_t
+			t0 = game_t
 			path = CardinalNav.path(_p().global_position, to)
 			pi = 0
 			if not await _tick():
