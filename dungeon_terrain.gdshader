@@ -8,11 +8,11 @@
 shader_type spatial;
 render_mode cull_disabled;
 
-uniform vec3 stone_light : source_color = vec3(0.47, 0.44, 0.52);
-uniform vec3 stone_dark : source_color = vec3(0.30, 0.28, 0.36);
+uniform vec3 stone_light : source_color = vec3(0.37, 0.35, 0.42);
+uniform vec3 stone_dark : source_color = vec3(0.23, 0.22, 0.29);
 uniform vec3 dirt_color : source_color = vec3(0.55, 0.44, 0.33);
 uniform vec3 deck_color : source_color = vec3(0.36, 0.28, 0.21);
-uniform vec3 moss_color : source_color = vec3(0.30, 0.46, 0.26);
+uniform vec3 moss_color : source_color = vec3(0.24, 0.36, 0.22);
 uniform vec3 glow_moss : source_color = vec3(0.30, 1.0, 0.55);
 uniform vec3 rock_light : source_color = vec3(0.44, 0.40, 0.52);
 uniform vec3 rock_dark : source_color = vec3(0.22, 0.20, 0.29);
@@ -97,11 +97,12 @@ void fragment() {
 	} else if (kind >= 0.75) {
 		col = deck_color * (0.85 + 0.2 * n3);
 	}
-	// Мох и светящаяся плесень пятнами (ближе к стенам — гуще)
-	float wall_near = smoothstep(-4.0, 0.0, fsd);
-	float moss = smoothstep(0.62, 0.72, n2 + wall_near * 0.18) * (kind < 0.75 ? 1.0 : 0.0);
-	col = mix(col, moss_color, moss * 0.55);
-	float glow = rich ? smoothstep(0.82, 0.9, n2 * 0.6 + n3 * 0.5 + wall_near * 0.12) * (kind < 0.25 ? 1.0 : 0.0) : 0.0;
+	// Мох и светящаяся плесень редкими пятнами
+	float moss = smoothstep(0.66, 0.74, n2) * (kind < 0.75 ? 1.0 : 0.0);
+	col = mix(col, moss_color, moss * 0.4);
+	float glow = rich ? smoothstep(0.9, 0.95, n2 * 0.6 + n3 * 0.5) * (kind < 0.25 ? 1.0 : 0.0) : 0.0;
+	// К стенам пол темнее (тень у подножия скалы)
+	col *= mix(1.0, 0.72, smoothstep(-2.5, 0.0, fsd));
 
 	// --- Мокрая кромка у воды: темнее
 	float wet = 1.0 - smoothstep(0.0, 1.6, wsd);

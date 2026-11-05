@@ -20,8 +20,11 @@ const SOLID := ["dg_spire", "dg_crag", "dg_moss_stones", "dg_amethyst_spires", "
 	"dg_cannon", "dg_relics", "dg_hoard", "dg_brazier", "dg_harbor_post", "dg_siren", "dg_mast", "dg_crows_nest",
 	"dg_helm", "dg_leviathan", "dg_cavern", "dg_cliffs", "dg_dripstone"]
 ## Камни скального края: id и вес (чаще низкие — камера смотрит сверху через край).
-const RIM_ROCKS := [["dg_crag", 4], ["dg_moss_stones", 4], ["dg_spire", 1], ["dg_cliffs", 1], ["dg_amethyst_spires", 1]]
+const RIM_ROCKS := [["dg_crag", 4], ["dg_moss_stones", 4], ["dg_amethyst_spires", 1]]
 const MAX_LIGHTS := 10
+## Модель моста на настил мостов и мостков, насколько опустить её (доски модели — у её основания), м.
+const BRIDGE_PROP := "dg_rope_bridge"
+const BRIDGE_SINK := 0.12
 ## Огни: id объекта → [цвет, энергия, радиус, высота над основанием (доля высоты модели)].
 const LIGHTS := {
 	"dg_brazier": [Color(1.0, 0.62, 0.3), 1.4, 7.5, 0.92],
@@ -69,6 +72,7 @@ static func build(world: DungeonWorld, rng: RandomNumberGenerator) -> void:
 			_light(holder, id, pos, s)
 			lights += 1
 	placed += _rim_rocks(world, holder, fallback, zones, rng)
+	placed += _bridge_decks(world, holder, fallback, zones)
 	for key in zones:
 		_zone_mesh(holder, zones[key])
 	holder.set_meta("placed", placed)
@@ -167,6 +171,35 @@ static func _rim_rocks(world: DungeonWorld, holder: Node3D, fallback: Node3D, zo
 		var s := rng.randf_range(0.8, 1.25)
 		_place(world, holder, fallback, zones, id, Vector3(p.x, world.height_at(p.x, p.y) - 0.3, p.y),
 			rng.randf() * TAU, s, false)
+		n += 1
+	return n
+
+
+## Мосты и мостки — модель верёвочного моста вдоль настила (растянута по длине и ширине; настил и коллизия — свои,
+## IslandWorld._build_bridges).
+static func _bridge_decks(world: DungeonWorld, holder: Node3D, fallback: Node3D, zones: Dictionary) -> int:
+	if not PropAsset.has(BRIDGE_PROP):
+		return 0
+	var sz := PropAsset.size(BRIDGE_PROP)
+	var n := 0
+	for br in world.bridges:
+		var a: Vector3 = br["a"]
+		var b: Vector3 = br["b"]
+		var flat := Vector2(b.x - a.x, b.z - a.z)
+		var mid := IslandWorld.bridge_point(br, 0.5)
+		var yaw := atan2(flat.x, flat.y)
+		var sc := Vector3(float(br["width"]) / sz.x * 1.05, 1.0, flat.length() / sz.z * 1.02)
+		var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(sc), Vector3(mid.x, mid.y - BRIDGE_SINK, mid.z))
+		var key := Vector2i(floori(mid.x / ZONE), floori(mid.z / ZONE))
+		if not zones.has(key):
+			var zn := Zone.new()
+			zn.origin = Vector3((float(key.x) + 0.5) * ZONE, 0.0, (float(key.y) + 0.5) * ZONE)
+			zones[key] = zn
+		var zone: Zone = zones[key]
+		var pg := PropAsset.page(BRIDGE_PROP)
+		if not zone.items.has(pg):
+			zone.items[pg] = []
+		(zone.items[pg] as Array).append([PropAsset.mesh(BRIDGE_PROP), Transform3D(Basis.IDENTITY, -zone.origin) * xf])
 		n += 1
 	return n
 

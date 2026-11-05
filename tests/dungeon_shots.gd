@@ -51,8 +51,8 @@ func run_step() -> void:
 			# Остров: портал у пещеры
 			var pt: Portal = main.get("portal")
 			var ep := pt.exit_point()
-			main.player.global_position = main.world.ground(ep.x + 1.5, ep.z + 2.0, 0.2)
-			main.cam_yaw = pt.rotation.y + PI + 0.35
+			main.player.global_position = main.world.ground(ep.x, ep.z, 0.2)
+			main.cam_yaw = pt.rotation.y + 0.45
 			main.cam_pitch = deg_to_rad(22.0)
 			main.cam_dist = 11.0
 			main.hud.visible = false

@@ -55,6 +55,55 @@
 				2048,
 				2048
 			]
+		},
+		"dg_big": {
+			"file": "props_dg_big.png",
+			"size": [
+				4096,
+				4096
+			]
+		},
+		"dg_big_b": {
+			"file": "props_dg_big_b.png",
+			"size": [
+				4096,
+				4096
+			]
+		},
+		"dg_a": {
+			"file": "props_dg_a.png",
+			"size": [
+				4096,
+				4096
+			]
+		},
+		"dg_b": {
+			"file": "props_dg_b.png",
+			"size": [
+				4096,
+				4096
+			]
+		},
+		"dg_c": {
+			"file": "props_dg_c.png",
+			"size": [
+				4096,
+				4096
+			]
+		},
+		"dg_d": {
+			"file": "props_dg_d.png",
+			"size": [
+				4096,
+				4096
+			]
+		},
+		"dg_e": {
+			"file": "props_dg_e.png",
+			"size": [
+				2048,
+				2048
+			]
 		}
 	},
 	"props": {
@@ -2041,6 +2090,3070 @@
 					-0.075,
 					0.019,
 					0.812
+				]
+			}
+		},
+		"dg_ship_deck": {
+			"page": "dg_big",
+			"slot": [
+				0,
+				0,
+				2048
+			],
+			"src": "Meshy_AI_Rotting_Pirate_Ship_Deck_20261105_texture_dbc8b681.glb",
+			"size": [
+				14.0,
+				5.443,
+				6.473
+			],
+			"min": [
+				-7.0,
+				0.0,
+				-3.237
+			],
+			"max": [
+				7.0,
+				5.443,
+				3.237
+			],
+			"tris": 12144,
+			"verts": 22661,
+			"src_tris": 14452,
+			"open_edges": 329,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 145,
+			"flipped": 67,
+			"markers": {
+				"front": [
+					-3.705,
+					3.386,
+					3.028
+				]
+			}
+		},
+		"dg_wreck": {
+			"page": "dg_big",
+			"slot": [
+				2048,
+				0,
+				2048
+			],
+			"src": "Meshy_AI_The_Verdant_Wreck_20261105_texture_8849b3a9.glb",
+			"size": [
+				8.462,
+				9.0,
+				10.848
+			],
+			"min": [
+				-4.231,
+				0.0,
+				-5.424
+			],
+			"max": [
+				4.231,
+				9.0,
+				5.424
+			],
+			"tris": 12234,
+			"verts": 20657,
+			"src_tris": 14181,
+			"open_edges": 1329,
+			"glow_verts": 1,
+			"glow_max": 0.5,
+			"panel_tris": 234,
+			"flipped": 224,
+			"markers": {
+				"front": [
+					-0.486,
+					2.905,
+					5.232
+				]
+			}
+		},
+		"dg_ship_bow": {
+			"page": "dg_big",
+			"slot": [
+				0,
+				2048,
+				2048
+			],
+			"src": "Meshy_AI_The_Forgotten_Bow_20261105_texture_c3fae3b1.glb",
+			"size": [
+				12.0,
+				7.806,
+				5.92
+			],
+			"min": [
+				-6.0,
+				0.0,
+				-2.96
+			],
+			"max": [
+				6.0,
+				7.806,
+				2.96
+			],
+			"tris": 12006,
+			"verts": 18956,
+			"src_tris": 13915,
+			"open_edges": 2020,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 6,
+			"flipped": 64,
+			"markers": {
+				"front": [
+					1.026,
+					4.065,
+					2.812
+				]
+			}
+		},
+		"dg_coral_altar": {
+			"page": "dg_big",
+			"slot": [
+				2048,
+				2048,
+				2048
+			],
+			"src": "Meshy_AI_Coral_Skull_Altar_20261105_texture_d8910f36.glb",
+			"size": [
+				7.964,
+				7.2,
+				7.964
+			],
+			"min": [
+				-3.982,
+				0.0,
+				-3.982
+			],
+			"max": [
+				3.982,
+				7.2,
+				3.982
+			],
+			"tris": 12131,
+			"verts": 21892,
+			"src_tris": 14737,
+			"open_edges": 874,
+			"glow_verts": 122,
+			"glow_max": 0.6,
+			"panel_tris": 133,
+			"flipped": 110,
+			"markers": {
+				"glow": [
+					-0.71,
+					2.554,
+					2.04
+				],
+				"front": [
+					-1.245,
+					0.418,
+					3.801
+				]
+			}
+		},
+		"dg_cavern": {
+			"page": "dg_big_b",
+			"slot": [
+				0,
+				0,
+				2048
+			],
+			"src": "Meshy_AI_Mossveil_Cavern_20261105_texture_0d4273ee.glb",
+			"size": [
+				6.828,
+				6.999,
+				6.895
+			],
+			"min": [
+				-3.414,
+				0.0,
+				-3.448
+			],
+			"max": [
+				3.414,
+				6.999,
+				3.448
+			],
+			"tris": 9170,
+			"verts": 17447,
+			"src_tris": 15119,
+			"open_edges": 300,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 184,
+			"flipped": 316,
+			"markers": {
+				"front": [
+					-2.405,
+					1.268,
+					3.234
+				]
+			}
+		},
+		"dg_cliffs": {
+			"page": "dg_big_b",
+			"slot": [
+				2048,
+				0,
+				2048
+			],
+			"src": "Meshy_AI_Mossveil_Cliffs_20261105_texture_aac14839.glb",
+			"size": [
+				7.639,
+				6.391,
+				2.402
+			],
+			"min": [
+				-3.82,
+				0.0,
+				-1.201
+			],
+			"max": [
+				3.82,
+				6.391,
+				1.201
+			],
+			"tris": 8999,
+			"verts": 11810,
+			"src_tris": 15923,
+			"open_edges": 334,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 2,
+			"markers": {
+				"front": [
+					-0.801,
+					5.461,
+					1.148
+				]
+			}
+		},
+		"dg_mine": {
+			"page": "dg_big_b",
+			"slot": [
+				0,
+				2048,
+				2048
+			],
+			"src": "Meshy_AI_Abandoned_Amethyst_Mine_20261105_texture_68d134dc.glb",
+			"size": [
+				6.0,
+				3.37,
+				6.0
+			],
+			"min": [
+				-3.0,
+				0.0,
+				-3.0
+			],
+			"max": [
+				3.0,
+				3.37,
+				3.0
+			],
+			"tris": 9023,
+			"verts": 15740,
+			"src_tris": 14579,
+			"open_edges": 505,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 28,
+			"flipped": 55,
+			"markers": {
+				"front": [
+					-1.402,
+					0.285,
+					2.811
+				]
+			}
+		},
+		"dg_dripstone": {
+			"page": "dg_big_b",
+			"slot": [
+				2048,
+				2048,
+				2048
+			],
+			"src": "Meshy_AI_Amethyst_Dripstone_Isles_20261105_texture_0e2d6fed.glb",
+			"size": [
+				4.905,
+				3.497,
+				3.958
+			],
+			"min": [
+				-2.453,
+				0.0,
+				-1.979
+			],
+			"max": [
+				2.453,
+				3.497,
+				1.979
+			],
+			"tris": 8997,
+			"verts": 11201,
+			"src_tris": 15670,
+			"open_edges": 380,
+			"glow_verts": 59,
+			"glow_max": 0.4,
+			"panel_tris": 0,
+			"flipped": 28,
+			"markers": {
+				"glow": [
+					0.08,
+					0.667,
+					0.166
+				],
+				"front": [
+					-0.648,
+					2.722,
+					1.872
+				]
+			}
+		},
+		"dg_spire": {
+			"page": "dg_a",
+			"slot": [
+				0,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Mossfang_Spire_20261105_texture_07d64808.glb",
+			"size": [
+				2.868,
+				4.134,
+				2.985
+			],
+			"min": [
+				-1.434,
+				0.0,
+				-1.493
+			],
+			"max": [
+				1.434,
+				4.134,
+				1.493
+			],
+			"tris": 4500,
+			"verts": 7229,
+			"src_tris": 13877,
+			"open_edges": 772,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 8,
+			"markers": {
+				"front": [
+					-0.032,
+					0.617,
+					1.4
+				]
+			}
+		},
+		"dg_crag": {
+			"page": "dg_a",
+			"slot": [
+				1024,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Violetstone_Crag_20261105_texture_150c45fa.glb",
+			"size": [
+				3.018,
+				2.185,
+				3.0
+			],
+			"min": [
+				-1.509,
+				0.0,
+				-1.5
+			],
+			"max": [
+				1.509,
+				2.185,
+				1.5
+			],
+			"tris": 2996,
+			"verts": 4809,
+			"src_tris": 10584,
+			"open_edges": 2102,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 7,
+			"markers": {
+				"front": [
+					-0.269,
+					0.209,
+					1.421
+				]
+			}
+		},
+		"dg_moss_stones": {
+			"page": "dg_a",
+			"slot": [
+				2048,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Violet_Moss_Stones_20261105_texture_ff0de899.glb",
+			"size": [
+				2.592,
+				1.708,
+				2.52
+			],
+			"min": [
+				-1.296,
+				0.0,
+				-1.26
+			],
+			"max": [
+				1.296,
+				1.708,
+				1.26
+			],
+			"tris": 3000,
+			"verts": 6016,
+			"src_tris": 13839,
+			"open_edges": 531,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 63,
+			"markers": {
+				"front": [
+					-0.124,
+					0.192,
+					1.177
+				]
+			}
+		},
+		"dg_amethyst_spires": {
+			"page": "dg_a",
+			"slot": [
+				3072,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Amethyst_Spires_20261105_texture_d1642b65.glb",
+			"size": [
+				2.511,
+				2.599,
+				2.464
+			],
+			"min": [
+				-1.255,
+				0.0,
+				-1.232
+			],
+			"max": [
+				1.255,
+				2.599,
+				1.232
+			],
+			"tris": 3000,
+			"verts": 4738,
+			"src_tris": 14895,
+			"open_edges": 553,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 8,
+			"markers": {
+				"front": [
+					-0.083,
+					0.101,
+					1.166
+				]
+			}
+		},
+		"dg_ascent": {
+			"page": "dg_a",
+			"slot": [
+				0,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Mossworn_Ascent_20261105_texture_b16c8b8e.glb",
+			"size": [
+				2.992,
+				3.531,
+				5.767
+			],
+			"min": [
+				-1.496,
+				0.0,
+				-2.884
+			],
+			"max": [
+				1.496,
+				3.531,
+				2.884
+			],
+			"tris": 4489,
+			"verts": 6920,
+			"src_tris": 9837,
+			"open_edges": 2994,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 108,
+			"markers": {
+				"front": [
+					-0.301,
+					0.255,
+					2.788
+				]
+			}
+		},
+		"dg_crystal_purple": {
+			"page": "dg_a",
+			"slot": [
+				1024,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Amethyst_Crown_20261105_texture_e34d166c.glb",
+			"size": [
+				1.8,
+				1.71,
+				1.79
+			],
+			"min": [
+				-0.9,
+				0.0,
+				-0.895
+			],
+			"max": [
+				0.9,
+				1.71,
+				0.895
+			],
+			"tris": 2969,
+			"verts": 6019,
+			"src_tris": 14288,
+			"open_edges": 419,
+			"glow_verts": 2143,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 32,
+			"markers": {
+				"glow": [
+					-0.097,
+					0.425,
+					-0.123
+				],
+				"front": [
+					0.023,
+					0.056,
+					0.849
+				]
+			}
+		},
+		"dg_crystal_blue": {
+			"page": "dg_a",
+			"slot": [
+				2048,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Azure_Crystal_Cluster_20261105_texture_48d361fa.glb",
+			"size": [
+				1.736,
+				1.8,
+				1.8
+			],
+			"min": [
+				-0.868,
+				0.0,
+				-0.9
+			],
+			"max": [
+				0.868,
+				1.8,
+				0.9
+			],
+			"tris": 2982,
+			"verts": 5094,
+			"src_tris": 14711,
+			"open_edges": 404,
+			"glow_verts": 1203,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 8,
+			"markers": {
+				"glow": [
+					-0.016,
+					0.503,
+					-0.046
+				],
+				"front": [
+					0.037,
+					0.11,
+					0.857
+				]
+			}
+		},
+		"dg_glowcaps": {
+			"page": "dg_a",
+			"slot": [
+				3072,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Azure_Glowcaps_20261105_texture_ad7948d7.glb",
+			"size": [
+				1.5,
+				1.5,
+				1.192
+			],
+			"min": [
+				-0.75,
+				0.0,
+				-0.596
+			],
+			"max": [
+				0.75,
+				1.5,
+				0.596
+			],
+			"tris": 2999,
+			"verts": 4661,
+			"src_tris": 14850,
+			"open_edges": 410,
+			"glow_verts": 907,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 7,
+			"markers": {
+				"glow": [
+					-0.045,
+					0.928,
+					0.013
+				],
+				"front": [
+					-0.13,
+					0.579,
+					0.555
+				]
+			}
+		},
+		"dg_coral": {
+			"page": "dg_a",
+			"slot": [
+				0,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Azure_Reef_Bloom_20261105_texture_4ec9d5a8.glb",
+			"size": [
+				1.5,
+				1.289,
+				1.1
+			],
+			"min": [
+				-0.75,
+				0.0,
+				-0.55
+			],
+			"max": [
+				0.75,
+				1.289,
+				0.55
+			],
+			"tris": 2990,
+			"verts": 6181,
+			"src_tris": 15832,
+			"open_edges": 42,
+			"glow_verts": 2522,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 33,
+			"markers": {
+				"glow": [
+					0.04,
+					0.597,
+					-0.024
+				],
+				"front": [
+					-0.13,
+					0.141,
+					0.512
+				]
+			}
+		},
+		"dg_kelp": {
+			"page": "dg_a",
+			"slot": [
+				1024,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Golden_Kelp_Tide_20261105_texture_b5996336.glb",
+			"size": [
+				0.917,
+				2.0,
+				0.764
+			],
+			"min": [
+				-0.459,
+				0.0,
+				-0.382
+			],
+			"max": [
+				0.459,
+				2.0,
+				0.382
+			],
+			"tris": 1999,
+			"verts": 3342,
+			"src_tris": 13230,
+			"open_edges": 1200,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 72,
+			"markers": {
+				"front": [
+					0.015,
+					1.115,
+					0.367
+				]
+			}
+		},
+		"dg_tidepool": {
+			"page": "dg_a",
+			"slot": [
+				2048,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Tidepool_Treasures_20261105_texture_24c69a52.glb",
+			"size": [
+				2.0,
+				1.167,
+				2.0
+			],
+			"min": [
+				-1.0,
+				0.0,
+				-1.0
+			],
+			"max": [
+				1.0,
+				1.167,
+				1.0
+			],
+			"tris": 2993,
+			"verts": 5152,
+			"src_tris": 15940,
+			"open_edges": 361,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 89,
+			"markers": {
+				"front": [
+					-0.013,
+					0.2,
+					0.953
+				]
+			}
+		},
+		"dg_obelisk": {
+			"page": "dg_a",
+			"slot": [
+				3072,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_The_Cursed_Obelisk_20261105_texture_a8581135.glb",
+			"size": [
+				1.876,
+				2.639,
+				1.982
+			],
+			"min": [
+				-0.938,
+				0.0,
+				-0.991
+			],
+			"max": [
+				0.938,
+				2.639,
+				0.991
+			],
+			"tris": 2994,
+			"verts": 6371,
+			"src_tris": 14658,
+			"open_edges": 677,
+			"glow_verts": 1,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 106,
+			"markers": {
+				"glow": [
+					0.215,
+					1.491,
+					0.445
+				],
+				"front": [
+					-0.124,
+					0.012,
+					0.935
+				]
+			}
+		},
+		"dg_monolith": {
+			"page": "dg_a",
+			"slot": [
+				0,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Verdant_Rune_Monolith_20261105_texture_7585c216.glb",
+			"size": [
+				2.257,
+				2.51,
+				2.372
+			],
+			"min": [
+				-1.128,
+				0.0,
+				-1.186
+			],
+			"max": [
+				1.128,
+				2.51,
+				1.186
+			],
+			"tris": 2987,
+			"verts": 5694,
+			"src_tris": 12539,
+			"open_edges": 1330,
+			"glow_verts": 285,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 78,
+			"markers": {
+				"glow": [
+					-0.061,
+					1.276,
+					0.473
+				],
+				"front": [
+					-0.198,
+					0.089,
+					1.11
+				]
+			}
+		},
+		"dg_rune_arch": {
+			"page": "dg_a",
+			"slot": [
+				1024,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Verdant_Rune_Arch_20261105_texture_490c2576.glb",
+			"size": [
+				3.811,
+				0.791,
+				1.95
+			],
+			"min": [
+				-1.906,
+				0.0,
+				-0.975
+			],
+			"max": [
+				1.906,
+				0.791,
+				0.975
+			],
+			"tris": 2972,
+			"verts": 5958,
+			"src_tris": 14927,
+			"open_edges": 572,
+			"glow_verts": 1,
+			"glow_max": 0.843,
+			"panel_tris": 0,
+			"flipped": 47,
+			"markers": {
+				"glow": [
+					-0.661,
+					0.711,
+					-0.778
+				],
+				"front": [
+					-0.536,
+					0.398,
+					0.906
+				]
+			}
+		},
+		"dg_spiral": {
+			"page": "dg_a",
+			"slot": [
+				2048,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Glowing_Ruins_of_the_Ancient_Spiral_20261105_texture_d61806cb.glb",
+			"size": [
+				3.41,
+				0.799,
+				0.658
+			],
+			"min": [
+				-1.705,
+				0.0,
+				-0.329
+			],
+			"max": [
+				1.705,
+				0.799,
+				0.329
+			],
+			"tris": 3000,
+			"verts": 4787,
+			"src_tris": 15064,
+			"open_edges": 357,
+			"glow_verts": 9,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 1,
+			"markers": {
+				"glow": [
+					0.019,
+					0.744,
+					0.205
+				],
+				"front": [
+					0.015,
+					0.25,
+					0.314
+				]
+			}
+		},
+		"dg_leviathan": {
+			"page": "dg_a",
+			"slot": [
+				3072,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Leviathan_Remains_20261105_texture_15ded6ea.glb",
+			"size": [
+				0.83,
+				0.964,
+				2.497
+			],
+			"min": [
+				-0.415,
+				0.0,
+				-1.249
+			],
+			"max": [
+				0.415,
+				0.964,
+				1.249
+			],
+			"tris": 2996,
+			"verts": 6310,
+			"src_tris": 15962,
+			"open_edges": 21,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 25,
+			"markers": {
+				"front": [
+					-0.006,
+					0.296,
+					1.2
+				]
+			}
+		},
+		"dg_pier": {
+			"page": "dg_b",
+			"slot": [
+				0,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Mossbound_Pier_20261105_texture_84a718a6.glb",
+			"size": [
+				3.96,
+				1.534,
+				4.0
+			],
+			"min": [
+				-1.98,
+				0.0,
+				-2.0
+			],
+			"max": [
+				1.98,
+				1.534,
+				2.0
+			],
+			"tris": 2991,
+			"verts": 6138,
+			"src_tris": 13528,
+			"open_edges": 496,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 48,
+			"markers": {
+				"front": [
+					0.028,
+					0.838,
+					1.915
+				]
+			}
+		},
+		"dg_wharf": {
+			"page": "dg_b",
+			"slot": [
+				1024,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Mossbound_Wharf_20261105_texture_ae48a81a.glb",
+			"size": [
+				3.871,
+				3.568,
+				3.846
+			],
+			"min": [
+				-1.936,
+				0.0,
+				-1.923
+			],
+			"max": [
+				1.936,
+				3.568,
+				1.923
+			],
+			"tris": 3000,
+			"verts": 6395,
+			"src_tris": 14504,
+			"open_edges": 152,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 9,
+			"markers": {
+				"front": [
+					0.128,
+					1.237,
+					1.813
+				]
+			}
+		},
+		"dg_dock": {
+			"page": "dg_b",
+			"slot": [
+				2048,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Mossy_Mariner_s_Dock_20261105_texture_c0e687c1.glb",
+			"size": [
+				5.407,
+				1.456,
+				2.365
+			],
+			"min": [
+				-2.703,
+				0.0,
+				-1.183
+			],
+			"max": [
+				2.703,
+				1.456,
+				1.183
+			],
+			"tris": 3000,
+			"verts": 5769,
+			"src_tris": 14281,
+			"open_edges": 445,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 28,
+			"markers": {
+				"front": [
+					-0.08,
+					0.94,
+					1.128
+				]
+			}
+		},
+		"dg_rope_bridge": {
+			"page": "dg_b",
+			"slot": [
+				3072,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Mossbound_Rope_Bridge_20261105_texture_581c986d.glb",
+			"size": [
+				1.126,
+				1.6,
+				3.516
+			],
+			"min": [
+				-0.563,
+				0.0,
+				-1.758
+			],
+			"max": [
+				0.563,
+				1.6,
+				1.758
+			],
+			"tris": 2995,
+			"verts": 6114,
+			"src_tris": 15207,
+			"open_edges": 172,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 7,
+			"markers": {
+				"front": [
+					-0.029,
+					0.165,
+					1.661
+				]
+			}
+		},
+		"dg_barrel": {
+			"page": "dg_b",
+			"slot": [
+				0,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Barnacle_Barrel_20261105_texture_d7cb629e.glb",
+			"size": [
+				0.9,
+				0.924,
+				0.831
+			],
+			"min": [
+				-0.45,
+				0.0,
+				-0.415
+			],
+			"max": [
+				0.45,
+				0.924,
+				0.415
+			],
+			"tris": 1996,
+			"verts": 3355,
+			"src_tris": 13657,
+			"open_edges": 659,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 35,
+			"markers": {
+				"front": [
+					-0.003,
+					0.401,
+					0.391
+				]
+			}
+		},
+		"dg_crates": {
+			"page": "dg_b",
+			"slot": [
+				1024,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Forgotten_Dockside_Crates_20261105_texture_24e53b2a.glb",
+			"size": [
+				1.958,
+				1.8,
+				1.578
+			],
+			"min": [
+				-0.979,
+				0.0,
+				-0.789
+			],
+			"max": [
+				0.979,
+				1.8,
+				0.789
+			],
+			"tris": 3050,
+			"verts": 5908,
+			"src_tris": 14175,
+			"open_edges": 687,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 60,
+			"flipped": 50,
+			"markers": {
+				"front": [
+					-0.231,
+					0.364,
+					0.724
+				]
+			}
+		},
+		"dg_bell": {
+			"page": "dg_b",
+			"slot": [
+				2048,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Dockside_Warning_Bell_20261105_texture_6b8b1657.glb",
+			"size": [
+				2.0,
+				1.889,
+				0.648
+			],
+			"min": [
+				-1.0,
+				0.0,
+				-0.324
+			],
+			"max": [
+				1.0,
+				1.889,
+				0.324
+			],
+			"tris": 2998,
+			"verts": 5744,
+			"src_tris": 14831,
+			"open_edges": 477,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 38,
+			"markers": {
+				"front": [
+					-0.042,
+					0.978,
+					0.317
+				]
+			}
+		},
+		"dg_harbor_post": {
+			"page": "dg_b",
+			"slot": [
+				3072,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Harborlight_Post_20261105_texture_35b1bbeb.glb",
+			"size": [
+				0.598,
+				1.427,
+				0.33
+			],
+			"min": [
+				-0.299,
+				0.0,
+				-0.165
+			],
+			"max": [
+				0.299,
+				1.427,
+				0.165
+			],
+			"tris": 1998,
+			"verts": 3727,
+			"src_tris": 15433,
+			"open_edges": 274,
+			"glow_verts": 8,
+			"glow_max": 0.917,
+			"panel_tris": 0,
+			"flipped": 20,
+			"markers": {
+				"glow": [
+					-0.177,
+					0.992,
+					-0.023
+				],
+				"front": [
+					0.111,
+					0.821,
+					0.158
+				]
+			}
+		},
+		"dg_net": {
+			"page": "dg_b",
+			"slot": [
+				0,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Tideworn_Fishing_Net_20261105_texture_7464ac81.glb",
+			"size": [
+				2.977,
+				2.903,
+				0.999
+			],
+			"min": [
+				-1.488,
+				0.0,
+				-0.499
+			],
+			"max": [
+				1.488,
+				2.903,
+				0.499
+			],
+			"tris": 2982,
+			"verts": 6008,
+			"src_tris": 14413,
+			"open_edges": 534,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 55,
+			"markers": {
+				"front": [
+					0.155,
+					2.8,
+					0.474
+				]
+			}
+		},
+		"dg_anchor": {
+			"page": "dg_b",
+			"slot": [
+				1024,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Ancient_Mariner_s_Anchor_20261105_texture_c307e97a.glb",
+			"size": [
+				1.594,
+				2.4,
+				0.48
+			],
+			"min": [
+				-0.797,
+				0.0,
+				-0.24
+			],
+			"max": [
+				0.797,
+				2.4,
+				0.24
+			],
+			"tris": 1989,
+			"verts": 3886,
+			"src_tris": 14916,
+			"open_edges": 148,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 8,
+			"markers": {
+				"front": [
+					-0.002,
+					0.277,
+					0.228
+				]
+			}
+		},
+		"dg_raft": {
+			"page": "dg_b",
+			"slot": [
+				2048,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Swampwreck_Raft_20261105_texture_9e6aa786.glb",
+			"size": [
+				2.115,
+				0.794,
+				2.908
+			],
+			"min": [
+				-1.057,
+				0.0,
+				-1.454
+			],
+			"max": [
+				1.057,
+				0.794,
+				1.454
+			],
+			"tris": 2998,
+			"verts": 5920,
+			"src_tris": 13965,
+			"open_edges": 860,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 17,
+			"markers": {
+				"front": [
+					-0.25,
+					0.291,
+					1.387
+				]
+			}
+		},
+		"dg_rowboat": {
+			"page": "dg_b",
+			"slot": [
+				3072,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_The_Barnacle_Drift_20261105_texture_f97d53ae.glb",
+			"size": [
+				3.595,
+				1.292,
+				1.58
+			],
+			"min": [
+				-1.797,
+				0.0,
+				-0.79
+			],
+			"max": [
+				1.797,
+				1.292,
+				0.79
+			],
+			"tris": 2991,
+			"verts": 5342,
+			"src_tris": 13676,
+			"open_edges": 1049,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 37,
+			"markers": {
+				"front": [
+					0.431,
+					0.584,
+					0.75
+				]
+			}
+		},
+		"dg_siren": {
+			"page": "dg_b",
+			"slot": [
+				0,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Driftwood_Siren_20261105_texture_b2254012.glb",
+			"size": [
+				1.982,
+				3.077,
+				1.781
+			],
+			"min": [
+				-0.991,
+				0.0,
+				-0.891
+			],
+			"max": [
+				0.991,
+				3.077,
+				0.891
+			],
+			"tris": 2997,
+			"verts": 5308,
+			"src_tris": 15016,
+			"open_edges": 391,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 45,
+			"markers": {
+				"front": [
+					-0.004,
+					0.304,
+					0.858
+				]
+			}
+		},
+		"dg_mast": {
+			"page": "dg_b",
+			"slot": [
+				1024,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Eye_of_the_Drowned_Mast_20261105_texture_8fee4c8f.glb",
+			"size": [
+				2.494,
+				3.608,
+				0.629
+			],
+			"min": [
+				-1.247,
+				0.0,
+				-0.315
+			],
+			"max": [
+				1.247,
+				3.608,
+				0.315
+			],
+			"tris": 3000,
+			"verts": 5891,
+			"src_tris": 14713,
+			"open_edges": 412,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 5,
+			"markers": {
+				"front": [
+					-0.065,
+					3.04,
+					0.304
+				]
+			}
+		},
+		"dg_crows_nest": {
+			"page": "dg_b",
+			"slot": [
+				2048,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Rotten_Crow_s_Nest_20261105_texture_e14b4ae6.glb",
+			"size": [
+				2.116,
+				3.25,
+				0.789
+			],
+			"min": [
+				-1.058,
+				0.0,
+				-0.395
+			],
+			"max": [
+				1.058,
+				3.25,
+				0.395
+			],
+			"tris": 2972,
+			"verts": 6414,
+			"src_tris": 13918,
+			"open_edges": 695,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 47,
+			"markers": {
+				"front": [
+					-0.172,
+					0.197,
+					0.372
+				]
+			}
+		},
+		"dg_mast_relic": {
+			"page": "dg_b",
+			"slot": [
+				3072,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Rotten_Mast_Relic_20261105_texture_1e851d23.glb",
+			"size": [
+				6.349,
+				1.204,
+				3.993
+			],
+			"min": [
+				-3.175,
+				0.0,
+				-1.996
+			],
+			"max": [
+				3.175,
+				1.204,
+				1.996
+			],
+			"tris": 3000,
+			"verts": 5682,
+			"src_tris": 14992,
+			"open_edges": 619,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 34,
+			"markers": {
+				"front": [
+					-0.438,
+					0.949,
+					1.934
+				]
+			}
+		},
+		"dg_helm": {
+			"page": "dg_c",
+			"slot": [
+				0,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Mossbound_Helm_Wheel_20261105_texture_25a88405.glb",
+			"size": [
+				1.391,
+				1.663,
+				0.442
+			],
+			"min": [
+				-0.696,
+				0.0,
+				-0.221
+			],
+			"max": [
+				0.696,
+				1.663,
+				0.221
+			],
+			"tris": 1991,
+			"verts": 4104,
+			"src_tris": 14519,
+			"open_edges": 356,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 11,
+			"markers": {
+				"front": [
+					-0.098,
+					1.04,
+					0.216
+				]
+			}
+		},
+		"dg_ladder": {
+			"page": "dg_c",
+			"slot": [
+				1024,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Mossy_Rope_Ladder_20261105_texture_1ab98fc6.glb",
+			"size": [
+				1.961,
+				2.997,
+				0.208
+			],
+			"min": [
+				-0.98,
+				0.0,
+				-0.104
+			],
+			"max": [
+				0.98,
+				2.997,
+				0.104
+			],
+			"tris": 1999,
+			"verts": 4412,
+			"src_tris": 14637,
+			"open_edges": 133,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 10,
+			"markers": {
+				"front": [
+					-0.027,
+					0.063,
+					0.098
+				]
+			}
+		},
+		"dg_cannon": {
+			"page": "dg_c",
+			"slot": [
+				2048,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Rustwake_Cannon_20261105_texture_e1604906.glb",
+			"size": [
+				2.268,
+				1.193,
+				0.957
+			],
+			"min": [
+				-1.134,
+				0.0,
+				-0.478
+			],
+			"max": [
+				1.134,
+				1.193,
+				0.478
+			],
+			"tris": 3000,
+			"verts": 5751,
+			"src_tris": 14599,
+			"open_edges": 263,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 71,
+			"markers": {
+				"front": [
+					0.211,
+					0.216,
+					0.449
+				]
+			}
+		},
+		"dg_tent": {
+			"page": "dg_c",
+			"slot": [
+				3072,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Tattered_Oar_Shelter_20261105_texture_8171f349.glb",
+			"size": [
+				3.5,
+				2.408,
+				3.5
+			],
+			"min": [
+				-1.75,
+				0.0,
+				-1.75
+			],
+			"max": [
+				1.75,
+				2.408,
+				1.75
+			],
+			"tris": 2995,
+			"verts": 4865,
+			"src_tris": 16037,
+			"open_edges": 20,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 51,
+			"markers": {
+				"front": [
+					-0.429,
+					0.098,
+					1.645
+				]
+			}
+		},
+		"dg_cauldron": {
+			"page": "dg_c",
+			"slot": [
+				0,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Rustwood_Cauldron_20261105_texture_77e9ec77.glb",
+			"size": [
+				1.785,
+				1.8,
+				1.23
+			],
+			"min": [
+				-0.892,
+				0.0,
+				-0.615
+			],
+			"max": [
+				0.892,
+				1.8,
+				0.615
+			],
+			"tris": 2997,
+			"verts": 6072,
+			"src_tris": 15125,
+			"open_edges": 164,
+			"glow_verts": 33,
+			"glow_max": 0.93,
+			"panel_tris": 0,
+			"flipped": 26,
+			"markers": {
+				"glow": [
+					0.036,
+					0.034,
+					-0.016
+				],
+				"front": [
+					0.028,
+					0.031,
+					0.578
+				]
+			}
+		},
+		"dg_nest": {
+			"page": "dg_c",
+			"slot": [
+				1024,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Tidebound_Treasure_Nest_20261105_texture_a03a2697.glb",
+			"size": [
+				2.4,
+				0.894,
+				2.389
+			],
+			"min": [
+				-1.2,
+				0.0,
+				-1.195
+			],
+			"max": [
+				1.2,
+				0.894,
+				1.195
+			],
+			"tris": 3083,
+			"verts": 5488,
+			"src_tris": 11163,
+			"open_edges": 1648,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 90,
+			"flipped": 154,
+			"markers": {
+				"front": [
+					-0.271,
+					0.299,
+					1.131
+				]
+			}
+		},
+		"dg_bearskin": {
+			"page": "dg_c",
+			"slot": [
+				2048,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Bearskin_Rug_20261105_texture_db3e407c.glb",
+			"size": [
+				1.723,
+				0.199,
+				1.684
+			],
+			"min": [
+				-0.861,
+				0.0,
+				-0.842
+			],
+			"max": [
+				0.861,
+				0.199,
+				0.842
+			],
+			"tris": 1989,
+			"verts": 3117,
+			"src_tris": 16026,
+			"open_edges": 540,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 36,
+			"markers": {
+				"front": [
+					-0.167,
+					0.072,
+					0.791
+				]
+			}
+		},
+		"dg_bedroll": {
+			"page": "dg_c",
+			"slot": [
+				3072,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Worn_Traveler_s_Bedroll_20261105_texture_f923e99f.glb",
+			"size": [
+				1.814,
+				0.25,
+				0.955
+			],
+			"min": [
+				-0.907,
+				0.0,
+				-0.477
+			],
+			"max": [
+				0.907,
+				0.25,
+				0.477
+			],
+			"tris": 1996,
+			"verts": 2883,
+			"src_tris": 14077,
+			"open_edges": 1066,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 49,
+			"markers": {
+				"front": [
+					0.54,
+					0.025,
+					0.454
+				]
+			}
+		},
+		"dg_palisade": {
+			"page": "dg_c",
+			"slot": [
+				0,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Skullbound_Palisade_20261105_texture_db3ac570.glb",
+			"size": [
+				2.379,
+				1.677,
+				0.793
+			],
+			"min": [
+				-1.189,
+				0.0,
+				-0.397
+			],
+			"max": [
+				1.189,
+				1.677,
+				0.397
+			],
+			"tris": 2985,
+			"verts": 6639,
+			"src_tris": 16114,
+			"open_edges": 47,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 22,
+			"markers": {
+				"front": [
+					0.332,
+					1.281,
+					0.376
+				]
+			}
+		},
+		"dg_barricade": {
+			"page": "dg_c",
+			"slot": [
+				1024,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Rustfang_Barricade_20261105_texture_a4d9c1ce.glb",
+			"size": [
+				2.27,
+				1.361,
+				0.3
+			],
+			"min": [
+				-1.135,
+				0.0,
+				-0.15
+			],
+			"max": [
+				1.135,
+				1.361,
+				0.15
+			],
+			"tris": 2989,
+			"verts": 6151,
+			"src_tris": 15334,
+			"open_edges": 313,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 78,
+			"markers": {
+				"front": [
+					-0.973,
+					0.464,
+					0.14
+				]
+			}
+		},
+		"dg_spikes": {
+			"page": "dg_c",
+			"slot": [
+				2048,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Rustfang_Barricade_20261105_texture_e6d0f0d7.glb",
+			"size": [
+				2.245,
+				2.343,
+				1.2
+			],
+			"min": [
+				-1.123,
+				0.0,
+				-0.6
+			],
+			"max": [
+				1.123,
+				2.343,
+				0.6
+			],
+			"tris": 2986,
+			"verts": 5950,
+			"src_tris": 13574,
+			"open_edges": 742,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 29,
+			"markers": {
+				"front": [
+					0.089,
+					0.063,
+					0.58
+				]
+			}
+		},
+		"dg_barricade_moss": {
+			"page": "dg_c",
+			"slot": [
+				3072,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Mossbound_Barricade_20261105_texture_99e4f372.glb",
+			"size": [
+				2.846,
+				1.5,
+				1.288
+			],
+			"min": [
+				-1.423,
+				0.0,
+				-0.644
+			],
+			"max": [
+				1.423,
+				1.5,
+				0.644
+			],
+			"tris": 2984,
+			"verts": 5957,
+			"src_tris": 13499,
+			"open_edges": 814,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 18,
+			"markers": {
+				"front": [
+					-0.75,
+					0.215,
+					0.625
+				]
+			}
+		},
+		"dg_totem": {
+			"page": "dg_c",
+			"slot": [
+				0,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Horned_Bone_Totem_20261105_texture_0e890b1e.glb",
+			"size": [
+				0.677,
+				2.451,
+				0.692
+			],
+			"min": [
+				-0.339,
+				0.0,
+				-0.346
+			],
+			"max": [
+				0.339,
+				2.451,
+				0.346
+			],
+			"tris": 1994,
+			"verts": 3767,
+			"src_tris": 13861,
+			"open_edges": 531,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 58,
+			"markers": {
+				"front": [
+					-0.066,
+					0.028,
+					0.332
+				]
+			}
+		},
+		"dg_table": {
+			"page": "dg_c",
+			"slot": [
+				1024,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Dockside_Tavern_Table_20261105_texture_c76cf163.glb",
+			"size": [
+				1.844,
+				1.311,
+				0.997
+			],
+			"min": [
+				-0.922,
+				0.0,
+				-0.498
+			],
+			"max": [
+				0.922,
+				1.311,
+				0.498
+			],
+			"tris": 2989,
+			"verts": 5350,
+			"src_tris": 14964,
+			"open_edges": 459,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 60,
+			"markers": {
+				"front": [
+					0.246,
+					0.669,
+					0.467
+				]
+			}
+		},
+		"dg_spoils": {
+			"page": "dg_c",
+			"slot": [
+				2048,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Merchant_s_Spoils_20261105_texture_c9f809d9.glb",
+			"size": [
+				1.6,
+				0.973,
+				1.584
+			],
+			"min": [
+				-0.8,
+				0.0,
+				-0.792
+			],
+			"max": [
+				0.8,
+				0.973,
+				0.792
+			],
+			"tris": 1989,
+			"verts": 3394,
+			"src_tris": 16185,
+			"open_edges": 32,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 105,
+			"markers": {
+				"front": [
+					-0.275,
+					0.139,
+					0.749
+				]
+			}
+		},
+		"dg_stone_ring": {
+			"page": "dg_c",
+			"slot": [
+				3072,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Emberless_Stone_Ring_20261105_texture_1b046d97.glb",
+			"size": [
+				1.948,
+				0.399,
+				1.949
+			],
+			"min": [
+				-0.974,
+				0.0,
+				-0.974
+			],
+			"max": [
+				0.974,
+				0.399,
+				0.974
+			],
+			"tris": 1997,
+			"verts": 3551,
+			"src_tris": 15680,
+			"open_edges": 209,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 15,
+			"markers": {
+				"front": [
+					0.068,
+					0.095,
+					0.91
+				]
+			}
+		},
+		"dg_brazier": {
+			"page": "dg_d",
+			"slot": [
+				0,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Emberguard_Brazier_20261105_texture_74dbbc1c.glb",
+			"size": [
+				0.607,
+				2.0,
+				0.601
+			],
+			"min": [
+				-0.303,
+				0.0,
+				-0.3
+			],
+			"max": [
+				0.303,
+				2.0,
+				0.3
+			],
+			"tris": 1969,
+			"verts": 4089,
+			"src_tris": 15058,
+			"open_edges": 103,
+			"glow_verts": 1357,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 56,
+			"markers": {
+				"glow": [
+					-0.002,
+					1.48,
+					0.002
+				],
+				"front": [
+					-0.009,
+					1.602,
+					0.29
+				]
+			}
+		},
+		"dg_torch": {
+			"page": "dg_d",
+			"slot": [
+				1024,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Torch_of_the_Ironbound_Gate_20261105_texture_60388435.glb",
+			"size": [
+				0.5,
+				1.182,
+				0.342
+			],
+			"min": [
+				-0.25,
+				0.0,
+				-0.171
+			],
+			"max": [
+				0.25,
+				1.182,
+				0.171
+			],
+			"tris": 2000,
+			"verts": 3662,
+			"src_tris": 14588,
+			"open_edges": 316,
+			"glow_verts": 65,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 26,
+			"markers": {
+				"glow": [
+					-0.015,
+					0.81,
+					-0.0
+				],
+				"front": [
+					-0.053,
+					0.87,
+					0.158
+				]
+			}
+		},
+		"dg_lantern": {
+			"page": "dg_d",
+			"slot": [
+				2048,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Candlelit_Copper_Lantern_20261105_texture_20f796aa.glb",
+			"size": [
+				0.382,
+				0.972,
+				0.5
+			],
+			"min": [
+				-0.191,
+				0.0,
+				-0.25
+			],
+			"max": [
+				0.191,
+				0.972,
+				0.25
+			],
+			"tris": 1997,
+			"verts": 3943,
+			"src_tris": 13472,
+			"open_edges": 356,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 19,
+			"markers": {
+				"front": [
+					-0.002,
+					0.225,
+					0.234
+				]
+			}
+		},
+		"dg_relics": {
+			"page": "dg_d",
+			"slot": [
+				3072,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Sunken_Relics_20261105_texture_96df9bdf.glb",
+			"size": [
+				1.4,
+				1.4,
+				1.054
+			],
+			"min": [
+				-0.7,
+				0.0,
+				-0.527
+			],
+			"max": [
+				0.7,
+				1.4,
+				0.527
+			],
+			"tris": 1993,
+			"verts": 3110,
+			"src_tris": 14600,
+			"open_edges": 475,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 40,
+			"markers": {
+				"front": [
+					0.445,
+					0.382,
+					0.493
+				]
+			}
+		},
+		"dg_remains": {
+			"page": "dg_d",
+			"slot": [
+				0,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Forgotten_Remains_20261105_texture_85ebe779.glb",
+			"size": [
+				1.478,
+				0.6,
+				1.478
+			],
+			"min": [
+				-0.739,
+				0.0,
+				-0.739
+			],
+			"max": [
+				0.739,
+				0.6,
+				0.739
+			],
+			"tris": 1983,
+			"verts": 4173,
+			"src_tris": 16392,
+			"open_edges": 81,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 38,
+			"markers": {
+				"front": [
+					-0.054,
+					0.101,
+					0.699
+				]
+			}
+		},
+		"dg_mariner": {
+			"page": "dg_d",
+			"slot": [
+				1024,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Forgotten_Mariner_20261105_texture_ede98061.glb",
+			"size": [
+				1.786,
+				0.333,
+				1.798
+			],
+			"min": [
+				-0.893,
+				0.0,
+				-0.899
+			],
+			"max": [
+				0.893,
+				0.333,
+				0.899
+			],
+			"tris": 1996,
+			"verts": 4635,
+			"src_tris": 15344,
+			"open_edges": 114,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 84,
+			"markers": {
+				"front": [
+					-0.011,
+					0.232,
+					0.847
+				]
+			}
+		},
+		"dg_mossy_remains": {
+			"page": "dg_d",
+			"slot": [
+				2048,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Mossbound_Remains_20261105_texture_d1679504.glb",
+			"size": [
+				1.724,
+				1.027,
+				1.554
+			],
+			"min": [
+				-0.862,
+				0.0,
+				-0.777
+			],
+			"max": [
+				0.862,
+				1.027,
+				0.777
+			],
+			"tris": 1990,
+			"verts": 3764,
+			"src_tris": 15116,
+			"open_edges": 363,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 34,
+			"markers": {
+				"front": [
+					0.107,
+					0.08,
+					0.746
+				]
+			}
+		},
+		"dg_prison": {
+			"page": "dg_d",
+			"slot": [
+				3072,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Forsaken_Prison_Crate_20261105_texture_35f4b931.glb",
+			"size": [
+				1.609,
+				1.691,
+				1.598
+			],
+			"min": [
+				-0.805,
+				0.0,
+				-0.799
+			],
+			"max": [
+				0.805,
+				1.691,
+				0.799
+			],
+			"tris": 2986,
+			"verts": 6217,
+			"src_tris": 15889,
+			"open_edges": 146,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 121,
+			"markers": {
+				"front": [
+					-0.145,
+					0.053,
+					0.754
+				]
+			}
+		},
+		"dg_armory": {
+			"page": "dg_d",
+			"slot": [
+				0,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Forgotten_Armory_20261105_texture_189ce0e7.glb",
+			"size": [
+				2.053,
+				1.1,
+				2.019
+			],
+			"min": [
+				-1.026,
+				0.0,
+				-1.01
+			],
+			"max": [
+				1.026,
+				1.1,
+				1.01
+			],
+			"tris": 2994,
+			"verts": 5077,
+			"src_tris": 15929,
+			"open_edges": 242,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 51,
+			"markers": {
+				"front": [
+					0.051,
+					0.133,
+					0.991
+				]
+			}
+		},
+		"dg_banner": {
+			"page": "dg_d",
+			"slot": [
+				1024,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Banner_of_the_Emerald_Watcher_20261105_texture_7a381709.glb",
+			"size": [
+				1.4,
+				2.526,
+				0.172
+			],
+			"min": [
+				-0.7,
+				0.0,
+				-0.086
+			],
+			"max": [
+				0.7,
+				2.526,
+				0.086
+			],
+			"tris": 2000,
+			"verts": 3737,
+			"src_tris": 15640,
+			"open_edges": 68,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 0,
+			"markers": {
+				"front": [
+					-0.089,
+					1.845,
+					0.081
+				]
+			}
+		},
+		"dg_crypt_altar": {
+			"page": "dg_d",
+			"slot": [
+				2048,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Emerald_Crypt_Altar_20261105_texture_454678f2.glb",
+			"size": [
+				0.996,
+				1.979,
+				0.977
+			],
+			"min": [
+				-0.498,
+				0.0,
+				-0.488
+			],
+			"max": [
+				0.498,
+				1.979,
+				0.488
+			],
+			"tris": 2000,
+			"verts": 3963,
+			"src_tris": 13937,
+			"open_edges": 659,
+			"glow_verts": 194,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 4,
+			"markers": {
+				"glow": [
+					0.032,
+					1.369,
+					-0.008
+				],
+				"front": [
+					0.172,
+					0.089,
+					0.462
+				]
+			}
+		},
+		"dg_candles": {
+			"page": "dg_d",
+			"slot": [
+				3072,
+				2048,
+				1024
+			],
+			"src": "Meshy_AI_Emerald_Waxflame_Candles_20261105_texture_8b4d05a9.glb",
+			"size": [
+				0.958,
+				0.9,
+				0.933
+			],
+			"min": [
+				-0.479,
+				0.0,
+				-0.466
+			],
+			"max": [
+				0.479,
+				0.9,
+				0.466
+			],
+			"tris": 1999,
+			"verts": 3554,
+			"src_tris": 15002,
+			"open_edges": 349,
+			"glow_verts": 240,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 88,
+			"markers": {
+				"glow": [
+					0.012,
+					0.558,
+					0.02
+				],
+				"front": [
+					-0.183,
+					0.012,
+					0.447
+				]
+			}
+		},
+		"dg_witch_brazier": {
+			"page": "dg_d",
+			"slot": [
+				0,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Emerald_Witchfire_Brazier_20261105_texture_1c39372d.glb",
+			"size": [
+				1.199,
+				1.6,
+				1.057
+			],
+			"min": [
+				-0.599,
+				0.0,
+				-0.529
+			],
+			"max": [
+				0.599,
+				1.6,
+				0.529
+			],
+			"tris": 2905,
+			"verts": 6139,
+			"src_tris": 15825,
+			"open_edges": 47,
+			"glow_verts": 984,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 97,
+			"markers": {
+				"glow": [
+					0.004,
+					1.257,
+					-0.008
+				],
+				"front": [
+					0.087,
+					0.723,
+					0.502
+				]
+			}
+		},
+		"dg_throne": {
+			"page": "dg_d",
+			"slot": [
+				1024,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Pirate_Bone_Throne_20261105_texture_4a02d011.glb",
+			"size": [
+				2.95,
+				2.395,
+				2.585
+			],
+			"min": [
+				-1.475,
+				0.0,
+				-1.292
+			],
+			"max": [
+				1.475,
+				2.395,
+				1.292
+			],
+			"tris": 3051,
+			"verts": 6548,
+			"src_tris": 13279,
+			"open_edges": 785,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 58,
+			"flipped": 75,
+			"markers": {
+				"front": [
+					0.079,
+					0.071,
+					1.226
+				]
+			}
+		},
+		"dg_oracle": {
+			"page": "dg_d",
+			"slot": [
+				2048,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Tideborne_Oracle_20261105_texture_63f8d91e.glb",
+			"size": [
+				1.549,
+				1.8,
+				0.847
+			],
+			"min": [
+				-0.775,
+				0.0,
+				-0.423
+			],
+			"max": [
+				0.775,
+				1.8,
+				0.423
+			],
+			"tris": 2998,
+			"verts": 5646,
+			"src_tris": 14309,
+			"open_edges": 450,
+			"glow_verts": 32,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 58,
+			"markers": {
+				"glow": [
+					0.123,
+					0.424,
+					0.089
+				],
+				"front": [
+					0.075,
+					0.254,
+					0.403
+				]
+			}
+		},
+		"dg_prayer_rug": {
+			"page": "dg_d",
+			"slot": [
+				3072,
+				3072,
+				1024
+			],
+			"src": "Meshy_AI_Watcher_s_Worn_Prayer_Rug_20261105_texture_03d6c10f.glb",
+			"size": [
+				1.807,
+				0.394,
+				2.077
+			],
+			"min": [
+				-0.903,
+				0.0,
+				-1.038
+			],
+			"max": [
+				0.903,
+				0.394,
+				1.038
+			],
+			"tris": 1984,
+			"verts": 4761,
+			"src_tris": 15229,
+			"open_edges": 114,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 34,
+			"markers": {
+				"front": [
+					0.156,
+					0.045,
+					0.992
+				]
+			}
+		},
+		"dg_chest": {
+			"page": "dg_e",
+			"slot": [
+				0,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Sunken_Treasure_Chest_20261105_texture_5c4b5390.glb",
+			"size": [
+				1.209,
+				0.979,
+				0.896
+			],
+			"min": [
+				-0.604,
+				0.0,
+				-0.448
+			],
+			"max": [
+				0.604,
+				0.979,
+				0.448
+			],
+			"tris": 2024,
+			"verts": 4016,
+			"src_tris": 13566,
+			"open_edges": 551,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 26,
+			"flipped": 52,
+			"markers": {
+				"front": [
+					-0.174,
+					0.397,
+					0.424
+				]
+			}
+		},
+		"dg_chest_open": {
+			"page": "dg_e",
+			"slot": [
+				1024,
+				0,
+				1024
+			],
+			"src": "Meshy_AI_Sunken_Treasure_Trove_20261105_texture_01596c8a.glb",
+			"size": [
+				1.3,
+				1.261,
+				1.245
+			],
+			"min": [
+				-0.65,
+				0.0,
+				-0.623
+			],
+			"max": [
+				0.65,
+				1.261,
+				0.623
+			],
+			"tris": 3020,
+			"verts": 5964,
+			"src_tris": 15443,
+			"open_edges": 255,
+			"glow_verts": 1116,
+			"glow_max": 1.0,
+			"panel_tris": 24,
+			"flipped": 58,
+			"markers": {
+				"glow": [
+					-0.0,
+					0.582,
+					-0.016
+				],
+				"front": [
+					-0.004,
+					0.046,
+					0.587
+				]
+			}
+		},
+		"dg_gold": {
+			"page": "dg_e",
+			"slot": [
+				0,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Gilded_Treasure_Trove_20261105_texture_63432239.glb",
+			"size": [
+				1.743,
+				0.493,
+				1.737
+			],
+			"min": [
+				-0.871,
+				0.0,
+				-0.868
+			],
+			"max": [
+				0.871,
+				0.493,
+				0.868
+			],
+			"tris": 1993,
+			"verts": 3792,
+			"src_tris": 16100,
+			"open_edges": 0,
+			"glow_verts": 385,
+			"glow_max": 1.0,
+			"panel_tris": 0,
+			"flipped": 23,
+			"markers": {
+				"glow": [
+					-0.085,
+					0.145,
+					-0.176
+				],
+				"front": [
+					-0.113,
+					0.037,
+					0.812
+				]
+			}
+		},
+		"dg_hoard": {
+			"page": "dg_e",
+			"slot": [
+				1024,
+				1024,
+				1024
+			],
+			"src": "Meshy_AI_Sunken_Pirate_Hoard_20261105_texture_622d5b74.glb",
+			"size": [
+				2.465,
+				1.299,
+				2.411
+			],
+			"min": [
+				-1.232,
+				0.0,
+				-1.205
+			],
+			"max": [
+				1.232,
+				1.299,
+				1.205
+			],
+			"tris": 2980,
+			"verts": 5365,
+			"src_tris": 13808,
+			"open_edges": 826,
+			"glow_verts": 0,
+			"glow_max": 0.0,
+			"panel_tris": 0,
+			"flipped": 14,
+			"markers": {
+				"front": [
+					-0.362,
+					0.126,
+					1.138
 				]
 			}
 		}
