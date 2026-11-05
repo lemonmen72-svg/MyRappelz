@@ -16,7 +16,9 @@ const LEVELS := [0, 1, 2]
 ## Окна для проверки: [что, метод, который его открывает].
 const WINDOWS := [
 	["окно героя", "_w_hero"], ["древо «Мечи и кинжалы»", "_w_blades"], ["древо «Арбалет»", "_w_crossbow"],
-	["окно существа", "_w_creature"], ["умения существа", "_w_creature_skills"], ["питомцы", "_w_pets"],
+	["окно существа", "_w_creature"], ["умения существа", "_w_creature_skills"],
+	["ауры и бафы существа", "_w_creature_auras"], ["пассивные существа", "_w_creature_passive"],
+	["оружие и доспехи существа", "_w_creature_gear"], ["питомцы", "_w_pets"],
 	["сумка с картой", "_w_bag"], ["лавка Кирка", "_w_shop"], ["журнал заданий", "_w_journal"],
 	["диалог", "_w_dialog"], ["задание в диалоге", "_w_dialog_quest"], ["настройки: графика", "_w_settings"],
 	["настройки: интерфейс", "_w_settings_ui"], ["настройки: прочее", "_w_settings_other"],
@@ -57,6 +59,8 @@ func before_start() -> void:
 		_cfg_backup = FileAccess.get_file_as_string(UiScale.PATH)
 	UiScale.set_level(UiScale.MEDIUM, false)
 	game.add_pet("panther", "Тень", 20)
+	for sp in ["wolf", "turtle", "pheasant", "centaur", "panther"]:
+		game.add_pet(String(sp), PetData.stage_name(String(sp), 0), 30)
 	game.active_pet = 0
 	game.inventory.add("card_panther_soul", 1)
 	game.inventory.add("card_wolf", 3)
@@ -169,6 +173,22 @@ func _w_creature() -> void:
 
 func _w_creature_skills() -> void:
 	main.pets.open_creature(0, "skills")
+
+
+func _w_creature_auras() -> void:
+	main.pets.open_creature(0, "aura")
+
+
+func _w_creature_passive() -> void:
+	main.pets.open_creature(0, "passive")
+
+
+## Снаряжение питомца: в сумке оружие и доспехи, выбрана вещь (карточка с «Надеть питомцу»).
+func _w_creature_gear() -> void:
+	var cw: CreatureWindow = main.pets.creature
+	main.pets.open_creature(0, "gear")
+	cw.gear_sel = "armor_body_warrior_r2"
+	cw.open(0, "gear")
 
 
 func _w_pets() -> void:

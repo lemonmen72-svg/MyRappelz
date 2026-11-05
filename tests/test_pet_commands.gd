@@ -363,7 +363,10 @@ func _check_window(pm: PetManager) -> void:
 	_press(cw, "skill_daze")
 	_press(cw, "slot_auto_0")
 	check(String((rec["slots"] as Array)[0]) == "daze", "касание пустой ячейки поставило выбранный «Морок»")
-	# Ауры в карточке: «В ячейку ауры 1–2»
+	# Ауры в карточке: «В ячейку ауры 1–2» (вкладка «Ауры и бафы» — с теми же ячейками)
+	_press(cw, "tab_aura")
+	for key in ["slot_auto_0", "slot_aura_1"]:
+		check(cw.buttons.has(key), "на вкладке «Ауры и бафы» — ячейка %s" % key)
 	_press(cw, "skill_provoke")
 	check(cw.buttons.has("toslot_provoke_1") and not cw.buttons.has("toslot_provoke_2"), "в карточке ауры — «В ячейку ауры 1–2»")
 	pm.active_pet.mp = pm.active_pet.max_mp
@@ -374,6 +377,8 @@ func _check_window(pm: PetManager) -> void:
 	# Неизученное и пассивное — без кнопок ячеек
 	_press(cw, "skill_hunter_call")
 	check(not cw.buttons.has("toslot_hunter_call_0"), "неизученное умение в ячейку не поставить (кнопок нет)")
+	_press(cw, "tab_passive")
+	check(not cw.buttons.has("slot_auto_0"), "на вкладке «Пассивные» ячеек нет")
 	_press(cw, "skill_inner_fire")
 	check(not cw.buttons.has("toslot_inner_fire_0"), "пассивное — без ячейки")
 	# Окно «Питомцы»

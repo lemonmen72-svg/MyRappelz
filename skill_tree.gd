@@ -9,6 +9,10 @@ extends Control
 ## Касание значка — сигнал picked(id): окно показывает карточку умения.
 ## Картинка значка — PNG по пути из поля "icon" (128×128, прозрачные углы); нет файла — кружок с буквой.
 ##
+## Крупный режим (setup(…, true); окно существа — вкладки «Активные», «Ауры и бафы», «Пассивные»): значки до
+## ICON_BIG, ярус может переноситься на несколько строк (подпись «ур. N» — у первой), раскладка (сколько ярусов
+## слить, сколько значков в строке) выбирается та, где значки крупнее всего.
+##
 ## Использование:
 ##   var t := SkillTree.new()
 ##   t.setup(items, Vector2(640, 420), selected_id)
@@ -31,6 +35,17 @@ const COL_MIN := 60.0
 const COL_MAX := 100.0
 const ICON_MIN := 42.0
 const ICON_MAX := 58.0
+## Крупный режим: наибольшие значок, строка и колонка; наименьший значок (касание на телефоне).
+const ICON_BIG := 86.0
+const ROW_BIG := 104.0
+const COL_BIG := 124.0
+const ICON_BIG_MIN := 40.0
+## Крупный режим: ярусов — сколько можно, пока значки не мельче этой доли самой крупной раскладки.
+const BIG_KEEP := 0.86
+## Крупный режим: до стольких разных уровней перебираются все разбиения на ярусы (больше — слияние ближайших).
+const BIG_PARTITION_MAX := 12
+## Крупный режим: ширина подписи яруса.
+const LABEL_BIG := 86.0
 const GOLD := Color(1.0, 0.82, 0.38)
 const LINE_ON := Color(1.0, 0.85, 0.45, 0.9)
 const LINE_OFF := Color(0.6, 0.62, 0.75, 0.45)
@@ -42,12 +57,18 @@ var icons: Dictionary = {}
 ## Ярусы после слияния: [{"from": ур., "to": ур., "ids": [id, ...]}, ...].
 var rows: Array = []
 var icon_size := 60.0
+## Крупный режим (переносы ярусов, значки до ICON_BIG).
+var big := false
+## Строки значков (в крупном режиме ярус бывает в нескольких строках): [{"ids": [...], "row": ярус, "first": bool}].
+var lines: Array = []
 
 ## Центры значков и пререквизиты (для линий).
 var _center: Dictionary = {}
 var _pre: Dictionary = {}
 var _learned: Dictionary = {}
 var _row_y: Array = []
+## Высоты разделителей ярусов.
+var _sep_y: Array = []
 
 static var _tex_cache: Dictionary = {}
 
@@ -81,10 +102,11 @@ static func reset_cache() -> void:
 	_tex_cache.clear()
 
 
-## Строит древо в прямоугольнике sz. sel — выделенное умение.
-func setup(list: Array, sz: Vector2, sel: String = "") -> void:
+## Строит древо в прямоугольнике sz. sel — выделенное умение; big_mode — крупные значки (см. шапку).
+func setup(list: Array, sz: Vector2, sel: String = "", big_mode: bool = false) -> void:
 	items = list
 	selected = sel
+	big = big_mode
 	custom_minimum_size = sz
 	size = sz
 	mouse_filter = Control.MOUSE_FILTER_PASS
@@ -96,6 +118,12 @@ func setup(list: Array, sz: Vector2, sel: String = "") -> void:
 	_pre.clear()
 	_learned.clear()
 	_row_y.clear()
+	_sep_y.clear()
+	lines.clear()
+	if big:
+		_setup_big(sz)
+		queue_redraw()
+		return
 	_make_rows(sz.y)
 	if rows.is_empty():
 		return
@@ -129,16 +157,10 @@ func setup(list: Array, sz: Vector2, sel: String = "") -> void:
 		var r: Dictionary = rows[ri]
 		var cy := row_h * (float(ri) + 0.5)
 		_row_y.append(cy)
-		var lt := "ур. %d" % int(r["from"]) if int(r["from"]) == int(r["to"]) else "ур. %d–%d" % [int(r["from"]), int(r["to"])]
-		var l := Label.new()
-		l.text = lt
-		var lf := UiScale.fs(UiScale.FONT_SMALL)
-		l.add_theme_font_size_override("font_size", lf)
-		l.add_theme_color_override("font_color", Color(0.78, 0.8, 0.9))
-		l.position = Vector2(0, cy - float(lf) * 0.75)
-		l.size = Vector2(label_w - 4.0, float(lf) * 1.5)
-		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(l)
+		lines.append({"ids": r["ids"], "row": ri, "first": true})
+		if ri > 0:
+			_sep_y.append(row_h * float(ri))
+		_add_row_label(r, cy, label_w, UiScale.FONT_SMALL)
 		for id in r["ids"]:
 			var sid := String(id)
 			var center := Vector2(x0 + col_w * (float(col_of[sid]) + 0.5), cy)
@@ -150,20 +172,206 @@ func setup(list: Array, sz: Vector2, sel: String = "") -> void:
 	queue_redraw()
 
 
-## Ярусы: различные требуемые уровни; если не помещаются по высоте h — сливаются ближайшие соседние.
-func _make_rows(h: float) -> void:
+## Подпись яруса «ур. 5» / «ур. 5–6» слева от строки с центром cy.
+func _add_row_label(r: Dictionary, cy: float, label_w: float, font: int) -> void:
+	var lt := "ур. %d" % int(r["from"]) if int(r["from"]) == int(r["to"]) else "ур. %d–%d" % [int(r["from"]), int(r["to"])]
+	var l := Label.new()
+	l.text = lt
+	var lf := UiScale.fs(font)
+	l.add_theme_font_size_override("font_size", lf)
+	l.add_theme_color_override("font_color", Color(0.78, 0.8, 0.9))
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.position = Vector2(0, cy - float(lf) * 0.75)
+	l.size = Vector2(label_w - 4.0, float(lf) * 1.5)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(l)
+
+
+## Крупный режим: перебор числа ярусов (слияние соседних уровней) и значков в строке — самые крупные значки.
+func _setup_big(sz: Vector2) -> void:
 	rows.clear()
+	var levels := _levels()
+	if levels.is_empty():
+		return
+	var label_w := UiScale.px(LABEL_BIG)
+	var avail := sz.x - label_w
+	var pad := UiScale.px(16)
+	# Варианты ярусов: все разбиения уровней на соседние группы (уровней мало — до 2^(n−1)), при многих уровнях —
+	# слияние ближайших (_group_levels). Для каждого — лучшее число значков в строке; ярус, где пререквизит слит
+	# с умением, — хуже (×0.88)
+	var parts: Array = []
+	if levels.size() <= BIG_PARTITION_MAX:
+		for mask in 1 << (levels.size() - 1):
+			var groups: Array = [[levels[0]]]
+			for i in range(1, levels.size()):
+				if mask & (1 << (i - 1)):
+					groups.append([levels[i]])
+				else:
+					(groups[groups.size() - 1] as Array).append(levels[i])
+			parts.append(groups)
+	else:
+		for nr in range(levels.size(), 0, -1):
+			parts.append(_group_levels(levels, nr))
+	var cands: Array = []
+	var top := 0.0
+	for groups in parts:
+		var counts: Array = []
+		var most := 1
+		var pre_merged := false
+		for g in groups:
+			var n := _ids_of(g).size()
+			counts.append(n)
+			most = maxi(most, n)
+			pre_merged = pre_merged or _pre_inside(g)
+		var nr_icon := -1.0
+		var nr_c := 1
+		for c in range(1, most + 1):
+			var nl := 0
+			for n in counts:
+				nl += maxi(1, ceili(float(n) / float(c)))
+			var row_h := minf(UiScale.px(ROW_BIG), sz.y / float(nl))
+			var col_w := minf(UiScale.px(COL_BIG), avail / float(c))
+			var ic := minf(minf(row_h - pad, col_w - UiScale.px(8)), UiScale.px(ICON_BIG))
+			if ic > nr_icon + 0.5:
+				nr_icon = ic
+				nr_c = c
+		var score := nr_icon * (0.88 if pre_merged else 1.0)
+		top = maxf(top, score)
+		cands.append([(groups as Array).size(), groups, nr_c, nr_icon, score])
+	# Больше ярусов (уровни видны), пока значки не мельче BIG_KEEP самой крупной раскладки; при равных — крупнее
+	var best_icon := -1.0
+	var best_groups: Array = []
+	var best_c := 1
+	var best_n := -1
+	for cd in cands:
+		if float(cd[4]) < top * BIG_KEEP:
+			continue
+		if int(cd[0]) > best_n or (int(cd[0]) == best_n and float(cd[4]) > best_icon + 0.5):
+			best_n = int(cd[0])
+			best_groups = cd[1]
+			best_c = int(cd[2])
+			best_icon = float(cd[4])
+	if best_groups.is_empty():
+		best_groups = [levels]
+	for cd in cands:
+		if cd[1] == best_groups:
+			best_icon = float(cd[3])
+	icon_size = maxf(best_icon, UiScale.px(ICON_BIG_MIN))
+	var nlines := 0
+	for g in best_groups:
+		nlines += maxi(1, ceili(float(_ids_of(g).size()) / float(best_c)))
+	var row_h := minf(UiScale.px(ROW_BIG), sz.y / float(maxi(1, nlines)))
+	var col_w := minf(UiScale.px(COL_BIG), avail / float(best_c))
+	var x0 := label_w + maxf(0.0, (avail - col_w * float(best_c)) * 0.5)
+	# Сетка по центру высоты, если строк мало
+	var y0 := maxf(0.0, (sz.y - row_h * float(nlines)) * 0.5)
+	var col_of: Dictionary = {}
+	var li := 0
+	for gi in best_groups.size():
+		var g: Array = best_groups[gi]
+		var ids := _ids_of(g)
+		rows.append({"from": int(g[0]), "to": int(g[g.size() - 1]), "ids": ids})
+		if gi > 0:
+			_sep_y.append(y0 + row_h * float(li))
+		var chunks: Array = []
+		var k := 0
+		while k < ids.size():
+			chunks.append(ids.slice(k, mini(k + best_c, ids.size())))
+			k += best_c
+		if chunks.is_empty():
+			chunks.append([])
+		for ci in chunks.size():
+			var line_ids: Array = chunks[ci]
+			var cy := y0 + row_h * (float(li) + 0.5)
+			_row_y.append(cy)
+			lines.append({"ids": line_ids, "row": gi, "first": ci == 0})
+			if ci == 0:
+				_add_row_label(rows[gi], cy, label_w, UiScale.FONT_SMALL)
+			# Колонка: под пререквизитом, если она свободна в этой строке; иначе первая свободная
+			var used: Dictionary = {}
+			var place: Dictionary = {}
+			for id in line_ids:
+				var pre := String(_item(String(id)).get("pre", ""))
+				if pre != "" and col_of.has(pre) and int(col_of[pre]) < best_c and not used.has(int(col_of[pre])):
+					place[String(id)] = int(col_of[pre])
+					used[int(col_of[pre])] = true
+			for id in line_ids:
+				if place.has(String(id)):
+					continue
+				var c := 0
+				while used.has(c):
+					c += 1
+				place[String(id)] = c
+				used[c] = true
+			for id in line_ids:
+				var sid := String(id)
+				col_of[sid] = int(place[sid])
+				var center := Vector2(x0 + col_w * (float(place[sid]) + 0.5), cy)
+				_center[sid] = center
+				var it := _item(sid)
+				_pre[sid] = String(it.get("pre", ""))
+				_learned[sid] = bool(it.get("learned", false))
+				_add_icon(it, center)
+			li += 1
+
+
+## Пререквизит и умение — оба в группе уровней g.
+func _pre_inside(g: Array) -> bool:
+	for it in items:
+		var d: Dictionary = it
+		var pre := String(d.get("pre", ""))
+		if pre == "" or not g.has(int(d.get("row", 1))):
+			continue
+		var pd := _item(pre)
+		if not pd.is_empty() and g.has(int(pd.get("row", 1))):
+			return true
+	return false
+
+
+## Требуемые уровни умений (ярусы до слияния), по возрастанию.
+func _levels() -> Array:
 	var levels: Array = []
 	for it in items:
 		var lv := int((it as Dictionary).get("row", 1))
 		if not levels.has(lv):
 			levels.append(lv)
 	levels.sort()
+	return levels
+
+
+## id умений с требуемым уровнем из группы g (в порядке items; в крупном режиме — по уровню, при равном — как в items).
+func _ids_of(g: Array) -> Array:
+	var ids: Array = []
+	if big:
+		for lv in g:
+			for it in items:
+				var d: Dictionary = it
+				if int(d.get("row", 1)) == int(lv):
+					ids.append(String(d["id"]))
+		return ids
+	for it in items:
+		var d: Dictionary = it
+		if g.has(int(d.get("row", 1))):
+			ids.append(String(d["id"]))
+	return ids
+
+
+## Ярусы: различные требуемые уровни; если не помещаются по высоте h — сливаются ближайшие соседние.
+func _make_rows(h: float) -> void:
+	rows.clear()
+	var max_rows := maxi(1, int(floor(h / row_min())))
+	for g in _group_levels(_levels(), max_rows):
+		var ga: Array = g
+		rows.append({"from": int(ga[0]), "to": int(ga[ga.size() - 1]), "ids": _ids_of(ga)})
+
+
+## Уровни levels группами, не больше max_rows групп: сливаются ближайшие соседние (пререквизит и умение — в последнюю
+## очередь).
+func _group_levels(levels: Array, max_rows: int) -> Array:
 	var groups: Array = []
 	for lv in levels:
 		groups.append([lv])
-	var max_rows := maxi(1, int(floor(h / row_min())))
-	while groups.size() > max_rows:
+	while groups.size() > maxi(1, max_rows):
 		var best := 0
 		var best_gap := INF
 		for i in groups.size() - 1:
@@ -176,17 +384,11 @@ func _make_rows(h: float) -> void:
 			if gap < best_gap:
 				best_gap = gap
 				best = i
-		var merged: Array = groups[best]
+		var merged: Array = (groups[best] as Array).duplicate()
 		merged.append_array(groups[best + 1])
+		groups[best] = merged
 		groups.remove_at(best + 1)
-	for g in groups:
-		var ga: Array = g
-		var ids: Array = []
-		for it in items:
-			var d: Dictionary = it
-			if ga.has(int(d.get("row", 1))):
-				ids.append(String(d["id"]))
-		rows.append({"from": int(ga[0]), "to": int(ga[ga.size() - 1]), "ids": ids})
+	return groups
 
 
 ## Есть ли умение яруса b (требуемые уровни), чей пререквизит — в ярусе a.
@@ -302,7 +504,7 @@ func _add_icon(it: Dictionary, center: Vector2) -> void:
 		b.add_child(ring)
 	elif kind == "toggle":
 		var on := bool(it.get("on", false))
-		var dd := UiScale.px(11)
+		var dd := UiScale.px(11) if not big else maxf(UiScale.px(11), s * 0.16)
 		b.add_child(_dot(Vector2((s - dd) * 0.5, s - dd - 2.0), dd,
 			Color(0.35, 1.0, 0.5) if on else Color(1, 1, 1, 0.85)))
 	if bool(it.get("unfit", false)):
@@ -311,7 +513,7 @@ func _add_icon(it: Dictionary, center: Vector2) -> void:
 	# Уровень мелко в углу
 	var lv := Label.new()
 	lv.text = "%d/%d" % [int(it.get("level", 0)), int(it.get("max", 1))]
-	var lvf := UiScale.fs(UiScale.FONT_TINY)
+	var lvf := UiScale.fs(UiScale.FONT_SMALL if big else UiScale.FONT_TINY)
 	lv.add_theme_font_size_override("font_size", lvf)
 	lv.add_theme_color_override("font_color", GOLD if learned else Color(0.85, 0.86, 0.95))
 	lv.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -347,9 +549,8 @@ func _on_pick(id: String) -> void:
 
 func _draw() -> void:
 	# Тонкие разделители ярусов
-	var h := size.y / float(maxi(1, rows.size()))
-	for i in range(1, rows.size()):
-		draw_line(Vector2(4, h * float(i)), Vector2(size.x - 4.0, h * float(i)), Color(1, 1, 1, 0.07), 1.0)
+	for y in _sep_y:
+		draw_line(Vector2(4, float(y)), Vector2(size.x - 4.0, float(y)), Color(1, 1, 1, 0.07), 1.0)
 	# Линии пререквизитов: от нижнего края значка-предка к верхнему краю умения
 	var r := icon_size * 0.5
 	for id in _pre:

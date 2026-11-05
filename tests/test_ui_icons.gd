@@ -48,7 +48,7 @@ func run_step() -> void:
 
 
 func _check_textures() -> void:
-	check(UiIcons.IDS.size() == 30, "в контракте 30 значков: %d" % UiIcons.IDS.size())
+	check(UiIcons.IDS.size() == 34, "в контракте 34 значка: %d" % UiIcons.IDS.size())
 	var files := 0
 	for k in UiIcons.IDS:
 		var id := String(k)
@@ -122,7 +122,7 @@ func _check_windows(hud: HUD) -> void:
 	hud.close_window()
 	main.pets.open_creature(0, "stats")
 	var cw: CreatureWindow = main.pets.creature
-	for k in ["tab_stats", "tab_skills", "back"]:
+	for k in ["tab_stats", "tab_skills", "tab_active", "tab_aura", "tab_passive", "tab_gear", "back"]:
 		var b := cw.buttons.get(k) as Button
 		check(b != null and b.icon != null and b.text != "", "окно существа: %s — значок и подпись «%s»" % [k, b.text if b != null else ""])
 	hud.close_window()

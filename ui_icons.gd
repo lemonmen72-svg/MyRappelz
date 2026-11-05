@@ -20,6 +20,7 @@ const IDS := [
 	"btn_talk", "btn_merchant", "btn_tame", "btn_storage", "btn_forge", "btn_craft",
 	"gold", "map", "joystick_base", "joystick_knob",
 	"quest_available", "quest_active", "quest_complete", "quest_target",
+	"tab_pet_active", "tab_pet_auras", "tab_pet_passive", "tab_pet_gear",
 ]
 ## Подписи значков (подсказка на ПК, подпись по долгому касанию).
 const NAMES := {
@@ -32,6 +33,8 @@ const NAMES := {
 	"joystick_base": "Джойстик", "joystick_knob": "Ручка джойстика",
 	"quest_available": "Можно взять задание", "quest_active": "Задание выполняется",
 	"quest_complete": "Задание выполнено — можно сдать", "quest_target": "Цель задания",
+	"tab_pet_active": "Активные умения", "tab_pet_auras": "Ауры и бафы", "tab_pet_passive": "Пассивные умения",
+	"tab_pet_gear": "Оружие и доспехи",
 }
 ## Контур процедурных рисунков (доля размера) и его цвет.
 const OUTLINE := 0.05
@@ -441,5 +444,31 @@ static func _draw(pt: _Paint, id: String) -> void:
 			pt.circle(Vector2(0.5, 0.38), 0.28, red)
 			pt.seg(Vector2(0.4, 0.28), Vector2(0.6, 0.48), 0.07, light)
 			pt.seg(Vector2(0.6, 0.28), Vector2(0.4, 0.48), 0.07, light)
+		"tab_pet_active":
+			# Три следа когтей
+			var claw := Color(1.0, 0.55, 0.4)
+			for i in 3:
+				var dx := 0.17 * float(i - 1)
+				pt.seg(Vector2(0.36 + dx, 0.18), Vector2(0.62 + dx, 0.82), 0.09, claw)
+		"tab_pet_auras":
+			# Лапа в сияющем кольце
+			var glow := Color(0.5, 0.95, 0.65)
+			pt.arc(c, 0.38, 0.07, 0.0, TAU, glow)
+			for i in 8:
+				var a := TAU * float(i) / 8.0
+				pt.circle(c + Vector2(cos(a), sin(a)) * 0.38, 0.05, glow.lightened(0.3))
+			_paw(pt, Vector2(0.5, 0.53), 0.36, light)
+		"tab_pet_passive":
+			# Щит со звездой
+			pt.poly(_v([Vector2(0.2, 0.16), Vector2(0.8, 0.16), Vector2(0.8, 0.5), Vector2(0.5, 0.88),
+				Vector2(0.2, 0.5)]), Color(0.55, 0.65, 0.95))
+			pt.poly(_star(Vector2(0.5, 0.44), 0.2, 0.08, 5), gold)
+		"tab_pet_gear":
+			# Клинок поверх нагрудника
+			pt.poly(_v([Vector2(0.18, 0.3), Vector2(0.38, 0.2), Vector2(0.62, 0.2), Vector2(0.82, 0.3),
+				Vector2(0.74, 0.86), Vector2(0.26, 0.86)]), Color(0.62, 0.66, 0.76))
+			pt.seg(Vector2(0.3, 0.78), Vector2(0.78, 0.14), 0.09, light)
+			pt.seg(Vector2(0.22, 0.7), Vector2(0.38, 0.86), 0.07, gold)
+			pt.seg(Vector2(0.3, 0.78), Vector2(0.2, 0.9), 0.07, Color(0.6, 0.4, 0.22))
 		_:
 			pt.circle(c, 0.3, Color(0.7, 0.72, 0.8))

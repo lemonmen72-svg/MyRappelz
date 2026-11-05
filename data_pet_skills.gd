@@ -373,28 +373,50 @@ const SPECIES_SKILLS := {
 ## Умения существ из базы, которых раньше не было (0.31; SkillTreeResource 2101–2903, 1701–1703; задачи Максима
 ## «бонус существа», «снаряжение существа»): по виду — DB_EXTRAS, строит _static_init в _extra и _lists.
 ##   * «Знаток снаряжения» (Creature Item Expert): питомец получает долю характеристик надетых оружия и доспеха
-##     (80 % у пантеры, черепахи, фазана; 90 % — волк; 100 % — кентавр) и всю прибавку их заточки (PetGear);
+##     и всю прибавку их заточки (PetGear);
 ##   * «Живучесть: доспех …» (Vital Unit, 40 ур.): макс. HP + доля, если надет доспех своего варианта (воина или охотника);
-##   * «Боец: …» (Fighter Unit, 90 ур., 2-я форма): атака + доля с оружием ближнего боя (у фазана — крит +5 с кинжалом);
+##   * «Боец: …» (Fighter Unit, 90 ур.): атака + доля с оружием ближнего боя (у фазана — крит с кинжалом);
 ##   * «Способность карты» ×2 (Card Ability, 40 и 90 ур.): карта питомца встаёт в пояс героя (PetBelt) и даёт герою
 ##     долю его характеристики (Сила, Выносливость …) или атаки / защиты / точности / избегания;
+##     у этих пяти — ровно 3 уровня, по одному на форму питомца (PER_FORM: 1-я форма — до 1 ур., 2-я — до 2,
+##     3-я — до 3; решение Максима). В базе каждое — умение в 1 уровень, а сила растёт с «рангом» существа
+##     (варианты «<Stage N>» SkillResource: Item Expert 80 / 90 / 95 / 100 %, Vital и Fighter Unit, Card Ability —
+##     5 / 10 / 12 / 14 / 16 / 18 %): ур. 1 — ранг вида в базе (пантера, черепаха, фазан — 1-й, волк — 2-й,
+##     кентавр — 4-й), ур. 2 и 3 — следующие ранги. Требования: ур. 1 — уровень базы (1 / 40 / 90), ур. 2 — 2-я форма
+##     (с 50 ур.; у «Бойца» и 2-й карты — с 90), ур. 3 — 3-я форма (со 100 ур.). Числа — tools/rappelz_db_reference.md;
 ##   * «Зализать раны» (Wound Lick, 2-я и 3-я форма): восстановление HP хозяину и питомцу на 30 с (база: +100 за
 ##     уровень — у нас × 0.03, как «Быстрое заживление» ← Meditation), тратит материал вида;
 ##   * «Создание: материал» (2-я форма, раз в 12 ч) и «Создание: зелье» (3-я форма, раз в час, нужен пустой флакон) —
 ##     вручную в окне существа (вид "manual");
 ##   * «Благословение …» ×6 (Blessing of Strength … Wisdom, Basic / Intermediate): +1 к характеристике за уровень,
 ##     с 51 ур. (1-я форма) и 101 ур. (2-я форма).
+## Числа по уровням 1–3 (поле "value" — таблица из 3 чисел, value()): expert — доля снаряжения, unit — [Живучесть, Боец]
+## (доли; у фазана «Боец» — крит, единицы), cards — [[ключ, [ур. 1, 2, 3]], …]. Без значения в базе (ранг 5–6 у
+## «Способности карты: атака» кентавра, ранг 4 «избегания» волка) — по шагу +2 % соседних рангов.
 const DB_EXTRAS := {
-	"panther": {"expert": 0.8, "armor": "warrior", "unit": [0.05, 0.05], "weapon": "melee",
-		"cards": [["str", 0.05], ["atk", 0.05]], "material": "panther_fang"},
-	"turtle": {"expert": 0.8, "armor": "warrior", "unit": [0.05, 0.05], "weapon": "melee",
-		"cards": [["vit", 0.05], ["def", 0.05]], "material": "shell_plate"},
-	"pheasant": {"expert": 0.8, "armor": "hunter", "unit": [0.05, 5.0], "weapon": "dagger",
-		"cards": [["dex", 0.05], ["acc", 0.05]], "material": "pheasant_feather"},
-	"wolf": {"expert": 0.9, "armor": "hunter", "unit": [0.10, 0.10], "weapon": "melee",
-		"cards": [["agi", 0.10], ["avoid", 0.10]], "material": "wolf_claw"},
-	"centaur": {"expert": 1.0, "armor": "warrior", "unit": [0.14, 0.14], "weapon": "melee",
-		"cards": [["str", 0.14], ["atk", 0.14]], "material": "horse_hair"},
+	"panther": {"expert": [0.8, 0.9, 0.95], "armor": "warrior", "vital": [0.05, 0.10, 0.12],
+		"fighter": [0.05, 0.10, 0.12], "weapon": "melee",
+		"cards": [["str", [0.05, 0.10, 0.12]], ["atk", [0.05, 0.10, 0.12]]], "material": "panther_fang"},
+	"turtle": {"expert": [0.8, 0.9, 0.95], "armor": "warrior", "vital": [0.05, 0.10, 0.12],
+		"fighter": [0.05, 0.10, 0.12], "weapon": "melee",
+		"cards": [["vit", [0.05, 0.10, 0.12]], ["def", [0.05, 0.10, 0.12]]], "material": "shell_plate"},
+	"pheasant": {"expert": [0.8, 0.9, 0.95], "armor": "hunter", "vital": [0.05, 0.10, 0.12],
+		"fighter": [5.0, 10.0, 12.0], "weapon": "dagger",
+		"cards": [["dex", [0.05, 0.10, 0.12]], ["acc", [0.05, 0.10, 0.12]]], "material": "pheasant_feather"},
+	"wolf": {"expert": [0.9, 0.95, 1.0], "armor": "hunter", "vital": [0.10, 0.12, 0.14],
+		"fighter": [0.10, 0.12, 0.14], "weapon": "melee",
+		"cards": [["agi", [0.10, 0.12, 0.14]], ["avoid", [0.10, 0.12, 0.14]]], "material": "wolf_claw"},
+	"centaur": {"expert": [1.0, 1.0, 1.0], "armor": "warrior", "vital": [0.14, 0.16, 0.18],
+		"fighter": [0.14, 0.16, 0.18], "weapon": "melee",
+		"cards": [["str", [0.14, 0.16, 0.18]], ["atk", [0.14, 0.16, 0.18]]], "material": "horse_hair"},
+}
+## Уровни умений «по формам» (у каждого — 3 уровня, по одному на форму): требования по стадиям для ур. 1, 2, 3.
+const FORM_TIERS := {
+	"item_expert": [[1, 1], [50, 2], [100, 3]],
+	"vital_unit": [[40, 1], [50, 2], [100, 3]],
+	"card_1": [[40, 1], [50, 2], [100, 3]],
+	"fighter_unit": [[90, 1], [90, 2], [100, 3]],
+	"card_2": [[90, 1], [90, 2], [100, 3]],
 }
 ## Подписи характеристик и чисел для «Способности карты».
 const CARD_NAMES := {"str": "Сила", "vit": "Выносливость", "agi": "Ловкость", "dex": "Меткость", "int": "Интеллект",
@@ -419,31 +441,32 @@ static func _static_init() -> void:
 		var d: Dictionary = DB_EXTRAS[sp]
 		var ids: Array = []
 		var ex := "item_expert_" + sp
-		_extra[ex] = {"name": "Знаток снаряжения", "kind": "passive", "glyph": "С", "color": GRAY, "jp": 1,
-			"desc": "Питомец носит оружие и доспех (окно существа: ячейки «Оружие» и «Броня», нужна карта снаряжения) и получает %d%% их характеристик и всю прибавку заточки." % roundi(float(d["expert"]) * 100.0),
-			"tiers": [[1, 1], [0, 0], [0, 0]], "bonus": "item_expert", "value": [float(d["expert"]), 0.0]}
+		var xp: Array = d["expert"]
+		_extra[ex] = {"name": "Знаток снаряжения", "kind": "passive", "glyph": "С", "color": GRAY, "jp": 1, "per_form": true,
+			"desc": "Питомец носит оружие и доспех (окно существа, вкладка «Оружие и доспехи»; нужна карта снаряжения) и получает долю их характеристик (%s %% по уровням умения) и всю прибавку заточки." % _pct_list(xp),
+			"tiers": FORM_TIERS["item_expert"], "bonus": "item_expert", "value": xp}
 		ids.append(ex)
 		var vu := "vital_unit_" + sp
 		var av := String(d["armor"])
 		_extra[vu] = {"name": "Живучесть: %s" % String(arm[av]), "kind": "passive", "glyph": "Ж", "color": Color(0.85, 0.3, 0.35),
-			"jp": 1, "armor": av, "desc": "Макс. HP питомца выше, когда на нём %s." % String(arm[av]),
-			"tiers": [[40, 1], [0, 0], [0, 0]], "bonus": "vital_unit", "value": [float(d["unit"][0]), 0.0]}
+			"jp": 1, "armor": av, "per_form": true, "desc": "Макс. HP питомца выше, когда на нём %s." % String(arm[av]),
+			"tiers": FORM_TIERS["vital_unit"], "bonus": "vital_unit", "value": d["vital"]}
 		ids.append(vu)
 		var fu := "fighter_unit_" + sp
 		var dagger := String(d["weapon"]) == "dagger"
 		_extra[fu] = {"name": "Боец: кинжал" if dagger else "Боец: ближний бой", "kind": "passive", "glyph": "Б", "color": RED,
-			"jp": 1, "weapon": String(d["weapon"]),
+			"jp": 1, "weapon": String(d["weapon"]), "per_form": true,
 			"desc": "Шанс крита питомца выше, когда на нём кинжал." if dagger else "Атака питомца выше, когда на нём оружие ближнего боя.",
-			"tiers": [[0, 0], [90, 1], [0, 0]], "bonus": "fighter_unit", "value": [float(d["unit"][1]), 0.0]}
+			"tiers": FORM_TIERS["fighter_unit"], "bonus": "fighter_unit", "value": d["fighter"]}
 		ids.append(fu)
 		for k in 2:
 			var c: Array = d["cards"][k]
 			var cid := "card_%s_%d" % [sp, k + 1]
 			var what := String(CARD_NAMES[String(c[0])])
 			_extra[cid] = {"name": "Способность карты: %s" % what, "kind": "passive", "glyph": "К", "color": VIOLET, "jp": 1,
-				"card": String(c[0]),
-				"desc": "Отозванного питомца можно вставить в пояс героя (окно «Питомцы», блок «Пояс»): %s героя +%d%%." % [what, roundi(float(c[1]) * 100.0)],
-				"tiers": [[40, 1], [0, 0], [0, 0]] if k == 0 else [[0, 0], [90, 1], [0, 0]], "bonus": "card", "value": [float(c[1]), 0.0]}
+				"card": String(c[0]), "per_form": true,
+				"desc": "Отозванного питомца можно вставить в пояс героя (сумка, пояс с картами существ): %s героя выше (%s %% по уровням умения)." % [what, _pct_list(c[1])],
+				"tiers": FORM_TIERS["card_%d" % (k + 1)], "bonus": "card", "value": c[1]}
 			ids.append(cid)
 		var mat := String(d["material"])
 		var wl := "wound_lick_" + sp
@@ -486,11 +509,22 @@ static func has_skill(species: String, id: String) -> bool:
 	return list_for(species).has(id)
 
 
-## Значение поля-пары [на 1 ур., за уровень] на уровне умения n (n ≥ 1).
+## Значение поля-пары [на 1 ур., за уровень] на уровне умения n (n ≥ 1). Массив из 3 и больше чисел — таблица
+## по уровням (ур. 1, 2, 3 …; умения «по формам» из базы — DB_EXTRAS); выше последнего — последнее.
 static func value(pair: Array, n: int) -> float:
+	if pair.size() > 2:
+		return float(pair[clampi(n - 1, 0, pair.size() - 1)])
 	if pair.size() < 2:
 		return 0.0
 	return float(pair[0]) + float(pair[1]) * float(maxi(n, 1) - 1)
+
+
+## «80 / 90 / 95» — таблица долей по уровням.
+static func _pct_list(vals: Array) -> String:
+	var parts: PackedStringArray = []
+	for v in vals:
+		parts.append(str(roundi(float(v) * 100.0)) if float(v) <= 1.0 else str(roundi(float(v))))
+	return " / ".join(parts)
 
 
 ## Уровень вики → наш уровень питомца: 1:1 с оригиналом (решение Максима), не меньше 1.
@@ -588,7 +622,37 @@ static func ensure_record(rec: Dictionary) -> void:
 		rec["mp"] = -1
 	if not COMMANDS.has(String(rec.get("cmd", ""))):
 		rec["cmd"] = DEFAULT_COMMAND
+	_clamp_form_levels(rec)
 	_ensure_slots(rec)
+
+
+## Наибольший уровень умения id на форме st (0..2) без учёта уровня питомца.
+static func form_cap(id: String, st: int) -> int:
+	var best := 0
+	var tiers: Array = get_skill(id).get("tiers", [])
+	for i in mini(st + 1, tiers.size()):
+		best = maxi(best, int(tiers[i][1]))
+	return best
+
+
+## Умения «по формам» (поле per_form: «Знаток снаряжения», «Живучесть», «Боец», «Способности карты») — не выше, чем
+## разрешает форма питомца (старые записи, возврат в 1-ю форму); лишние уровни снимаются, их JP возвращаются.
+static func _clamp_form_levels(rec: Dictionary) -> void:
+	var skills: Dictionary = rec["skills"]
+	var st := PetData.stage_of(rec)
+	for k in skills.keys():
+		var id := String(k)
+		var sk := get_skill(id)
+		if not bool(sk.get("per_form", false)):
+			continue
+		var cap := form_cap(id, st)
+		var n := int(skills[k])
+		if n > cap:
+			rec["jp"] = int(rec.get("jp", 0)) + (n - cap) * int(sk.get("jp", 1))
+			if cap > 0:
+				skills[k] = cap
+			else:
+				skills.erase(k)
 
 
 ## Ячейки «Авто» и «Ауры»: перенос старых записей и чистка (см. ensure_record).
@@ -823,6 +887,37 @@ static func bonuses(species: String, skills: Dictionary, toggles: Dictionary, ow
 			continue
 		var key := String(sk["bonus"])
 		res[key] = float(res.get(key, 0.0)) + value(sk["value"], n)
+	return res
+
+
+# ---------- Вкладки окна существа ----------
+
+## Вкладки умений окна существа: [ключ, подпись, значок UiIcons].
+const TABS := [["active", "Активные", "tab_pet_active"], ["aura", "Ауры и бафы", "tab_pet_auras"],
+	["passive", "Пассивные", "tab_pet_passive"]]
+
+
+## Вкладка умения id: "active" — активные (урон, ослабления зверя) и «Создание» (вручную), "aura" — переключаемые
+## (узы, вызов) и активные усиления (поле buff: клич, стена, песнь, «Зализать раны»), "passive" — пассивные (в т. ч.
+## «Знаток снаряжения», «Живучесть», «Боец», «Способности карты», «Благословения»).
+static func tab_of(id: String) -> String:
+	var sk := get_skill(id)
+	match String(sk.get("kind", "")):
+		"toggle":
+			return "aura"
+		"passive":
+			return "passive"
+		"active":
+			return "aura" if sk.has("buff") else "active"
+	return "active"
+
+
+## Умения вида на вкладке tab (в порядке list_for).
+static func list_tab(species: String, tab: String) -> Array:
+	var res: Array = []
+	for id in list_for(species):
+		if tab_of(String(id)) == tab:
+			res.append(String(id))
 	return res
 
 

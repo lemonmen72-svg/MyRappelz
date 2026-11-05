@@ -50,7 +50,9 @@ func _windows() -> Array:
 	for t in HeroSkills.tabs_for(JOB):
 		res.append(["_w_hero", "Окно героя: %s" % String(t[1]), String(t[0])])
 	res.append(["_w_creature", "Существо: характеристики", "stats"])
-	res.append(["_w_creature", "Существо: умения", "skills"])
+	for t in PetSkills.TABS:
+		res.append(["_w_creature", "Существо: %s" % String(t[1]), String(t[0])])
+	res.append(["_w_creature", "Существо: оружие и доспехи", "gear"])
 	res.append(["_w_job", "Выбор профессии"])
 	var n := npcs()
 	if n != null:

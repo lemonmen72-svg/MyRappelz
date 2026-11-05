@@ -3,8 +3,9 @@ extends Node
 ## Питомцы: призыв из коллекции Game.pets, команды (круглые кнопки у панели питомца в HUD: «Авто» — сам нападает
 ## на зверей рядом с хозяином, «Атака» — атаковать выделенную цель героя, «Защита» — бить напавших на хозяина
 ## и его цель, «За мной» — следовать без боя; режим запоминается в записи питомца — Pet.set_mode), опыт за убийства,
-## окно питомцев (формирование существ из карт с душой, подробнее — окно существа, призвать, отозвать,
-## воскресить свитком, отпустить).
+## окно питомцев (ряд значков питомцев — касание открывает окно существа, формирование существ из карт с душой,
+## подробнее — окно существа, призвать, отозвать, воскресить свитком, отпустить). Пояс с картами существ (PetBelt) —
+## в сумке (InventoryWindow); питомца в поясе призвать нельзя.
 ## Призванный питомец всегда соответствует Game.active_pet: сверка идёт каждый кадр,
 ## поэтому после загрузки сохранения или отпускания другого питомца узел пересоздаётся сам.
 
@@ -22,8 +23,8 @@ var main: Node
 ## Призванный питомец (узел в мире) или null. Контракт узла (используют HUD и другие модули):
 ## поля pet_name, level, hp, max_hp, is_down (погиб/скрыт), метод heal(amount: int), сигнал stats_changed.
 var active_pet: Pet = null
-## Кнопки открытого окна питомцев: "form_<id карты>", "info_<i>", "summon_<i>", "recall_<i>", "revive_<i>",
-## "release_<i>".
+## Кнопки открытого окна питомцев: "pet_<i>" (значок в ряду питомцев), "form_<id карты>", "info_<i>", "summon_<i>",
+## "recall_<i>", "revive_<i>", "release_<i>".
 var window_buttons: Dictionary = {}
 ## Окно существа (характеристики и умения питомца).
 var creature: CreatureWindow = null
@@ -95,7 +96,7 @@ func summon(i: int) -> bool:
 		_msg("Питомец «%s» погиб — сначала воскресите его" % String(rec.get("name", "")))
 		return false
 	if PetBelt.in_belt(rec):
-		_msg("Карта «%s» в поясе — сначала выньте её (окно «Питомцы», «Пояс»)" % String(rec.get("name", "")))
+		_msg("Карта «%s» в поясе — сначала выньте её из пояса (сумка)" % String(rec.get("name", "")))
 		return false
 	Game.active_pet = i
 	_sync()
@@ -231,7 +232,7 @@ func open_window() -> void:
 		Game.pets.size(), Game.MAX_PETS, Game.inventory.count("revive_scroll")]
 	head.add_theme_color_override("font_color", Color(0.85, 0.8, 0.6))
 	body.add_child(head)
-	_add_belt(body)
+	_add_strip(body)
 	_add_forming(body)
 	if Game.pets.is_empty():
 		var hint := Label.new()
@@ -243,6 +244,20 @@ func open_window() -> void:
 		return
 	for i in Game.pets.size():
 		_add_row(body, i)
+
+
+## Ряд значков питомцев (CreatureWindow.pet_chip): касание — окно существа этого питомца.
+func _add_strip(body: VBoxContainer) -> void:
+	if Game.pets.is_empty():
+		return
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", int(UiScale.px(6)))
+	body.add_child(row)
+	for i in Game.pets.size():
+		var b := CreatureWindow.pet_chip(i, UiScale.px(CreatureWindow.CHIP_PX), false)
+		b.pressed.connect(_on_info.bind(i))
+		row.add_child(b)
+		window_buttons["pet_%d" % i] = b
 
 
 ## Карты с душой в сумке (id, по порядку сортировки сумки).
@@ -319,13 +334,17 @@ func _add_row(body: VBoxContainer, i: int) -> void:
 	if dead:
 		_add_button(row, "revive_%d" % i, "Воскресить", _on_revive.bind(i))
 	elif PetBelt.in_belt(rec):
-		_add_button(row, "unbelt_%d" % i, "Из пояса", _on_unbelt.bind(i))
+		var bl := Label.new()
+		bl.text = "в поясе"
+		bl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		bl.tooltip_text = "Карта питомца в поясе героя (сумка): призвать — сначала вынуть из пояса"
+		bl.mouse_filter = Control.MOUSE_FILTER_PASS
+		bl.add_theme_color_override("font_color", Color(0.75, 0.6, 1.0))
+		row.add_child(bl)
 	elif active:
 		_add_button(row, "recall_%d" % i, "Отозвать", _on_recall.bind(i))
 	else:
 		_add_button(row, "summon_%d" % i, "Призвать", _on_summon.bind(i))
-	if not dead and not PetBelt.in_belt(rec) and not PetBelt.abilities(rec).is_empty():
-		_add_button(row, "belt_%d" % i, "В пояс", _on_belt.bind(i))
 	var rel_text: String = "Точно отпустить?" if _release_confirm == i else "Отпустить"
 	_add_button(row, "release_%d" % i, rel_text, _on_release.bind(i))
 
@@ -440,79 +459,6 @@ func _add_button(row: HBoxContainer, key: String, text: String, cb: Callable) ->
 	b.pressed.connect(cb)
 	row.add_child(b)
 	window_buttons[key] = b
-
-
-## Блок «Пояс» (PetBelt): ячейки карт (имя питомца или пусто / закрыто), бонус герою, «Расширить».
-func _add_belt(body: VBoxContainer) -> void:
-	var title := Label.new()
-	var worn := PetBelt.belt_worn()
-	title.text = "Пояс: ячеек %d из %d%s" % [Game.belt_slots, PetBelt.MAX_SLOTS, "" if worn else " — наденьте пояс (украшение), иначе карты не действуют"]
-	title.add_theme_color_override("font_color", Color(0.95, 0.82, 0.5) if worn else Color(1.0, 0.62, 0.45))
-	body.add_child(title)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", int(UiScale.px(6)))
-	body.add_child(row)
-	for s in PetBelt.MAX_SLOTS:
-		var lb := Label.new()
-		lb.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_SMALL))
-		var pi := PetBelt.pet_in(s)
-		var need := int(PetBelt.SLOT_STAGE.get(s, 0))
-		if s >= Game.belt_slots:
-			lb.text = "[%d: закрыта]" % (s + 1)
-			lb.modulate = Color(0.55, 0.55, 0.6)
-		elif pi >= 0:
-			lb.text = "[%d: %s]" % [s + 1, String(Game.pets[pi].get("name", ""))]
-			lb.modulate = Color(0.6, 0.95, 0.8)
-		else:
-			lb.text = "[%d: пусто%s]" % [s + 1, (", %d-я форма+" % (need + 1)) if need > 0 else ""]
-		row.add_child(lb)
-	var b := PetBelt.hero_bonus(Game.class_id, Game.level)
-	var bl := Label.new()
-	bl.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_SMALL))
-	bl.text = ("Герою: " + PetBelt.bonus_text(b)) if not b.is_empty() else "Карта в поясе даёт герою бонус «Способности карты» питомца (с 40 ур. питомца)."
-	bl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	bl.custom_minimum_size = Vector2(UiScale.px(WINDOW_SIZE.x - 260.0), 0)
-	var brow := HBoxContainer.new()
-	body.add_child(brow)
-	brow.add_child(bl)
-	if Game.belt_slots < PetBelt.MAX_SLOTS:
-		_add_button(brow, "belt_expand", "Расширить (%d%%)" % roundi(PetBelt.expand_chance(Game.belt_slots) * 100.0), _on_belt_expand)
-		(window_buttons["belt_expand"] as Button).disabled = PetBelt.expand_block() != ""
-		(window_buttons["belt_expand"] as Button).tooltip_text = PetBelt.expand_block()
-
-
-func _on_belt(i: int) -> void:
-	_release_confirm = -1
-	var err := "Нет свободной ячейки пояса"
-	for s in Game.belt_slots:
-		if PetBelt.pet_in(s) < 0:
-			err = PetBelt.put(i, s, self)
-			if err == "":
-				break
-	_msg(err if err != "" else "Карта «%s» — в поясе" % String(Game.pets[i].get("name", "")))
-	_hero_restat()
-	_refresh_window()
-
-
-func _on_unbelt(i: int) -> void:
-	_release_confirm = -1
-	PetBelt.take(i)
-	_hero_restat()
-	_refresh_window()
-
-
-func _on_belt_expand() -> void:
-	var r := PetBelt.expand()
-	_msg(String(r["text"]))
-	_hero_restat()
-	_refresh_window()
-
-
-## Пояс изменился — бонусы героя заново.
-func _hero_restat() -> void:
-	if main != null and is_instance_valid(main.player):
-		main.player.recalc_stats()
-		main.player.stats_changed.emit()
 
 
 func _on_form(card_id: String) -> void:

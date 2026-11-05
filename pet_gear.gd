@@ -5,9 +5,11 @@ extends RefCounted
 ## запечатывается в «Карту снаряжения» (unit_card тратится, вещь уходит из сумки в запись питомца rec["gear"]),
 ## снять — «Мел восстановления» (restore_chalk тратится, вещь — обратно в сумку). Вещь — по уровню питомца (ранг:
 ## ItemData.required_level), любой вариант доспеха.
-## Питомец получает долю характеристик вещи — «Знаток снаряжения» (80 / 90 / 100 % по виду) — и всю прибавку её заточки;
-## с доспехом своего варианта — «Живучесть: доспех …» (макс. HP + доля), с оружием ближнего боя — «Боец: …» (атака +
-## доля; у фазана — крит +5 с кинжалом). Без «Знатока снаряжения» надеть нельзя (умение 1-го уровня, 1 JP).
+## Питомец получает долю характеристик вещи — «Знаток снаряжения» (3 уровня по формам: пантера, черепаха, фазан —
+## 80 / 90 / 95 %, волк — 90 / 95 / 100 %, кентавр — 100 %) — и всю прибавку её заточки; с доспехом своего варианта —
+## «Живучесть: доспех …» (макс. HP + доля), с оружием ближнего боя — «Боец: …» (атака + доля; у фазана — крит с
+## кинжалом). Без «Знатока снаряжения» надеть нельзя (умение с 1 ур. питомца, 1 JP). Окно — CreatureWindow, вкладка
+## «Оружие и доспехи».
 
 const SLOTS := ["weapon", "armor"]
 const SLOT_NAMES := {"weapon": "Оружие", "armor": "Броня"}
@@ -109,13 +111,9 @@ static func apply(rec: Dictionary, r: Dictionary) -> void:
 	for id in [w, a]:
 		if id == "":
 			continue
-		var it := ItemData.get_item(id)
-		var base := ItemData.get_item(ItemData.base_id(id))
-		for key in [["atk", "patk"], ["matk", "matk"], ["def", "def"], ["mdef", "mdef"]]:
-			var v0 := float(base.get(key[0], 0))
-			var v1 := float(it.get(key[0], 0))
-			# Доля характеристик базовой вещи + вся прибавка заточки (база: «plus 100% of enhancement»)
-			add[key[1]] = float(add[key[1]]) + v0 * k + (v1 - v0)
+		var g := gain(id, k)
+		for key in add:
+			add[key] = float(add[key]) + float(g[key])
 	r["patk"] = int(r.get("patk", 0)) + roundi(float(add["patk"]))
 	r["matk"] = int(r.get("matk", 0)) + roundi(float(add["matk"]))
 	r["def"] = int(r.get("def", 0)) + roundi(float(add["def"]))
@@ -139,6 +137,59 @@ static func apply(rec: Dictionary, r: Dictionary) -> void:
 		r["max_hp"] = roundi(float(r.get("max_hp", 0)) * (1.0 + PetSkills.value(PetSkills.get_skill(vu)["value"], vn)))
 	var magic := PetStats.is_magic(sp)
 	r["atk"] = int(r["matk"]) if magic else int(r["patk"])
+
+
+## Что питомец получит от вещи id при доле k («Знаток снаряжения»): {"patk", "matk", "def", "mdef"} — доля
+## характеристик базовой вещи + вся прибавка заточки (база: «plus 100% of enhancement»), без округления.
+static func gain(id: String, k: float) -> Dictionary:
+	var res := {"patk": 0.0, "matk": 0.0, "def": 0.0, "mdef": 0.0}
+	var it := ItemData.get_item(id)
+	var base := ItemData.get_item(ItemData.base_id(id))
+	for key in [["atk", "patk"], ["matk", "matk"], ["def", "def"], ["mdef", "mdef"]]:
+		var v0 := float(base.get(key[0], 0))
+		var v1 := float(it.get(key[0], 0))
+		res[key[1]] = v0 * k + (v1 - v0)
+	return res
+
+
+## Строка «физ. атака +24, маг. атака +3» — что питомец rec получит от вещи id ("" — ничего).
+static func gain_text(rec: Dictionary, id: String) -> String:
+	var g := gain(id, expert(rec))
+	var parts: PackedStringArray = []
+	for e in [["patk", "физ. атака"], ["matk", "маг. атака"], ["def", "физ. защита"], ["mdef", "маг. защита"]]:
+		var v := roundi(float(g[e[0]]))
+		if v != 0:
+			parts.append("%s +%d" % [String(e[1]), v])
+	return ", ".join(parts)
+
+
+## Что дадут «Боец» и «Живучесть» питомца rec с вещью id ("" — ничего): «Боец: атака +10 %».
+static func unit_text(rec: Dictionary, id: String) -> String:
+	var sp := String(rec.get("species", ""))
+	var slot := slot_for(id)
+	if slot == "weapon":
+		var fu := "fighter_unit_" + sp
+		var fn := PetSkills.skill_level(rec, fu)
+		var fsk := PetSkills.get_skill(fu)
+		if fsk.is_empty():
+			return ""
+		var dagger := String(fsk.get("weapon", "")) == "dagger"
+		var fits := ItemData.weapon_kind(id) == "dagger" if dagger else MELEE.has(ItemData.weapon_kind(id))
+		if not fits:
+			return ""
+		if fn <= 0:
+			return "«%s» не изучен" % String(fsk["name"])
+		return "«%s»: %s" % [String(fsk["name"]), PetSkills.effect_text(fu, fn)]
+	if slot == "armor":
+		var vu := "vital_unit_" + sp
+		var vsk := PetSkills.get_skill(vu)
+		if vsk.is_empty() or ItemData.armor_variant(id) != String(vsk.get("armor", "")):
+			return ""
+		var vn := PetSkills.skill_level(rec, vu)
+		if vn <= 0:
+			return "«%s» не изучена" % String(vsk["name"])
+		return "«%s»: %s" % [String(vsk["name"]), PetSkills.effect_text(vu, vn)]
+	return ""
 
 
 ## Описание надетого одной строкой для окна существа: «Оружие: Меч +3 (физ. атака +26)».
