@@ -43,6 +43,7 @@ jobs:
       shots: ${{ steps.plan.outputs.shots }}
       perf: ${{ steps.plan.outputs.perf }}
       full: ${{ steps.plan.outputs.full }}
+      smoke_skip: ${{ steps.plan.outputs.smoke_skip }}
       # Где идут автотесты: .github/runner.txt — "laptop" (ноутбук Максима, self-hosted, метка laptop: одна часть,
       # тесты потоками SMOKE_JOBS) или "github" (как раньше — 4 части на серверах GitHub). Скриншоты и замер — всегда
       # на GitHub (нужен рендер и параллельность; i3 ноутбука проходил бы их час).
@@ -138,6 +139,7 @@ jobs:
           SMOKE_PART: ${{ matrix.part }}
           SMOKE_PARTS: ${{ strategy.job-total }}
           SMOKE_JOBS: ${{ needs.plan.outputs.smoke_jobs }}
+          SMOKE_SKIP: ${{ needs.plan.outputs.smoke_skip }}
         run: .github/scripts/smoke_test.sh
 
       - name: Время этапов

@@ -40,6 +40,22 @@ NO_PICTURE = [
 ]
 
 
+# Тест прохождения острова Кардиналом (tests/test_cardinal_story.gd, 10–12 мин): идёт, только если изменился код игры
+# (*.gd вне tests/, кроме прочих тестов), данные мира (world/), сцены и шейдеры (*.tscn, *.gdshader*), project.godot,
+# бот (bot/) или сам тест и его основа (решение Максима 05.11: пуши с моделями, значками, документами — без него).
+CARDINAL_NEEDS = [
+	r"^(?!tests/)[^/]+\.gd$",
+	r"^(bot|world)/",
+	r"\.(tscn|gdshader|gdshaderinc)$",
+	r"^project\.godot$",
+	r"^tests/(test_cardinal_story|test_base)\.gd$",
+]
+
+
+def needs_cardinal(path):
+	return any(re.search(p, path) for p in CARDINAL_NEEDS)
+
+
 def needs_picture(path):
 	return not any(re.search(p, path) for p in NO_PICTURE)
 
@@ -93,7 +109,7 @@ def parse_parts(text, n):
 def main(argv):
 	if argv and argv[0] == "--files":
 		for p in argv[1:]:
-			print("%s %s" % ("снимки" if needs_picture(p) else "—", p))
+			print("%s %s %s" % ("снимки" if needs_picture(p) else "—", "кардинал" if needs_cardinal(p) else "—", p))
 		return 0
 	n = int(os.environ.get("SHOTS_PARTS", "1"))
 	perf_groups = os.environ.get("PERF_PARTS", "").split()
@@ -102,8 +118,10 @@ def main(argv):
 		shots = parse_parts(os.environ.get("INPUT_SHOTS", "all"), n)
 		perf = perf_groups if os.environ.get("INPUT_PERF", "true") == "true" else []
 		reason = "ручной запуск"
+		cardinal = True
 	else:
 		files = changed_files()
+		cardinal = files is None or any(needs_cardinal(f) for f in files)
 		if files is None:
 			pic = True
 			reason = "изменённые файлы неизвестны"
@@ -124,13 +142,15 @@ def main(argv):
 		shots = MIN_SHOTS[:] if release else []
 		perf = []
 	visual = bool(shots or perf)
-	print("План: %s → снимки %s, замер %s" % (reason, shots or "нет", perf or "нет"))
+	print("План: %s → снимки %s, замер %s, тест Кардинала %s" % (reason, shots or "нет", perf or "нет",
+		"идёт" if cardinal else "нет (код игры не менялся)"))
 	out = os.environ.get("GITHUB_OUTPUT")
 	lines = [
 		"visual=%s" % ("true" if visual else "false"),
 		"shots=%s" % json.dumps(shots),
 		"perf=%s" % json.dumps(perf),
 		"full=%s" % ("true" if len(shots) == n else "false"),
+		"smoke_skip=%s" % ("" if cardinal else "test_cardinal_story"),
 	]
 	if out:
 		with open(out, "a", encoding="utf-8") as f:

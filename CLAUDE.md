@@ -1980,6 +1980,12 @@
   - **Снимки по минимуму (решение Максима 04.11)**: на обычных пушах кадров и замера нет; пуш новой версии в
     `android/release_version.txt` (сборка APK) — только часть 1 кадров (`MIN_SHOTS`); полный набор и замер — ручным
     запуском (поля `shots`, `perf`). Метка `[no-shots]` в сообщении коммита отключает и эту часть. Ниже — прежние правила.
+  - **Тест Кардинала** (`tests/test_cardinal_story.gd`, 10–12 мин; решение Максима 05.11): в «Проверке кода» — только
+    если изменился код игры (`*.gd` вне `tests/`, `bot/`, `world/`, сцены, шейдеры, `project.godot`, сам тест или
+    `test_base`) — `ci_plan.CARDINAL_NEEDS` → выход `smoke_skip` → `SMOKE_SKIP` (ручной запуск и неизвестные файлы — идёт;
+    проверить: `ci_plan.py --files …`). В сборке APK не идёт никогда (`SMOKE_SKIP=test_cardinal_story`). Свой предел
+    времени теста в `smoke_test.sh` — 1500 с (у остальных 600). Перед каждой сборкой — полный прогон всех тестов
+    локально (4 потока ≈ 15 мин), Кардинал — в нём.
   - `plan` — `.github/scripts/ci_plan.py`: изменённые файлы (GitHub API compare: push — before…sha, PR — base…head);
     скриншоты и замер идут, только если изменилось что-то кроме `NO_PICTURE` (`*.md`, `*.docx`, `tools/`, `tests/test_*.gd`
     кроме `test_base.gd`, `tests/smoke_test.gd`, `android/`, `export_presets.cfg`, `android-apk.yml`, скрипты только
