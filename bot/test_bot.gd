@@ -511,6 +511,8 @@ func step_name() -> String:
 
 func _run_step(dt: float, fdt: float) -> void:
 	if _si >= _steps.size():
+		# Последний раздел закрыт до итога — иначе в строке «Конец» он ещё не в счёте («разделов 8 из 9»)
+		_close_section("готово")
 		var sm := scenario.summary(self)
 		_finish("done", "готово: " + (sm if sm != "" else progress_text()))
 		return
