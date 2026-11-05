@@ -442,6 +442,8 @@ func reset_env() -> void:
 	Quality.msaa_scaled_override = -1
 	AdminPanel.reset_session()
 	AdminPanel.spawn_level = int(_saved.get("spawn_level", 5))
+	# Тесты ждут вкладку по умолчанию («Герой»); у игрока запомнена своя (бота запускают с «Тест-бота») — вернётся в конце
+	AdminPanel.tab = "hero"
 	JobFxNeophyte.corpses.clear()
 	CreatureAsset.use_assets = true
 	CharacterModel.use_assets = true
