@@ -99,6 +99,11 @@ var _nav := IslandWorld.Route.new()
 var _split := "wait"
 var _boosted := false
 var _skip_mob: Dictionary = {}
+## Где герой недавно погиб: [{pos: Vector3, until: игровое время}] — зверей рядом не выбирать (иначе цикл
+## «возродился — пошёл к тем же волкам у агрессивных кентавров — погиб», 40 смертей подряд при ×32).
+var _danger: Array = []
+const DANGER_RADIUS := 25.0
+const DANGER_SEC := 300.0
 var _goal_state: Dictionary = {}
 var _stuck_goals: Dictionary = {}
 var _last_skill_level := 0
@@ -366,6 +371,7 @@ func _on_message(text: String) -> void:
 			var m := p.last_attacker as Mob
 			who = ", напал «%s» %d ур." % [m.mob_name, m.level]
 		_ev("death", "смерть у (%.0f, %.0f), герой %d ур.%s (план: %s)" % [_last_pos.x, _last_pos.z, Game.level, who, _last_plan])
+		_danger.append({"pos": _last_pos, "until": game_t + DANGER_SEC})
 
 
 func _last_msg() -> String:
@@ -844,11 +850,21 @@ func _find_mob(species: Array, lo: int, hi: int, allow_strong: bool = false) -> 
 			continue
 		if m.is_boss and Game.level < m.level - int(profile["boss_gap"]):
 			continue
+		if not m.is_boss and _in_danger(m.global_position):
+			continue
 		var d := _flat(m.global_position, p.global_position)
 		if d < bd:
 			bd = d
 			best = m
 	return best
+
+
+## Рядом с местом недавней смерти героя (DANGER_RADIUS, DANGER_SEC).
+func _in_danger(pos: Vector3) -> bool:
+	for dz in _danger:
+		if float(dz["until"]) > game_t and _flat(pos, dz["pos"]) < DANGER_RADIUS:
+			return true
+	return false
 
 
 ## Есть ли такие звери в мире вообще (живые или нет — по слотам; для причины «застряло»).
