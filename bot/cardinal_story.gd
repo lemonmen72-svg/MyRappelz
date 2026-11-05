@@ -2583,6 +2583,10 @@ func _temper(slot: String) -> bool:
 	var price := Enchant.temper_price(item)
 	if Game.gold < price:
 		await _raise_gold(price)
+	# Продал лишнее, а золота всё равно мало — закалку отложить (кнопка «Закалить» без золота неактивна, это не ошибка)
+	if Game.gold < price:
+		_ev("wait", "закалка «%s» ждёт золота: %d из %d" % [ItemData.item_name(item), Game.gold, price])
+		return false
 	if not await _talk(Enchant.SMITH_NPC):
 		return false
 	if not _dlg("opt_forge"):
