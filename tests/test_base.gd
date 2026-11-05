@@ -76,7 +76,13 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if done or main == null or not main.is_inside_tree():
+	# Главная сцена перестроилась сама (переход через портал — main.restart_scene): новая — в группе main_scene
+	if not done and (main == null or not is_instance_valid(main) or main.is_queued_for_deletion()):
+		for n in get_tree().get_nodes_in_group("main_scene"):
+			if is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
+				main = n
+				break
+	if done or main == null or not is_instance_valid(main) or not main.is_inside_tree():
 		return
 	frame += 1
 	if frame > MAX_FRAMES:

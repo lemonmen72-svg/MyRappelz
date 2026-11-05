@@ -14,10 +14,11 @@ const NPCS := {
 	"hunter": ["f", 1.68], "merc_chief": ["m", 1.82],
 	"weaponsmith": ["m", 1.84], "armorer": ["f", 1.74], "jeweler": ["f", 1.70],
 	"fisher": ["m", 1.82], "veteran": ["m", 1.84], "herbalist": ["f", 1.72], "buffer": ["f", 1.70],
+	"scribe": ["m", 1.76],
 }
 ## Клипы жителя (нижний регистр): покой и приветствие обязательны, остальные — общий набор героя.
 ## Жители, у которых модели из файла пока нет (модель — по промтам, ждём).
-const NO_MODEL_YET := ["rare_merchant", "scribe"]
+const NO_MODEL_YET := ["rare_merchant"]
 const CLIPS := ["idle", "wave", "walking", "running", "hit", "cast", "pickup"]
 ## Меш жителя: до 50 тыс. (tools/prepare_npcs.py NPC_TRIS), у большинства исходник целиком (~31 тыс.).
 const MAX_TRIS := 52000

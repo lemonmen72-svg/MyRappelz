@@ -582,13 +582,26 @@ const QUESTS := {
 		],
 		"rewards": {"xp": 32700, "gold": 6000, "items": {"@weapon_r2": 1, "cube_ancient_attack_r1": 1}},
 	},
+	# ---------- Корвен: подземелье (0.35; дальше — сюжет подземелья, его распишет Максим) ----------
+	"merc_dungeon": {
+		"name": "Тропа во тьму", "giver": "merc_chief", "turn_in": "merc_chief", "level": DUNGEON_LEVEL,
+		"prev": "merc_closed_cave", "job_only": true, "xp_level": DUNGEON_LEVEL + 1,
+		"desc": "Корвен открыл проход в подземелье за пещерой: у входа горит портал. Спуститесь вниз, осмотритесь и возвращайтесь с вестями.",
+		"offer": "Мои люди открыли проход за пещерой — у входа теперь горит портал. Что внизу, толком никто не знает: оттуда тянет сыростью, солью и чем-то зелёным, мертвенным. Спустись первым, осмотрись — и назад, ко мне. Портал пропустит тебя, раз ты со мной в деле.",
+		"progress": "Портал — прямо у входа в пещеру. Спустись в подземелье и возвращайся.",
+		"done": "Живой! Значит, и отряд пройдёт. Рассказывай всё, что видел, — каждую мелочь.",
+		"goals": [
+			{"type": "enter", "location": "dungeon", "n": 1, "text": "Спуститься в подземелье через портал у пещеры"},
+		],
+		"rewards": {"xp": 3200, "gold": 2400, "items": {"potion_hp_r3": 5}},
+	},
 	"merc_cave_soon": {
 		"name": "Пещера откроется", "giver": "merc_chief", "turn_in": "merc_chief", "level": 23, "prev": "merc_guardian",
 		"job_only": true, "xp_level": 24,
-		"desc": "Страж логова повержен. Корвен готовит отряд для спуска в подземелье — оно откроется позже, и вы пойдёте первым.",
-		"offer": "Вход свободен. Но вниз без отряда я не пойду и тебя не пущу: в глубине что-то держит анатем в узде, и оно сильнее вожака. Соберу людей — и откроем подземелье. Ты пойдёшь первым, слово наёмника. А пока — твоя доля.",
+		"desc": "Страж логова повержен — анатемы остались без вожака. Корвен готовит отряд: в глубине подземелья есть кто-то сильнее.",
+		"offer": "Вожак пал, но анатемы не разбежались: в глубине что-то держит их в узде, и оно сильнее вожака. Я соберу отряд, а ты держи портал за собой — пойдёшь первым, слово наёмника. Вот твоя доля.",
 		"progress": "Поговори со мной.",
-		"done": "Жди моего слова. Когда подземелье откроется, ты узнаешь первым.",
+		"done": "Отряд будет готов. Подземелье ждёт — до встречи внизу.",
 		"goals": [
 			{"type": "talk", "npc": "merc_chief", "n": 1, "text": "Выслушать Корвена"},
 		],
@@ -916,10 +929,14 @@ const BOSS_QUESTS := ["hunter_boss_pheasant", "hunter_boss_wolf", "hunter_boss_t
 const PRE_JOB := ["elder_hunt", "elder_trophies", "elder_potion", "elder_grow", "elder_to_sage", "sage_path",
 	"sage_storage", "sage_shop", "sage_teacher", "sage_to_hunter", "hunter_hunt", "sage_trial"]
 ## Цепочка Корвена после профессии.
-const MERC_CHAIN := ["merc_closed_cave", "merc_scout", "merc_blades", "merc_approach", "merc_guardian", "merc_cave_soon"]
+const MERC_CHAIN := ["merc_closed_cave", "merc_scout", "merc_blades", "merc_approach", "merc_guardian", "merc_cave_soon",
+	"merc_dungeon"]
+## Подземелье (0.35): вход — с этого уровня, портал у пещеры пропускает, когда задание Корвена взято или сдано.
+const DUNGEON_LEVEL := 20
+const DUNGEON_QUEST := "merc_dungeon"
 ## Задания профессии: сбрасываются вместе с ней (админ-панель «Сбросить в Бродягу»; испытание мудреца остаётся пройденным).
 const JOB_RESET := ["sage_first_job", "sage_first_skill", "sage_to_merc", "merc_closed_cave", "merc_scout",
-	"merc_blades", "merc_approach", "merc_guardian", "merc_cave_soon", "weaponsmith_offhand"]
+	"merc_blades", "merc_approach", "merc_guardian", "merc_cave_soon", "merc_dungeon", "weaponsmith_offhand"]
 ## Цепочки жителей по порядку (тесты, справка): житель → задания.
 const NPC_CHAINS := {
 	"smith": ["smith_temper", "smith_gear"],
@@ -1211,6 +1228,8 @@ static func goal_text(g: Dictionary) -> String:
 			return "Собрать с земли: " + what
 		"quest":
 			return "Выполнить задание «%s»" % quest_name(String(g.get("id", "")))
+		"enter":
+			return "Спуститься в подземелье" if String(g.get("location", "dungeon")) == "dungeon" else "Вернуться на остров"
 	return String(g.get("type", "?"))
 
 

@@ -71,6 +71,10 @@ const ITEMS := {
 	"herbalist": [
 		{"item": "npc_herb_sickle", "at": "hand_r", "up": Vector3(0, 1.0, 0.25), "front": Vector3(-1, 0, 0)},
 	],
+	# Писарь Онфим (0.35): перо в правой руке, остриём вперёд-вниз
+	"scribe": [
+		{"item": "npc_quill", "at": "hand_r", "up": Vector3(0, 1.0, 0.35), "front": Vector3(-1, 0, 0)},
+	],
 	"buffer": [
 		{"item": "npc_sun_staff", "at": "hand_r", "up": Vector3(0.06, 1.0, 0.05), "front": Vector3(0, 0, 1), "ground": true},
 		{"item": "npc_sun_lantern", "at": "hand_l", "up": Vector3(0, 1.0, 0), "front": Vector3(0, 0, 1)},

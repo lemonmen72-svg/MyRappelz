@@ -1456,6 +1456,10 @@ func _cave(h: Node3D, poi: Dictionary) -> void:
 	var base_y := w.height_at(c.x, c.y)
 	var body := _body(h, Vector3(c.x, base_y, c.y), yaw)
 	body.name = "Cave"
+	# Портал в подземелье (0.35, Portal — ставит main): вплотную к закрытому проёму, лицом наружу
+	var door_z := (-3.0 + PropAsset.size("cave_entrance").z * 0.5 - 0.55) if model else -0.15
+	w.set_meta("cave_portal", {"pos": Transform3D(Basis(Vector3.UP, yaw), Vector3(c.x, base_y, c.y)) * Vector3(0, 0, door_z),
+		"yaw": yaw})
 	if model:
 		_cave_model(body, c, best, yaw)
 		return

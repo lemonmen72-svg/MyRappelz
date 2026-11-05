@@ -124,9 +124,15 @@ var _rng := RandomNumberGenerator.new()
 var _started := false
 var _autosave := 0.0
 var _transition_cd := 0.0
+## Портал этой локации (у пещеры острова — в подземелье, у входа подземелья — на остров); null — нет.
+var portal: Portal = null
+var _portal_cd := 0.0
+## Идёт переход в другую локацию (сцена перестраивается в конце кадра).
+var traveling := false
 
 
 func _ready() -> void:
+	add_to_group("main_scene")
 	# Тест-бот не закончился в прошлый раз (игру закрыли или она упала) — вернуть настройки игрока, если он их убирал
 	TestBot.recover_after_crash()
 	_rng.seed = 1234
@@ -249,12 +255,24 @@ func restart_scene() -> Node:
 	p.add_child.call_deferred(fresh)
 	if was_current:
 		(func() -> void: tree.current_scene = fresh).call_deferred()
+	# Тест-бот и автотест (узлы у корня дерева или на уровень ниже — раннер тестов) следят за главной сценой:
+	# переход через портал перестраивает её сам
+	var watchers: Array[Node] = []
+	for n in tree.root.get_children():
+		watchers.append(n)
+		watchers.append_array(n.get_children())
+	for n in watchers:
+		if n != self and n.get("main") == self:
+			n.set("main", fresh)
+			if n.has_signal("main_changed"):
+				n.emit_signal("main_changed", fresh)
 	return fresh
 
 
 func _start_world() -> void:
 	Quality.set_screen_idle(false)
 	_build_world()
+	_build_portals()
 	_build_hud()
 	_build_player()
 	_build_modules()
@@ -267,6 +285,7 @@ func _start_world() -> void:
 		hud.update_player(player)
 		refresh_skill_buttons())
 	_started = true
+	_on_location_entered()
 	# Vulkan проверяется: время в мире до подтверждения; сообщение о рендерере (откат после вылета, Vulkan со
 	# следующего запуска) — один раз
 	RendererGuard.world_started()
@@ -281,8 +300,13 @@ func _start_world() -> void:
 
 
 func _build_world() -> void:
-	world = IslandWorld.new()
-	world.name = "Island"
+	# Локация героя (Game.location): остров или подземелье — строится только она (переход — travel)
+	if Game.location == "dungeon":
+		world = DungeonWorld.new()
+		world.name = "Dungeon"
+	else:
+		world = IslandWorld.new()
+		world.name = "Island"
 	add_child(world)
 	world.build(_rng)
 	add_child(PostFx.new())
@@ -318,6 +342,11 @@ func _build_hud() -> void:
 func _build_player() -> void:
 	player = Player.new()
 	player.position = world.spawn_point(Game.race_id)
+	# Пришёл через портал — встаёт перед порталом этой локации
+	if Game.arrive == "portal" and portal != null:
+		var ep := portal.exit_point()
+		player.position = world.ground(ep.x, ep.z, 0.2)
+	Game.arrive = ""
 	add_child(player)
 	player.stats_changed.connect(func():
 		hud.update_player(player)
@@ -590,6 +619,7 @@ func _process(delta: float) -> void:
 	cam.look_at(cam_focus + Vector3(0, _cam_look_y(), 0), Vector3.UP)
 
 	_check_transitions(delta)
+	_check_portal(delta)
 
 	_autosave += delta
 	if _autosave >= AUTOSAVE_TIME:
@@ -686,3 +716,72 @@ func _check_transitions(delta: float) -> void:
 			hud.show_message(String(tr.get("message", "Переход пока закрыт")))
 			_transition_cd = 4.0
 			return
+
+
+# ---------- Локации: остров и подземелье (0.35) ----------
+
+## Портал локации: на острове — у входа в пещеру (IslandPois, мета "cave_portal"), в подземелье — у его входа.
+func _build_portals() -> void:
+	var pos := Vector3.INF
+	var yaw := 0.0
+	var to := "dungeon"
+	if world is DungeonWorld:
+		var d: Dictionary = (world as DungeonWorld).portal()
+		var c: Vector2 = d["center"]
+		pos = Vector3(c.x, 0.0, c.y)
+		yaw = deg_to_rad(float(d["yaw"]))
+		to = "island"
+	elif world.has_meta("cave_portal"):
+		var cp: Dictionary = world.get_meta("cave_portal")
+		pos = cp["pos"]
+		yaw = float(cp["yaw"])
+	if not pos.is_finite():
+		return
+	portal = Portal.new()
+	portal.to = to
+	portal.position = Vector3(pos.x, world.height_at(pos.x, pos.z), pos.z)
+	portal.rotation.y = yaw
+	add_child(portal)
+
+
+## Герой у портала: проверка доступа и переход (сообщение отказа — не чаще раза в 3 с).
+func _check_portal(delta: float) -> void:
+	_portal_cd = maxf(0.0, _portal_cd - delta)
+	if portal == null or traveling or player == null:
+		return
+	var fp := portal.front_point()
+	if Vector2(player.global_position.x - fp.x, player.global_position.z - fp.z).length() > Portal.ENTER_RANGE:
+		return
+	try_portal()
+
+
+## Пройти портал: "" — переход начат, иначе причина отказа (и сообщение).
+func try_portal() -> String:
+	if portal == null:
+		return "Портала нет"
+	var why := Dungeon.enter_block() if portal.to == "dungeon" else ""
+	if why != "":
+		if _portal_cd <= 0.0:
+			hud.show_message(why, 4.0)
+			_portal_cd = 3.0
+		return why
+	travel(portal.to)
+	return ""
+
+
+## Перейти в локацию to ("island" / "dungeon"): герой сохраняется, сцена строится заново только с ней.
+func travel(to: String) -> void:
+	if traveling:
+		return
+	traveling = true
+	Game.location = to
+	Game.arrive = "portal"
+	Game.save_game()
+	restart_scene()
+
+
+## Мир построен: события локации (задания «спуститься»), сообщение с её названием.
+func _on_location_entered() -> void:
+	if world is DungeonWorld:
+		quests.on_entered("dungeon")
+		hud.show_message("Подземелье", 3.0)

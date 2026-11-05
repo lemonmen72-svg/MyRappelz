@@ -20,6 +20,7 @@ test_character_model
 test_combat
 test_combat_magic
 test_combat_melee
+test_dungeon
 test_economy
 test_enchant
 test_equipment

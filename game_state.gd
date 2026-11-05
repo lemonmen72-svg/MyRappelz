@@ -79,6 +79,11 @@ var pets: Array[Dictionary] = []
 var active_pet := -1
 ## Ячейки карт существ в поясе (PetBelt; 1…6, «Расширитель пояса»). Питомец в ячейке — запись pets[i]["belt"].
 var belt_slots := 1
+## Локация героя (0.35): "island" — остров, "dungeon" — подземелье за пещерой (DungeonWorld). Сохраняется: вошёл в
+## игру в подземелье — у его входа. arrive — откуда пришёл (не сохраняется): "portal" — через портал (герой встаёт у
+## портала локации), "" — обычный старт (точка старта / вход подземелья).
+var location := "island"
+var arrive := ""
 ## Золото нового героя: цены у жителей — как в базе оригинала (зелье 200, оружие 500–750), золота хватает на зелья
 ## и первые покупки (0.31; раньше 50 при ценах ×20 ниже).
 const START_GOLD := 1000
@@ -118,6 +123,8 @@ func xp_to_next(lvl: int) -> int:
 
 func reset() -> void:
 	has_character = false
+	location = "island"
+	arrive = ""
 	char_name = ""
 	race_id = ""
 	class_id = ""
@@ -551,6 +558,7 @@ func to_dict() -> Dictionary:
 		"storage": {"items": storage.to_dict(), "cells": storage.layout_to_array()},
 		"storage_gold": storage_gold,
 		"belt_slots": belt_slots,
+		"location": location,
 		"xp_mult": xp_mult,
 	}
 
@@ -674,6 +682,7 @@ func from_dict(d: Dictionary) -> void:
 		storage.load_layout(sd.get("cells", []))
 	storage_gold = maxi(0, int(d.get("storage_gold", 0)))
 	belt_slots = clampi(int(d.get("belt_slots", 1)), 1, PetBelt.MAX_SLOTS)
+	location = "dungeon" if String(d.get("location", "island")) == "dungeon" else "island"
 	PetBelt.ensure()
 	# Оружие (переведённые герои — стартовый набор Наёмника, см. ensure_hero). Вторая рука — "offhand"
 	# (раньше "shield"); прежняя пара клинков одним предметом (ItemData.PAIRED) — тот же клинок в обеих руках

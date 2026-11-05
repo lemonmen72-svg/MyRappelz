@@ -90,6 +90,10 @@ var _say_next := ""
 
 func setup(m: Node) -> void:
 	main = m
+	# Подземелье (0.35): жителей нет (кнопка «Говорить» скрыта, значки заданий — пусто)
+	if IslandWorld.current != null and IslandWorld.current.location() != "island":
+		main.hud.set_button_visible("talk", false)
+		return
 	kirk = Npc.new()
 	kirk.npc_id = "kirk"
 	kirk.name = "Kirk"

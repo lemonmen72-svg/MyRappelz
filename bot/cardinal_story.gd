@@ -330,6 +330,8 @@ func _tick() -> bool:
 	if game_t - _beat_t >= BEAT_SEC:
 		_beat_t = game_t
 		var bp := _p()
+		if bp == null:
+			return true
 		var awake := 0
 		for n in _tree.get_nodes_in_group("mobs"):
 			if (n as Node).process_mode != Node.PROCESS_MODE_DISABLED:
@@ -1617,6 +1619,13 @@ func _solve(id: String, gi: int, g: Dictionary) -> Dictionary:
 			return t2
 		"gather":
 			return {"kind": "gather", "cost": _dist_finds(String(g.get("zone", "")))}
+		"enter":
+			var pt: Portal = bot.main.get("portal") as Portal
+			if pt == null:
+				return {"why": "нет портала в подземелье"}
+			if Dungeon.enter_block() != "":
+				return {"why": Dungeon.enter_block()}
+			return {"kind": "enter", "cost": _flat(pt.front_point(), _p().global_position)}
 		"buy":
 			var npc := String(g.get("npc", ""))
 			var it := _buy_choice(g)
@@ -2007,6 +2016,8 @@ func _do_goal(t: Dictionary) -> bool:
 			ok = await _kill_one(t["species"], int(t["lo"]), int(t["hi"]), "задание «%s»" % QuestData.quest_name(id))
 		"gather":
 			ok = await _gather(id, gi)
+		"enter":
+			ok = await _enter_dungeon()
 		"buy":
 			ok = await _buy(String(t["npc"]), String(t["item"]), int(t["n"]))
 		"sell":
@@ -2059,6 +2070,45 @@ func _do_goal(t: Dictionary) -> bool:
 			_find("задание «%s»: %s" % [QuestData.quest_name(id), String(_stuck_goals[key])])
 	_goal_state[key] = st
 	return ok
+
+
+## Цель «спуститься в подземелье»: к порталу у пещеры, переход (сцена строится заново — ждём мир подземелья),
+## осмотреться, к порталу подземелья — и назад на остров (дальше задания острова). Как игрок: только ходьба.
+func _enter_dungeon() -> bool:
+	var pt: Portal = bot.main.get("portal") as Portal
+	if pt == null:
+		return false
+	await _go(pt.front_point(), 0.5, "портал в подземелье")
+	if not await _wait_location("dungeon"):
+		_find("портал у пещеры не перенёс в подземелье (%s)" % _last_msg())
+		return false
+	_feature("dungeon", true, "вход через портал у пещеры, мир подземелья построен")
+	await _wait(1.0)
+	pt = bot.main.get("portal") as Portal
+	if pt == null:
+		_find("в подземелье нет портала на остров")
+		return false
+	await _go(pt.front_point(), 0.5, "портал на остров")
+	if not await _wait_location("island"):
+		_find("портал подземелья не вернул на остров")
+		return false
+	return true
+
+
+## Ждать, пока главная сцена — мир локации loc (переход через портал перестраивает сцену), до 30 с игры.
+func _wait_location(loc: String) -> bool:
+	var t0 := game_t
+	while game_t - t0 < 30.0:
+		var m := bot.main
+		if m != null and is_instance_valid(m) and bool(m.get("_started")):
+			var w: Variant = m.get("world")
+			if w is IslandWorld and (w as IslandWorld).location() == loc:
+				CardinalNav.ensure(w as IslandWorld, _tree)
+				_nav.reset()
+				return true
+		if not await _tick():
+			return false
+	return false
 
 
 ## Сбор находок (QuestFind): к ближайшей светящейся траве; нет в мире — к зоне цели.

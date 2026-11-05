@@ -207,6 +207,11 @@ const PACKS := {
 		"assets/characters/npc_rare_merchant.glb",
 		"assets/characters/npc_rare_merchant.png",
 	],
+	# Подземелье (0.35): объекты по залам — атласы props_dg_* и модели dg_* (tools/prepare_props.py)
+	"dungeon": [
+		"assets/props/dg_*.glb",
+		"assets/props/props_dg_*.png",
+	],
 }
 ## Порядок загрузки частей: сначала мир (с ним игра выглядит нормально), затем значки, оружие, звери; части не из
 ## списка (герои, жители, стадии, новые) — после, в порядке манифеста. По нему идут HTTPRequest (по очереди) и

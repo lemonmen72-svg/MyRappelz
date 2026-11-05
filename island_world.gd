@@ -91,6 +91,11 @@ func _exit_tree() -> void:
 		current = null
 
 
+## Локация мира: "island" — остров, "dungeon" — подземелье (DungeonWorld).
+func location() -> String:
+	return "island"
+
+
 ## Строит остров. rng — общий генератор мира (зерно фиксировано в main).
 func build(rng: RandomNumberGenerator) -> void:
 	_load_config()

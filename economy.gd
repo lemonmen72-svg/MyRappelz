@@ -64,10 +64,13 @@ var _shop_near := false
 
 func setup(m: Node) -> void:
 	main = m
-	_build_safe_zone()
-	merchant = Merchant.new()
-	merchant.position = MERCHANT_POS
-	main.add_child(merchant)
+	# Подземелье (0.35): ни торговца, ни кольца городской безопасной зоны — только окна сумки
+	var on_island := IslandWorld.current == null or IslandWorld.current.location() == "island"
+	if on_island:
+		_build_safe_zone()
+		merchant = Merchant.new()
+		merchant.position = MERCHANT_POS
+		main.add_child(merchant)
 	window = InventoryWindow.new()
 	window.name = "InventoryWindow"
 	add_child(window)

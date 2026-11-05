@@ -551,6 +551,11 @@ func on_used(id: String) -> void:
 
 
 ## На склад положено n штук id.
+## Герой вошёл в локацию (main: мир построен; "dungeon" — подземелье): цели enter.
+func on_entered(location: String) -> void:
+	_event("enter", func(g: Dictionary) -> bool: return String(g.get("location", "dungeon")) == location)
+
+
 func on_stored(id: String, n: int) -> void:
 	_event("store", func(g: Dictionary) -> bool: return _item_ok(g, id), n)
 

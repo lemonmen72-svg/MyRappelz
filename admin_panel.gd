@@ -47,7 +47,7 @@ extends RefCounted
 ##     "pet_lvl_plus10", "pet_lvl_<1|30|50|60|100|115>", "pet_evolve", "pet_devolve", "pet_xp_up", "pet_full",
 ##     "pet_revive", "pets_clear", "pets_clear_yes", "pets_clear_no";
 ##   «Мир»: "kill_target", "kill_around", "respawn_all", "mob_lvl_minus5", "mob_lvl_minus", "mob_lvl_plus",
-##     "mob_lvl_plus5", "mob_lvl_hero", "spawn_<вид>", "speed_<1|2|3>", "tp_poi_<id>", "tp_zone_<id>" (teleports());
+##     "mob_lvl_plus5", "mob_lvl_hero", "spawn_<вид>", "speed_<1|2|3>", "loc_island", "loc_dungeon" (go_location), "tp_poi_<id>", "tp_zone_<id>" (teleports());
 ##   «Тест-бот»: "bot_mode_<id>" (BotScenario.MODES; «скоро» — недоступны), "bot_sec_<раздел>" (режим «По разделам»:
 ##     переключатели разделов BotSection.SECTIONS), "bot_start", "bot_stop", "bot_open", "bot_share",
 ##     "anim_system", "anim_combat_idle" (система анимаций 1.0 и боевая стойка — выключатели отката).
@@ -764,6 +764,12 @@ static func _build_world(main: Node, body: VBoxContainer) -> void:
 		var m := int(v)
 		_choice(sr, "speed_%d" % m, "×%d" % m, m == speed_mult, func() -> void: AdminPanel.set_speed(main, m))
 
+	_head(body, "Локация (подземелье — без проверки уровня и задания)")
+	var lc := _row(body)
+	var here := IslandWorld.current.location() if IslandWorld.current != null else "island"
+	_choice(lc, "loc_island", "Остров", here == "island", func() -> void: AdminPanel.go_location(main, "island"))
+	_choice(lc, "loc_dungeon", "Подземелье", here == "dungeon", func() -> void: AdminPanel.go_location(main, "dungeon"))
+
 	_head(body, "Перенестись")
 	var tg := _grid(body, 3)
 	for e in teleports():
@@ -908,6 +914,14 @@ static func teleports() -> Array:
 		res.append({"key": "tp_zone_" + id, "name": "%s\nзвери %d–%d ур." % [String(z.get("name", id)), int(lv[0]),
 			int(lv[lv.size() - 1])], "c": IslandWorld.v2(z["center"])})
 	return res
+
+
+## Перейти в локацию to ("island" / "dungeon") без проверок портала: герой встаёт у портала локации.
+static func go_location(main: Node, to: String) -> void:
+	if IslandWorld.current != null and IslandWorld.current.location() == to:
+		return
+	main.hud.close_window()
+	main.travel(to)
 
 
 ## Перенести героя (и призванного питомца) к точке c: свободное ровное место рядом. Возвращает, куда.
