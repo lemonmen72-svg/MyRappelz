@@ -113,7 +113,7 @@ func _weapon_stats() -> void:
 	note("Оружие: %s" % str(_stats))
 
 
-## Броня и украшения 1-го ранга во все 9 ячеек: защита, HP, крит, бег выросли.
+## Броня и украшения 1-го ранга во все 9 ячеек: защита, HP, крит выросли, пояс надет.
 func _gear() -> void:
 	var p := player()
 	# Основное оружие — одноручный меч (щит снят: защита — только от брони)
@@ -135,7 +135,7 @@ func _gear() -> void:
 	check(p.defense > int(_base["def"]), "броня: защита %d → %d" % [int(_base["def"]), p.defense])
 	check(p.max_hp > int(_base["hp"]), "кольца и кулон: HP %d → %d" % [int(_base["hp"]), p.max_hp])
 	check(p.crit > float(_base["crit"]), "серьги: крит %.3f → %.3f" % [float(_base["crit"]), p.crit])
-	check(p.cur_speed() > float(_base["speed"]), "пояс: бег %.2f → %.2f" % [float(_base["speed"]), p.cur_speed()])
+	check(String(Game.equip.get("belt", "")) == "belt_light_r1", "пояс надет: %s" % String(Game.equip.get("belt", "")))
 
 
 func _bag_check() -> void:

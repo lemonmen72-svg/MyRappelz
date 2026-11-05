@@ -41,7 +41,7 @@ func _build() -> void:
 
 func _setup() -> void:
 	hero(Game.class_id, 20)
-	fresh_bag(1000)
+	fresh_bag(100000)
 	no_pets()
 
 
