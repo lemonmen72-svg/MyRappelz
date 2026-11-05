@@ -3,7 +3,9 @@ extends Node
 ## Жители-NPC (NpcData) и разговор с ними. Ставит Учителя Кирка (Npc "kirk") в центре города рядом с торговцем
 ## и остальных жителей по полю spot (NpcData.placed_ids: мудрец, кузнец, кладовщик и три лавки — оружейник,
 ## бронница, ювелир — по краям площади города,
-## старосты у центров своих деревень, охотница в Западном лагере, глава наёмников на посту у входа в пещеру) —
+## старосты у центров своих деревень, охотница в Западном лагере, глава наёмников на посту у входа в пещеру,
+## рыбак в порту, ветеран в Восточном лагере (безопасная зона east_post), травница на краю деревни светлых эльфов
+## у Светлой рощи, писарь в городе — рядом с ним доска объявлений из примитивов, build_board) —
 ## на свободное место (find_spot: проходимая ровная земля, не на дороге, не в постройке, не у других жителей
 ## и точек старта; жители лагеря и пещеры — внутри своей безопасной зоны). Торговца ставит Economy, здесь
 ## он только учитывается (значки заданий, отступ).
@@ -49,7 +51,13 @@ const MUTED := Color(0.76, 0.78, 0.88)
 const GOOD := Color(0.55, 1.0, 0.6)
 const SOON := Color(0.62, 0.66, 0.78)
 
+## Житель, рядом с которым стоит доска объявлений (заказы писаря), и отступ доски от него, м.
+const BOARD_NPC := "scribe"
+const BOARD_GAP := 1.9
+
 var main: Node
+## Доска объявлений у писаря (null — писаря нет в мире).
+var board: Node3D
 ## NPC по id: Npc (Учитель Кирк, торговец, жители из NpcData.placed_ids).
 var nodes: Dictionary = {}
 var kirk: Npc
@@ -146,6 +154,52 @@ func place_all(w: IslandWorld, avoid: Array) -> void:
 		main.add_child(n)
 		nodes[id] = n
 		avoid.append(p)
+		if id == BOARD_NPC:
+			board = build_board(w, n, avoid)
+
+
+## Доска объявлений рядом с писарем (из примитивов, без коллизии): сбоку или позади жителя npc на ровной свободной
+## земле, лицом туда же, куда смотрит он. Группа "notice_board".
+func build_board(w: IslandWorld, npc_node: Npc, avoid: Array) -> Node3D:
+	var b := Node3D.new()
+	b.name = "NoticeBoard"
+	b.add_to_group("notice_board")
+	var c := Vector2(npc_node.position.x, npc_node.position.z)
+	var yaw := npc_node.face_yaw
+	var fwd := Vector2(-sin(yaw), -cos(yaw))
+	var pos := c - fwd * BOARD_GAP
+	var others: Array = avoid.duplicate()
+	others.erase(c)
+	for a in [PI * 0.5, -PI * 0.5, PI * 0.75, -PI * 0.75, PI]:
+		var q := c + fwd.rotated(float(a)) * BOARD_GAP
+		if w == null or Npcs.spot_ok(w, q, others, NPC_GAP - 1.5, 0.6):
+			pos = q
+			break
+	var wood := Util.mat(Color(0.5, 0.34, 0.2))
+	var dark := Util.mat(Color(0.36, 0.24, 0.14))
+	for x in [-0.72, 0.72]:
+		b.add_child(_box(Vector3(0.12, 1.9, 0.12), Vector3(float(x), 0.95, 0.0), dark))
+	b.add_child(_box(Vector3(1.6, 1.0, 0.08), Vector3(0.0, 1.3, 0.0), wood))
+	b.add_child(_box(Vector3(1.9, 0.08, 0.42), Vector3(0.0, 1.92, 0.0), dark))
+	var papers := [[-0.45, 1.45, Color(0.96, 0.93, 0.82)], [0.05, 1.5, Color(0.92, 0.9, 0.86)],
+		[0.48, 1.38, Color(0.98, 0.9, 0.7)], [-0.15, 1.08, Color(0.95, 0.95, 0.9)], [0.42, 1.02, Color(0.9, 0.85, 0.75)]]
+	for e in papers:
+		var pe: Array = e
+		b.add_child(_box(Vector3(0.32, 0.36, 0.01), Vector3(float(pe[0]), float(pe[1]), -0.05), Util.mat(pe[2])))
+	main.add_child(b)
+	b.position = Vector3(pos.x, w.height_at(pos.x, pos.y) if w != null else 0.0, pos.y)
+	b.rotation.y = yaw
+	return b
+
+
+static func _box(size: Vector3, at: Vector3, m: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	mi.mesh = bm
+	mi.position = at
+	mi.material_override = m
+	return mi
 
 
 ## Где хочется поставить жителя по его spot: {"want": Vector2, "area_c": Vector2, "area_r": float (0 — без
@@ -353,7 +407,7 @@ static func situation(npc_id: String) -> String:
 	if NpcData.has_greet(npc_id, "kin"):
 		if (d.has("race") and String(d["race"]) == Game.race_id) or (d.has("class") and String(d["class"]) == Game.class_id):
 			return "kin"
-	if NpcData.has_greet(npc_id, "full_bag") and Game.inventory.used_cells() >= Inventory.CAPACITY - 4:
+	if NpcData.has_greet(npc_id, "full_bag") and Game.inventory.used_cells() >= Game.inventory.capacity - 4:
 		return "full_bag"
 	return "idle"
 
@@ -476,8 +530,10 @@ func _page_quests() -> void:
 				"active":
 					b = _option("…  " + QuestData.quest_name(id) + " — в процессе", "dq_" + id, _on_quest.bind(id))
 				_:
-					b = _option("%s — с %d уровня" % [QuestData.quest_name(id), int(QuestData.get_quest(id).get("level", 1))],
-						"dq_" + id, _on_quest.bind(id))
+					var left := q.cooldown_left(id)
+					var why := "снова через " + Quests.time_text(left) if left > 0.0 \
+						else "с %d уровня" % int(QuestData.get_quest(id).get("level", 1))
+					b = _option("%s — %s" % [QuestData.quest_name(id), why], "dq_" + id, _on_quest.bind(id))
 					b.disabled = true
 			opts.add_child(b)
 	opts.add_child(_option("Назад", "back", _on_back))

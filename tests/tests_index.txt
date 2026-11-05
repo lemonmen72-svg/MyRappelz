@@ -6,6 +6,7 @@ test_anathema
 test_anim_system
 test_asset_fallback
 test_asset_pack
+test_bags
 test_balance_start
 test_bot
 test_bot_game
@@ -47,6 +48,7 @@ test_props
 test_quest_chain
 test_quest_marks
 test_quests
+test_quests_new
 test_renderer
 test_skill_cast
 test_skills_light_dark_casters

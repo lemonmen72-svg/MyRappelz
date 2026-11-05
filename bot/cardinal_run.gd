@@ -17,8 +17,13 @@ extends RefCounted
 ## журнал). Каждый отдых сверяется с расчётом по формуле восстановления (rest_predict): расхождение больше REST_TOL —
 ## буст выключается до конца прогона (откат к точному режиму).
 
+## Профиль 3 (0.32): игрок с торбой 1-го ранга (Inventory.capacity 48) и взятым первым заданием старосты (убить
+## трёх фазанов) — сверки: прогресс задания = числу убитых фазанов (до цели), занятые ячейки сумки не выходят за
+## вместимость, сообщения «Сумка полна» считаются (мешочек остаётся лежать).
 const PROFILE_REGULAR := {
-	"id": "regular", "name": "Обычный игрок", "version": 2,
+	"id": "regular", "name": "Обычный игрок", "version": 3,
+	"bag": "bag_r1",        # торба, надетая перед прогоном ("" — без торбы)
+	"quest": "elder_hunt",  # задание, взятое перед прогоном ("" — без задания)
 	"rest_below": 0.45,     # доля HP: ниже — отдых перед следующим зверем
 	"rest_until": 0.95,     # отдых до этой доли HP
 	"level_gap": 1,         # зверь не старше героя + gap
@@ -65,6 +70,16 @@ var kills: Array[Dictionary] = []
 var deaths := 0
 var damage_taken := 0
 var xp_mismatch: Array[String] = []
+## Сверки профиля 3: задание (прогресс цели «победить» = убитым зверям его вида), сумка (вместимость, «Сумка полна»).
+var quest_id := ""
+var quest_species := ""
+var quest_need := 0
+var quest_kills := 0
+var quest_mismatch: Array[String] = []
+var bag_capacity := 0
+var bag_used_max := 0
+var bag_over := 0
+var bag_full_msgs := 0
 ## Диагностика: целей выбрано, брошено, ударов по цели, «не нашёл цель» (кадров)
 var picks := 0
 var abandoned := 0
@@ -128,6 +143,7 @@ func begin() -> void:
 	respawned = int(bot.main.call("reset_mobs")) if bot.main.has_method("reset_mobs") else AdminPanel.respawn_all(bot.main)
 	if zone_mobs_start == 0:
 		bot.note("Кардинал: в зоне «%s» в начале прогона живых зверей нет — возрождено по миру %d" % [zone_id, respawned])
+	_prepare_profile()
 	p.hp = p.max_hp
 	p.mp = p.max_mp
 	_last_hp = p.hp
@@ -141,6 +157,54 @@ func begin() -> void:
 	# Решения «игрока» — каждый тик физики, а не кадр: при ×8 на кадр приходится 8 тиков, на телефоне кадры неровные —
 	# по кадрам прогоны с одним seed расходились (0.30: совпало 4 из 7 убийств); по тикам — одинаково при любой частоте
 	bot.get_tree().physics_frame.connect(_on_physics_frame)
+
+
+## Профиль 3: надеть торбу и взять задание — как игрок (купил торбу, поговорил со старостой).
+func _prepare_profile() -> void:
+	var bag := String(profile.get("bag", ""))
+	if bag != "" and Game.gear_in("bag") != bag:
+		if not Game.inventory.has(bag):
+			Game.inventory.add(bag)
+		var err := Game.equip_gear(bag)
+		if err != "":
+			bot.note("Кардинал: торба «%s» не надета — %s" % [ItemData.item_name(bag), err])
+	bag_capacity = Game.inventory.capacity
+	quest_id = String(profile.get("quest", ""))
+	var qs: Quests = bot.main.get("quests") as Quests if bot.main != null else null
+	if quest_id == "" or qs == null:
+		quest_id = ""
+		return
+	if not qs.is_active(quest_id) and not qs.is_done(quest_id):
+		qs.accept(quest_id)
+	if not qs.is_active(quest_id):
+		bot.note("Кардинал: задание «%s» не взято (%s)" % [quest_id, qs.accept_block(quest_id)])
+		quest_id = ""
+		return
+	var goals := QuestData.goals(quest_id)
+	if goals.is_empty() or String((goals[0] as Dictionary).get("type", "")) != "kill":
+		quest_id = ""
+		return
+	quest_species = String((goals[0] as Dictionary).get("target", ""))
+	quest_need = QuestData.goal_need(goals[0])
+	quest_kills = qs.goal_progress(quest_id, 0)
+
+
+## Сверка после убийства: прогресс задания и сумка.
+func _check_profile(mob_type: String) -> void:
+	var inv := Game.inventory
+	bag_used_max = maxi(bag_used_max, inv.used_cells())
+	if inv.used_cells() > inv.capacity:
+		bag_over += 1
+	if quest_id == "":
+		return
+	if quest_species == "" or mob_type == quest_species:
+		quest_kills = mini(quest_kills + 1, quest_need)
+	var qs: Quests = bot.main.get("quests") as Quests if bot.main != null else null
+	if qs == null or not qs.is_active(quest_id):
+		return
+	var got := qs.goal_progress(quest_id, 0)
+	if got != quest_kills:
+		quest_mismatch.append("после «%s»: прогресс %d, ожидалось %d" % [mob_type, got, quest_kills])
 
 
 func _on_physics_frame() -> void:
@@ -329,6 +393,7 @@ func _on_kill(p: Player) -> void:
 	if gained != expect:
 		xp_mismatch.append("%s %d ур. (герой %d): получено %d, по формуле %d" % [_target.type_id, _target.level, _hero_lvl,
 			gained, expect])
+	_check_profile(_target.type_id)
 	_target = null
 	_loot = _nearest_loot(p)
 	_go("loot" if _loot != null else ("rest" if _need_rest(p) else "seek"))
@@ -349,6 +414,8 @@ func _nearest_loot(p: Player) -> Node3D:
 
 
 func _on_message(text: String) -> void:
+	if text.contains("Сумка полна"):
+		bag_full_msgs += 1
 	if text.contains("погибли"):
 		deaths += 1
 		_target = null
@@ -461,6 +528,10 @@ func result() -> Dictionary:
 		"gold": int(finish.get("gold", 0)) - int(start.get("gold", 0)),
 		"ttk_avg": snappedf(ttk / maxf(float(kills.size()), 1.0), 0.01),
 		"time_split": t_split, "xp_mismatch": xp_mismatch, "kill_log": kills,
+		"quest": {"id": quest_id, "species": quest_species, "need": quest_need, "kills": quest_kills,
+			"mismatch": quest_mismatch},
+		"bag": {"id": String(profile.get("bag", "")), "capacity": bag_capacity, "used_max": bag_used_max,
+			"over": bag_over, "full_msgs": bag_full_msgs},
 		"clock": "Util.game_time",
 		"anim": AnimResolver.summary(),
 		"rest_boost": {"on": accel > 1.0, "boost": REST_BOOST, "game_sec": snappedf(boost_game, 0.1), "aborts": boost_aborts,

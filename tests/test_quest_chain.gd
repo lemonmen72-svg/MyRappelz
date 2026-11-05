@@ -1,11 +1,13 @@
 extends "res://tests/test_base.gd"
 ## Цепочка заданий острова для каждой расы (новый Бродяга): староста своей деревни (фазаны → волки и шкуры
-## с квестовой добычей → зелье, выданное при взятии → 5 ур. → к мудрецу; чужие старосты заданий не дают) →
+## с квестовой добычей → зелье, выданное при взятии → «Подарок кузнецу»: 5 ур., перья, закалка +1 у кузнеца, сдача
+## кузнецу → кузнец отправляет к мудрецу; чужие старосты заданий не дают) →
 ## мудрец, четыре задания сразу («Взять все»: 10 ур., склад, лавка Гордея — покупки и продажи считаются только
-## у него, Учитель Кирк) → «К охотнице» только после склада, лавки и учителя → охотница: 20 волков 6+ ур. →
+## у него, Учитель Кирк) → «К охотнице» только после склада, лавки и учителя → охотница: 10 волков 6+ ур. и когти →
 ## семь вожаков и «Доклад мудрецу» («Взять все»; вожаки — убийством, один — настоящим) → «Победа над вожаками»
-## (засчитывается в разговоре) → «Вести для мудреца» → профессия у мудреца (10 ур., окно выбора) →
-## «Первое умение» (стартовые умения не в счёт) → «Глава наёмников» → «Закрытая пещера» у Корвена.
+## (засчитывается в разговоре) → «Вести для мудреца» → испытание мудреца (берётся, пока доклад взят: анатема) →
+## профессия у мудреца (10 ур., окно выбора) → «Три умения» (стартовые не в счёт) → «Глава наёмников» →
+## «Закрытая пещера» у Корвена (дальше — его цепочка, tests/test_quests_new.gd).
 ## Склад: положить / забрать (часть и всю стопку), стопки, надетое оружие не в ячейках, полная сумка и полный склад,
 ## окно (ячейки, карточка, перетаскивание), закрытие вдали от кладовщика, сохранение и загрузка. Перенос старых
 ## сохранений: Бродяга 5+ ур. — без старосты, ветеран с профессией — всё до профессии сдано, «Знакомство с городом»
@@ -83,7 +85,9 @@ func _unit() -> void:
 	for i in range(1, QuestData.ELDER_CHAIN.size()):
 		check(QuestData.prereqs(String(QuestData.ELDER_CHAIN[i])) == [String(QuestData.ELDER_CHAIN[i - 1])],
 			"цепочка старосты: %s после %s" % [QuestData.ELDER_CHAIN[i], QuestData.ELDER_CHAIN[i - 1]])
-	check(QuestData.turn_in("elder_to_sage") == "sage", "«Дорога в город» сдаётся мудрецу")
+	check(QuestData.turn_in("elder_to_sage") == "sage", "«Совет кузнеца» сдаётся мудрецу")
+	check(QuestData.turn_in("elder_grow") == "smith" and QuestData.giver("elder_to_sage") == "smith",
+		"«Подарок кузнецу» сдаётся кузнецу, он и отправляет к мудрецу")
 	for id in SAGE4:
 		check(QuestData.giver(String(id)) == "sage" and QuestData.prereqs(String(id)) == ["elder_to_sage"],
 			"%s: у мудреца после старосты" % id)
@@ -94,6 +98,11 @@ func _unit() -> void:
 	check(QuestData.giver(QID) == "hunter" and QuestData.turn_in(QID) == "sage" and bool(jq.get("job_choice", false))
 		and bool(jq.get("wanderer_only", false)) and QuestData.prereqs(QID) == ["hunter_hunt"],
 		"«Доклад мудрецу»: выдаёт охотница после «Волчьей стаи», сдача — выбор профессии")
+	var jg: Array = QuestData.goals(QID)
+	check(jg.size() == 2 and String(jg[1]["type"]) == "quest" and String(jg[1]["id"]) == QuestData.TRIAL_QUEST,
+		"доклад требует испытание мудреца")
+	check(QuestData.giver(QuestData.TRIAL_QUEST) == "sage"
+		and String(QuestData.get_quest(QuestData.TRIAL_QUEST).get("while_active", "")) == QID, "испытание — у мудреца при взятом докладе")
 	# Вожаки: по заданию на каждого босса острова
 	var bosses: Array = []
 	for k in MobData.TYPES:
@@ -110,7 +119,11 @@ func _unit() -> void:
 	check(bosses.is_empty(), "каждому боссу — своё задание")
 	check(QuestData.prereqs("hunter_bosses_done") == QuestData.BOSS_QUESTS, "награда — после всех вожаков")
 	check(QuestData.prereqs("sage_first_skill") == [QID] and QuestData.turn_in("sage_to_merc") == "merc_chief"
-		and QuestData.giver("merc_closed_cave") == "merc_chief", "после профессии: умение → Корвен → закрытая пещера")
+		and QuestData.giver("merc_closed_cave") == "merc_chief", "после профессии: умения → Корвен → закрытая пещера")
+	check(QuestData.prereqs("merc_scout") == ["merc_closed_cave"], "«Закрытая пещера» — не тупик: дальше разведка")
+	for k in QuestData.BOSS_QUESTS:
+		check(QuestData.cooldown(String(k)) == QuestData.DAY and QuestData.get_quest(String(k)).has("repeat_rewards"),
+			"%s: снова раз в сутки" % k)
 	# Свои тексты у каждого старосты
 	var offers: Dictionary = {}
 	var race0: String = game.race_id
@@ -225,23 +238,38 @@ func _elder_chain(race: String) -> void:
 	player.hp = maxi(1, int(player.max_hp * 0.5))
 	check(eco.use_potion() and q.is_ready("elder_potion"), "выпито зелье — задание выполнено")
 	_complete_at(elder, "elder_potion")
-	# 4. 5 уровень
-	check(q.accept("elder_grow"), "«5 уровень» взято")
+	# 4. Подарок кузнецу: 5 уровень, три пера (квестовая добыча с фазанов), закалка оружия +1 у кузнеца
+	check(q.accept("elder_grow"), "«Подарок кузнецу» взято")
+	npcs.refresh_marks()
+	check(npcs.npc("smith").mark_kind == "active", "над кузнецом серый «?»")
+	check(q.quest_loot("pheasant") == {"pheasant_feather": 1}, "квестовая добыча: перо с фазана")
 	if game.level < 5:
 		check(not q.is_ready("elder_grow"), "до 5 ур. не готово")
 	_level_to(5)
-	check(q.is_ready("elder_grow"), "5 уровень")
-	_complete_at(elder, "elder_grow")
-	# 5. К мудрецу
-	_stand_by(elder, 1.8)
-	npcs.talk_to(elder)
+	inv.remove("pheasant_feather", inv.count("pheasant_feather"))
+	inv.add("pheasant_feather", 3)
+	check(q.goal_done("elder_grow", 0) and q.goal_done("elder_grow", 1) and not q.is_ready("elder_grow"),
+		"5 ур. и перья есть — нужна закалка")
+	_stand_by("smith", 1.8)
+	game.gold += 1000
+	var w0: String = game.weapon
+	var tr := eco.temper(w0, "weapon")
+	check(bool(tr["ok"]) and ItemData.enchant_level(game.weapon) == 1, "закалка у кузнеца: %s" % game.weapon)
+	check(q.is_ready("elder_grow"), "закалка +1 — «Подарок кузнецу» выполнено")
+	var feathers := inv.count("pheasant_feather")
+	_complete_at("smith", "elder_grow")
+	check(inv.count("pheasant_feather") == feathers - 3, "перья отданы кузнецу")
+	# 5. Кузнец отправляет к мудрецу
+	npcs.refresh_marks()
+	check(npcs.npc(elder).mark_text() == "", "у старосты дел больше нет")
+	_stand_by("smith", 1.8)
+	npcs.talk_to("smith")
 	_press("opt_quests")
 	_press("dq_elder_to_sage")
 	_press("accept")
-	check(q.is_active("elder_to_sage") and not q.is_ready("elder_to_sage"), "«К мудрецу» взято")
+	check(q.is_active("elder_to_sage") and not q.is_ready("elder_to_sage"), "«Совет кузнеца» взято")
 	npcs.close_dialog()
 	npcs.refresh_marks()
-	check(npcs.npc(elder).mark_text() == "", "у старосты дел больше нет")
 	check(npcs.npc("sage").mark_kind == "active", "над мудрецом серый «?»")
 	_stand_by("sage", 1.8)
 	npcs.talk_to("sage")
@@ -414,9 +442,13 @@ func _hunter(first: bool) -> void:
 	var weak: Mob = main.spawn_mob("wolf", 3, far + Vector3(2, 0, 0))
 	q.on_mob_killed(weak)
 	check(q.goal_progress("hunter_hunt", 0) == 0, "волк 3 ур. не в счёт")
-	for i in 20:
+	check(q.quest_loot("wolf").has("wolf_claw"), "квестовая добыча: коготь с волка")
+	for i in 10:
 		q.on_mob_killed(strong)
-	check(q.is_ready("hunter_hunt"), "двадцать волков 6+ ур.")
+	check(q.goal_done("hunter_hunt", 0) and not q.is_ready("hunter_hunt"), "десять волков 6+ ур., когтей нет")
+	game.inventory.remove("wolf_claw", game.inventory.count("wolf_claw"))
+	game.inventory.add("wolf_claw", 5)
+	check(q.is_ready("hunter_hunt"), "десять волков и пять когтей")
 	strong.queue_free()
 	weak.queue_free()
 	_complete_at("hunter", "hunter_hunt")
@@ -461,8 +493,8 @@ func _hunter(first: bool) -> void:
 	for k in order:
 		check(q.state("hunter_bosses_done") == "locked", "«Победа над вожаками» ещё закрыта")
 		var mirrors: int = game.inventory.count("mirror_card")
-		check(q.complete(String(k)), "сдано: %s" % k)
 		var items := QuestData.reward_items(String(k))
+		check(q.complete(String(k)), "сдано: %s" % k)
 		check(game.inventory.count("mirror_card") == mirrors + int(items.get("mirror_card", 0)), "зеркальные карты за вожака")
 	check(q.state("hunter_bosses_done") == "available", "все вожаки — награда доступна")
 	_stand_by("hunter", 1.8)
@@ -490,7 +522,9 @@ func _profession(race: String) -> void:
 	var q: Quests = main.quests
 	var npcs: Npcs = main.npcs
 	_level_to(10)
-	check(q.is_ready(QID) and q.is_ready("sage_path"), "10 ур.: доклад и «Путь к профессии» готовы")
+	check(q.is_ready("sage_path") and not q.is_ready(QID) and q.goal_done(QID, 0), "10 ур.: доклад ждёт испытания")
+	_trial()
+	check(q.is_ready(QID) and q.is_ready("sage_path"), "10 ур. и испытание: доклад и «Путь к профессии» готовы")
 	_complete_at("sage", "sage_path")
 	_stand_by("sage", 1.8)
 	npcs.open_dialog("sage", "quest", QID)
@@ -505,23 +539,49 @@ func _profession(race: String) -> void:
 	check(q.state("sage_first_skill") == "available" and npcs.npc("sage").mark_text() == "!", "мудрец: «Первое умение»")
 
 
+## Испытание мудреца: берётся у мудреца, пока доклад взят; анатема на Западных скалах.
+func _trial() -> void:
+	var q: Quests = main.quests
+	var npcs: Npcs = main.npcs
+	var tq := QuestData.TRIAL_QUEST
+	check(q.state(tq) == "available", "испытание доступно (%s)" % q.accept_block(tq))
+	_stand_by("sage", 1.8)
+	npcs.talk_to("sage")
+	_press("opt_quests")
+	_press("dq_" + tq)
+	_press("accept")
+	npcs.close_dialog()
+	check(q.is_active(tq), "испытание взято")
+	check(q.target_species().has("anathema"), "анатема — цель задания (красный значок)")
+	var m: Mob = main.spawn_mob("anathema", 9, _ground(Vector2(-130.0, -32.0)))
+	q.on_mob_killed(m)
+	m.queue_free()
+	check(q.is_ready(tq), "анатема побеждена")
+	_complete_at("sage", tq)
+
+
 func _after_job() -> void:
 	var q: Quests = main.quests
 	var npcs: Npcs = main.npcs
 	var job: String = game.class_id
 	check(q.accept("sage_first_skill"), "«Первое умение» взято")
 	check(q.goal_progress("sage_first_skill", 0) == 0, "стартовые умения не в счёт (%d)" % Quests.learned_skills())
-	_level_to(11)
-	game.hero["jp"] = int(game.hero["jp"]) + 100
-	var sid := ""
-	for k in HeroSkills.list_for(job):
-		if sid == "" and HeroSkills.learn_block(game.hero, job, game.level, String(k)) == "":
-			sid = String(k)
-	check(sid != "", "есть умение для изучения")
-	check(HeroSkills.learn(game.hero, job, game.level, sid), "изучено «%s»" % String(HeroSkills.get_skill(sid, job).get("name", sid)))
-	main.player.refresh_skills()
-	game.changed.emit()
-	check(q.is_ready("sage_first_skill"), "умение изучено — задание выполнено")
+	_level_to(15)
+	game.hero["jp"] = int(game.hero["jp"]) + 300
+	for n in 3:
+		var sid := ""
+		for k in HeroSkills.list_for(job):
+			if sid == "" and HeroSkills.skill_level(game.hero, String(k)) == 0 \
+					and HeroSkills.learn_block(game.hero, job, game.level, String(k)) == "":
+				sid = String(k)
+		check(sid != "", "есть умение для изучения (%d)" % (n + 1))
+		if sid == "":
+			break
+		check(not q.is_ready("sage_first_skill"), "умений %d из 3 — ещё не готово" % n)
+		check(HeroSkills.learn(game.hero, job, game.level, sid), "изучено «%s»" % String(HeroSkills.get_skill(sid, job).get("name", sid)))
+		main.player.refresh_skills()
+		game.changed.emit()
+	check(q.is_ready("sage_first_skill"), "три умения изучены — задание выполнено")
 	_complete_at("sage", "sage_first_skill")
 	check(q.accept("sage_to_merc"), "«Глава наёмников» взято")
 	_stand_by("merc_chief", 1.8)
@@ -539,13 +599,16 @@ func _after_job() -> void:
 	check(q.is_done("merc_closed_cave") and npcs.reply == QuestData.text("merc_closed_cave", "done"), "«Закрытая пещера» сдано")
 	check(bool(NpcData.talk_entry("merc_chief", "dungeon").get("soon", false)), "подземелье — «скоро»")
 	npcs.close_dialog()
-	for k in QuestData.QUESTS:
+	var main_chain: Array = QuestData.PRE_JOB + [QID] + QuestData.BOSS_QUESTS + ["hunter_bosses_done", "hunter_to_sage",
+		"sage_first_skill", "sage_to_merc", "merc_closed_cave"]
+	for k in main_chain:
 		var id := String(k)
-		if not id.begins_with("kirk_"):
-			check(q.is_done(id), "цепочка пройдена: «%s»" % QuestData.quest_name(id))
+		check(q.is_done(id), "цепочка пройдена: «%s»" % QuestData.quest_name(id))
 	npcs.refresh_marks()
-	for who in ["sage", "hunter", "merc_chief", String(QuestData.ELDERS[game.race_id])]:
+	for who in ["sage", "hunter", String(QuestData.ELDERS[game.race_id])]:
 		check(npcs.npc(String(who)).mark_text() == "", "%s: значков нет" % who)
+	check(npcs.npc("merc_chief").mark_text() == "!", "у Корвена — следующее: «Разведка скал»")
+	check(q.state("hunter_boss_wolf") == "locked" and q.cooldown_left("hunter_boss_wolf") > 0.0, "вожаки — снова через сутки")
 
 
 # ---------- Старые сохранения ----------
@@ -573,9 +636,27 @@ func _check_migration() -> void:
 	# Бродяга с прежним заданием на профессию в работе: задание остаётся, цель — 10 ур.
 	game.from_dict({"version": 2, "name": "Бродяга", "race": "human", "class": "wanderer", "level": 11,
 		"quests": {"active": {QID: {"progress": [1, 3]}}, "done": {}}})
-	check(q.is_active(QID) and (game.quests_active[QID]["progress"] as Array).size() == 1, "прежнее задание — с новой целью")
+	check(q.is_active(QID) and (game.quests_active[QID]["progress"] as Array).size() == 2, "прежнее задание — с новыми целями")
 	q._refresh_state_goals(false)
-	check(q.is_ready(QID), "11 ур. — доклад можно сдать")
+	check(q.goal_done(QID, 0) and not q.is_ready(QID) and q.state(QuestData.TRIAL_QUEST) == "available",
+		"11 ур. — доклад ждёт испытания, испытание можно взять")
+	# Сохранение версии 1 (до испытания): с профессией — испытание засчитано; «Крепкая рука» в работе — теперь
+	# «Подарок кузнецу» с тремя целями, сданное остаётся сданным
+	var done1: Dictionary = {}
+	for k in QuestData.PRE_JOB:
+		if String(k) != QuestData.TRIAL_QUEST:
+			done1[String(k)] = 1
+	done1[QID] = 1
+	game.from_dict({"version": 2, "name": "Версия1", "race": "human", "class": "warrior", "level": 15,
+		"quests": {"active": {"merc_closed_cave": {"progress": [0]}}, "done": done1, "tracked": "", "chain": 1}})
+	check(q.is_done(QuestData.TRIAL_QUEST) and q.is_active("merc_closed_cave") and q.is_done("hunter_hunt"),
+		"версия 1 с профессией: испытание засчитано, взятое осталось")
+	game.from_dict({"version": 2, "name": "Версия1б", "race": "human", "class": "wanderer", "level": 6,
+		"quests": {"active": {"elder_grow": {"progress": [5]}}, "done": {"elder_hunt": 1, "elder_trophies": 1,
+			"elder_potion": 1}, "tracked": "elder_grow", "chain": 1}})
+	check(q.is_active("elder_grow") and (game.quests_active["elder_grow"]["progress"] as Array).size() == 3
+		and not q.is_done(QuestData.TRIAL_QUEST) and game.quest_tracked == "elder_grow",
+		"версия 1 Бродяга: «Подарок кузнецу» продолжается с новыми целями")
 	# Новое сохранение: версия цепочки и склад
 	var d: Dictionary = game.to_dict()
 	check(int(d["quests"]["chain"]) == QuestData.CHAIN_VERSION and d.has("storage"), "в сохранении — версия цепочки и склад")

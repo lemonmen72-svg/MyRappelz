@@ -72,7 +72,7 @@ const PET_LEVELS := [[1, 0], [30, 0], [60, 1], [115, 2]]
 ## Уровень призванного питомца сразу: пороги эволюции и сверх-эволюции.
 const PET_LEVEL_PRESETS := [1, 30, 50, 60, 100, 115]
 ## Группы предметов на вкладке «Предметы»: [тип ItemData, подпись]; прочие типы — «Прочее».
-const ITEM_GROUPS := [["weapon", "Оружие"], ["armor", "Броня"], ["jewelry", "Украшения"], ["consumable", "Расходники"],
+const ITEM_GROUPS := [["weapon", "Оружие"], ["armor", "Броня"], ["jewelry", "Украшения"], ["bag", "Торбы"], ["consumable", "Расходники"],
 	["cube", "Кубы"], ["upgrade", "Прокачка"], ["card", "Карты существ"], ["trophy", "Трофеи"]]
 const KILL_RADIUS := 30.0
 const MOB_MAX_LEVEL := 50
@@ -428,7 +428,7 @@ static func pet_xp_next(main: Node) -> void:
 
 static func _build_items(main: Node, body: VBoxContainer) -> void:
 	_head(body, "Выдать предмет (кладётся столько, сколько поместится): занято %d/%d" % [Game.inventory.used_cells(),
-		Inventory.CAPACITY])
+		Game.inventory.capacity])
 	for g in item_groups():
 		var grp: Array = g
 		body.add_child(_text(String(grp[1]), UiScale.FONT_TEXT, Color(0.9, 0.92, 1.0)))

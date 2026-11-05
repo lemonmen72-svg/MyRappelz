@@ -65,7 +65,9 @@ func _queue_run(bot: TestBot, run_id: String, run_title: String, k: float) -> vo
 
 
 func _save_start(bot: TestBot) -> void:
-	_start_state = {"level": Game.level, "xp": Game.xp, "gold": Game.gold, "bag": Game.inventory.to_dict()}
+	_start_state = {"level": Game.level, "xp": Game.xp, "gold": Game.gold, "bag": Game.inventory.to_dict(),
+		"equip": (Game.equip as Dictionary).duplicate(), "quests_active": (Game.quests_active as Dictionary).duplicate(true),
+		"quests_done": Game.quests_done.duplicate(true)}
 	var p := bot.player()
 	if p != null and p.current_target != null:
 		p.select_target(null)
@@ -76,6 +78,11 @@ func _restore_start(bot: TestBot) -> void:
 	Game.xp = int(_start_state["xp"])
 	Game.gold = int(_start_state["gold"])
 	Game.inventory.from_dict(_start_state["bag"])
+	# Торба и задание профиля 3 — снова с нуля (прогон наденет и возьмёт их сам)
+	Game.equip = (_start_state["equip"] as Dictionary).duplicate()
+	Game.quests_active = (_start_state["quests_active"] as Dictionary).duplicate(true)
+	Game.quests_done = (_start_state["quests_done"] as Variant).duplicate(true)
+	Game.ensure_gear()
 	var p := bot.player()
 	p.recalc_stats()
 	p.hp = p.max_hp
@@ -103,6 +110,16 @@ func _compare(bot: TestBot) -> void:
 		bot.check((rd["xp_mismatch"] as Array).is_empty(), "Кардинал «%s»: опыт за каждое убийство = формула игры%s" % [
 			rd["title"], "" if (rd["xp_mismatch"] as Array).is_empty() else ": " + "; ".join(
 			PackedStringArray((rd["xp_mismatch"] as Array).slice(0, 5)))])
+		var qd: Dictionary = rd.get("quest", {})
+		if String(qd.get("id", "")) != "":
+			bot.check((qd["mismatch"] as Array).is_empty(), "Кардинал «%s»: задание «%s» — прогресс = убитым (%d из %d)%s" % [
+				rd["title"], QuestData.quest_name(String(qd["id"])), int(qd["kills"]), int(qd["need"]),
+				"" if (qd["mismatch"] as Array).is_empty() else ": " + "; ".join(PackedStringArray((qd["mismatch"] as Array).slice(0, 3)))])
+		var bd: Dictionary = rd.get("bag", {})
+		if String(bd.get("id", "")) != "":
+			bot.check(int(bd["capacity"]) == Inventory.CAPACITY + ItemData.bag_slots(String(bd["id"])) and int(bd["over"]) == 0,
+				"Кардинал «%s»: торба — ячеек %d, занято до %d, за вместимостью %d раз, «Сумка полна» %d" % [rd["title"],
+				int(bd["capacity"]), int(bd["used_max"]), int(bd["over"]), int(bd["full_msgs"])])
 	if is_det():
 		_compare_det(bot, a, b)
 		return
@@ -202,7 +219,7 @@ func summary(_bot: TestBot) -> String:
 func report_lines(_bot: TestBot) -> PackedStringArray:
 	var out := PackedStringArray()
 	out.append("Кардинал — проверка детерминизма (фаза 2)" if is_det() else "Кардинал — первый срез (фазы 1–2)")
-	out.append("  Профиль «Обычный игрок» v2 (брошенную цель минуту не выбирает; фаза 2 — игровые часы физики, перемотка отдыха), seed %d, зона «Окрестности деревни людей», герой — Бродяга 1 ур." % seed_value)
+	out.append("  Профиль «Обычный игрок» v3 (торба 1-го ранга, взято первое задание старосты; брошенную цель минуту не выбирает; игровые часы физики, перемотка отдыха), seed %d, зона «Окрестности деревни людей», герой — Бродяга 1 ур." % seed_value)
 	for r in runs:
 		var d := r.result()
 		if not r.done:
@@ -230,6 +247,15 @@ func report_lines(_bot: TestBot) -> PackedStringArray:
 				", ".join(errs) if not errs.is_empty() else "отдыха не было"])
 		if not (d["xp_mismatch"] as Array).is_empty():
 			out.append("    ! опыт не по формуле: " + "; ".join(PackedStringArray((d["xp_mismatch"] as Array).slice(0, 5))))
+		var qd: Dictionary = d.get("quest", {})
+		if String(qd.get("id", "")) != "":
+			out.append("    задание «%s»: убито %d из %d (%s)%s" % [QuestData.quest_name(String(qd["id"])), int(qd["kills"]),
+				int(qd["need"]), String(qd["species"]), "" if (qd["mismatch"] as Array).is_empty() else
+				" ! расхождение: " + "; ".join(PackedStringArray((qd["mismatch"] as Array).slice(0, 3)))])
+		var bd: Dictionary = d.get("bag", {})
+		if String(bd.get("id", "")) != "":
+			out.append("    сумка: торба «%s», ячеек %d, занято до %d, «Сумка полна» %d раз" % [ItemData.item_name(String(bd["id"])),
+				int(bd["capacity"]), int(bd["used_max"]), int(bd["full_msgs"])])
 	if _last.has("determinism"):
 		var dd: Dictionary = _last["determinism"]
 		out.append("  Детерминизм (одинаковый seed, оба ×%.0f): %s — совпало %d из %d убийств, итог %s%s" % [accel,

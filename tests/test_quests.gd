@@ -271,8 +271,13 @@ func run_step() -> void:
 			_check_bonus("kirk_bond_trial")
 			for id in CHAIN:
 				check(q.state(String(id)) == "done", "цепочка: %s сдано" % id)
-			check(kirk.mark_text() == "", "все задания сданы — значка нет")
-			check(npcs.greeting("kirk") == NpcData.greet("kirk", "idle"), "приветствие без заданий")
+			# Дальше у Кирка — задания о питомце (с 5 ур.): «!», если уже доступно, иначе значка нет и «подрасти»
+			var more := String((QuestData.NPC_CHAINS["kirk"] as Array)[0])
+			var more_open := q.state(more) == "available"
+			check(kirk.mark_text() == ("!" if more_open else ""), "цепочка сдана — значок по следующему заданию: «%s»"
+				% kirk.mark_text())
+			check(npcs.greeting("kirk") == NpcData.greet("kirk", "offer" if more_open else "wait"),
+				"приветствие после цепочки: " + npcs.greeting("kirk"))
 			# Отказ от задания: взять, отказаться в журнале, взять снова
 			_unit_other_goals()
 			wait = 3
@@ -505,7 +510,9 @@ func _unit_other_goals() -> void:
 	check(q.accept("test_all"), "взято задание-проверка")
 	check(q.goal_done("test_all", 4), "form с counts_existing: существо уже есть — засчитано сразу")
 	check(q.goal_progress("test_all", 2) == game.level, "level: прогресс — текущий уровень")
-	check(main.npcs.kirk.mark_kind == "active", "сдавать Кирку — над ним серый «?»")
+	# (новое задание Кирка «!» важнее серого «?»)
+	check(main.npcs.kirk.mark_kind == "active" or (main.npcs.kirk.mark_kind == "offer"
+		and q.state("kirk_pet_skills") == "available"), "сдавать Кирку — над ним серый «?» (%s)" % main.npcs.kirk.mark_kind)
 	# Отказ в журнале и повторное взятие
 	q.window.open("test_all")
 	_press_journal("abandon")

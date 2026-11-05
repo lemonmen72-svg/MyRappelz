@@ -82,11 +82,13 @@ var belt_slots := 1
 ## Золото нового героя: цены у жителей — как в базе оригинала (зелье 200, оружие 500–750), золота хватает на зелья
 ## и первые покупки (0.31; раньше 50 при ценах ×20 ниже).
 const START_GOLD := 1000
-## Задания (QuestData, логика — Quests): взятые {id: {"progress": [число по каждой цели]}} в порядке взятия,
-## сданные {id: сколько раз сдано}, отслеживаемое на экране ("" — никакое).
+## Задания (QuestData, логика — Quests): взятые {id: {"progress": [число по каждой цели]}} в порядке взятия
+## (у заказа писаря — ещё свои "goals" и "rewards", выбранные при взятии), сданные {id: сколько раз сдано},
+## отслеживаемое на экране ("" — никакое), время последней сдачи {id: Unix, с} — для суточных заданий (cooldown).
 var quests_active: Dictionary = {}
 var quests_done: Dictionary = {}
 var quest_tracked := ""
+var quests_time: Dictionary = {}
 ## Склад у Кладовщика Тобина (Economy.deposit / withdraw, окно — InventoryWindow "storage"): те же ячейки и стопки,
 ## что в сумке, Inventory.CAPACITY ячеек. В сохранении — ключ "storage" {"items", "cells"}; у старых сохранений пуст.
 var storage := Inventory.new()
@@ -137,6 +139,7 @@ func reset() -> void:
 	quests_active = {}
 	quests_done = {}
 	quest_tracked = ""
+	quests_time = {}
 	storage.from_dict({})
 	storage_gold = 0
 	xp_mult = 1
@@ -334,6 +337,19 @@ func gear_block(id: String, gslot: String) -> String:
 			used += 1
 	if not inventory.has(id, used + 1):
 		return "Этой вещи нет в сумке" if used == 0 else "Второй такой вещи нет в сумке"
+	if ItemData.is_bag(id):
+		return bag_block(id)
+	return ""
+
+
+## Почему нельзя надеть торбу new_bag вместо нынешней ("" — снять её) — "" можно: вещи сумки должны поместиться
+## в новую вместимость (прежняя торба ляжет в ячейку, новая уйдёт из ячейки в «Торбу»).
+func bag_block(new_bag: String) -> String:
+	var old := gear_in("bag")
+	var cap := Inventory.CAPACITY + ItemData.bag_slots(new_bag)
+	var need := inventory.used_cells() + (1 if old != "" else 0) - (1 if new_bag != "" else 0)
+	if need > cap:
+		return "Вещи не поместятся: освободите %d ячеек сумки" % (need - cap)
 	return ""
 
 
@@ -369,6 +385,8 @@ func equip_gear(id: String, gslot: String = "") -> String:
 ## true — что-то снято.
 func unequip_gear(gslot: String) -> bool:
 	if String(equip.get(gslot, "")) == "":
+		return false
+	if gslot == "bag" and bag_block("") != "":
 		return false
 	equip.erase(gslot)
 	_sync_worn()
@@ -419,6 +437,7 @@ func _sync_worn() -> void:
 		if id != "":
 			w[id] = int(w.get(id, 0)) + 1
 	inventory.worn = w
+	inventory.capacity = Inventory.CAPACITY + ItemData.bag_slots(gear_in("bag"))
 
 
 # ---------- Профессия ----------
@@ -528,7 +547,7 @@ func to_dict() -> Dictionary:
 		"pets": pets.duplicate(true),
 		"active_pet": active_pet,
 		"quests": {"active": quests_active.duplicate(true), "done": quests_done.duplicate(), "tracked": quest_tracked,
-			"chain": QuestData.CHAIN_VERSION},
+			"chain": QuestData.CHAIN_VERSION, "times": quests_time.duplicate()},
 		"storage": {"items": storage.to_dict(), "cells": storage.layout_to_array()},
 		"storage_gold": storage_gold,
 		"belt_slots": belt_slots,
@@ -645,7 +664,7 @@ func from_dict(d: Dictionary) -> void:
 	_load_quests(qsrc)
 	var chain := int((qsrc as Dictionary).get("chain", 0)) if qsrc is Dictionary else 0
 	if chain < QuestData.CHAIN_VERSION:
-		migrate_quest_chain()
+		migrate_quest_chain(chain)
 	# Склад (старые сохранения — пустой)
 	var st: Variant = d.get("storage", {})
 	if st is Dictionary:
@@ -712,12 +731,26 @@ func _load_quests(src: Variant) -> void:
 			var old: Array = []
 			if rec is Dictionary and (rec as Dictionary).get("progress", []) is Array:
 				old = (rec as Dictionary)["progress"]
+			var entry: Dictionary = {"progress": []}
+			# Заказ писаря: цели и награда выбраны при взятии и хранятся в записи; без них заказ не продолжить
+			if QuestData.get_quest(id).has("gen"):
+				var sg: Variant = (rec as Dictionary).get("goals") if rec is Dictionary else null
+				var sr: Variant = (rec as Dictionary).get("rewards") if rec is Dictionary else null
+				if not (sg is Array) or (sg as Array).is_empty() or not (sr is Dictionary):
+					continue
+				var gl: Array = []
+				for g in sg:
+					if g is Dictionary:
+						gl.append((g as Dictionary).duplicate(true))
+				entry["goals"] = gl
+				entry["rewards"] = (sr as Dictionary).duplicate(true)
+			quests_active[id] = entry
 			var prog: Array = []
 			var goals := QuestData.goals(id)
 			for gi in goals.size():
 				var v := int(old[gi]) if gi < old.size() else 0
 				prog.append(clampi(v, 0, QuestData.goal_need(goals[gi])))
-			quests_active[id] = {"progress": prog}
+			entry["progress"] = prog
 	var dn: Variant = d.get("done", {})
 	if dn is Dictionary:
 		for k in dn:
@@ -727,6 +760,11 @@ func _load_quests(src: Variant) -> void:
 	var tr := String(d.get("tracked", ""))
 	if quests_active.has(tr):
 		quest_tracked = tr
+	var tm: Variant = d.get("times", {})
+	if tm is Dictionary:
+		for k in tm:
+			if QuestData.has_quest(String(k)):
+				quests_time[String(k)] = float((tm as Dictionary)[k])
 
 
 ## Сохранение до цепочки заданий острова (староста → мудрец → охотница → профессия): профессия уже выбрана
@@ -734,9 +772,17 @@ func _load_quests(src: Variant) -> void:
 ## ветеран не проходит старосту заново, задания после профессии и вожаки открыты; Бродяга с ELDER_SKIP_LEVEL ур. —
 ## сдана цепочка старосты (начинает у мудреца). Прежнее «Знакомство с городом» в QuestData больше нет — при загрузке
 ## оно просто отбрасывается (_load_quests).
-func migrate_quest_chain() -> void:
+## Версия 1 → 2 (from = 1): испытание мудреца (sage_trial) появилось перед докладом — у героя с профессией оно
+## считается пройденным; остальное новое («Подарок кузнецу» вместо «Крепкой руки», 10 волков и когти, «Три умения»,
+## цепочки жителей) подхватывается само: взятые задания пересчитывают прогресс по новым целям, сданные остаются
+## сданными.
+func migrate_quest_chain(from: int = 0) -> void:
 	var list: Array = []
-	if job_changed or int(quests_done.get(QuestData.JOB_QUEST, 0)) > 0:
+	var job := job_changed or int(quests_done.get(QuestData.JOB_QUEST, 0)) > 0
+	if from >= 1:
+		if job:
+			list = [QuestData.TRIAL_QUEST]
+	elif job:
 		list = QuestData.PRE_JOB.duplicate()
 		list.append(QuestData.JOB_QUEST)
 	elif level >= QuestData.ELDER_SKIP_LEVEL:

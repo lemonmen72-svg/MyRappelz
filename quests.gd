@@ -7,9 +7,14 @@ extends Node
 ##   душа поймана (Taming.soul_caught → tame), существо сформировано (Taming.formed → form),
 ##   питомец призван (PetManager.summoned → summon), покупка у NPC (Economy.bought → buy), продажа NPC
 ##   (Economy.sold → sell), выпито зелье (Economy.used → use), вещь положена на склад (Economy.stored → store),
-##   разговор с NPC (Npcs → on_talk → talk), сумка, уровень и умения (Inventory.changed, Game.changed → collect,
-##   level, skill). Квестовая добыча: пока цель collect с drop_from не выполнена, Economy кладёт её предмет
-##   в мешочек с каждого такого зверя (quest_loot).
+##   разговор с NPC (Npcs → on_talk → talk), сумка, уровень, умения и снаряжение (Inventory.changed, Game.changed
+##   и опрос раз в POLL с — collect, level, skill, equip, upgrade, pet_gear, gather, quest), умения питомцев (опрос:
+##   сумма изученных уровней выросла → pet_skill). Квестовая добыча: пока цель collect с drop_from не выполнена,
+##   Economy кладёт её предмет в мешочек с каждого такого зверя (quest_loot).
+## Находки (цель gather): пока цель не выполнена, в её зоне зверей лежат FIND_COUNT светящихся трав (QuestFind);
+##   подошёл ближе QuestFind.PICK_RANGE — трава в сумке, новая вырастет через FIND_RESPAWN с.
+## Суточные задания (cooldown): после сдачи берутся снова через cooldown с настоящего времени (Game.quests_time,
+##   QuestData.now); заказ писаря (gen) — цели и награда выбираются при взятии (generate) и хранятся в записи.
 ## Сообщает на экране («Задание обновлено: Поймать душу 1/1», «… выполнено — вернитесь к Учителю Кирку»).
 ## Сдача (complete) — у NPC-сдающего: награды — опыт героя (Player.gain_xp: уровни и доля JP), золото, предметы
 ## (если не помещаются — «Освободите место в сумке», задание остаётся взятым), JP героя; предметы целей collect
@@ -31,6 +36,15 @@ const TRACKER_TOP := 60.0
 const GOLD := Color(1.0, 0.85, 0.3)
 const DONE_COLOR := Color(0.55, 1.0, 0.6)
 const MUTED := Color(0.8, 0.82, 0.9)
+## Опрос состояния (снаряжение, умения питомцев, находки), с.
+const POLL := 0.5
+## Находок одной цели gather в зоне сразу; через сколько секунд после сбора вырастают новые.
+const FIND_COUNT := 5
+const FIND_RESPAWN := 12.0
+## Находки не ближе этого друг к другу, м.
+const FIND_GAP := 3.0
+## Узел находки (quest_find.gd, класс QuestFind) — через preload: так модуль не зависит от кэша глобальных классов.
+const FindScript := preload("res://quest_find.gd")
 
 var main: Node
 ## Журнал заданий.
@@ -42,6 +56,15 @@ var _tracker_box: VBoxContainer
 var _last_level := -1
 ## Случайные предметы последней сдачи {id: количество} (сообщение, тесты).
 var last_bonus: Dictionary = {}
+## Генератор заказов писаря (тесты подставляют свой; null — случайный).
+var gen_rng: RandomNumberGenerator = null
+
+var _poll_t := 0.0
+## Сумма изученных уровней умений всех питомцев при прошлом опросе (рост — событие pet_skill).
+var _pet_skill_sum := 0
+## Находки: ключ цели ("<предмет>@<зона>") → сколько секунд до новых.
+var _find_cd: Dictionary = {}
+var _rng := RandomNumberGenerator.new()
 
 
 func setup(m: Node) -> void:
@@ -64,6 +87,8 @@ func setup(m: Node) -> void:
 	window.setup(main, self)
 	_build_tracker()
 	_last_level = Game.level
+	_pet_skill_sum = pet_skill_sum()
+	_rng.randomize()
 	_refresh_state_goals(false)
 	refresh_tracker()
 
@@ -83,12 +108,38 @@ func handle_action(id: String) -> bool:
 
 ## Состояние задания: "active" (взято), "ready" (все цели выполнены, можно сдать), "done" (сдано, не повторяется),
 ## "available" (можно взять), "locked" (требования не выполнены).
+## Сданное повторяемое на перезарядке (cooldown_left > 0) — "locked".
 func state(id: String) -> String:
 	if Game.quests_active.has(id):
 		return "ready" if is_ready(id) else "active"
 	if int(Game.quests_done.get(id, 0)) > 0 and not bool(QuestData.get_quest(id).get("repeatable", false)):
 		return "done"
 	return "available" if accept_block(id) == "" else "locked"
+
+
+## Сколько секунд до того, как сданное суточное задание можно взять снова (0 — можно или перезарядки нет).
+func cooldown_left(id: String) -> float:
+	var cd := QuestData.cooldown(id)
+	if cd <= 0.0 or times_done(id) <= 0:
+		return 0.0
+	return maxf(0.0, float(Game.quests_time.get(id, 0.0)) + cd - QuestData.now())
+
+
+## Время словами: «5 ч 20 мин», «12 мин».
+static func time_text(sec: float) -> String:
+	var m := int(ceil(sec / 60.0))
+	if m >= 60:
+		return "%d ч %d мин" % [m / 60, m % 60]
+	return "%d мин" % maxi(1, m)
+
+
+## Носит ли профессия что-то во второй руке (щит или пару клинков).
+static func can_offhand(class_id: String) -> bool:
+	var w := ClassData.weapons(class_id)
+	for k in ["shield", "daggers", "dual_swords", "dual_axes"]:
+		if w.has(k):
+			return true
+	return false
 
 
 ## Почему задание нельзя взять ("" — можно).
@@ -107,6 +158,14 @@ func accept_block(id: String) -> String:
 		return "Профессия уже выбрана"
 	if bool(q.get("job_only", false)) and ClassData.is_wanderer(Game.class_id):
 		return "Сначала выберите профессию"
+	if bool(q.get("offhand_only", false)) and not can_offhand(Game.class_id):
+		return "Ваша профессия не носит щит или второй клинок"
+	var wa := String(q.get("while_active", ""))
+	if wa != "" and not Game.quests_active.has(wa):
+		return "Сначала возьмите задание «%s»" % QuestData.quest_name(wa)
+	var left := cooldown_left(id)
+	if left > 0.0:
+		return "Снова можно взять через %s" % time_text(left)
 	var lvl := int(q.get("level", 1))
 	if Game.level < lvl:
 		return "Задание доступно с %d уровня" % lvl
@@ -124,6 +183,11 @@ func level_locked(id: String) -> bool:
 	if bool(q.get("wanderer_only", false)) and not ClassData.is_wanderer(Game.class_id):
 		return false
 	if bool(q.get("job_only", false)) and ClassData.is_wanderer(Game.class_id):
+		return false
+	if bool(q.get("offhand_only", false)) and not can_offhand(Game.class_id):
+		return false
+	var wa := String(q.get("while_active", ""))
+	if (wa != "" and not Game.quests_active.has(wa)) or cooldown_left(id) > 0.0:
 		return false
 	return Game.level < int(q.get("level", 1))
 
@@ -223,15 +287,17 @@ func target_species() -> Dictionary:
 				continue
 			var sp := ""
 			var lvl := 0
+			var list: Array = []
 			match String(g.get("type", "")):
 				"kill":
-					sp = String(g.get("target", ""))
+					list = QuestData.goal_species(g)
 					lvl = int(g.get("min_level", 0))
 				"collect":
 					sp = String(g.get("drop_from", ""))
-			if sp == "":
-				continue
-			res[sp] = mini(int(res.get(sp, lvl)), lvl)
+					if sp != "":
+						list = [sp]
+			for e in list:
+				res[String(e)] = mini(int(res.get(String(e), lvl)), lvl)
 	return res
 
 
@@ -252,9 +318,10 @@ func refresh_mob_marks() -> void:
 			m.set_quest_target(t.has(m.type_id) and m.level >= int(t[m.type_id]))
 
 
-## Задания NPC для диалога: готовые к сдаче, доступные, взятые и следующее, закрытое уровнем.
+## Задания NPC для диалога: готовые к сдаче, доступные, взятые, следующее, закрытое уровнем, и суточные
+## на перезарядке («снова через …»).
 func npc_quests(npc_id: String) -> Array:
-	var order := ["ready", "available", "active", "level"]
+	var order := ["ready", "available", "active", "level", "later"]
 	var res: Array = []
 	for want in order:
 		for k in QuestData.all_ids():
@@ -273,6 +340,9 @@ func npc_quests(npc_id: String) -> Array:
 						res.append(id)
 				"level":
 					if QuestData.giver(id) == npc_id and level_locked(id):
+						res.append(id)
+				"later":
+					if QuestData.giver(id) == npc_id and st == "locked" and cooldown_left(id) > 0.0:
 						res.append(id)
 	return res
 
@@ -295,6 +365,15 @@ func accept(id: String) -> bool:
 			Game.inventory.add(gid, miss)
 			given.append("%s ×%d" % [ItemData.item_name(gid), miss])
 	var talking := _talking_to()
+	# Заказ писаря: цели и награда — при взятии, в записи задания (QuestData.goals / rewards читают её)
+	var rec: Dictionary = {"progress": []}
+	if QuestData.get_quest(id).has("gen"):
+		var gen := generate(id)
+		rec["goals"] = gen["goals"]
+		rec["rewards"] = gen["rewards"]
+	Game.quests_active[id] = rec
+	# Умения питомцам — в счёт только изученные после взятия
+	_pet_skill_sum = pet_skill_sum()
 	var goals := QuestData.goals(id)
 	var prog: Array = []
 	for gi in goals.size():
@@ -308,7 +387,7 @@ func accept(id: String) -> bool:
 			# Задание взято в разговоре с тем, с кем нужно поговорить
 			v = 1
 		prog.append(mini(v, QuestData.goal_need(g)))
-	Game.quests_active[id] = {"progress": prog}
+	rec["progress"] = prog
 	if Game.quest_tracked == "" or not Game.quests_active.has(Game.quest_tracked):
 		Game.quest_tracked = id
 	if is_ready(id):
@@ -342,7 +421,10 @@ func complete(id: String) -> bool:
 	if not is_ready(id):
 		_msg("Задание «%s» ещё не выполнено" % QuestData.quest_name(id))
 		return false
-	var items := QuestData.reward_items(id)
+	# Награда — до того, как задание станет сданным (у повторной сдачи своя, у заказа — из записи)
+	var r := QuestData.rewards(id)
+	var said := QuestData.rewards_line(r)
+	var items: Dictionary = r.get("items", {})
 	# Случайная награда (1–2 предмета): бросок при сдаче, место — вместе с наградой из данных
 	var bonus := LootTable.quest_reward(Game.level, Game.class_id)
 	var all_items: Dictionary = items.duplicate()
@@ -355,19 +437,19 @@ func complete(id: String) -> bool:
 	var goals := QuestData.goals(id)
 	Game.quests_active.erase(id)
 	Game.quests_done[id] = times_done(id) + 1
+	Game.quests_time[id] = QuestData.now()
 	if Game.quest_tracked == id:
 		Game.quest_tracked = _first_active()
 	# Предметы целей «собрать» с take = true — забираем
 	for g in goals:
 		var gd: Dictionary = g
-		if String(gd.get("type", "")) == "collect" and bool(gd.get("take", false)):
+		if ["collect", "gather"].has(String(gd.get("type", ""))) and bool(gd.get("take", false)):
 			var left := QuestData.goal_need(gd)
 			for it in gd.get("items", []):
 				var take_n := mini(left, Game.inventory.count(String(it)))
 				if take_n > 0:
 					Game.inventory.remove(String(it), take_n)
 					left -= take_n
-	var r := QuestData.rewards(id)
 	var xp := int(r.get("xp", 0))
 	var gold := int(r.get("gold", 0))
 	var jp := int(r.get("jp", 0))
@@ -389,7 +471,6 @@ func complete(id: String) -> bool:
 		if text != "":
 			Util.float_text(main, p.global_position + Vector3(0, 3.0, 0), text, GOLD, 1.2)
 		Vfx.level_up(main, p.global_position)
-	var said := QuestData.reward_text(id)
 	if not bonus.is_empty():
 		said += ("; " if said != "" else "") + "случайная награда: " + LootDrop.describe(bonus)
 	_msg("Задание «%s» выполнено! Награда: %s" % [QuestData.quest_name(id), said], 5.0)
@@ -413,7 +494,7 @@ func on_mob_killed(mob: Mob) -> void:
 		return
 	var sp := mob.type_id
 	var lvl := mob.level
-	_event("kill", func(g: Dictionary) -> bool: return _species_ok(g, sp) and lvl >= int(g.get("min_level", 0)))
+	_event("kill", func(g: Dictionary) -> bool: return _kill_ok(g, sp, lvl))
 	if _pet_out():
 		_event("pet_kill", func(g: Dictionary) -> bool: return _species_ok(g, sp))
 
@@ -587,8 +668,171 @@ func _layout_tracker() -> void:
 	tracker.size = Vector2(w, 0.0)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_layout_tracker()
+	_poll_t -= delta
+	if _poll_t <= 0.0:
+		_poll_t = POLL
+		poll(POLL)
+
+
+## Опрос раз в POLL с: умения питомцев (pet_skill), цели-состояния без своих сигналов (снаряжение, заточка,
+## вещи питомцев, сданные задания), находки (gather). dt — сколько прошло с прошлого опроса.
+func poll(dt: float = POLL) -> void:
+	var sum := pet_skill_sum()
+	if sum > _pet_skill_sum:
+		_event("pet_skill", func(_g: Dictionary) -> bool: return true, sum - _pet_skill_sum)
+	_pet_skill_sum = sum
+	_refresh_state_goals(true)
+	finds_tick(dt)
+
+
+## Сумма изученных уровней умений всех питомцев коллекции.
+static func pet_skill_sum() -> int:
+	var n := 0
+	for rec in Game.pets:
+		var sk: Variant = (rec as Dictionary).get("skills", {})
+		if sk is Dictionary:
+			for k in sk:
+				n += maxi(0, int((sk as Dictionary)[k]))
+	return n
+
+
+# ---------- Заказ писаря ----------
+
+## Цели и награда заказа (gen) по уровню героя: {"goals", "rewards"} (QuestData.contract по зонам острова).
+func generate(id: String) -> Dictionary:
+	var zones: Array = []
+	if IslandWorld.current != null:
+		zones = IslandWorld.current.cfg.get("mob_zones", [])
+	var res := QuestData.contract(Game.level, zones, gen_rng)
+	if String(QuestData.get_quest(id).get("gen", "")) != "scribe":
+		push_warning("Неизвестный заказ: %s" % id)
+	return res
+
+
+# ---------- Находки (цель gather) ----------
+
+## Нужные сейчас находки: ключ "<предмет>@<зона>" → {"item", "zone"} по невыполненным целям gather взятых заданий.
+func wanted_finds() -> Dictionary:
+	var res: Dictionary = {}
+	for k in Game.quests_active.keys():
+		var id := String(k)
+		var goals := QuestData.goals(id)
+		for gi in goals.size():
+			var g: Dictionary = goals[gi]
+			if String(g.get("type", "")) != "gather" or goal_done(id, gi):
+				continue
+			var items: Array = g.get("items", [])
+			if items.is_empty():
+				continue
+			var item := String(items[0])
+			var zone := String(g.get("zone", ""))
+			res["%s@%s" % [item, zone]] = {"item": item, "zone": zone}
+	return res
+
+
+## Находки в мире (живые узлы QuestFind).
+func finds() -> Array:
+	var res: Array = []
+	if not is_inside_tree():
+		return res
+	for n in get_tree().get_nodes_in_group("quest_finds"):
+		if not n.is_queued_for_deletion():
+			res.append(n)
+	return res
+
+
+## Находки: ненужные убрать, нужных — до FIND_COUNT в зоне (новые — когда прошла пауза после сбора).
+func finds_tick(dt: float) -> void:
+	if main == null or not is_inside_tree():
+		return
+	var want := wanted_finds()
+	var have: Dictionary = {}
+	for n in finds():
+		var f := n as Node3D
+		if f == null:
+			continue
+		var fk := String(f.get("key"))
+		if not want.has(fk):
+			f.queue_free()
+			continue
+		have[fk] = int(have.get(fk, 0)) + 1
+	for key in want:
+		var cd := float(_find_cd.get(key, 0.0)) - dt
+		_find_cd[key] = cd
+		if cd > 0.0:
+			continue
+		var w: Dictionary = want[key]
+		for i in FIND_COUNT - int(have.get(key, 0)):
+			if _spawn_find(String(key), String(w["item"]), String(w["zone"])) == null:
+				break
+
+
+## Точка для находки в зоне зверей zone острова: суша, не у воды, не в безопасной зоне, не у других находок.
+func find_spot(zone: String) -> Variant:
+	var w := IslandWorld.current
+	if w == null:
+		return null
+	var zd: Dictionary = {}
+	for z in w.cfg.get("mob_zones", []):
+		if String((z as Dictionary).get("id", "")) == zone:
+			zd = z
+	if zd.is_empty():
+		return null
+	var c := IslandWorld.v2(zd["center"])
+	var r := float(zd.get("radius", 10.0)) * 0.9
+	var others: Array = []
+	for n in finds():
+		var nd := n as Node3D
+		others.append(Vector2(nd.global_position.x, nd.global_position.z))
+	for t in 40:
+		var a := _rng.randf() * TAU
+		var p := c + Vector2(cos(a), sin(a)) * sqrt(_rng.randf()) * r
+		if not w.is_walkable(p.x, p.y) or w.water_distance(p.x, p.y) < 2.0:
+			continue
+		var pos := Vector3(p.x, w.height_at(p.x, p.y), p.y)
+		if w.in_safe_zone(pos):
+			continue
+		var ok := true
+		for o in others:
+			if p.distance_to(o) < FIND_GAP:
+				ok = false
+				break
+		if ok:
+			return pos
+	return null
+
+
+func _spawn_find(key: String, item: String, zone: String) -> Node3D:
+	var pos: Variant = find_spot(zone)
+	if pos == null:
+		return null
+	var f: Node3D = FindScript.new()
+	f.set("key", key)
+	f.set("item", item)
+	f.set("quests", self)
+	main.add_child(f)
+	f.global_position = pos
+	return f
+
+
+## Сорвать находку f (герой подошёл): предмет в сумку, находка исчезает, новая — через FIND_RESPAWN с.
+func pick_find(f: Node3D) -> bool:
+	if f == null or f.is_queued_for_deletion():
+		return false
+	var item := String(f.get("item"))
+	if Game.inventory.room_for(item) <= 0:
+		f.set("full_cd", 3.0)
+		_msg("Сумка полна — освободите место")
+		return false
+	Game.inventory.add(item, 1)
+	var pos := f.global_position
+	f.queue_free()
+	_find_cd[String(f.get("key"))] = FIND_RESPAWN
+	Vfx.pickup(main, pos + Vector3(0, 0.3, 0))
+	Util.float_text(main, pos + Vector3(0, 1.2, 0), "+" + ItemData.item_name(item), DONE_COLOR, 0.9)
+	return true
 
 
 func _on_tracker_input(ev: InputEvent) -> void:
@@ -676,7 +920,63 @@ func _state_value(g: Dictionary) -> int:
 			return Game.level
 		"skill":
 			return learned_skills()
+		"gather":
+			var items: Array = g.get("items", [])
+			return Game.inventory.count(String(items[0])) if not items.is_empty() else 0
+		"equip":
+			var n := 0
+			for e in g.get("slots", []):
+				if _slot_item(String(e), 0) != "":
+					n += 1
+			return n
+		"upgrade":
+			return _upgraded(g)
+		"pet_gear":
+			var n := 0
+			for rec in Game.pets:
+				for s in PetGear.SLOTS:
+					if PetGear.gear_in(rec, String(s)) != "":
+						n += 1
+			return n
+		"quest":
+			return 1 if is_done(String(g.get("id", ""))) else 0
 	return 0
+
+
+## Вещь, надетая в ячейке entry ("ring1|ring2" — любая из), с заточкой не ниже plus ("" — нет такой).
+static func _slot_item(entry: String, plus: int) -> String:
+	for s in entry.split("|"):
+		var id := Enchant.equipped_in(String(s))
+		if id != "" and not ItemData.is_broken(id) and ItemData.enchant_level(id) >= plus:
+			return id
+	return ""
+
+
+## Прогресс цели upgrade: ячейки slots с заточкой +plus, иначе — сколько вещей вида what (в сумке и надетых) +plus.
+static func _upgraded(g: Dictionary) -> int:
+	var plus := int(g.get("plus", 1))
+	var n := 0
+	var slots: Array = g.get("slots", [])
+	if not slots.is_empty():
+		for e in slots:
+			if _slot_item(String(e), plus) != "":
+				n += 1
+		return n
+	var what := String(g.get("what", "any"))
+	for k in Game.inventory.ids():
+		var id := String(k)
+		if ItemData.is_broken(id) or ItemData.enchant_level(id) < plus:
+			continue
+		var kind := ItemData.enchant_kind(id)
+		var fits := kind != ""
+		match what:
+			"weapon":
+				fits = kind == "attack"
+			"armor":
+				fits = kind == "defense"
+		if fits:
+			n += Game.inventory.count(id)
+	return n
 
 
 ## Сколько умений профессии герой изучил сам (стартовые бесплатные умения 1-го уровня не в счёт).
@@ -733,6 +1033,15 @@ static func _species_ok(g: Dictionary, species: String) -> bool:
 	return t == "" or t == species
 
 
+## Убийство подходит цели kill: вид (target / targets; пусто — любой) и уровень (min_level … max_level).
+static func _kill_ok(g: Dictionary, species: String, lvl: int) -> bool:
+	var list := QuestData.goal_species(g)
+	if not list.is_empty() and not list.has(species):
+		return false
+	var mx := int(g.get("max_level", 0))
+	return lvl >= int(g.get("min_level", 0)) and (mx <= 0 or lvl <= mx)
+
+
 ## Предмет подходит цели: items пусто — любой; семья зелий ("potion_hp") — зелье этого вида любого ранга.
 static func _item_ok(g: Dictionary, id: String) -> bool:
 	var items: Array = g.get("items", [])
@@ -742,6 +1051,8 @@ static func _item_ok(g: Dictionary, id: String) -> bool:
 ## Покупка или продажа подходит цели: предмет (items пусто — любой) и NPC (npc "" — любой).
 static func _trade_ok(g: Dictionary, id: String, who: String) -> bool:
 	var npc := String(g.get("npc", ""))
+	if bool(g.get("fits", false)) and not ItemData.weapon_fits(id, Game.class_id):
+		return false
 	return _item_ok(g, id) and (npc == "" or npc == who)
 
 

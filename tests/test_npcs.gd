@@ -8,7 +8,7 @@ extends "res://tests/test_base.gd"
 ## окно склада, «Закалка» у кузнеца — окно кузницы (без «скоро»); реплики по положению героя; задания мудреца после старосты (четыре сразу, «Взять все»), задание
 ## «Городской склад» (поговорить с кладовщиком, положить вещь на склад) берётся и сдаётся. Три лавки города
 ## (оружейник, бронница, ювелир): «Торговля» в диалоге открывает окно со своим ассортиментом 1-го ранга
-## (предметы, которых ещё нет в ItemData, пропускаются), у торговца Гордея — только зелья и свиток.
+## (предметы, которых ещё нет в ItemData, пропускаются), у торговца Гордея — только зелья, свиток и торбы 1–3-го ранга.
 
 ## Кто где стоит: id → [POI, ближайшая из POI этого вида должна быть она].
 const HOMES := {
@@ -16,6 +16,7 @@ const HOMES := {
 	"weaponsmith": "town", "armorer": "town", "jeweler": "town", "rare_merchant": "town",
 	"elder_human": "human_village", "elder_light": "light_elf_village", "elder_dark": "dark_elf_village",
 	"hunter": "tent_w1", "merc_chief": "cave",
+	"fisher": "port", "veteran": "tent_e", "herbalist": "light_elf_village", "scribe": "town",
 }
 ## Особые детали модели: id → [вид оружия, узлы].
 const PARTS := {
@@ -31,6 +32,7 @@ const PARTS := {
 	"armorer": ["", ["Axe"]],
 	"jeweler": ["", ["Necklace", "Cape"]],
 	"rare_merchant": ["", []],
+	"fisher": ["", []], "veteran": ["", []], "herbalist": ["", []], "scribe": ["", []],
 }
 ## Лавки города: житель → ассортимент (ItemData), всё — 1-го ранга.
 const SHOPS := {
@@ -233,7 +235,8 @@ func _unit_data() -> void:
 				soon += 1
 		# Дела, которых ещё нет, — с пометкой «скоро» (кузница, подземелье); у мудреца, кладовщика (склад), старост
 		# и охотницы (задания) пункты рабочие
-		check(soon >= 1 or ["sage", "storekeeper", "smith", "elder_human", "elder_light", "elder_dark", "hunter"].has(id)
+		check(soon >= 1 or ["sage", "storekeeper", "smith", "elder_human", "elder_light", "elder_dark", "hunter", "fisher",
+			"veteran", "herbalist", "scribe"].has(id)
 			or SHOPS.has(id), "%s: будущее дело с пометкой «скоро»" % id)
 		check(NpcData.is_trader(id) == SHOPS.has(id), "%s: торгует — только лавка" % id)
 	check(String(NpcData.talk_entry("sage", "profession").get("text", "")).contains("десятого уровня")
@@ -259,7 +262,7 @@ func _unit_shops() -> void:
 	for k in gordey:
 		var id := String(k)
 		check(not ItemData.is_weapon(id), "у Гордея нет оружия: %s" % id)
-		check(ItemData.is_potion(id) or id == "revive_scroll", "у Гордея — зелья и свиток: %s" % id)
+		check(ItemData.is_potion(id) or id == "revive_scroll" or ItemData.is_bag(id), "у Гордея — зелья, свиток и торбы: %s" % id)
 	check(gordey.has("potion_hp_r1") and gordey.has("potion_speed_r2") and gordey.has("revive_scroll"),
 		"у Гордея зелья 1–2 ранга и свиток воскрешения")
 	for who in SHOPS:

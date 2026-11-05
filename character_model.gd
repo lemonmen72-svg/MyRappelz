@@ -744,6 +744,50 @@ static func jeweler_spec() -> Dictionary:
 	}
 
 
+## Рыбак Сигурд (порт; модели Meshy npc_fisher.glb пока нет): обветренный, седеющая рыжеватая борода, широкая
+## шляпа от солнца, синий кафтан моряка с медными пуговицами.
+static func fisher_spec() -> Dictionary:
+	return {
+		"skin": Color(0.88, 0.68, 0.52), "hair": Color(0.66, 0.5, 0.36), "hair_style": "short",
+		"eyes": Color(0.32, 0.5, 0.62), "eye_style": "smile", "ears": false,
+		"outfit": "elder", "main": Color(0.18, 0.3, 0.5), "accent": Color(0.82, 0.62, 0.3),
+		"weapon": "", "girth": 1.12, "hat": true, "beard": true, "beard_style": "full",
+	}
+
+
+## Ветеран Борислав (Восточный лагерь; модели npc_veteran.glb пока нет): седой коротко стриженый воин, шрам,
+## потёртый стальной доспех с зелёным плащом, седые усы и короткая борода.
+static func veteran_spec() -> Dictionary:
+	return {
+		"skin": Color(0.9, 0.74, 0.6), "hair": Color(0.78, 0.78, 0.76), "hair_style": "short",
+		"eyes": Color(0.4, 0.42, 0.36), "eye_style": "normal", "ears": false,
+		"outfit": "merc", "main": Color(0.48, 0.5, 0.54), "accent": Color(0.22, 0.42, 0.26),
+		"weapon": "", "girth": 1.2, "scar": true, "beard": true, "beard_style": "short",
+	}
+
+
+## Травница Мирта (у Светлой рощи; модели npc_herbalist.glb пока нет): молодая женщина, русая коса, зелёное
+## платье с фартуком, сумка трав, деревянный посох-клюка.
+static func herbalist_spec() -> Dictionary:
+	return {
+		"skin": Color(0.97, 0.84, 0.72), "hair": Color(0.62, 0.46, 0.26), "hair_style": "braid",
+		"eyes": Color(0.36, 0.6, 0.38), "eye_style": "smile", "ears": false,
+		"outfit": "lady", "main": Color(0.4, 0.62, 0.36), "second": Color(0.9, 0.86, 0.7),
+		"accent": Color(0.7, 0.5, 0.28), "weapon": "", "girth": 0.95,
+	}
+
+
+## Писарь Онфим (город, у доски объявлений; модели npc_scribe.glb пока нет): худой, лысеющий, очки, коричневая
+## мантия писаря с чернильными пятнами, книга.
+static func scribe_spec() -> Dictionary:
+	return {
+		"skin": Color(0.95, 0.82, 0.7), "hair": Color(0.36, 0.28, 0.22), "hair_style": "short",
+		"eyes": Color(0.36, 0.3, 0.24), "eye_style": "normal", "ears": false,
+		"outfit": "sage", "main": Color(0.42, 0.3, 0.2), "accent": Color(0.78, 0.7, 0.5),
+		"weapon": "", "girth": 0.92, "glasses": true,
+	}
+
+
 ## Путь модели NPC из файла (Meshy с родным скелетом, tools/prepare_npcs.py → prepare_hero.py: клипы Idle, Wave и
 ## другие, роли костей в npc_<id>.json; в пакете ресурсов — Assets.exists): есть — грузится вместо примитивов,
 ## предметы в руках вешает NpcProps.
@@ -782,6 +826,14 @@ static func npc_spec(npc_id: String) -> Dictionary:
 			s = jeweler_spec()
 		"rare_merchant":
 			s = rare_merchant_spec()
+		"fisher":
+			s = fisher_spec()
+		"veteran":
+			s = veteran_spec()
+		"herbalist":
+			s = herbalist_spec()
+		"scribe":
+			s = scribe_spec()
 		_:
 			s = merchant_spec()
 	var asset := npc_asset(npc_id)

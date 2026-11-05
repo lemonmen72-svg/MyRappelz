@@ -5,7 +5,7 @@ extends "res://tests/test_base.gd"
 ##   bot_sec_<id>) запоминается, без выбора «Начать» недоступна, лимит «По разделам» — по оценке выбранных;
 ## - «Быстрый» целиком (паузы wait ×0.5): все разделы «готово», ни одной ошибки проверки (иначе — список ошибок
 ##   с разделами), посреди раздела «Питомцы» (шаг ожидания, не замер) подставной статус температуры 2 — пауза
-##   «остывание» (дерево на паузе) и продолжение раздела; отчёт: «Разделов: 9 из 9», блок «Разделы» со всеми разделами, метки разделов
+##   «остывание» (дерево на паузе) и продолжение раздела; отчёт: «Разделов: 11 из 11», блок «Разделы» со всеми разделами, метки разделов
 ##   в логе; игрок снова в своём аккаунте, слоте и мире, размер интерфейса — как был.
 
 const BOT_REPORTS := "user://test_bot_game_reports/"
@@ -83,7 +83,7 @@ func _on_finished(r: Dictionary) -> void:
 
 ## Каждый раздел ставит шаги (быстрый и полный проход), первый шаг — начало раздела.
 func _check_build() -> void:
-	check(BotSection.SECTIONS.size() == 9, "разделов 9: %s" % ", ".join(BotSection.ids()))
+	check(BotSection.SECTIONS.size() == 11, "разделов 11: %s" % ", ".join(BotSection.ids()))
 	for v in BotSection.ids():
 		var sid := String(v)
 		for q in [true, false]:
@@ -167,10 +167,10 @@ func _check_result() -> void:
 		check(String(sd["state"]) == "готово" and float(sd["sec"]) > 0.0 and int(sd["checks"]) > 0,
 			"раздел «%s»: %s, %s, проверок %d, снимков %d" % [String(sd["title"]), String(sd["state"]),
 			TestBot.clock(float(sd["sec"])), int(sd["checks"]), int(sd["shots"])])
-	check(_bot.sections.size() == 9, "разделов в отчёте: %d" % _bot.sections.size())
+	check(_bot.sections.size() == 11, "разделов в отчёте: %d" % _bot.sections.size())
 	print("  время «Быстрого»: активное %s, всего %s" % [TestBot.clock(_bot.active_time), TestBot.clock(_bot.total_time)])
 	var text := FileAccess.get_file_as_string(String(_result["txt"]))
-	for part in ["Режим: Быстрый (5 мин)", "Итог: готово", "Разделов: 9 из 9", "Разделы", "Пауз на остывание: 1",
+	for part in ["Режим: Быстрый (5 мин)", "Итог: готово", "Разделов: 11 из 11", "Разделы", "Пауз на остывание: 1",
 			"Рекомендации", "Ошибок проверок нет.", "Журнал", "Проверки: "]:
 		check(text.contains(part), "отчёт содержит «%s»" % part)
 	for v in BotSection.SECTIONS:

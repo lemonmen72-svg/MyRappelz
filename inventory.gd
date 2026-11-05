@@ -1,7 +1,7 @@
 class_name Inventory
 extends RefCounted
 ## Сумка как в MMORPG: items — id предмета → количество (по нему считают все модули), и раскладка по ячейкам
-## (окно сумки InventoryWindow). Ячейка — {"id": String, "n": int} или пустая {}. Вместимость — CAPACITY ячеек,
+## (окно сумки InventoryWindow). Ячейка — {"id": String, "n": int} или пустая {}. Вместимость — capacity ячеек (CAPACITY + торба),
 ## в ячейке стопка до ItemData.stack_size (оружие и карты с душой по 1, пустые карты до 20, расходники и трофеи до 99).
 ## Надетое оружие (equipped, его ставит Game через Game.weapon), вторая рука (equipped_off) и надетые броня
 ## и украшения (worn {id: штук}, ставит Game через Game.equip) числятся в items, но ячейки не занимают.
@@ -13,8 +13,15 @@ extends RefCounted
 
 signal changed
 
-## Вместимость сумки, ячеек.
+## Вместимость сумки без торбы (и склада), ячеек.
 const CAPACITY := 40
+
+## Вместимость этой сумки: CAPACITY + ячейки надетой торбы (ставит Game._sync_worn; у склада — CAPACITY).
+var capacity := CAPACITY:
+	set(v):
+		if v != capacity:
+			capacity = maxi(1, v)
+			_dirty = true
 
 var items: Dictionary = {}
 ## Надетое оружие (id предмета): одна штука не лежит в ячейках.
@@ -118,7 +125,7 @@ func from_dict(d: Dictionary) -> void:
 
 # ---------- Ячейки ----------
 
-## Копия раскладки: [{"id", "n"} или {}], не меньше CAPACITY ячеек.
+## Копия раскладки: [{"id", "n"} или {}], не меньше capacity ячеек.
 func cells() -> Array:
 	_sync()
 	return _cells.duplicate(true)
@@ -135,7 +142,7 @@ func cell(i: int) -> Dictionary:
 ## Сколько ячеек показывать: вместимость (или больше, если сумка переполнена принудительно).
 func cell_count() -> int:
 	_sync()
-	return maxi(CAPACITY, _cells.size())
+	return maxi(capacity, _cells.size())
 
 
 ## Занятые ячейки.
@@ -149,14 +156,14 @@ func used_cells() -> int:
 
 
 func is_full() -> bool:
-	return used_cells() >= CAPACITY
+	return used_cells() >= capacity
 
 
 ## Сколько штук предмета ещё поместится: место в неполных стопках и свободные ячейки.
 func room_for(id: String) -> int:
 	_sync()
 	var st := ItemData.stack_size(id)
-	var room := maxi(0, CAPACITY - used_cells()) * st
+	var room := maxi(0, capacity - used_cells()) * st
 	for c in _cells:
 		var d: Dictionary = c
 		if not d.is_empty() and String(d["id"]) == id:
@@ -168,7 +175,7 @@ func room_for(id: String) -> int:
 ## остальное — в свободные ячейки.
 func room_for_all(add_items: Dictionary) -> bool:
 	_sync()
-	var free := maxi(0, CAPACITY - used_cells())
+	var free := maxi(0, capacity - used_cells())
 	for k in add_items:
 		var id := String(k)
 		var n := int(add_items[k])
@@ -272,7 +279,7 @@ func sort() -> void:
 			var k := mini(st, left)
 			_cells.append({"id": id, "n": k})
 			left -= k
-	while _cells.size() < CAPACITY:
+	while _cells.size() < capacity:
 		_cells.append({})
 	changed.emit()
 
@@ -317,7 +324,7 @@ func _sync() -> void:
 	if not _dirty:
 		return
 	_dirty = false
-	while _cells.size() < CAPACITY:
+	while _cells.size() < capacity:
 		_cells.append({})
 	var want: Dictionary = {}
 	for key in items:
@@ -366,7 +373,26 @@ func _sync() -> void:
 	_trim()
 
 
-## Пустые ячейки сверх вместимости в конце не нужны.
+## Пустые ячейки сверх вместимости в конце не нужны; стопки за краем (сняли торбу) переезжают в свободные ячейки
+## внутри вместимости, если там есть место.
 func _trim() -> void:
-	while _cells.size() > CAPACITY and (_cells.back() as Dictionary).is_empty():
+	if _cells.size() > capacity:
+		var free := 0
+		for i in range(capacity - 1, -1, -1):
+			if i < _cells.size() and (_cells[i] as Dictionary).is_empty():
+				free += 1
+		var j := 0
+		for i in range(capacity, _cells.size()):
+			if free <= 0:
+				break
+			if (_cells[i] as Dictionary).is_empty():
+				continue
+			while j < capacity and not (_cells[j] as Dictionary).is_empty():
+				j += 1
+			if j >= capacity:
+				break
+			_cells[j] = _cells[i]
+			_cells[i] = {}
+			free -= 1
+	while _cells.size() > capacity and (_cells.back() as Dictionary).is_empty():
 		_cells.pop_back()

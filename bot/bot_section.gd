@@ -17,7 +17,9 @@ const SECTIONS := [
 	{"id": "trade", "name": "Торговля", "script": "res://bot/section_trade.gd", "quick": 6, "full": 10},
 	{"id": "storage", "name": "Склад", "script": "res://bot/section_storage.gd", "quick": 5, "full": 5},
 	{"id": "quests", "name": "Задания", "script": "res://bot/section_quests.gd", "quick": 15, "full": 20},
+	{"id": "npc_quests", "name": "Задания жителей", "script": "res://bot/section_npc_quests.gd", "quick": 10, "full": 12},
 	{"id": "equipment", "name": "Экипировка", "script": "res://bot/section_equipment.gd", "quick": 8, "full": 12},
+	{"id": "bags", "name": "Торба и пояс", "script": "res://bot/section_bags.gd", "quick": 5, "full": 6},
 	{"id": "world", "name": "Мир", "script": "res://bot/section_world.gd", "quick": 40, "full": 200},
 	{"id": "ui", "name": "Интерфейс", "script": "res://bot/section_ui.gd", "quick": 15, "full": 40},
 ]

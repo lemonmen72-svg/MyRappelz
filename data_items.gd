@@ -299,9 +299,49 @@ const UPGRADE_ITEMS := {
 	# Материалы существ (Creation базы): у пантеры, черепахи, фазана и кентавра — их трофеи; у волка — коготь
 	"wolf_claw": {"name": "Волчий коготь", "type": "trophy", "icon": "fang", "buy": 0, "sell": 25, "color": Color(0.75, 0.75, 0.8),
 		"desc": "Крепкий коготь волка. Нужен для умения волка «Зализать раны»; торговец купит как трофей."},
+	# Находки заданий (QuestFind: светящиеся травы на земле, пока задание взято) — задания Травницы Мирты
+	"herb_silverleaf": {"name": "Серебролист", "type": "trophy", "icon": "feather", "buy": 0, "sell": 20,
+		"color": Color(0.55, 0.95, 0.7),
+		"desc": "Светлая трава с серебристой изнанкой листьев, растёт в Светлой роще. Нужна Травнице Мирте; торговец купит за гроши."},
 }
 ## Зелья существ (Creation: <вид> Potion базы, StateResource 4031–4048, уровень состояния 10, 1 час): варит питомец
 ## 3-й формы своего вида из пустого флакона. bonus — ключи Player.timed_bonus (atk_flat, def_flat, acc_flat, avoid_flat).
+## Торбы (задача Максима 0.32): надетая в ячейку «Торба» (GEAR_SLOTS "bag") добавляет ячеек сумке
+## (Inventory.capacity = Inventory.CAPACITY + bag_slots). Семь рангов, как у оружия, но без ограничения по уровню —
+## любую можно надеть сразу. На острове Торговец Гордей продаёт 1–3-й ранг; старшие пока не продаются (цена продажи
+## есть). Снять или сменить на меньшую — только если вещи сумки поместятся (Game.bag_block).
+const BAG_RANKS := 7
+## Ячеек сверх CAPACITY по рангам 1…7 (кратно 8 — ширине сетки сумки).
+const BAG_SLOTS := [8, 16, 24, 32, 40, 48, 56]
+const BAG_NAMES := ["Холщовая торба", "Кожаная торба", "Торба путника", "Торба охотника", "Торба искателя",
+	"Торба странника", "Торба героя"]
+## Цена (база для продажи — четверть): 1–3-й ранг у Гордея.
+const BAG_PRICE := [3000, 12000, 36000, 90000, 200000, 400000, 800000]
+const BAG_SOLD := 3
+
+
+static func bag_id(rank_n: int) -> String:
+	return "bag_r%d" % rank_n
+
+
+static func _make_bag(r: int) -> Dictionary:
+	var price := int(BAG_PRICE[r - 1])
+	return {"name": String(BAG_NAMES[r - 1]), "type": "bag", "slot": "bag", "rank": r, "level": 1, "stack": 1,
+		"bag_slots": int(BAG_SLOTS[r - 1]), "icon": "pelt", "buy": price if r <= BAG_SOLD else 0,
+		"sell": roundi(float(price) * SELL_SHARE), "color": Color(0.78, 0.6, 0.4).lerp(Color(1.0, 0.82, 0.3), float(r - 1) / 6.0),
+		"desc": "Торба %d-го ранга: +%d ячеек сумки. Надевается в ячейку «Торба», уровень не нужен." % [r, int(BAG_SLOTS[r - 1])]}
+
+
+## Торба (тип "bag").
+static func is_bag(id: String) -> bool:
+	return item_type(id) == "bag"
+
+
+## Сколько ячеек добавляет торба id (0 — не торба или "").
+static func bag_slots(id: String) -> int:
+	return int(get_item(id).get("bag_slots", 0)) if id != "" and is_bag(id) else 0
+
+
 const CREATURE_POTIONS := {
 	"panther": {"name": "Зелье пантеры", "bonus": {"atk_flat": 90.0}, "what": "физ. атака +90"},
 	"turtle": {"name": "Зелье черепахи", "bonus": {"def_flat": 90.0}, "what": "физ. защита +90"},
@@ -332,6 +372,8 @@ static func _static_init() -> void:
 			ITEMS[cube_id(String(k), r)] = _make_cube(String(k), r)
 	for k in UPGRADE_ITEMS:
 		ITEMS[k] = (UPGRADE_ITEMS[k] as Dictionary).duplicate(true)
+	for r in range(1, BAG_RANKS + 1):
+		ITEMS[bag_id(r)] = _make_bag(r)
 	for sp in CREATURE_POTIONS:
 		var cp: Dictionary = CREATURE_POTIONS[sp]
 		ITEMS["potion_" + String(sp)] = {"name": String(cp["name"]), "type": "consumable", "icon": "flask",
@@ -825,12 +867,12 @@ static func weapon_stats_text(id: String) -> String:
 const GEAR_SLOTS := [
 	["head", "Голова", "head"], ["body", "Тело", "body"], ["hands", "Руки", "hands"], ["feet", "Ноги", "feet"],
 	["ring1", "Кольцо 1", "ring"], ["ring2", "Кольцо 2", "ring"], ["earring", "Серьги", "earring"],
-	["pendant", "Кулон", "pendant"], ["belt", "Пояс", "belt"],
+	["pendant", "Кулон", "pendant"], ["belt", "Пояс", "belt"], ["bag", "Торба", "bag"],
 ]
 ## Вид вещи → что это, словами (карточка: «шлем»).
 const GEAR_KIND_NAMES := {
 	"head": "шлем", "body": "доспех", "hands": "перчатки", "feet": "ботинки", "ring": "кольцо", "earring": "серьги",
-	"pendant": "кулон", "belt": "пояс",
+	"pendant": "кулон", "belt": "пояс", "bag": "торба",
 }
 const GEAR_RANKS := 2
 ## Варианты доспеха (тело) и кому они (решение Максима): воин — высокая физ. и низкая маг. защита (Наёмник, Воин,
@@ -999,7 +1041,7 @@ static func is_jewelry(id: String) -> bool:
 ## Броня или украшение (надевается в ячейки GEAR_SLOTS).
 static func is_gear(id: String) -> bool:
 	var t := item_type(id)
-	return t == "armor" or t == "jewelry"
+	return t == "armor" or t == "jewelry" or t == "bag"
 
 
 ## Вид вещи: "head", "body", "hands", "feet", "ring", "earring", "pendant", "belt" ("" — не броня и не украшение).
@@ -1142,6 +1184,7 @@ const TYPES := {
 	"weapon": {"name": "Оружие", "order": 0, "color": Color(0.7, 0.72, 0.78)},
 	"armor": {"name": "Броня", "order": 1, "color": Color(0.7, 0.72, 0.78)},
 	"jewelry": {"name": "Украшение", "order": 2, "color": Color(0.7, 0.72, 0.78)},
+	"bag": {"name": "Торба", "order": 2, "color": Color(0.85, 0.65, 0.4)},
 	"consumable": {"name": "Расходник", "order": 3, "color": Color(0.95, 0.45, 0.5)},
 	"cube": {"name": "Куб чарования", "order": 4, "color": Color(0.5, 0.82, 1.0)},
 	"card": {"name": "Карта существа", "order": 5, "color": Color(0.78, 0.56, 0.34)},

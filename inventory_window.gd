@@ -55,6 +55,8 @@ const GAP := 5.0
 ## Товары торговца: столбцов.
 const SHOP_COLS := 3
 const EQUIP_CELL := 54.0
+## Ячейка пояса с картой питомца (сетка 3 × 2 под экипировкой).
+const BELT_CELL := 36.0
 ## Ширина карточки предмета (окно сумки / окно торговца).
 const CARD_W := 300.0
 const SHOP_CARD_W := 290.0
@@ -103,7 +105,7 @@ const CELL_BG := Color(0.05, 0.06, 0.13, 0.92)
 const EQUIP_SLOTS := [
 	["weapon", "Оружие"], ["offhand", "2-я рука"], ["head", "Голова"], ["body", "Тело"],
 	["hands", "Руки"], ["feet", "Ноги"], ["ring1", "Кольцо 1"], ["ring2", "Кольцо 2"], ["earring", "Серьги"],
-	["pendant", "Кулон"], ["belt", "Пояс"],
+	["pendant", "Кулон"], ["belt", "Пояс"], ["bag", "Торба"],
 ]
 const EQUIP_COL_A := 6
 
@@ -142,6 +144,8 @@ var moving := false
 var drop_confirm := false
 var drop_count := 1
 var buttons: Dictionary = {}
+## Прокрутка сетки сумки (есть, когда с торбой ячеек больше Inventory.CAPACITY).
+var bag_scroll: ScrollContainer = null
 ## Сумка или золото изменились — Economy перестроит окно в _process.
 var dirty := false
 var seen_gold := 0
@@ -314,6 +318,116 @@ func _build_equipment(parent: VBoxContainer) -> void:
 			String(EQUIP_SLOTS[i][1]))
 		(col_a if i < EQUIP_COL_A else col_b).add_child(b)
 		buttons["equip_" + slot_id] = b
+	if mode == "bag":
+		_build_belt(parent)
+
+
+# ---------- Пояс: карты питомцев (PetBelt) ----------
+
+## Ячейки пояса под экипировкой: PetBelt.MAX_SLOTS (открыто Game.belt_slots), в ячейке — карта питомца
+## (значок карты вида с душой), закрытая — «×». Касание — карточка справа: в поясе — питомец и «Из пояса»;
+## пустая — карты питомцев, которых можно вставить (касание карты — в эту ячейку); закрытая — расширитель.
+func _build_belt(parent: VBoxContainer) -> void:
+	var worn := PetBelt.belt_worn()
+	parent.add_child(_label("Пояс: карты питомцев" if worn else "Пояс: наденьте пояс", UiScale.FONT_SMALL,
+		GOLD if worn else MUTED))
+	var g := GridContainer.new()
+	g.columns = 3
+	g.add_theme_constant_override("h_separation", int(UiScale.px(GAP)))
+	g.add_theme_constant_override("v_separation", int(UiScale.px(GAP)))
+	parent.add_child(g)
+	var sz := UiScale.px(BELT_CELL)
+	for sl in PetBelt.MAX_SLOTS:
+		var id := ""
+		var pi := PetBelt.pet_in(sl)
+		if pi >= 0:
+			id = ItemData.soul_card_for(String(Game.pets[pi].get("species", "")))
+		var cap := "" if id != "" else ("%d" % (sl + 1) if sl < Game.belt_slots else "×")
+		var b := _make_cell("belt", sl, id, "", sz, sel_kind == "belt" and sel_index == sl, cap)
+		g.add_child(b)
+		buttons["belt_%d" % sl] = b
+
+
+## Карточка ячейки пояса sel_index.
+func _card_belt(card: VBoxContainer) -> void:
+	var sl := sel_index
+	card.add_child(_label("Пояс · ячейка %d" % (sl + 1), UiScale.FONT_HEAD, GOLD))
+	if not PetBelt.belt_worn():
+		card.add_child(_text("Карты в поясе действуют, только когда надет пояс (украшение, ячейка «Пояс»).",
+			UiScale.FONT_BODY, BAD))
+	var b := PetBelt.hero_bonus(Game.class_id, Game.level)
+	if not b.is_empty():
+		card.add_child(_text("Герою сейчас: " + PetBelt.bonus_text(b), UiScale.FONT_BODY, GOOD))
+	if sl >= Game.belt_slots:
+		card.add_child(_text("Ячейка закрыта. «Расширитель пояса» (Торговец редкостями) открывает следующую: шанс %d %%, неудача — у пояса снова одна ячейка." % roundi(PetBelt.expand_chance(Game.belt_slots) * 100.0),
+			UiScale.FONT_TEXT, MUTED))
+		var acts: Array = [["Расширить пояс", "act_belt_expand", _on_belt_expand]]
+		card.add_child(_action_grid(acts))
+		(buttons["act_belt_expand"] as Button).disabled = PetBelt.expand_block() != ""
+		if PetBelt.expand_block() != "":
+			card.add_child(_text(PetBelt.expand_block(), UiScale.FONT_BODY, BAD))
+		return
+	var need := int(PetBelt.SLOT_STAGE.get(sl, 0))
+	if need > 0:
+		card.add_child(_text("Сюда — питомец %d-й формы и старше." % (need + 1), UiScale.FONT_BODY, MUTED))
+	var pi := PetBelt.pet_in(sl)
+	if pi >= 0:
+		var rec: Dictionary = Game.pets[pi]
+		_card_head(card, ItemData.soul_card_for(String(rec.get("species", ""))), "%s · %d ур." % [String(rec.get("name", "Питомец")),
+			int(rec.get("level", 1))])
+		var parts: PackedStringArray = []
+		for a in PetBelt.abilities(rec):
+			parts.append("%s +%d%%" % [String(PetSkills.CARD_NAMES.get(String(a[0]), String(a[0]))), roundi(float(a[1]) * 100.0)])
+		card.add_child(_text("Способности карты: " + ", ".join(parts), UiScale.FONT_TEXT, Color.WHITE))
+		card.add_child(_text("Пока питомец в поясе, призвать его нельзя.", UiScale.FONT_BODY, MUTED))
+		card.add_child(_action_grid([["Из пояса", "act_belt_take", _on_belt_take.bind(pi)]]))
+		return
+	card.add_child(_text("Коснитесь карты питомца, чтобы вставить её в эту ячейку. В пояс идёт отозванный питомец с изученной «Способностью карты» (умение с 40 ур. питомца).",
+		UiScale.FONT_TEXT, MUTED))
+	var any := false
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", int(UiScale.px(GAP)))
+	grid.add_theme_constant_override("v_separation", int(UiScale.px(GAP)))
+	card.add_child(grid)
+	for i in Game.pets.size():
+		var rec: Dictionary = Game.pets[i]
+		if PetBelt.in_belt(rec):
+			continue
+		var err := PetBelt.put_block(i, sl)
+		var bt := Button.new()
+		bt.focus_mode = Control.FOCUS_NONE
+		bt.text = "%s · %d ур." % [String(rec.get("name", "Питомец")), int(rec.get("level", 1))]
+		bt.icon = ItemIcon.texture(ItemData.soul_card_for(String(rec.get("species", ""))))
+		bt.expand_icon = false
+		bt.add_theme_constant_override("icon_max_width", int(UiScale.px(32)))
+		bt.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_BODY))
+		bt.disabled = err != ""
+		bt.tooltip_text = err
+		bt.pressed.connect(_on_belt_put.bind(i, sl))
+		grid.add_child(bt)
+		buttons["belt_pet_%d" % i] = bt
+		any = true
+	if not any:
+		card.add_child(_text("Питомцев для пояса нет.", UiScale.FONT_BODY, BAD))
+
+
+func _on_belt_put(i: int, sl: int) -> void:
+	var err := PetBelt.put(i, sl, main.pets if main != null else null)
+	if err != "":
+		_msg(err)
+	refresh()
+
+
+func _on_belt_take(i: int) -> void:
+	PetBelt.take(i)
+	refresh()
+
+
+func _on_belt_expand() -> void:
+	var r := PetBelt.expand()
+	_msg(String(r.get("text", "")))
+	refresh()
 
 
 ## Что надето в слоте slot_id ("weapon", "offhand" или ячейка брони и украшений): id предмета или "".
@@ -424,7 +538,7 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 	head.add_theme_constant_override("separation", int(UiScale.px(10)))
 	parent.add_child(head)
 	head.add_child(_label("Золото: %d" % Game.gold, UiScale.FONT_HEAD, GOLD))
-	var used := _label("Занято: %d/%d" % [inv.used_cells(), Inventory.CAPACITY], UiScale.FONT_HEAD,
+	var used := _label("Занято: %d/%d" % [inv.used_cells(), inv.capacity], UiScale.FONT_HEAD,
 		BAD if inv.is_full() else MUTED)
 	used.name = "used_label"
 	used.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -438,9 +552,22 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 	grid.columns = COLS
 	grid.add_theme_constant_override("h_separation", int(UiScale.px(GAP)))
 	grid.add_theme_constant_override("v_separation", int(UiScale.px(GAP)))
-	parent.add_child(grid)
 	var list := inv.cells()
 	var total := inv.cell_count()
+	if total > Inventory.CAPACITY:
+		# С торбой ячеек больше 40: видно 5 рядов, остальное — прокруткой (окно не растёт)
+		var sc := ScrollContainer.new()
+		sc.name = "BagScroll"
+		sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		var rows := float(Inventory.CAPACITY) / float(COLS)
+		sc.custom_minimum_size = Vector2(COLS * (cell_sz + UiScale.px(GAP)) + UiScale.px(12),
+			rows * (cell_sz + UiScale.px(GAP)))
+		parent.add_child(sc)
+		sc.add_child(grid)
+		bag_scroll = sc
+	else:
+		parent.add_child(grid)
+		bag_scroll = null
 	for i in total:
 		var c: Dictionary = list[i] if i < list.size() else {}
 		var id := String(c.get("id", ""))
@@ -916,6 +1043,8 @@ func _build_card(card: VBoxContainer) -> void:
 			_card_good(card)
 		"store":
 			_card_store(card)
+		"belt":
+			_card_belt(card)
 		_:
 			card.add_child(_label("Предмет", UiScale.FONT_HEAD, GOLD))
 			var t := "Коснитесь предмета, чтобы увидеть описание и действия. Перетащите значок в другую ячейку, чтобы переложить."
@@ -1310,6 +1439,10 @@ func _on_cell(kind: String, index: int) -> void:
 			sel_kind = "equip"
 			sel_index = index
 			sel_id = String(EQUIP_SLOTS[index][0])
+		"belt":
+			sel_kind = "belt"
+			sel_index = index
+			sel_id = ""
 		"good":
 			var list := goods(Game.class_id, seller)
 			if index >= 0 and index < list.size():
@@ -1445,6 +1578,9 @@ func _equip_gear_cell(i: int, gslot: String = "") -> void:
 
 
 func _on_unequip(gslot: String) -> void:
+	if gslot == "bag" and Game.bag_block("") != "":
+		_msg(Game.bag_block(""))
+		return
 	main.player.unequip_gear(gslot)
 	refresh()
 

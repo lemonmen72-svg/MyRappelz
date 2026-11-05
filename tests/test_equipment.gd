@@ -107,7 +107,7 @@ func _unit_items() -> void:
 			"pendant_mdef_r1", "pendant_mdef_r2", "belt_light_r1", "belt_light_r2", "belt_light_r1", "belt_light_r2"]:
 		check(ItemData.is_gear(String(id)), "id из контракта: %s" % id)
 	# Ячейки: 9, кольцо — в обе ячейки колец
-	check(ItemData.GEAR_SLOTS.size() == 9, "ячеек брони и украшений — 9")
+	check(ItemData.GEAR_SLOTS.size() == 10, "ячеек брони, украшений и торбы — 10")
 	check(ItemData.gear_slots_for("ring_vit_r1") == ["ring1", "ring2"], "кольцо — в «Кольцо 1» и «Кольцо 2»")
 	check(ItemData.gear_slots_for("armor_body_mage_r1") == ["body"] and ItemData.gear_slots_for("belt_light_r1") == ["belt"],
 		"доспех — «Тело», пояс — «Пояс»")
@@ -448,7 +448,7 @@ func _bag_window() -> void:
 	main.economy.open_bag()
 	for e in InventoryWindow.EQUIP_SLOTS:
 		check(win.buttons.has("equip_" + String(e[0])), "ячейка экипировки «%s»" % String(e[1]))
-	check(InventoryWindow.EQUIP_SLOTS.size() == 11, "в сумке 11 ячеек экипировки (оружие, 2-я рука и 9 брони и украшений)")
+	check(InventoryWindow.EQUIP_SLOTS.size() == 12, "в сумке 12 ячеек экипировки (оружие, 2-я рука, 9 брони и украшений, торба)")
 	# Надетое — касание ячейки «Тело»: карточка и «Снять»
 	_press("equip_body")
 	check(win.sel_kind == "equip" and _card_title() == ItemData.item_name("armor_body_warrior_r1"), "карточка надетого доспеха")
