@@ -43,6 +43,14 @@ run_one() {
 
 t0=$(date +%s)
 mapfile -t ALL < <(python3 -I "$DIR/split_tests.py" "$PART" "$PARTS")
+# SMOKE_SKIP — тесты через пробел, которые здесь не идут (сборка APK: долгий тест Кардинала проверяет «Проверка кода»)
+if [ -n "${SMOKE_SKIP:-}" ]; then
+	KEEP=()
+	for name in "${ALL[@]}"; do
+		case " $SMOKE_SKIP " in *" $name "*) echo "пропущен здесь: $name" ;; *) KEEP+=("$name") ;; esac
+	done
+	ALL=("${KEEP[@]}")
+fi
 echo "часть $PART/$PARTS, потоков $JOBS: ${ALL[*]}"
 if [ "$JOBS" -le 1 ]; then
 	for name in "${ALL[@]}"; do run_one "$name"; done

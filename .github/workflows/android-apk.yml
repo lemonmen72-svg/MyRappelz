@@ -139,7 +139,8 @@ jobs:
           t_done "копия проекта для автотеста" "$t0"
           cd "$T"
           rm -f "$RUNNER_TEMP/smoke.code"
-          nohup setsid bash -c 'SMOKE_JOBS=2 .github/scripts/smoke_test.sh > "$RUNNER_TEMP/smoke.log" 2>&1; echo $? > "$RUNNER_TEMP/smoke.code"' \
+          # Долгий тест прохождения острова Кардиналом (10–20 мин) — только в «Проверке кода» (идёт на каждый пуш)
+          nohup setsid bash -c 'SMOKE_JOBS=2 SMOKE_SKIP=test_cardinal_story .github/scripts/smoke_test.sh > "$RUNNER_TEMP/smoke.log" 2>&1; echo $? > "$RUNNER_TEMP/smoke.code"' \
             > /dev/null 2>&1 &
           echo "автотест запущен в фоне: $T"
 
