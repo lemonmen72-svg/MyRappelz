@@ -163,13 +163,14 @@ func _dungeon_heights() -> void:
 			var fs := floor_sd[k]
 			var ws := water_sd[k]
 			var h: float
+			# Вода — поверх пола залов (озёра у алтаря внутри зала), палубы — поверх воды
 			if deck_of[k] >= 0:
 				h = float((decks[deck_of[k]] as Dictionary).get("height", 0.3))
+			elif ws <= 0.0:
+				# Дно: от кромки (уровень воды − 0.15) к глубине за BANK м
+				h = lerpf(water_y - 0.15, bed, smoothstep(0.0, BANK, -ws))
 			elif fs <= 0.0:
 				h = fy + _noise.get_noise_2d(p.x * 2.3 + 17.0, p.y * 2.3) * FLOOR_BUMP
-			elif ws <= 0.0:
-				# Дно: от кромки (уровень воды − 0.1) к глубине за BANK м
-				h = lerpf(water_y - 0.15, bed, smoothstep(0.0, BANK, -ws))
 			else:
 				# Скальный край вокруг пола и воды, за ним пустота
 				var d := minf(fs, ws)
@@ -182,7 +183,7 @@ func _dungeon_heights() -> void:
 					h = lerpf(top, void_y, smoothstep(rim_w, rim_w + 2.5, d))
 			heights[k] = h
 			# Вода: узлы воды и кромка (меш воды и шейдер земли — мокрое дно)
-			if ws < 1.5 and deck_of[k] < 0 and fs > 0.0:
+			if ws < 1.5 and deck_of[k] < 0:
 				water_level[k] = water_y
 				water_d[k] = maxf(0.0, ws + 1.5)
 
@@ -228,14 +229,14 @@ func _dungeon_environment() -> void:
 	env.background_color = Color(0.02, 0.03, 0.05)
 	# Тени сиренево-бирюзовые, освещённое — изумрудный и тёплый свет огней (свечение объектов)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.42, 0.5, 0.62)
-	env.ambient_light_energy = 0.62
+	env.ambient_light_color = Color(0.5, 0.47, 0.6)
+	env.ambient_light_energy = 0.6
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.05, 0.12, 0.13)
+	env.fog_light_color = Color(0.04, 0.05, 0.08)
 	env.fog_light_energy = 1.0
-	env.fog_density = 0.012
+	env.fog_density = 0.009
 	env.fog_sky_affect = 0.0
 	env.adjustment_enabled = true
 	env.adjustment_saturation = 1.05
@@ -246,7 +247,7 @@ func _dungeon_environment() -> void:
 	var sun := DirectionalLight3D.new()
 	sun.name = "DungeonLight"
 	sun.rotation_degrees = Vector3(-62, -35, 0)
-	sun.light_color = Color(0.62, 0.86, 0.8)
+	sun.light_color = Color(0.8, 0.84, 0.95)
 	sun.light_energy = 0.55
 	sun.shadow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS

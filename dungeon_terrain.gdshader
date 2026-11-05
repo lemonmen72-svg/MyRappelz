@@ -136,10 +136,13 @@ void fragment() {
 
 void light() {
 	float ndl = dot(NORMAL, LIGHT);
-	float sh = smoothstep(0.15, 0.75, ATTENUATION);
+	// Солнце: тень от объектов — в ступенях тона; огни (omni): затухание по расстоянию на всё (иначе «цвет тени»
+	// каждого огня, назначенного участку рельефа, подсвечивал участок целиком — резкая граница по участкам)
+	float sh = LIGHT_IS_DIRECTIONAL ? smoothstep(0.15, 0.75, ATTENUATION) : 1.0;
+	float k = LIGHT_IS_DIRECTIONAL ? 1.0 : ATTENUATION;
 	float lit = smoothstep(0.0, 0.06, ndl) * sh;
 	float full = smoothstep(0.40, 0.48, ndl) * sh;
 	vec3 tone = mix(shadow_tint * 0.6, vec3(0.8), lit);
 	tone = mix(tone, vec3(1.0), full);
-	DIFFUSE_LIGHT += LIGHT_COLOR * tone / PI;
+	DIFFUSE_LIGHT += LIGHT_COLOR * tone * k / PI;
 }
