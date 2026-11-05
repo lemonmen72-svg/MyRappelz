@@ -2063,7 +2063,13 @@ func _gather(id: String, gi: int) -> bool:
 			if String((z as Dictionary).get("id", "")) == zone:
 				var c := IslandWorld.v2((z as Dictionary)["center"])
 				await _go(IslandWorld.current.ground(c.x, c.y), 4.0, "зона «%s»" % zone)
-		return await _wait(1.0)
+		# Все сорваны — ждём, пока вырастет новая (Quests.FIND_RESPAWN), одной попыткой, а не по секунде: иначе
+		# ожидание засчитывалось как «попытки без прогресса» (48 за прогон)
+		var t0 := game_t
+		while q.finds().is_empty() and game_t - t0 < Quests.FIND_RESPAWN + 2.0:
+			if not await _tick():
+				return false
+		return false
 	var item := String(best.get("item"))
 	var have := Game.inventory.count(item)
 	await _go(best.global_position, 1.2, "находка")
