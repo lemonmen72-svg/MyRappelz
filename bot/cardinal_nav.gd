@@ -54,7 +54,32 @@ static func ensure(w: IslandWorld, tree: SceneTree) -> void:
 		_stamp(a, w, cs)
 	for br in w.bridges:
 		_bridge_lane(a, w, br)
+	for pt in tree.get_nodes_in_group("portals"):
+		_portal_keep(a, w, pt as Node3D)
 	_astar = a
+
+
+## Портал (у пещеры острова — рядом логово анатем): путь обходит круг PORTAL_KEEP м у его входа, иначе герой по
+## пути к анатемам заходил в портал и уходил в подземелье (прогон Кардинала 0.35: два десятка переходов по кругу).
+## К самому порталу _go доходит: конец пути — ближайшая свободная клетка, дальше по прямой.
+const PORTAL_KEEP := 3.0
+
+
+static func _portal_keep(a: AStarGrid2D, w: IslandWorld, pt: Node3D) -> void:
+	if pt == null or not pt.has_method("front_point"):
+		return
+	var f: Vector3 = pt.call("front_point")
+	var r := ceili(PORTAL_KEEP / w.step)
+	var c0 := Vector2i(roundi((f.x - w.origin.x) / w.step), roundi((f.z - w.origin.y) / w.step))
+	for j in range(c0.y - r, c0.y + r + 1):
+		for i in range(c0.x - r, c0.x + r + 1):
+			var c := Vector2i(i, j)
+			if not a.is_in_boundsv(c):
+				continue
+			var x := w.origin.x + float(i) * w.step
+			var z := w.origin.y + float(j) * w.step
+			if Vector2(x - f.x, z - f.z).length() <= PORTAL_KEEP:
+				a.set_point_solid(c, true)
 
 
 ## Мост — только по середине настила, как идёт игрок: клетки у краёв настила (перила) и склон берега под концом

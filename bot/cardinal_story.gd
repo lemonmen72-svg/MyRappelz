@@ -1397,6 +1397,14 @@ func _step() -> bool:
 	var p := _p()
 	if p == null:
 		return false
+	# Оказался в подземелье не по цели «спуститься» (зашёл в портал по пути) — назад на остров
+	var wl: Variant = bot.main.get("world")
+	if wl is IslandWorld and (wl as IslandWorld).location() != "island":
+		_help("portal", "случайно в подземелье — назад через портал")
+		var back: Portal = bot.main.get("portal") as Portal
+		if back != null:
+			await _go(back.front_point(), 0.5, "портал на остров")
+		return await _wait_location("island")
 	# 0. Сумка почти полна — продать лишнее
 	var inv := Game.inventory
 	if inv.capacity - inv.used_cells() < int(profile["bag_reserve"]):
