@@ -364,7 +364,8 @@ jobs:
         run: |
           . .github/scripts/timing.sh
           t0=$(date +%s)
-          for i in $(seq 1 360); do
+          # До 40 мин после экспорта: тест прохождения острова Кардиналом идёт 10–20 мин
+          for i in $(seq 1 480); do
             [ -f "$RUNNER_TEMP/smoke.code" ] && break
             sleep 5
           done

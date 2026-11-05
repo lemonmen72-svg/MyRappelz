@@ -22,13 +22,18 @@ mkdir -p "$LOGS"
 
 # Один тест (имя без tests/ и .gd; perf — замер нагрузки): лог, код выхода и время — в $LOGS
 run_one() {
-	local name="$1" t0 code
+	local name="$1" t0 code limit=600
+	# Долгие тесты — свой предел: прохождение острова Кардиналом ≈ 10–12 мин, в сборке APK (2 потока рядом с
+	# экспортом) — дольше 10 мин (0.34.0: 54 из 57 заданий за 601 с — упёрся в 600)
+	case "$name" in
+		test_cardinal_story) limit=1500 ;;
+	esac
 	t0=$(date +%s)
 	if [ "$name" = "perf" ]; then
 		# Нагрузка скриптов без отрисовки (в headless TIME_PROCESS — только скрипты и движок, без рендера)
 		timeout 600 godot --headless --path . res://tests/runner.tscn -- res://tests/perf.gd > "$LOGS/$name.log" 2>&1
 	else
-		timeout 600 godot --headless --fixed-fps 60 --path . res://tests/runner.tscn -- "res://tests/$name.gd" \
+		timeout "$limit" godot --headless --fixed-fps 60 --path . res://tests/runner.tscn -- "res://tests/$name.gd" \
 			> "$LOGS/$name.log" 2>&1
 	fi
 	code=$?
