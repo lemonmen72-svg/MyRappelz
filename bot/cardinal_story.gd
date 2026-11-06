@@ -1206,7 +1206,9 @@ func _turn_in_at(npc_id: String) -> int:
 			_qrec(id)["reason"] = "не сдаётся: " + why
 			if why.contains("место"):
 				_close()
-				await _sell_junk(_nearest_trader())
+				# Продать лишнее; нечего продавать (сумка — кубы, карты, зелья старых рангов) — на склад с ними
+				if await _sell_junk(_nearest_trader()) <= 0:
+					await _stash(true)
 				return n
 			if not job_q:
 				_dlg("back")
@@ -2290,7 +2292,9 @@ var _stash_tried := false
 
 
 ## Сумка полна, продать нечего: на склад — вещи, что не нужны сейчас (трофеи, оружие, броня, украшения, не надетые).
-func _stash() -> bool:
+## wide — и кубы, предметы прокачки, карты, зелья (кроме лучших зелий здоровья и маны): награда задания не помещалась
+## (прогон 0.35.2 остановился на 55 из 58 — сумка из кубов и карт, продать по правилам нечего).
+func _stash(wide := false) -> bool:
 	if not await _talk(Economy.STORAGE_NPC):
 		return false
 	if not _dlg("opt_storage"):
@@ -2307,6 +2311,10 @@ func _stash() -> bool:
 			var it := String(c["id"])
 			var t := ItemData.item_type(it)
 			if (t == "trophy" and not need.has(it)) or ["weapon", "armor", "jewelry", "broken"].has(t):
+				cell = i
+				break
+			if wide and not need.has(it) and (["cube", "upgrade", "card"].has(t) or (t == "potion"
+					and it != Economy.best_potion("hp") and it != Economy.best_potion("mp"))):
 				cell = i
 				break
 		if cell < 0 or Game.storage.used_cells() >= Game.storage.capacity:
