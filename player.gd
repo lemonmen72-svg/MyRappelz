@@ -371,16 +371,100 @@ func recalc_stats() -> void:
 ## Усиление на время от умения sid (HeroSkillFx "buff"): bonus — {ключ HeroSkills.BONUS_NAMES: число} на sec секунд,
 ## значок у полоски HP ("buff:<id>"). Повтор продлевает (и заменяет прибавку). src — источник значка
 ## ({"name", "icon"}; пусто — умение героя sid; зелья — сам предмет, Economy.drink).
-func add_timed_bonus(sid: String, sec: float, bonus: Dictionary, src: Dictionary = {}) -> void:
+func add_timed_bonus(sid: String, sec: float, bonus: Dictionary, src: Dictionary = {}, kind := "buff") -> void:
 	if sec <= 0.0:
 		return
-	timed_bonus[sid] = {"left": sec, "bonus": bonus}
-	var info := StatusEffects.effect_info("buff", src if not src.is_empty() else StatusEffects.source_hero_skill(sid))
+	timed_bonus[sid] = {"left": sec, "bonus": bonus, "src": src, "kind": kind}
+	var info := StatusEffects.effect_info(kind, src if not src.is_empty() else StatusEffects.source_hero_skill(sid))
 	# Повтор: значок с новым источником (другой ранг зелья) и отсчёт заново
 	effects.remove("buff:" + sid)
 	effects.add("buff:" + sid, sec, info)
 	recalc_stats()
 	stats_changed.emit()
+
+
+## Усиления на время для переноса через портал: [[sid, осталось с, бонус, источник значка]].
+func export_timed() -> Array:
+	var out: Array = []
+	for id in timed_bonus:
+		var e: Dictionary = timed_bonus[id]
+		out.append([String(id), float(e["left"]), (e["bonus"] as Dictionary).duplicate(), e.get("src", {}),
+			String(e.get("kind", "buff"))])
+	return out
+
+
+## Вернуть усиления после перехода (export_timed прежнего героя).
+func import_timed(list: Array) -> void:
+	for e in list:
+		var a: Array = e
+		add_timed_bonus(String(a[0]), float(a[1]), a[2], a[3], String(a[4]) if a.size() > 4 else "buff")
+
+
+# ---------- Ослабления от зверей (проклятия босса: Mob «curses») ----------
+
+## Оглушение: герой стоит, не бьёт и не применяет умений (каст сбивается), с.
+var stun_left := 0.0
+## Яд: урон в секунду (без защиты, уклонения и блока), сколько ещё секунд, накопитель.
+var poison_dps := 0.0
+var poison_left := 0.0
+var _poison_acc := 0.0
+var _poison_from: Node3D = null
+## Значки и названия ослаблений (IconView.effect: assets/icons/effects/debuff_<вид>.png).
+const CURSES := {
+	"stun": ["Оглушение", "debuff_stun", "О", Color(1.0, 0.9, 0.35)],
+	"aslow": ["Слабая рука: скорость атаки ниже", "debuff_aslow", "А", Color(0.6, 0.85, 0.45)],
+	"slow": ["Тяжёлые ноги: бег медленнее", "debuff_slow", "Б", Color(0.55, 0.8, 1.0)],
+	"armor": ["Разбитая броня: защита ниже", "debuff_armor", "З", Color(0.85, 0.6, 0.35)],
+	"poison": ["Яд бездны", "debuff_poison", "Я", Color(0.35, 0.95, 0.45)],
+}
+
+
+## Ослабление kind на sec с силой value (доля для aslow/slow/armor, урон в секунду для poison) от зверя by.
+## Бессмертие админ-панели его не отменяет (на эффект смотрим), но яд урона не наносит.
+func curse(kind: String, sec: float, value: float, by: Node3D = null) -> void:
+	if not CURSES.has(kind) or sec <= 0.0:
+		return
+	var c: Array = CURSES[kind]
+	var src := {"name": String(by.get("mob_name")) if by != null and by.get("mob_name") != null else "",
+		"icon": IconView.effect(String(c[1]), String(c[2]), c[3])}
+	match kind:
+		"stun":
+			stun_left = maxf(stun_left, sec)
+			cancel_cast("Оглушение")
+			velocity = Vector3.ZERO
+			effects.remove("curse:stun")
+			var info := StatusEffects.effect_info("stun", src)
+			info["name"] = String(c[0])
+			effects.add("curse:stun", sec, info)
+		"aslow":
+			add_timed_bonus("curse_aslow", sec, {"aspd": -value}, src, "slow")
+		"slow":
+			add_timed_bonus("curse_slow", sec, {"speed_pct": -value}, src, "slow")
+		"armor":
+			add_timed_bonus("curse_armor", sec, {"def_pct": -value}, src, "vuln")
+		"poison":
+			poison_dps = value
+			poison_left = sec
+			_poison_acc = 0.0
+			_poison_from = by
+			effects.remove("curse:poison")
+			var pi := StatusEffects.effect_info("dot", src)
+			pi["name"] = String(c[0])
+			effects.add("curse:poison", sec, pi)
+	Util.float_text(get_parent(), global_position + Vector3(0, 2.7, 0), String(c[0]).get_slice(":", 0), c[3], 1.1)
+
+
+func _tick_curses(delta: float) -> void:
+	if stun_left > 0.0:
+		stun_left = maxf(0.0, stun_left - delta)
+		effects.sync("curse:stun", stun_left)
+	if poison_left > 0.0:
+		poison_left = maxf(0.0, poison_left - delta)
+		effects.sync("curse:poison", poison_left)
+		_poison_acc += delta
+		while _poison_acc >= 1.0:
+			_poison_acc -= 1.0
+			take_damage(roundi(poison_dps), _poison_from if is_instance_valid(_poison_from) else null, true)
 
 
 ## Лечение со временем от умения sid: всего total HP цели node (герой или питомец) за sec секунд.
@@ -616,6 +700,7 @@ func _physics_process(delta: float) -> void:
 	_mp_delay = maxf(0.0, _mp_delay - delta)
 	_tick_skills(delta)
 	_tick_timed(delta)
+	_tick_curses(delta)
 	_tick_mp(delta)
 	_fx.tick(delta)
 	_tick_cast(delta)
@@ -643,6 +728,9 @@ func _physics_process(delta: float) -> void:
 			stats_changed.emit()
 
 	var dir := Vector3(move_input.x, 0.0, move_input.y)
+	# Оглушён — стоит
+	if stun_left > 0.0:
+		dir = Vector3.ZERO
 	var spd := cur_speed()
 	velocity.x = dir.x * spd
 	velocity.z = dir.z * spd
@@ -846,6 +934,10 @@ func clear_pet_aura(src: Object) -> void:
 
 func clear_buffs() -> void:
 	cancel_cast("")
+	stun_left = 0.0
+	poison_left = 0.0
+	effects.remove("curse:stun")
+	effects.remove("curse:poison")
 	atk_buff_time = 0.0
 	atk_buff = 0.0
 	speed_buff_time = 0.0
@@ -873,7 +965,7 @@ func clear_buffs() -> void:
 
 ## Обычная атака по цели. true, если удар/выстрел состоялся.
 func try_attack() -> bool:
-	if attack_cd > 0.0 or casting != "":
+	if attack_cd > 0.0 or casting != "" or stun_left > 0.0:
 		return false
 	var target := _find_target(attack_range)
 	if target == null:
@@ -1078,6 +1170,9 @@ func slot_block(slot: String) -> String:
 
 ## Умение по кнопке "skill1"…"skill4" (или по id). true, если применено (переключаемое — включено/выключено).
 func use_skill(slot: String) -> bool:
+	if stun_left > 0.0:
+		message.emit("Оглушение — нельзя применять умения")
+		return false
 	var sid := skill_id(slot)
 	if sid == "":
 		if ClassData.is_wanderer(Game.class_id):
@@ -1511,27 +1606,30 @@ func _set_target(t: Mob) -> void:
 	target_changed.emit(t)
 
 
-func take_damage(amount: int, attacker: Node3D) -> void:
+func take_damage(amount: int, attacker: Node3D, pure: bool = false) -> void:
 	# Кто напал — запоминается и при «Бессмертии» (питомец в режиме «Защита» бьёт его)
 	if attacker is Mob:
 		last_attacker = attacker
 	# «Бессмертие» админ-панели: урон не проходит
 	if AdminPanel.god:
 		return
+	# pure — урон яда: без уклонения, блока и защиты
+	if pure:
+		pass
 	# Уклонение — только от ударов зверей
-	if attacker is Mob and cur_eva() > 0.0 and Combat.rand() < cur_eva():
+	elif attacker is Mob and cur_eva() > 0.0 and Combat.rand() < cur_eva():
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "Уклонение", Color(0.7, 0.95, 1.0))
 		if _has_model():
 			_model.play_dodge()
 		return
 	# Блок щитом: удар зверя приходится в щит
-	if attacker is Mob and block > 0.0 and Combat.rand() < block:
+	if not pure and attacker is Mob and block > 0.0 and Combat.rand() < block:
 		Util.float_text(get_parent(), global_position + Vector3(0, 2.4, 0), "Блок", Color(0.75, 0.85, 1.0))
 		if _has_model():
 			_model.play_block()
 		return
 	# Удар зверя уже прошёл через защиту героя (Combat.damage у зверя); прочий урон — по-старому
-	if not (attacker is Mob):
+	if not (attacker is Mob) and not pure:
 		amount = maxi(1, amount - int((defense + aura_def) * 0.5))
 	if guard_time > 0.0:
 		amount = maxi(1, roundi(float(amount) * (1.0 - guard)))

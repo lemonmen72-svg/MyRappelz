@@ -188,6 +188,12 @@ func _spawn(rec: Dictionary) -> void:
 	p.died.connect(_on_pet_died.bind(p))
 	active_pet = p
 	main.hud.update_pet(p)
+	# Перешли через портал: усиления героя на питомце — те же, с остатком времени (Game.carry_buffs)
+	if Game.carry_buffs.has("pet") and int(Game.carry_buffs.get("pet_index", -1)) == Game.active_pet:
+		for e in Game.carry_buffs["pet"]:
+			var a: Array = e
+			p.apply_hero_buff(String(a[0]), float(a[1]), a[2], a[3])
+	Game.carry_buffs.erase("pet")
 
 
 func _despawn() -> void:

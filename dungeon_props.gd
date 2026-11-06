@@ -13,6 +13,10 @@ extends RefCounted
 ## из примитивов (FALLBACK_COLORS), подземелье проходимо и узнаваемо.
 
 const ZONE := 40.0
+## Участок при дальности «В подземелье» (Quality.dungeon_range): мельче — видимость режется ровнее; ставит build.
+static var zone_size := ZONE
+## Сколько видно участок сверх дальности: половина его диагонали и камера позади героя, м.
+const VIEW_CAMERA := 10.0
 const COLLIDE_K := 0.8
 ## Крупное и твёрдое — с коллизией (коробка).
 const SOLID := ["dg_spire", "dg_crag", "dg_moss_stones", "dg_amethyst_spires", "dg_crystal_purple", "dg_crystal_blue",
@@ -58,6 +62,8 @@ static func build(world: DungeonWorld, _rng: RandomNumberGenerator) -> void:
 	var holder := Node3D.new()
 	holder.name = "DungeonProps"
 	world.add_child(holder)
+	var view := Quality.dungeon_range()
+	zone_size = clampf(view * 0.5, 10.0, ZONE) if view > 0.0 else ZONE
 	var zones := {}
 	var fallback := Node3D.new()
 	fallback.name = "Fallback"
@@ -111,10 +117,10 @@ static func _place(world: DungeonWorld, holder: Node3D, fallback: Node3D, zones:
 	if PropAsset.has(id):
 		var m := mesh_of(world, id)
 		if m != null:
-			var key := Vector2i(floori(pos.x / ZONE), floori(pos.z / ZONE))
+			var key := Vector2i(floori(pos.x / zone_size), floori(pos.z / zone_size))
 			if not zones.has(key):
 				var zn := Zone.new()
-				zn.origin = Vector3((float(key.x) + 0.5) * ZONE, 0.0, (float(key.y) + 0.5) * ZONE)
+				zn.origin = Vector3((float(key.x) + 0.5) * zone_size, 0.0, (float(key.y) + 0.5) * zone_size)
 				zones[key] = zn
 			var zone: Zone = zones[key]
 			var pg := PropAsset.page(id)
@@ -248,6 +254,10 @@ static func _zone_mesh(holder: Node3D, zone: Zone, node_name := "Props") -> void
 	mi.mesh = mesh
 	mi.position = zone.origin
 	mi.set_meta("no_outline", true)
+	# «В подземелье»: участок дальше дальности от камеры не рисуется
+	var view := Quality.dungeon_range()
+	if view > 0.0:
+		mi.visibility_range_end = view + zone_size * 0.71 + VIEW_CAMERA
 	holder.add_child(mi)
 
 
@@ -291,10 +301,10 @@ static func _bridge_decks(world: DungeonWorld, holder: Node3D, fallback: Node3D,
 			var basis := Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, pitch)
 			var sc := Vector3(float(br["width"]) / sz.x * 1.05, 1.0, seg / sz.z * 1.04)
 			var xf := Transform3D(basis * Basis.from_scale(sc), Vector3(mid.x, mid.y - BRIDGE_SINK, mid.z))
-			var key := Vector2i(floori(mid.x / ZONE), floori(mid.z / ZONE))
+			var key := Vector2i(floori(mid.x / zone_size), floori(mid.z / zone_size))
 			if not zones.has(key):
 				var zn := Zone.new()
-				zn.origin = Vector3((float(key.x) + 0.5) * ZONE, 0.0, (float(key.y) + 0.5) * ZONE)
+				zn.origin = Vector3((float(key.x) + 0.5) * zone_size, 0.0, (float(key.y) + 0.5) * zone_size)
 				zones[key] = zn
 			var zone: Zone = zones[key]
 			var pg := PropAsset.page(BRIDGE_PROP)

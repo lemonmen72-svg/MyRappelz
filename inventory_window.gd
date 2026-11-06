@@ -255,11 +255,21 @@ func _build() -> void:
 	var center := VBoxContainer.new()
 	center.add_theme_constant_override("separation", int(UiScale.px(6)))
 	row.add_child(center)
+	# Карточка — в своей прокрутке высотой с окно (жалоба Максима 0.39: описание длинное, до кнопок «Надеть»,
+	# «Продать» пальцем не долистать — панель карточки забирала касание, прокрутка окна не шла)
+	var card_scroll := ScrollContainer.new()
+	card_scroll.name = "CardScroll"
+	card_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	card_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card_scroll.custom_minimum_size = Vector2(_card_w(), _card_h())
+	row.add_child(card_scroll)
+	card_box = card_scroll
 	var card_panel := PanelContainer.new()
 	card_panel.add_theme_stylebox_override("panel", _card_style())
 	card_panel.custom_minimum_size = Vector2(_card_w(), 0)
 	card_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(card_panel)
+	card_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	card_scroll.add_child(card_panel)
 	var card := VBoxContainer.new()
 	card.add_theme_constant_override("separation", int(UiScale.px(5)))
 	card_panel.add_child(card)
@@ -279,6 +289,22 @@ func _build() -> void:
 		_build_equipment(left)
 		_build_bag(center, UiScale.px(CELL))
 	_build_card(card)
+
+
+## Прокрутка карточки (тесты: высота и прокрутка до кнопок).
+var card_box: ScrollContainer = null
+
+
+## Высота карточки: внутренняя высота окна (окно — UiScale.window_size, без заголовка и полей).
+func _card_h() -> float:
+	var view := Vector2(1280, 720)
+	if main != null and main.get("hud") != null:
+		var hn := main.hud as Node
+		if hn.is_inside_tree():
+			view = hn.get_viewport().get_visible_rect().size
+	var base := STORE_SIZE if mode == "storage" else WINDOW_SIZE
+	var wh := UiScale.window_size(base, view).y
+	return maxf(UiScale.px(160), wh - UiScale.px(UiScale.TAB_H) - UiScale.px(UiScale.PAD) * 4.0)
 
 
 ## Ширина карточки предмета (с масштабом интерфейса).
@@ -1144,7 +1170,10 @@ func _card_item(card: VBoxContainer) -> void:
 		if n > 1:
 			acts.append(["Продать все", "act_sell_all", _on_sell.bind(true)])
 	acts.append(["Переместить", "act_move", _on_move])
-	acts.append(["Выбросить", "act_drop", _on_drop_ask])
+	# Без подтверждения (решение Максима 0.40): «Выбросить» — сразу (у стопки — по одной), «Выбросить все» — стопку
+	acts.append(["Выбросить", "act_drop", _on_drop_now.bind(false)])
+	if n > 1:
+		acts.append(["Выбросить все", "act_drop_all", _on_drop_now.bind(true)])
 	card.add_child(_action_grid(acts))
 
 
@@ -1688,6 +1717,12 @@ func _on_move() -> void:
 func _on_move_cancel() -> void:
 	moving = false
 	refresh()
+
+
+## «Выбросить» без подтверждения: одну штуку или всю стопку (all).
+func _on_drop_now(all: bool) -> void:
+	drop_count = int(Game.inventory.cell(sel_index).get("n", 1)) if all else 1
+	_on_drop_yes()
 
 
 func _on_drop_ask() -> void:

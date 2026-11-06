@@ -62,6 +62,11 @@ static func item(id: String) -> Dictionary:
 	return {"item": id}
 
 
+## Значок эффекта (assets/icons/effects/<id>.png — благословения, ослабления босса); нет файла — буква на кружке.
+static func effect(id: String, text: String, col: Color) -> Dictionary:
+	return {"path": "res://assets/icons/effects/%s.png" % id, "glyph": text, "color": col}
+
+
 ## Буква на цветном кружке.
 static func glyph(text: String, col: Color) -> Dictionary:
 	return {"glyph": text, "color": col}

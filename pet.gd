@@ -1496,7 +1496,7 @@ var _spirit_acc := 0.0
 func apply_hero_buff(sid: String, sec: float, bonus: Dictionary, src: Dictionary = {}) -> void:
 	if is_down or sec <= 0.0:
 		return
-	hero_buffs[sid] = {"left": sec, "bonus": bonus.duplicate()}
+	hero_buffs[sid] = {"left": sec, "bonus": bonus.duplicate(), "src": src}
 	effects.remove("hero_buff:" + sid)
 	effects.add("hero_buff:" + sid, sec, StatusEffects.effect_info("buff",
 		src if not src.is_empty() else StatusEffects.source_hero_skill(sid)))
@@ -1504,6 +1504,15 @@ func apply_hero_buff(sid: String, sec: float, bonus: Dictionary, src: Dictionary
 	if is_inside_tree():
 		var c: Color = HeroSkills.get_skill(sid).get("color", Color(1.0, 0.85, 0.4))
 		Vfx.magic_burst(get_parent(), global_position + Vector3(0, _height * 0.6, 0), c, 1.1 * maxf(_scale, 0.8), 0.35)
+
+
+## Усиления героя на время для переноса через портал: [[sid, осталось с, бонус, источник значка]].
+func export_hero_buffs() -> Array:
+	var out: Array = []
+	for id in hero_buffs:
+		var e: Dictionary = hero_buffs[id]
+		out.append([String(id), float(e["left"]), (e["bonus"] as Dictionary).duplicate(), e.get("src", {})])
+	return out
 
 
 ## Значок эффекта id от героя на sec секунд (info — StatusEffects.effect_info): лечение со временем и т. п.

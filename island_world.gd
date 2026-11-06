@@ -979,12 +979,22 @@ func bridge_waypoint(from: Vector3, to: Vector3) -> Vector3:
 	return best
 
 
-## Путь существа (питомец, зверь) в обход реки: направление к цели напрямую или через мост
-## (bridge_waypoint; путь пересчитывается раз в 0.25 с или когда цель сдвинулась больше чем на 1.5 м).
+## Путь существа (питомец, зверь) в обход реки и препятствий: направление к цели напрямую, через мост
+## (bridge_waypoint) или, если прямую заслоняет препятствие (ограда, стена, скала, баррикада подземелья), по сетке пути
+## CardinalNav (проходимость мира + следы коллизий; строится раз на мир при первой нужде) — точки пути по очереди.
+## Путь пересчитывается раз в REPATH с или когда цель сдвинулась больше чем на 1.5 м. Жалоба Максима (0.39): звери
+## упирались в препятствие и не могли добраться до героя — стрелки и маги били их безнаказанно.
 class Route:
+	const REPATH := 0.5
+	## Шаг проверки прямой на препятствия, м.
+	const LINE_STEP := 0.5
 	var waypoint := Vector3.INF
 	var goal := Vector3.INF
 	var timer := 0.0
+	## Точки обхода препятствий (CardinalNav.path), следующая — первая.
+	var path := PackedVector3Array()
+	## Сколько раз путь обходил препятствие (тесты).
+	var detours := 0
 
 	## Единичное направление по земле от from к to (ноль — уже на месте).
 	func dir_to(from: Vector3, to: Vector3, delta: float) -> Vector3:
@@ -992,12 +1002,22 @@ class Route:
 		straight = straight.normalized() if straight.length() > 0.001 else Vector3.ZERO
 		timer -= delta
 		if timer <= 0.0 or not goal.is_finite() or to.distance_to(goal) > 1.5:
-			timer = 0.25
+			timer = REPATH
 			goal = to
 			waypoint = Vector3.INF
+			path = PackedVector3Array()
 			var w := IslandWorld.current
 			if w != null and is_instance_valid(w):
 				waypoint = w.bridge_waypoint(from, to)
+				if not waypoint.is_finite() and _blocked(w, from, to):
+					path = _detour(w, from, to)
+		# Обход препятствия: к первой точке пути, дошёл — к следующей
+		while not path.is_empty():
+			var pd := Vector3(path[0].x - from.x, 0.0, path[0].z - from.z)
+			if pd.length() < 0.6:
+				path.remove_at(0)
+				continue
+			return pd.normalized()
 		if not waypoint.is_finite():
 			return straight
 		var d := Vector3(waypoint.x - from.x, 0.0, waypoint.z - from.z)
@@ -1011,6 +1031,42 @@ class Route:
 		waypoint = Vector3.INF
 		goal = Vector3.INF
 		timer = 0.0
+		path = PackedVector3Array()
+
+	## Прямую от a к b заслоняет препятствие (клетка сетки пути занята). Сетки нет — строится сейчас.
+	func _blocked(w: IslandWorld, a: Vector3, b: Vector3) -> bool:
+		var len := Vector2(b.x - a.x, b.z - a.z).length()
+		if len < 1.0:
+			return false
+		if not w.is_inside_tree():
+			return false
+		CardinalNav.ensure(w, w.get_tree())
+		var n := int(len / LINE_STEP)
+		for i in range(1, n):
+			var t := float(i) / float(n)
+			if not CardinalNav.free_at(Vector3(lerpf(a.x, b.x, t), 0.0, lerpf(a.z, b.z, t))):
+				return true
+		return false
+
+	## Точки пути в обход (без лишних: идём сразу к самой дальней, до которой прямая свободна).
+	func _detour(w: IslandWorld, a: Vector3, b: Vector3) -> PackedVector3Array:
+		var pts := CardinalNav.path(a, b)
+		if pts.is_empty():
+			return pts
+		detours += 1
+		var out := PackedVector3Array()
+		var cur := a
+		var i := 0
+		while i < pts.size():
+			var far := i
+			for k in range(mini(pts.size() - 1, i + 12), i, -1):
+				if not _blocked(w, cur, pts[k]):
+					far = k
+					break
+			out.append(pts[far])
+			cur = pts[far]
+			i = far + 1
+		return out
 
 
 static func _flat_dist(a: Vector3, b: Vector3) -> float:

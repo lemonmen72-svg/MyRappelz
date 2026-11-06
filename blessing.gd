@@ -64,7 +64,7 @@ static func label_all() -> String:
 
 static func source(id: String) -> Dictionary:
 	var b: Array = BUFFS[id]
-	return {"name": String(b[0]), "icon": IconView.glyph(String(b[4]), b[5])}
+	return {"name": String(b[0]), "icon": IconView.effect(sid(id), String(b[4]), b[5])}
 
 
 ## Благословить героя p (и призванного питомца pet) одним усилением id: "" — получилось, иначе причина отказа.

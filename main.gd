@@ -292,6 +292,10 @@ func _start_world() -> void:
 		hud.update_player(player)
 		refresh_skill_buttons())
 	_started = true
+	# Сетка пути в обход препятствий (звери и питомцы — IslandWorld.Route; Кардинал): строится раз на мир — сразу,
+	# а не посреди первого боя
+	if IslandWorld.current != null:
+		CardinalNav.ensure(IslandWorld.current, get_tree())
 	_on_location_entered()
 	# Vulkan проверяется: время в мире до подтверждения; сообщение о рендерере (откат после вылета, Vulkan со
 	# следующего запуска) — один раз
@@ -359,6 +363,9 @@ func _build_player() -> void:
 		cam_yaw = DungeonEditor.return_yaw
 	Game.arrive = ""
 	add_child(player)
+	if Game.carry_buffs.has("hero"):
+		player.import_timed(Game.carry_buffs["hero"])
+		Game.carry_buffs.erase("hero")
 	player.stats_changed.connect(func():
 		hud.update_player(player)
 		refresh_skill_buttons())
@@ -808,6 +815,10 @@ func travel(to: String) -> void:
 	if traveling:
 		return
 	traveling = true
+	# Усиления на время (благословения, зелья, умения) — с собой в новую локацию
+	Game.carry_buffs = {"hero": player.export_timed() if player != null and is_instance_valid(player) else [],
+		"pet": pets.active_pet.export_hero_buffs() if pets != null and is_instance_valid(pets.active_pet) else [],
+		"pet_index": Game.active_pet}
 	Game.location = to
 	Game.arrive = "portal"
 	Game.save_game()

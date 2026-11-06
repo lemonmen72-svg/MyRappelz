@@ -57,13 +57,35 @@ BOSS_ITEMS = [
 		"corners, a green eye-and-tentacles mark burned into the cover, seaweed on the strap", "Проклятый капитан"),
 ]
 
+# Лист 3 (0.40): значки эффектов — благословения Сестры Аделины (баффы) и ослабления Проклятого капитана (дебаффы).
+# Рисуются в кружке у полосок HP (StatusRow), рамку цвета (зелёная — баф, красная — дебаф) игра рисует сама.
+FX_STYLE = ("Game status-effect icons (buff and debuff icons), anime cel-shading in the spirit of Genshin Impact, fully "
+	"original design (no logos, no text, no letters, no existing game assets). Each icon: one bold simple symbol, "
+	"centered, clean dark outline, 2–3 tone cel shading, glowing accents, readable at 32 px. Each icon on its own "
+	"square tile with a dark navy radial-gradient background and NO frame (the game draws the frame). Tiles are "
+	"separated by clear WHITE gaps of at least 40 px on a pure white sheet.")
+FX_ITEMS = [
+	("bless_might", "Благословение силы", "баф", "a golden sword pointing up inside a radiant warm-orange sunburst, holy light rays", "физ. атака +19.5 %"),
+	("bless_arcana", "Благословение чар", "баф", "a violet magic orb with a small star inside, surrounded by orbiting arcane sparks", "маг. атака +19.5 %"),
+	("bless_bulwark", "Благословение стойкости", "баф", "a sturdy bronze kite shield with a glowing golden sun emblem", "защита +19.5 %"),
+	("bless_ward", "Благословение оберега", "баф", "a translucent sky-blue magic barrier dome with a white rune circle", "маг. защита +19.5 %"),
+	("bless_fury", "Благословение ярости", "баф", "two crossed short blades with orange speed streaks and flame-like trails", "скорость атаки +18 %"),
+	("bless_word", "Благословение слова", "баф", "an open glowing book with cyan light rising from the pages like a spell", "скорость каста +19.5 %"),
+	("bless_wind", "Благословение ветра", "баф", "a light green winged boot with swirling wind lines", "бег +19.5 %"),
+	("debuff_stun", "Оглушение", "дебаф", "a dazed head silhouette with yellow stars and spirals circling above it", "Проклятый капитан: оглушение 2 с"),
+	("debuff_aslow", "Слабая рука", "дебаф", "a cracked sword wrapped in a heavy dark-green chain, sluggish purple haze", "скорость атаки −15 %"),
+	("debuff_slow", "Тяжёлые ноги", "дебаф", "a boot stuck in thick green sea sludge with dripping slime", "бег −15 %"),
+	("debuff_armor", "Разбитая броня", "дебаф", "a dented breastplate with a jagged crack and green corrosion spreading", "защита −10 %"),
+	("debuff_poison", "Яд бездны", "дебаф", "a toxic emerald droplet with a small skull reflection, bubbling green fumes", "яд: 100 HP в секунду 5 с"),
+]
 
-def sheet(doc, items, cols, rows, size):
-	lines = [STYLE, THEME, "Draw a sheet of %d icons in a %d x %d grid, in this exact order (left to right, top to bottom):"
+
+def sheet(doc, items, cols, rows, size, style=None):
+	lines = [style or STYLE, THEME, "Draw a sheet of %d icons in a %d x %d grid, in this exact order (left to right, top to bottom):"
 		% (len(items), cols, rows)]
 	for n, it in enumerate(items, 1):
-		frame = {"обычная": "grey frame", "редкая": "blue frame", "уникальная": "golden frame"}[it[2]]
-		lines.append("%d. %s (%s)." % (n, it[3], frame))
+		frame = {"обычная": "grey frame", "редкая": "blue frame", "уникальная": "golden frame", "баф": "", "дебаф": ""}[it[2]]
+		lines.append("%d. %s%s." % (n, it[3], " (%s)" % frame if frame else ""))
 	lines.append("Sheet %s px or larger. No captions, no numbers on the sheet." % size)
 	doc.add_paragraph("\n".join(lines))
 
@@ -71,7 +93,7 @@ def sheet(doc, items, cols, rows, size):
 def table(doc, items):
 	t = doc.add_table(rows=1, cols=5)
 	t.style = "Table Grid"
-	for c, h in enumerate(["№", "id (имя файла)", "Предмет", "Рамка", "Кто роняет"]):
+	for c, h in enumerate(["№", "id (имя файла)", "Что", "Рамка или вид", "Откуда, что даёт"]):
 		t.rows[0].cells[c].text = h
 	for n, it in enumerate(items, 1):
 		r = t.add_row().cells
@@ -87,7 +109,7 @@ def main():
 	st = doc.styles["Normal"]
 	st.font.name = "Calibri"
 	st.font.size = Pt(10.5)
-	doc.add_heading("Dark Pact — значки трофеев подземелья (0.36–0.38)", 0)
+	doc.add_heading("Dark Pact — значки подземелья: трофеи и эффекты (0.36–0.40)", 0)
 	doc.add_paragraph("Лист 1 ChatGPT: 12 значков сеткой 4 × 3, по порядку таблицы (слева направо, сверху вниз). "
 		"В игре они пока процедурные (ItemIcon по полю icon), с картинкой станут настоящими. Готовый лист — пришли мне, "
 		"нарежу командой:")
@@ -104,6 +126,14 @@ def main():
 	sheet(doc, BOSS_ITEMS, 3, 1, "1536 x 512")
 	doc.add_heading("Что на каждой плитке листа 2", 1)
 	table(doc, BOSS_ITEMS)
+	doc.add_heading("Лист 3 — значки эффектов: благословения жрицы и ослабления капитана (0.40)", 1)
+	doc.add_paragraph("Отдельный лист 4 × 3. Значки встают в кружки эффектов у полосок здоровья (рамку игра рисует сама). "
+		"Нарезка:")
+	doc.add_paragraph("python3 -I tools/cut_icon_sheet.py <лист.png> assets/icons/effects " + ",".join(i[0] for i in FX_ITEMS)
+		+ " --cols 4")
+	sheet(doc, FX_ITEMS, 4, 3, "1536 x 1152", FX_STYLE)
+	doc.add_heading("Что на каждой плитке листа 3", 1)
+	table(doc, FX_ITEMS)
 	doc.save(DOCX)
 	print("записан", DOCX)
 

@@ -145,6 +145,10 @@ var _slam_windup := 0.0
 var _slam_cfg: Dictionary = {}
 ## Ярость (MobData "enrage": hp — доля HP, aspd — удары чаще во столько раз, text): вторая фаза босса.
 var enraged := false
+## Проклятия (MobData.curses_of): до следующего, с; сколько наложено (тесты); последнее [вид, с, сила].
+var _curse_cd := -1.0
+var curse_uses := 0
+var last_curse: Array = []
 ## Что уже сказано (реплики MobData.says_of): "aggro", "half".
 var _said: Dictionary = {}
 var _attack_base := 1.3
@@ -314,6 +318,7 @@ func _physics_process(delta: float) -> void:
 	_tick_debuffs(delta)
 	if not _slam_cfg.is_empty():
 		_slam_cd = maxf(0.0, _slam_cd - delta)
+	_tick_curse(delta)
 	_tick_dots(delta)
 	if is_dead:
 		return
@@ -510,6 +515,40 @@ func _slam() -> void:
 				continue
 			if node.global_position.distance_to(global_position) <= r:
 				node.call("take_damage", _hit_damage(node, float(_slam_cfg["power"])), self)
+
+
+## Проклятие на героя-цель раз в every с боя (первое — через first с после начала боя): случайное из списка.
+func _tick_curse(delta: float) -> void:
+	var cfg := MobData.curses_of(type_id)
+	if cfg.is_empty():
+		return
+	if target == null or not is_instance_valid(target) or returning:
+		_curse_cd = -1.0
+		return
+	if _curse_cd < 0.0:
+		_curse_cd = float(cfg.get("first", 10.0))
+	_curse_cd -= delta
+	if _curse_cd > 0.0:
+		return
+	_curse_cd = float(cfg.get("every", 30.0))
+	if not target.has_method("curse") or target.global_position.distance_to(global_position) > _reach() + 6.0:
+		return
+	curse_now(target)
+
+
+## Наложить случайное проклятие на t (тесты зовут напрямую).
+func curse_now(t: Node3D) -> void:
+	var list: Array = MobData.curses_of(type_id).get("list", [])
+	if list.is_empty() or t == null or not t.has_method("curse"):
+		return
+	var c: Array = list[mini(int(Combat.rand() * float(list.size())), list.size() - 1)]
+	curse_uses += 1
+	last_curse = c
+	t.call("curse", String(c[0]), float(c[1]), float(c[2]), self)
+	if is_inside_tree():
+		Vfx.magic_burst(get_parent(), t.global_position + Vector3(0, 1.0, 0), Color(0.3, 1.0, 0.55), 1.4, 0.4)
+	if _asset != null:
+		_asset.play_cast(0.9)
 
 
 ## Реплика зверя (MobData.says_of(вид, key)) внизу экрана: «Имя: «…»», по одной на REPLICA_SEC с; «> » — герой.

@@ -440,6 +440,8 @@ static func mob_range_level() -> int:
 
 ## Дальность, м (0 — все звери).
 static func mob_range() -> float:
+	if Game.location == "dungeon":
+		return dungeon_range()
 	return float(MOB_RANGES[mob_range_level()])
 
 
@@ -447,6 +449,40 @@ static func set_mob_range_level(v: int, save: bool = true) -> void:
 	_mob_range = clampi(v, 0, MOB_RANGES.size() - 1)
 	if save:
 		_save({"mobs": _mob_range})
+
+
+# ---------- Дальность в подземелье ----------
+
+## «В подземелье» (просьба Максима 0.40: «дистанцию прорисовки объектов и монстров 20–30 м — снизим нагрузку на
+## телефон»): в подземелье объекты (склеенные участки DungeonProps — visibility_range_end, участки мельче) и монстры
+## (вместо «Звери вокруг») — не дальше этого от героя. Ключ dg_view секции [graphics]; объекты — со следующего входа
+## в подземелье, монстры — сразу. Тесты (mob_range_override) — «Все».
+const DUNGEON_RANGES := [20.0, 30.0, 45.0, 0.0]
+const DUNGEON_RANGE_LABELS := ["20 м", "30 м", "45 м", "Все"]
+const DUNGEON_RANGE_DEFAULT := 1
+static var _dg_range := -1
+
+
+static func dungeon_range_level() -> int:
+	if mob_range_override >= 0:
+		return DUNGEON_RANGES.size() - 1 if mob_range_override >= MOB_RANGES.size() - 1 else mob_range_override
+	if _dg_range < 0:
+		_dg_range = DUNGEON_RANGE_DEFAULT
+		var cf := ConfigFile.new()
+		if cf.load(PATH) == OK:
+			_dg_range = clampi(int(cf.get_value(SECTION, "dg_view", DUNGEON_RANGE_DEFAULT)), 0, DUNGEON_RANGES.size() - 1)
+	return _dg_range
+
+
+## Дальность в подземелье, м (0 — всё).
+static func dungeon_range() -> float:
+	return float(DUNGEON_RANGES[dungeon_range_level()])
+
+
+static func set_dungeon_range_level(v: int, save: bool = true) -> void:
+	_dg_range = clampi(v, 0, DUNGEON_RANGES.size() - 1)
+	if save:
+		_save({"dg_view": _dg_range})
 
 
 # ---------- Авто-снижение (ThermalGuard) ----------
@@ -508,6 +544,7 @@ static func reload() -> void:
 	_fps = -1
 	_guard = -1
 	_mob_range = -1
+	_dg_range = -1
 
 
 static func level_name(l: int = -1) -> String:

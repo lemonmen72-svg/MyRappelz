@@ -147,6 +147,7 @@ static func _build_graphics(hud: HUD, page: VBoxContainer) -> void:
 			_fps_row(hud, page)
 
 	_mob_rows(hud, page)
+	_dungeon_rows(hud, page)
 	_guard_rows(hud, page)
 	_renderer_rows(hud, page)
 
@@ -193,6 +194,26 @@ static func _mob_rows(hud: HUD, page: VBoxContainer) -> void:
 	page.add_child(_wrap_label("Звери дальше этого от героя не просто скрыты — их нет совсем: меньше работы процессору " \
 		+ "и памяти. Подходите ближе — звери появляются на своих местах. «Все» — все звери острова сразу.",
 		UiScale.FONT_SMALL, HINT_COLOR))
+
+
+## «В подземелье»: дальность объектов и монстров в подземелье (Quality.dungeon_range).
+static func _dungeon_rows(hud: HUD, page: VBoxContainer) -> void:
+	var row := _row(page)
+	row.add_child(_side_label("В подземелье"))
+	var cur := Quality.dungeon_range_level()
+	for v in Quality.DUNGEON_RANGES.size():
+		var val := v
+		_choice(row, "dg_view_%d" % v, String(Quality.DUNGEON_RANGE_LABELS[v]), v == cur,
+			func() -> void: SettingsMenu._select_dungeon(hud, val))
+	page.add_child(_wrap_label("В подземелье объекты и монстры дальше этого от героя не рисуются и не живут — телефон " \
+		+ "меньше греется. Объекты — со следующего входа в подземелье, монстры — сразу.", UiScale.FONT_SMALL, HINT_COLOR))
+
+
+static func _select_dungeon(hud: HUD, v: int) -> void:
+	if hud == null or not is_instance_valid(hud):
+		return
+	Quality.set_dungeon_range_level(v)
+	open(hud, "graphics", true)
 
 
 static func _select_mobs(hud: HUD, v: int) -> void:

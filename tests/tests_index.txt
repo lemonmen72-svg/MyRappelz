@@ -29,6 +29,7 @@ test_dungeon_story
 test_economy
 test_enchant
 test_equipment
+test_fixes_040
 test_flyfish
 test_graphics_settings
 test_handheld
