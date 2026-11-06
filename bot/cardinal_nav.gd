@@ -135,6 +135,10 @@ static func _stamp(a: AStarGrid2D, w: IslandWorld, cs: CollisionShape3D) -> void
 	elif sh is SphereShape3D:
 		round_r = (sh as SphereShape3D).radius
 		half = Vector3(round_r, round_r, round_r)
+	elif sh is ConvexPolygonShape3D:
+		# призма по следу модели (объекты подземелья 0.35.4, "prop_shapes"): след в осях формы
+		_stamp_convex(a, w, cs, sh as ConvexPolygonShape3D)
+		return
 	else:
 		return
 	# По высоте: ниже ступеньки или выше головы — не препятствие
@@ -158,6 +162,52 @@ static func _stamp(a: AStarGrid2D, w: IslandWorld, cs: CollisionShape3D) -> void
 			else:
 				var l := inv * p
 				hit = absf(l.x) <= half.x + INFLATE / maxf(sc.x, 0.01) and absf(l.z) <= half.z + INFLATE / maxf(sc.z, 0.01)
+			if hit and not a.is_point_solid(Vector2i(i, j)):
+				a.set_point_solid(Vector2i(i, j), true)
+				blocked_cells += 1
+
+
+static func _stamp_convex(a: AStarGrid2D, w: IslandWorld, cs: CollisionShape3D, sh: ConvexPolygonShape3D) -> void:
+	var xf := cs.global_transform
+	var pts := sh.points
+	if pts.size() < 3:
+		return
+	var lo := INF
+	var hi := -INF
+	var poly := PackedVector2Array()
+	for p in pts:
+		lo = minf(lo, p.y)
+		hi = maxf(hi, p.y)
+	for p in pts:
+		if absf(p.y - lo) < 0.01:
+			poly.append(Vector2(p.x, p.z))
+	poly = Geometry2D.convex_hull(poly)
+	if poly.size() < 3:
+		return
+	var c := xf.origin
+	var ground := w.height_at(c.x, c.z)
+	if c.y + hi < ground + LOW or c.y + lo > ground + HIGH:
+		return
+	var ext := 0.0
+	for q in poly:
+		ext = maxf(ext, q.length())
+	ext += INFLATE
+	var i0 := clampi(int(floorf((c.x - ext - w.origin.x) / w.step)), 0, w.nx - 1)
+	var i1 := clampi(int(ceilf((c.x + ext - w.origin.x) / w.step)), 0, w.nx - 1)
+	var j0 := clampi(int(floorf((c.z - ext - w.origin.y) / w.step)), 0, w.nz - 1)
+	var j1 := clampi(int(ceilf((c.z + ext - w.origin.y) / w.step)), 0, w.nz - 1)
+	var inv := xf.affine_inverse()
+	for j in range(j0, j1 + 1):
+		for i in range(i0, i1 + 1):
+			var l := inv * Vector3(w.origin.x + float(i) * w.step, c.y, w.origin.y + float(j) * w.step)
+			var q := Vector2(l.x, l.z)
+			var hit := Geometry2D.is_point_in_polygon(q, poly)
+			if not hit:
+				for k in poly.size():
+					var cp := Geometry2D.get_closest_point_to_segment(q, poly[k], poly[(k + 1) % poly.size()])
+					if cp.distance_to(q) <= INFLATE:
+						hit = true
+						break
 			if hit and not a.is_point_solid(Vector2i(i, j)):
 				a.set_point_solid(Vector2i(i, j), true)
 				blocked_cells += 1

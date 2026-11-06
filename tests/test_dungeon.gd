@@ -103,14 +103,33 @@ func run_step() -> void:
 				walk_targets.append([String(e["name"]), IslandWorld.v2(e["center"])])
 			for br in (w as DungeonWorld).cfg["bridges"]:
 				walk_targets.append(["конец моста " + str(br["b"]), IslandWorld.v2(br["b"])])
-			# Палуба-полоса (корабль 0.35.3): от носа до двери рубки — оба конца
+			# Палуба корабля (0.35.4 — поверхность по модели): крайние точки по оси — у двери рубки и у носа, затем
+			# зигзагом от борта к борту по всей длине (у бортов не застревает, у носа палуба поднимается)
 			for dk in (w as DungeonWorld).cfg["decks"]:
-				if (dk as Dictionary).has("points"):
-					for dpt in dk["points"]:
-						walk_targets.append(["палуба %s %s" % [String(dk["id"]), str(dpt)], IslandWorld.v2(dpt)])
-			# Корабль — арена босса: зигзагом от борта к борту по всей длине палубы (у бортов не застревает)
-			for zz in [[29.0, 20.0], [35.0, 24.0], [29.0, 30.0], [35.0, 39.5], [29.0, 43.0], [32.0, 47.0]]:
-				walk_targets.append(["палуба корабля у борта " + str(zz), IslandWorld.v2(zz)])
+				var dd: Dictionary = dk
+				if dd.has("points"):
+					for dpt in dd["points"]:
+						walk_targets.append(["палуба %s %s" % [String(dd["id"]), str(dpt)], IslandWorld.v2(dpt)])
+				if dd.has("surface"):
+					var zs: Array[float] = []
+					for zi in range(0, 120):
+						var zq := 10.0 + float(zi) * 0.5
+						if not is_nan(DungeonWorld.surface_at(dd, Vector2(32.0, zq))):
+							zs.append(zq)
+					check(zs.size() > 40, "палуба корабля по поверхности: %d точек по оси" % zs.size())
+					if zs.size() > 4:
+						walk_targets.append(["палуба у рубки", Vector2(32.0, zs[1])])
+						walk_targets.append(["палуба у носа", Vector2(32.0, zs[zs.size() - 2])])
+						var side := 1.0
+						var zq2 := zs[2]
+						while zq2 < zs[zs.size() - 3]:
+							for off in [3.0, 2.5, 2.0, 1.5]:
+								var q := Vector2(32.0 + side * off, zq2)
+								if not is_nan(DungeonWorld.surface_at(dd, q)) and w.is_walkable(q.x, q.y):
+									walk_targets.append(["палуба корабля у борта " + str(q), q])
+									break
+							side = -side
+							zq2 += 4.5
 			wait = 10
 			step = 30
 		30:
@@ -213,6 +232,68 @@ func _relief(w: DungeonWorld) -> void:
 	check(n > 200 and low < n / 50, "стены высотой ≥ 6 м над полом (%d узлов стены, ниже — %d)" % [n, low])
 
 
+## Раскладка из сцены Blender (0.35.4): столбы — высотой со стены, факелы — тыльной пластиной к скале, у твёрдых —
+## формы коллизии по модели, мосты — своя модель со сваями.
+func _props_placed(w: DungeonWorld, props: Node) -> void:
+	var tall := 0
+	var low := 0
+	var torches := 0
+	var on_wall := 0
+	var space := w.get_world_3d().direct_space_state
+	for e in w.cfg["props"]:
+		var a: Array = e
+		var id := String(a[0])
+		var s := float(a[4]) if a.size() > 4 else 1.0
+		var sy := float(a[6]) if a.size() > 6 else 1.0
+		if id == "dg_spire" or id == "dg_obelisk":
+			var h := float((w.cfg["prop_shapes"] as Dictionary).get(id, {}).get("h", 0.0)) * s * sy
+			if h >= 6.0:
+				tall += 1
+			else:
+				low += 1
+		if id == "dg_torch":
+			torches += 1
+			var pos := DungeonProps.base_pos(w, a)
+			var bas := Basis(Vector3.UP, deg_to_rad(float(a[3]))) * DungeonProps.tilt_of(a) * Basis.from_scale(Vector3.ONE * s)
+			var back := (bas * Vector3.RIGHT).normalized()
+			# Тыльная пластина (вершины модели у края +X): лучи от неё к скале — самый большой зазор
+			var worst := 0.0
+			for vtx in _plate_points():
+				var pw: Vector3 = pos + bas * (vtx as Vector3)
+				var q := PhysicsRayQueryParameters3D.create(pw - back * 0.5, pw + back * 1.5, 1)
+				var hit := space.intersect_ray(q)
+				worst = maxf(worst, 2.0 if hit.is_empty() else (pw - back * 0.5).distance_to(hit["position"]) - 0.5)
+			if worst < 0.35:
+				on_wall += 1
+			else:
+				print("ФАКЕЛ не у стены: (%.1f, %.1f) зазор пластины до %.2f м" % [pos.x, pos.z, worst])
+	check(low == 0 and tall > 0, "столбы и обелиски высотой со стены: %d, ниже 6 м — %d" % [tall, low])
+	check(torches > 0 and on_wall == torches, "факелы тыльной пластиной к скале: %d из %d" % [on_wall, torches])
+	check((w.cfg.get("prop_shapes", {}) as Dictionary).size() > 30, "формы коллизии по моделям: %d" % (w.cfg.get("prop_shapes", {}) as Dictionary).size())
+	if PropAsset.has(String(w.cfg.get("bridge_model", ""))):
+		check(props.find_child("Bridges", false, false) != null, "мосты — своя модель со сваями")
+
+
+## Точки тыльной пластины факела (модель; без файла — точка у края +X): до 16 вершин у края +X.
+func _plate_points() -> Array:
+	var out := []
+	var m := PropAsset.mesh("dg_torch") if PropAsset.has("dg_torch") else null
+	if m == null:
+		return [Vector3(0.2, 0.3, 0.0)]
+	var v: PackedVector3Array = m.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var mx := -INF
+	for p in v:
+		mx = maxf(mx, p.x)
+	for i in range(0, v.size(), 1):
+		if v[i].x > mx - 0.06:
+			out.append(v[i])
+	var step := maxi(1, out.size() / 16)
+	var res := []
+	for i in range(0, out.size(), step):
+		res.append(out[i])
+	return res
+
+
 func _check_world(w: DungeonWorld) -> void:
 	# Жителей и торговца нет
 	var npcs := 0
@@ -228,6 +309,7 @@ func _check_world(w: DungeonWorld) -> void:
 	check(int(props.get_meta("lights", 0)) <= DungeonProps.MAX_LIGHTS, "огней %d" % int(props.get_meta("lights", 0)))
 	if PropAsset.has("dg_ship_deck"):
 		check(props.find_child("Props", false, false) != null, "модели подземелья из файлов (меши участков)")
+	_props_placed(w, props)
 	# Все залы и корабль связаны путём от входа (мосты, мостки)
 	CardinalNav.ensure(w, get_tree())
 	var start := w.spawn_point("human")

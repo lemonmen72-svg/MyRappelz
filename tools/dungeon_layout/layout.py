@@ -72,10 +72,12 @@ PLACED = []  # [id, x, z, yaw, s, dy, zone]
 ZONE = ['']
 
 
-def put(id_, x, z, yaw=0.0, s=1.0, dy=0.0, jit=0.0):
+def put(id_, x, z, yaw=0.0, s=1.0, dy=0.0, jit=0.0, sy=1.0, absy=False):
+	"""Объект: [id, x, z, поворот, масштаб, сдвиг высоты, зона, вертикальный масштаб sy, точная высота absy —
+	сдвиг тогда — высота основания в мире]."""
 	if jit:
 		yaw += rng.uniform(-jit, jit)
-	PLACED.append([id_, round(x, 2), round(z, 2), round(yaw % 360, 1), round(s, 3), round(dy, 2), ZONE[0]])
+	PLACED.append([id_, round(x, 2), round(z, 2), round(yaw % 360, 1), round(s, 3), round(dy, 3), ZONE[0], sy, absy])
 
 
 def side(x, z, a, depth=0.7):

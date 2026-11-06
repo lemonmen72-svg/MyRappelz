@@ -29,8 +29,13 @@ const LEVEL_STEP := 2
 const LEVEL_CORE := 3.5
 const ROCK_COST := 4.0
 const LEVEL_BLUR := 3
-## Настил мостов над водой — не ниже воды + столько, м (вровень с площадками мостков).
+## Настил мостов над водой — не ниже воды + столько, м (конфиг "bridge_over_water"; 0.35.4 — 0.3: свои мосты
+## dg_bridges со сваями до дна не провисают, как прежняя верёвочная модель).
 const BRIDGE_OVER_WATER := 0.7
+## Палуба по поверхности (decks "surface", корабль 0.35.4): бортик коллизии по краю, м (не сойти с палубы в воду
+## там, где нет фальшборта), и проход в нём у конца моста — полуширина моста + столько.
+const SURFACE_WALL := 1.4
+const SURFACE_GAP := 0.4
 ## Берег без стены: пол и вода ближе SHORE_GAP м друг к другу — между ними пологий спуск к воде, а не скала (иначе
 ## узкая полоска края между залом и водой становилась стеной поперёк моста).
 const SHORE_GAP := 5.0
@@ -60,6 +65,7 @@ func build(rng: RandomNumberGenerator) -> void:
 	_find_dungeon_bridges()
 	_compute_walkable()
 	_rim_unwalkable()
+	_surface_walkable()
 	_dungeon_environment()
 	_build_collision()
 	_deck_collision()
@@ -121,6 +127,8 @@ func _init_dungeon_grid() -> void:
 
 ## Знаковое расстояние от точки p до формы d (ellipse / path); < 0 — внутри.
 static func shape_sd(d: Dictionary, p: Vector2) -> float:
+	if d.has("surface"):
+		return -0.5 if not is_nan(surface_at(d, p)) else 1.0
 	if String(d.get("shape", "path" if d.has("points") else "ellipse")) == "path":
 		var pts: Array = d.get("points", [])
 		var half := float(d.get("width", 4.0)) * 0.5
@@ -141,6 +149,42 @@ static func shape_sd(d: Dictionary, p: Vector2) -> float:
 	var q := (p - c).rotated(-deg_to_rad(float(d.get("rot", 0.0))))
 	var k := Vector2(q.x / rx, q.y / rz).length()
 	return (k - 1.0) * minf(rx, rz)
+
+
+## Палуба по поверхности (decks "surface": {ox, oz, step, nx, nz, h} — высоты, снятые лучами с моделей корабля в
+## tools/dungeon_layout/blender_scene.py; −99 — не палуба): высота в точке (билинейно по соседним точкам палубы,
+## ближайшая — если соседи не все), NAN — не палуба.
+static func surface_at(d: Dictionary, p: Vector2) -> float:
+	var sf: Dictionary = d["surface"]
+	var st := float(sf["step"])
+	var snx := int(sf["nx"])
+	var snz := int(sf["nz"])
+	var h: Array = sf["h"]
+	var u := (p.x - float(sf["ox"])) / st
+	var v := (p.y - float(sf["oz"])) / st
+	var ni := int(roundf(u))
+	var nj := int(roundf(v))
+	if ni < 0 or nj < 0 or ni >= snx or nj >= snz or float(h[nj * snx + ni]) < -50.0:
+		return NAN
+	var i0 := clampi(int(floorf(u)), 0, snx - 2)
+	var j0 := clampi(int(floorf(v)), 0, snz - 2)
+	var a := float(h[j0 * snx + i0])
+	var b := float(h[j0 * snx + i0 + 1])
+	var c := float(h[(j0 + 1) * snx + i0])
+	var e := float(h[(j0 + 1) * snx + i0 + 1])
+	if a < -50.0 or b < -50.0 or c < -50.0 or e < -50.0:
+		return float(h[nj * snx + ni])
+	var fu := clampf(u - float(i0), 0.0, 1.0)
+	var fv := clampf(v - float(j0), 0.0, 1.0)
+	return lerpf(lerpf(a, b, fu), lerpf(c, e, fu), fv)
+
+
+## Высота палубы d в точке p (палуба по поверхности — по ней, иначе — "height").
+static func deck_height(d: Dictionary, p: Vector2) -> float:
+	if d.has("surface"):
+		var v := surface_at(d, p)
+		return v if not is_nan(v) else 0.3
+	return float(d.get("height", 0.3))
 
 
 func _rasterize() -> void:
@@ -188,7 +232,7 @@ func _dungeon_heights() -> void:
 			var h: float
 			# Вода — поверх пола залов (озёра у алтаря внутри зала), палубы — поверх воды
 			if deck_of[k] >= 0:
-				h = float((decks[deck_of[k]] as Dictionary).get("height", 0.3))
+				h = deck_height(decks[deck_of[k]], p)
 			elif ws <= 0.0:
 				# Дно: от кромки (уровень воды − 0.15) к глубине за BANK м
 				h = lerpf(water_y - 0.15, bed, smoothstep(0.0, BANK, -ws))
@@ -213,8 +257,9 @@ func _dungeon_heights() -> void:
 				else:
 					h = lerpf(top, void_y, smoothstep(rim_w, rim_w + 2.5, d))
 			heights[k] = h
-			# Вода: узлы воды и кромка (меш воды и шейдер земли — мокрое дно)
-			if ws < 1.5 and deck_of[k] < 0:
+			# Вода: узлы воды и кромка (меш воды и шейдер земли — мокрое дно); под досками палуб — тоже (меш воды;
+			# рельеф там не рисуется — без неё под причалом зияла чёрная пустота, 0.35.3)
+			if ws < 1.5 and (deck_of[k] < 0 or _plank_deck(j, i)):
 				water_level[k] = water_y
 				water_d[k] = maxf(0.0, ws + 1.5)
 	_apply_ramps()
@@ -437,6 +482,7 @@ func _find_dungeon_bridges() -> void:
 		# Настил — прямо от конца к концу (концы вровень с полом), над водой не ниже воды + запас. Профиль острова
 		# (_deck_profile) берёт высоту земли по ширине моста — у края пола это скальная стена: настил у начала
 		# мостков к кораблю вздымался на 2 м (0.35, «до босса не добраться»)
+		var over := float(cfg.get("bridge_over_water", BRIDGE_OVER_WATER))
 		var deck := PackedFloat32Array()
 		deck.resize(BRIDGE_SAMPLES + 1)
 		var ya := _ground_or_deck(pa) - 0.03
@@ -445,11 +491,11 @@ func _find_dungeon_bridges() -> void:
 			deck[i] = lerpf(ya, yb, float(i) / float(BRIDGE_SAMPLES))
 		# Над водой — не ниже BRIDGE_OVER_WATER: верёвочная модель провисает, и середина пролёта уходила под воду
 		for i in range(1, deck.size() - 1):
-			deck[i] = maxf(deck[i], water_y + BRIDGE_OVER_WATER)
+			deck[i] = maxf(deck[i], water_y + over)
 		for _pass in 2:
 			var sm := deck.duplicate()
 			for i in range(1, deck.size() - 1):
-				sm[i] = maxf(deck[i - 1] * 0.25 + deck[i] * 0.5 + deck[i + 1] * 0.25, water_y + BRIDGE_OVER_WATER - 0.05)
+				sm[i] = maxf(deck[i - 1] * 0.25 + deck[i] * 0.5 + deck[i + 1] * 0.25, water_y + over - 0.05)
 			deck = sm
 		br["deck"] = deck
 		bridges.append(br)
@@ -459,7 +505,7 @@ func _find_dungeon_bridges() -> void:
 func _ground_or_deck(p: Vector2) -> float:
 	for d in cfg.get("decks", []):
 		if shape_sd(d, p) < 0.0:
-			return float((d as Dictionary).get("height", 0.3))
+			return deck_height(d, p)
 	return height_at(p.x, p.y)
 
 
@@ -470,6 +516,9 @@ func _deck_collision() -> void:
 	var decks: Array = cfg.get("decks", [])
 	for d in decks:
 		var dk: Dictionary = d
+		if dk.has("surface"):
+			_deck_surface_collision(dk)
+			continue
 		if dk.has("points"):
 			_deck_path_collision(dk)
 			continue
@@ -492,6 +541,91 @@ func _deck_collision() -> void:
 		col.shape = shape
 		body.add_child(col)
 		add_child(body)
+
+
+## Палуба по поверхности: треугольники по точкам палубы (расширено на точку — край не обрывается под ногой), по
+## краю — бортик SURFACE_WALL (не сойти в воду там, где у модели нет фальшборта), у концов мостов — проход.
+func _deck_surface_collision(dk: Dictionary) -> void:
+	var sf: Dictionary = dk["surface"]
+	var st := float(sf["step"])
+	var snx := int(sf["nx"])
+	var snz := int(sf["nz"])
+	var src: Array = sf["h"]
+	var ox := float(sf["ox"])
+	var oz := float(sf["oz"])
+	# расширение на одну точку: высота — ближайшей точки палубы
+	var h := PackedFloat32Array()
+	h.resize(snx * snz)
+	for j in snz:
+		for i in snx:
+			var v := float(src[j * snx + i])
+			if v < -50.0:
+				var best := -99.0
+				var bd := INF
+				for b in range(maxi(0, j - 1), mini(snz, j + 2)):
+					for a in range(maxi(0, i - 1), mini(snx, i + 2)):
+						var w := float(src[b * snx + a])
+						var dd := float((a - i) * (a - i) + (b - j) * (b - j))
+						if w > -50.0 and dd < bd:
+							bd = dd
+							best = w
+				v = best
+			h[j * snx + i] = v
+	var gaps: Array[Vector3] = []
+	for b in cfg.get("bridges", []):
+		for key in ["a", "b"]:
+			var q := v2(b[key])
+			if not is_nan(surface_at(dk, q)) or not is_nan(surface_at(dk, q + (q - v2(b["b" if key == "a" else "a"])).normalized() * 1.0)):
+				gaps.append(Vector3(q.x, q.y, float(b.get("width", 3.2)) * 0.5 + SURFACE_GAP + 0.6))
+	var faces := PackedVector3Array()
+	var pt := func(i: int, j: int) -> Vector3:
+		return Vector3(ox + float(i) * st, h[j * snx + i], oz + float(j) * st)
+	for j in snz - 1:
+		for i in snx - 1:
+			var ok := h[j * snx + i] > -50.0 and h[j * snx + i + 1] > -50.0 and h[(j + 1) * snx + i] > -50.0 \
+				and h[(j + 1) * snx + i + 1] > -50.0
+			if not ok:
+				continue
+			var a: Vector3 = pt.call(i, j)
+			var b: Vector3 = pt.call(i + 1, j)
+			var c: Vector3 = pt.call(i, j + 1)
+			var e: Vector3 = pt.call(i + 1, j + 1)
+			faces.append_array([a, b, c, b, e, c])
+	# бортик: рёбра между клеткой палубы и не палубой
+	var cell := func(i: int, j: int) -> bool:
+		return i >= 0 and j >= 0 and i < snx - 1 and j < snz - 1 and h[j * snx + i] > -50.0 \
+			and h[j * snx + i + 1] > -50.0 and h[(j + 1) * snx + i] > -50.0 and h[(j + 1) * snx + i + 1] > -50.0
+	var up := Vector3(0, SURFACE_WALL, 0)
+	for j in snz - 1:
+		for i in snx - 1:
+			if not cell.call(i, j):
+				continue
+			for d in [[Vector2i(1, 0), Vector2i(1, 0), Vector2i(1, 1)], [Vector2i(-1, 0), Vector2i(0, 0), Vector2i(0, 1)],
+					[Vector2i(0, 1), Vector2i(0, 1), Vector2i(1, 1)], [Vector2i(0, -1), Vector2i(0, 0), Vector2i(1, 0)]]:
+				var nb: Vector2i = d[0]
+				if cell.call(i + nb.x, j + nb.y):
+					continue
+				var c0: Vector2i = d[1]
+				var c1: Vector2i = d[2]
+				var p0: Vector3 = pt.call(i + c0.x, j + c0.y)
+				var p1: Vector3 = pt.call(i + c1.x, j + c1.y)
+				var mid := (p0 + p1) * 0.5
+				var open := false
+				for g in gaps:
+					if Vector2(mid.x - g.x, mid.z - g.y).length() < g.z:
+						open = true
+				if open:
+					continue
+				faces.append_array([p0, p1, p1 + up, p0, p1 + up, p0 + up])
+	var shape := ConcavePolygonShape3D.new()
+	shape.backface_collision = true
+	shape.set_faces(faces)
+	var body := StaticBody3D.new()
+	body.name = "Deck_" + String(dk.get("id", ""))
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	body.add_child(col)
+	add_child(body)
 
 
 func _deck_path_collision(dk: Dictionary) -> void:
@@ -518,6 +652,17 @@ func _deck_path_collision(dk: Dictionary) -> void:
 		col.shape = shape
 		body.add_child(col)
 		add_child(body)
+
+
+## Палуба по поверхности (корабль): проходим каждый узел на ней — уклон к воде за бортом или к пробоине узел не
+## закрывает (сетка 1 м отрезала края палубы, по кораблю оставалась полоса 2–4 м), сойти с палубы не даёт бортик
+## коллизии (_deck_surface_collision).
+func _surface_walkable() -> void:
+	var decks: Array = cfg.get("decks", [])
+	for k in walk.size():
+		var dk := deck_of[k]
+		if dk >= 0 and (decks[dk] as Dictionary).has("surface"):
+			walk[k] = 1
 
 
 ## Плоский верх скального края и дно пустоты проходимы по уклону, но туда не попасть — закрыты (звери не встают

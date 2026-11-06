@@ -1,8 +1,11 @@
 class_name DungeonProps
 extends RefCounted
 ## Объекты подземелья (DungeonWorld): модели Максима из папки «ДАНЖ» (assets/props/dg_*.glb, атласы props_dg_*.png —
-## tools/prepare_props.py) по списку world/dungeon.json "props" ([id, x, z, поворот°, масштаб, сдвиг по высоте]) и
-## верёвочные мосты пролётами по настилу мостов. Камней на скальной стене нет (0.35.1, Максим: «камни со стен убрать»).
+## tools/prepare_props.py) по списку world/dungeon.json "props" ([id, x, z, поворот°, масштаб, сдвиг по высоте,
+## вертикальный масштаб, 1 — сдвиг это точная высота основания в мире, наклон вокруг осей модели X и Z, °];
+## раскладку усаживает по настоящей геометрии
+## сцена Blender tools/dungeon_layout/blender_scene.py) и мосты — своя модель dg_bridges (доски, сваи до дна, перила;
+## координаты мира; "bridge_model"), без неё — верёвочная модель пролётом. Камней на скальной стене нет.
 ## Экземпляры склеиваются в меши участков ZONE м по странице атласа (один материал страницы — prop.gdshader), как
 ## постройки острова (IslandPois). Коллизия — коробка по габаритам модели × COLLIDE_K у крупных (SOLID), мелочь и
 ## лежащее на полу (ковры, кости, золото) — без коллизии. Огни — OmniLight3D у главных источников (LIGHTS, не больше
@@ -69,10 +72,9 @@ static func build(world: DungeonWorld, _rng: RandomNumberGenerator) -> void:
 		var z := float(a[2])
 		var yaw := deg_to_rad(float(a[3]) if a.size() > 3 else 0.0)
 		var s := float(a[4]) if a.size() > 4 else 1.0
-		# 6-е поле — сдвиг по высоте (корабль и причалы: их палуба — вровень с палубой-островом, где ходит герой)
-		var dy := float(a[5]) if a.size() > 5 else 0.0
-		var pos := Vector3(x, world.height_at(x, z) - 0.04 + dy, z)
-		_place(world, holder, fallback, zones, id, pos, yaw, s, SOLID.has(id))
+		var pos := base_pos(world, a)
+		var sy := float(a[6]) if a.size() > 6 else 1.0
+		_place(world, holder, fallback, zones, id, pos, yaw, s, SOLID.has(id), sy, tilt_of(a))
 		placed += 1
 		if LIGHTS.has(id) and lights < MAX_LIGHTS:
 			_light(holder, id, pos, s)
@@ -88,11 +90,24 @@ static func build(world: DungeonWorld, _rng: RandomNumberGenerator) -> void:
 	holder.set_meta("lights", lights)
 
 
-## Одна модель: в меш участка (или запасная из примитивов) и, если solid, коробка коллизии.
+## Точка основания записи раскладки: 6-е поле — сдвиг по высоте от рельефа, а при 8-м поле 1 — точная высота в
+## мире (корабль, вещи на палубе, причалы: их высоту задаёт поверхность палубы и настил, а не сетка рельефа).
+static func base_pos(world: IslandWorld, a: Array) -> Vector3:
+	var x := float(a[1])
+	var z := float(a[2])
+	var dy := float(a[5]) if a.size() > 5 else 0.0
+	if a.size() > 7 and int(a[7]) == 1:
+		return Vector3(x, dy, z)
+	return Vector3(x, world.height_at(x, z) - 0.04 + dy, z)
+
+
+## Одна модель: в меш участка (или запасная из примитивов) и коллизия: форма по модели из конфига ("prop_shapes" —
+## призма по следу ниже роста героя или столб мачты, сцена Blender), иначе у solid — коробка по габаритам.
 static func _place(world: DungeonWorld, holder: Node3D, fallback: Node3D, zones: Dictionary, id: String, pos: Vector3,
-		yaw: float, s: float, solid: bool) -> void:
-	var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(s, s, s)), pos)
+		yaw: float, s: float, solid: bool, sy: float = 1.0, tilt := Basis.IDENTITY) -> void:
+	var xf := Transform3D(Basis(Vector3.UP, yaw) * tilt * Basis.from_scale(Vector3(s, s * sy, s)), pos)
 	var size := PropAsset.size(id) * s if PropAsset.has(id) else _fallback_size(id) * s
+	size.y *= sy
 	if PropAsset.has(id):
 		var m := mesh_of(world, id)
 		if m != null:
@@ -108,7 +123,11 @@ static func _place(world: DungeonWorld, holder: Node3D, fallback: Node3D, zones:
 			(zone.items[pg] as Array).append([m, Transform3D(Basis.IDENTITY, -zone.origin) * xf])
 	else:
 		_fallback(fallback, id, xf, _fallback_size(id))
-	if solid:
+	var shapes: Dictionary = world.cfg.get("prop_shapes", {})
+	if shapes.has(id):
+		holder.add_child(shape_body(id, shapes[id], pos, yaw, s, sy))
+		return
+	if solid and not world.cfg.has("prop_shapes"):
 		var body := StaticBody3D.new()
 		body.name = id
 		body.collision_layer = 1
@@ -124,6 +143,45 @@ static func _place(world: DungeonWorld, holder: Node3D, fallback: Node3D, zones:
 		holder.add_child(body)
 
 
+## Наклон записи раскладки (9-е и 10-е поля — повороты вокруг осей модели X и Z, °: факелы, фонари, сети на наклонной
+## скале — тыльной стороной вдоль неё, сцена Blender).
+static func tilt_of(a: Array) -> Basis:
+	if a.size() < 10:
+		return Basis.IDENTITY
+	return Basis(Vector3.RIGHT, deg_to_rad(float(a[8]))) * Basis(Vector3.BACK, deg_to_rad(float(a[9])))
+
+
+## Тело коллизии по форме модели: {"hull": [[x, z], …] (модель), "h": высота модели} — выпуклая призма от
+## основания до высоты модели (не ниже 1.2 м), или {"pole": [x, z, радиус]} — столб (мачта).
+static func shape_body(id: String, sh: Dictionary, pos: Vector3, yaw: float, s: float, sy: float) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.name = id
+	body.collision_layer = 1
+	body.collision_mask = 0
+	body.position = pos
+	body.rotation.y = yaw
+	var h := maxf(float(sh.get("h", 1.0)) * s * sy, 1.2)
+	var col := CollisionShape3D.new()
+	if sh.has("pole"):
+		var pl: Array = sh["pole"]
+		var cap := CapsuleShape3D.new()
+		cap.radius = float(pl[2]) * s
+		cap.height = maxf(h, cap.radius * 2.0 + 0.1)
+		col.shape = cap
+		col.position = Vector3(float(pl[0]) * s, h * 0.5, float(pl[1]) * s)
+	else:
+		var pts := PackedVector3Array()
+		for q in sh.get("hull", []):
+			var a: Array = q
+			pts.append(Vector3(float(a[0]) * s, 0.0, float(a[1]) * s))
+			pts.append(Vector3(float(a[0]) * s, h, float(a[1]) * s))
+		var cv := ConvexPolygonShape3D.new()
+		cv.points = pts
+		col.shape = cv
+	body.add_child(col)
+	return body
+
+
 ## Меш модели id с вырезами из конфига мира (нет вырезов — общий меш PropAsset).
 static func mesh_of(world: IslandWorld, id: String) -> Mesh:
 	var base := PropAsset.mesh(id)
@@ -136,7 +194,8 @@ static func mesh_of(world: IslandWorld, id: String) -> Mesh:
 	return _cut_meshes[key]
 
 
-## Копия меша без треугольников, чей центр внутри одной из коробок [x0, y0, z0, x1, y1, z1].
+## Копия меша без треугольников, чей центр внутри одной из коробок [x0, y0, z0, x1, y1, z1] (7-е поле — ось 1/2/3:
+## только грани, смотрящие вдоль этой оси, |нормаль| > 0.7 — торцевые переборки корабля на стыках частей, 0.35.4).
 static func cut_mesh(base: Mesh, boxes: Array) -> ArrayMesh:
 	var out := ArrayMesh.new()
 	for si in base.get_surface_count():
@@ -149,12 +208,18 @@ static func cut_mesh(base: Mesh, boxes: Array) -> ArrayMesh:
 				idx[k] = k
 		var keep := PackedInt32Array()
 		for t in range(0, idx.size() - 2, 3):
-			var c := (v[idx[t]] + v[idx[t + 1]] + v[idx[t + 2]]) / 3.0
+			var a := v[idx[t]]
+			var b := v[idx[t + 1]]
+			var e := v[idx[t + 2]]
+			var c := (a + b + e) / 3.0
+			var nrm := (b - a).cross(e - a).normalized()
 			var inside := false
-			for b in boxes:
-				var q: Array = b
+			for bx in boxes:
+				var q: Array = bx
 				if c.x >= float(q[0]) and c.y >= float(q[1]) and c.z >= float(q[2]) \
 						and c.x <= float(q[3]) and c.y <= float(q[4]) and c.z <= float(q[5]):
+					if q.size() > 6 and int(q[6]) > 0 and absf(nrm[int(q[6]) - 1]) <= 0.7:
+						continue
 					inside = true
 					break
 			if not inside:
@@ -190,6 +255,18 @@ static func _zone_mesh(holder: Node3D, zone: Zone, node_name := "Props") -> void
 ## по профилю настила IslandWorld.bridge_point).
 ## Настил и коллизия — свои (IslandWorld._build_bridges), их доски скрыты.
 static func _bridge_decks(world: DungeonWorld, holder: Node3D, fallback: Node3D, zones: Dictionary) -> int:
+	# Свои мосты (0.35.4, Максим: «нарисуй мосты сам и натяни текстуры»): одна модель в координатах мира — доски
+	# поперёк, балки, сваи до дна, перила и верёвка по профилю настила (сцена Blender)
+	var own := String(world.cfg.get("bridge_model", ""))
+	if own != "" and PropAsset.has(own) and PropAsset.mesh(own) != null:
+		var mi := MeshInstance3D.new()
+		mi.name = "Bridges"
+		mi.mesh = PropAsset.mesh(own)
+		mi.material_override = PropAsset.material(PropAsset.page(own))
+		mi.set_meta("no_outline", true)
+		holder.add_child(mi)
+		_hide_plain_decks(world)
+		return world.bridges.size()
 	if not PropAsset.has(BRIDGE_PROP):
 		return 0
 	var sz := PropAsset.size(BRIDGE_PROP)
@@ -225,13 +302,17 @@ static func _bridge_decks(world: DungeonWorld, holder: Node3D, fallback: Node3D,
 				zone.items[pg] = []
 			(zone.items[pg] as Array).append([PropAsset.mesh(BRIDGE_PROP), Transform3D(Basis.IDENTITY, -zone.origin) * xf])
 			n += 1
-	# Свой настил (светлые доски) под моделью не виден: коллизия остаётся
+	_hide_plain_decks(world)
+	return n
+
+
+## Свой настил (светлые доски) под моделью моста не виден: коллизия остаётся.
+static func _hide_plain_decks(world: DungeonWorld) -> void:
 	for node in world.get_children():
 		if node is StaticBody3D and node.is_in_group("bridges"):
 			for c in node.get_children():
 				if c is MeshInstance3D:
 					(c as MeshInstance3D).visible = false
-	return n
 
 
 static func _light(holder: Node3D, id: String, pos: Vector3, s: float) -> void:

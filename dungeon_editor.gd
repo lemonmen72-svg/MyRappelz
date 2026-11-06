@@ -20,7 +20,8 @@ extends Node
 ## На время правки объекты подземелья — отдельные модели (склеенные меши участков, коробки коллизии и огни
 ## DungeonProps скрыты; мосты остаются), огни — у первых DungeonProps.MAX_LIGHTS объектов с огнём, как в игре.
 ## Раскладка сохраняется сама (AUTOSAVE с после правки, при выходе) в layout_path — user://dungeon_layout.json:
-## {"format": 1, "layout_version": …, "saved": дата, "count": N, "props": [[id, x, z, поворот°, масштаб, высота], …]} —
+## {"format": 1, "layout_version": …, "saved": дата, "count": N, "props": [[id, x, z, поворот°, масштаб, высота
+## (, вертикальный масштаб, 1 — высота точная)], …]} —
 ## формат world/dungeon.json "props". DungeonProps.build берёт её вместо встроенной (props_for), пока у файла тот же
 ## layout_version, что у world/dungeon.json: перенёс я раскладку в игру и поднял версию — файл больше не действует.
 ## «Отправить» — копия в «Загрузки/DarkPact_test» и «Поделиться» системы (плагин, как отчёт тест-бота).
@@ -353,7 +354,9 @@ func _load_entries(src: Array) -> void:
 			continue
 		items.append({"id": String(a[0]), "x": float(a[1]), "z": float(a[2]),
 			"yaw": float(a[3]) if a.size() > 3 else 0.0, "s": float(a[4]) if a.size() > 4 else 1.0,
-			"dy": float(a[5]) if a.size() > 5 else 0.0, "node": null})
+			"dy": float(a[5]) if a.size() > 5 else 0.0, "sy": float(a[6]) if a.size() > 6 else 1.0,
+			"abs": a.size() > 7 and int(a[7]) == 1, "rx": float(a[8]) if a.size() > 9 else 0.0,
+			"rz": float(a[9]) if a.size() > 9 else 0.0, "node": null})
 	for it in items:
 		_make_node(it)
 	_refresh_lights()
@@ -387,16 +390,21 @@ func _place_node(it: Dictionary) -> void:
 	var n: Node3D = it["node"]
 	if n == null:
 		return
-	n.transform = Transform3D(Basis(Vector3.UP, deg_to_rad(float(it["yaw"]))).scaled(Vector3.ONE * float(it["s"])),
-		pos_of(it))
+	var sc := float(it["s"])
+	var tilt := Basis(Vector3.RIGHT, deg_to_rad(float(it.get("rx", 0.0)))) * Basis(Vector3.BACK,
+		deg_to_rad(float(it.get("rz", 0.0))))
+	n.transform = Transform3D(Basis(Vector3.UP, deg_to_rad(float(it["yaw"]))) * tilt * Basis.from_scale(
+		Vector3(sc, sc * float(it.get("sy", 1.0)), sc)), pos_of(it))
 	if sel >= 0 and sel < items.size() and items[sel] == it:
 		_update_mark()
 
 
-## Точка основания объекта (как в DungeonProps.build).
+## Точка основания объекта (как в DungeonProps.build): "abs" — "dy" это точная высота в мире (вещи на палубе).
 func pos_of(it: Dictionary) -> Vector3:
 	var x := float(it["x"])
 	var z := float(it["z"])
+	if bool(it.get("abs", false)):
+		return Vector3(x, float(it["dy"]), z)
 	return Vector3(x, world.height_at(x, z) - 0.04 + float(it["dy"]), z)
 
 
@@ -421,8 +429,18 @@ func _refresh_lights() -> void:
 func entries() -> Array:
 	var res: Array = []
 	for it in items:
-		res.append([String(it["id"]), snappedf(float(it["x"]), 0.01), snappedf(float(it["z"]), 0.01),
-			snappedf(fposmod(float(it["yaw"]), 360.0), 0.1), snappedf(float(it["s"]), 0.001), snappedf(float(it["dy"]), 0.01)])
+		var e := [String(it["id"]), snappedf(float(it["x"]), 0.01), snappedf(float(it["z"]), 0.01),
+			snappedf(fposmod(float(it["yaw"]), 360.0), 0.1), snappedf(float(it["s"]), 0.001), snappedf(float(it["dy"]), 0.01)]
+		var sy := float(it.get("sy", 1.0))
+		var rx := float(it.get("rx", 0.0))
+		var rz := float(it.get("rz", 0.0))
+		if absf(rx) > 0.05 or absf(rz) > 0.05:
+			e.append_array([snappedf(sy, 0.001), 1 if bool(it.get("abs", false)) else 0, snappedf(rx, 0.1), snappedf(rz, 0.1)])
+		elif bool(it.get("abs", false)):
+			e.append_array([snappedf(sy, 0.001), 1])
+		elif absf(sy - 1.0) > 0.0001:
+			e.append(snappedf(sy, 0.001))
+		res.append(e)
 	return res
 
 
