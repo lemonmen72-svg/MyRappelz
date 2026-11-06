@@ -22,6 +22,10 @@ const LENGTHS := {
 	"npc_sun_staff": 1.7, "npc_sun_lantern": 0.45, "npc_sun_grimoire": 0.26, "npc_sun_altar": 1.6,
 	"npc_fishing_rod": 1.9, "npc_harpoon": 1.7, "npc_veteran_sword": 1.0, "npc_veteran_shield": 0.85,
 	"npc_herb_sickle": 0.5, "npc_quill": 0.32, "npc_notice_board": 2.3, "npc_herb_bush": 0.75,
+	# оружие монстров подземелья (0.36, MobData weapon)
+	"mw_axe": 0.8, "mw_bastard_sword": 1.25, "mw_broad_sword": 1.05, "mw_cleaver": 0.6, "mw_curved_dagger": 0.5,
+	"mw_cutlass": 0.9, "mw_knight_sword": 1.0, "mw_longsword": 1.1, "mw_ritual_dagger": 0.45, "mw_runic_sword": 1.05,
+	"mw_rusty_dagger": 0.42, "mw_scythe": 1.3, "mw_shortsword": 0.75, "mw_straight_sword": 0.95,
 }
 ## Предметы жителей (договорённость с моделями жителей: id не менять).
 const NPC_IDS := ["npc_grimoire", "npc_cane", "npc_wand", "npc_longbow", "npc_hammer", "npc_quiver", "npc_keys",

@@ -22,6 +22,7 @@ test_combat_magic
 test_combat_melee
 test_dungeon
 test_dungeon_editor
+test_dungeon_mobs
 test_economy
 test_enchant
 test_equipment
