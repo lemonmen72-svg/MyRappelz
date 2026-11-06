@@ -71,7 +71,7 @@
 	"mob_zones": [],
 	"transitions": [],
 	"props": [
-		["dg_ascent", -73.5, -7.9, 180, 1.0, -1.6],
+		["dg_ascent", -73.5, -7.9, 180, 1.0, -1.3],
 		["dg_brazier", -76.2, -0.4, 0, 1.0],
 		["dg_brazier", -70.8, -0.4, 0, 1.0],
 		["dg_crystal_blue", -75.8, 0.6, 0, 0.55],
