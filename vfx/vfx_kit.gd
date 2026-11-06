@@ -29,6 +29,26 @@ const LOOK_OF := {"flame": "fire", "smoke": "smoke", "puff": "smoke", "soft": "e
 	"crack": "lava", "swirl": "swirl", "drop": "water", "claw": "slash", "slash": "slash", "beam": "trail",
 	"trail": "trail", "pillar": "beam", "vgrad": "beam"}
 
+## Текстуры Kenney Particle Pack (CC0, vfx/tex/kenney; подготовлены: 256 px, форма и яркость — в альфе):
+## маска "k:<имя>", например "k:smoke_07", "k:trace_03r" (r — повёрнута вдоль оси X, для росчерков).
+const KENNEY_DIR := "res://vfx/tex/kenney/%s.png"
+## Вид материала по семье Kenney.
+const KENNEY_LOOK := {"smoke": "smoke", "dirt": "smoke", "flame": "fire", "fire": "fire", "muzzle": "fire",
+	"spark": "spark", "star": "spark", "flare": "spark", "magic": "magic", "circle": "wave", "light": "energy",
+	"scorch": "lava", "slash": "slash", "scratch": "slash", "trace": "spark", "twirl": "swirl"}
+## Своя маска → варианты Kenney: частицы и вспышки берут случайный (дым клубится по-разному, пламя рвётся,
+## искры — разные звёздочки). Остальные маски (знаки, волны, росчерки клинка) — свои.
+const KENNEY_SUB := {
+	"smoke": ["smoke_01", "smoke_02", "smoke_03", "smoke_04", "smoke_05", "smoke_06", "smoke_07", "smoke_08"],
+	"puff": ["smoke_02", "smoke_03", "smoke_05", "smoke_06"],
+	"flame": ["flame_01", "flame_02", "flame_03", "flame_04", "fire_01", "fire_02"],
+	"star": ["star_01", "star_04", "star_06", "star_07"],
+	"streak": ["trace_01r", "trace_02r", "trace_05r", "trace_06r", "trace_07r"],
+}
+## Подставлять текстуры Kenney (тест и откат — false).
+static var use_kenney := true
+static var _krng := RandomNumberGenerator.new()
+
 
 # ---------- Текстуры ----------
 
@@ -42,6 +62,13 @@ const LOOK_OF := {"flame": "fire", "smoke": "smoke", "puff": "smoke", "soft": "e
 static func tex(kind: String) -> Texture2D:
 	if _tex.has(kind):
 		return _tex[kind]
+	if kind.begins_with("k:"):
+		var path := KENNEY_DIR % kind.substr(2)
+		var kt: Texture2D = load(path) as Texture2D if ResourceLoader.exists(path) else null
+		if kt == null:
+			kt = tex("soft")
+		_tex[kind] = kt
+		return kt
 	if not kind in OWN:
 		return Vfx.tex(kind)
 	var img: Image = null
@@ -450,12 +477,27 @@ static func helix_mesh(turns: float, width: float) -> Mesh:
 ## billboard (0 — нет, 2 — картинка к камере), core — цвет ядра.
 static func fx(c: Color, kind: String, add: bool = true, look: String = "", billboard: int = 0,
 		core: Color = Color(0, 0, 0, 0)) -> VfxMat:
-	var lk := look if look != "" else String(LOOK_OF.get(kind, "spark"))
+	var lk := look if look != "" else look_of(kind)
 	var m := VfxMat.make(c, tex(kind), add, lk, billboard, core)
 	if not add:
 		m.set_shader_parameter("hdr", 1.0)
 		m.set_shader_parameter("core_amt", 0.35)
 	return m
+
+
+## Вид материала маски kind (LOOK_OF, у Kenney — KENNEY_LOOK по семье).
+static func look_of(kind: String) -> String:
+	if kind.begins_with("k:"):
+		return String(KENNEY_LOOK.get(kind.substr(2).get_slice("_", 0), "spark"))
+	return String(LOOK_OF.get(kind, "spark"))
+
+
+## Маска kind или её случайный вариант Kenney (KENNEY_SUB), если подстановка включена.
+static func pick(kind: String) -> String:
+	if not use_kenney or not KENNEY_SUB.has(kind):
+		return kind
+	var v: Array = KENNEY_SUB[kind]
+	return "k:" + String(v[_krng.randi() % v.size()])
 
 
 ## Материал частиц (общий на маску): поворот к камере или вдоль скорости (align).
@@ -543,7 +585,7 @@ static func particles(root: Node3D, o: Dictionary) -> CPUParticles3D:
 		_:
 			p.mesh = long_quad() if align else Vfx._quad()
 	if mesh_kind == "quad":
-		p.material_override = particle_mat(String(o.get("tex", "star")), bool(o.get("add", true)), align)
+		p.material_override = particle_mat(pick(String(o.get("tex", "star"))), bool(o.get("add", true)), align)
 	elif mesh_kind == "crystal":
 		p.material_override = glow_particle_mat()
 	else:
@@ -619,7 +661,7 @@ static func particles(root: Node3D, o: Dictionary) -> CPUParticles3D:
 ## Вспышка-картинка к камере: выпрыгивает и тает. look — вид материала ("" — по маске).
 static func flash(root: Node3D, kind: String, c: Color, size: float, time: float, add: bool = true,
 		offset: Vector3 = Vector3.ZERO, start: float = 0.25, delay: float = 0.0, look: String = "") -> MeshInstance3D:
-	var mi := _mi(root, Vfx._quad(), fx(c, kind, add, look, 2))
+	var mi := _mi(root, Vfx._quad(), fx(c, pick(kind), add, look, 2))
 	var m: VfxMat = mi.material_override
 	mi.position = offset
 	mi.scale = Vector3.ONE * size * start
@@ -1003,6 +1045,111 @@ static func trail(who: Node3D, c: Color, width: float, life: float, look: String
 	return VfxTrail.attach(who, fx(c, "trail", true, look), width, life)
 
 
+# ---------- Сторонние блоки (vfx/third_party, CC BY 4.0: Magic Circles 3D Free, Storm & Wind 3D Free) ----------
+
+## Стихия палитры → стихия магического круга MagicArea (звезда, шум, вид искр); цвета — свои, из палитры.
+const CIRCLE_EL := {"fire": "fire", "ice": "frost", "water": "frost", "earth": "arcane", "storm": "arcane",
+	"light": "holy", "heal": "nature", "dark": "shadow", "emerald": "poison", "poison": "poison", "blood": "blood",
+	"wind": "nature", "spirit": "holy", "mind": "arcane", "steel": "holy", "shield": "holy", "beast": "nature"}
+## Стихия палитры → вид молнии StormFX.
+const BOLT_EL := {"fire": "fire", "light": "holy", "heal": "holy", "spirit": "holy", "shield": "holy",
+	"dark": "void", "emerald": "toxic", "poison": "toxic", "mind": "arcane", "blood": "fire"}
+## Стихия палитры → что несёт ветер StormFX (air — чистые линии).
+const WIND_EL := {"fire": "ash", "earth": "sand", "ice": "snow", "water": "snow", "heal": "leaves",
+	"beast": "leaves", "spirit": "petals", "light": "petals", "dark": "ash", "blood": "ash"}
+## Включить сторонние блоки (тест и откат — false).
+static var use_third_party := true
+static var _seed_rng := RandomNumberGenerator.new()
+
+
+## Магический круг на земле (MagicArea): рисуется по кругу за appear, держится, гаснет за 0.6 с и удаляет себя.
+## pal — палитра стихии el (ядро — линии, основной цвет — свечение), kind "circle" / "ripple", q — качество
+## (с низкого — без частиц), delay — задержка появления. Возвращает узел или null (блоки выключены).
+static func magic_circle(root: Node3D, pal: Dictionary, el: String, ground: Vector3, radius: float, time: float,
+		kind: String = "circle", q: int = 1, delay: float = 0.0, appear: float = 0.35,
+		energy: float = 1.6) -> Node3D:
+	if not use_third_party:
+		return null
+	var a := MagicArea.new()
+	a.element = String(CIRCLE_EL.get(el, "arcane"))
+	a.kind = kind
+	a.seed = _seed_rng.randf() * 10.0
+	a.color = pal["core"]
+	a.edge_color = pal["a"]
+	a.radius = radius
+	a.one_shot = true
+	a.appear = appear
+	a.duration = maxf(0.05, time - appear - 0.6)
+	a.light = false
+	a.particles = q >= 1
+	a.set_param(&"energy", energy)
+	a.autoplay = delay <= 0.0
+	a.set_meta("no_outline", true)
+	root.add_child(a)
+	a.global_transform = Transform3D(Basis(), ground + Vector3(0, 0.03, 0))
+	if delay > 0.0:
+		var t := a.create_tween()
+		t.tween_interval(delay)
+		t.tween_callback(a.play)
+	return a
+
+
+## Молния с неба в точку ground (StormFX "strike"): ветвистый разряд с высоты height, вспышка и кольцо на земле,
+## подпалина, искры. Цвета — палитры (ядро и основной), вид — по стихии el.
+static func sky_strike(root: Node3D, pal: Dictionary, el: String, ground: Vector3, radius: float, height: float,
+		q: int = 1, delay: float = 0.0, hold: float = 0.9) -> Node3D:
+	if not use_third_party:
+		return null
+	var f := StormFX.new()
+	f.kind = "strike"
+	f.style = String(BOLT_EL.get(el, "storm"))
+	f.seed = _seed_rng.randf() * 10.0
+	f.color = pal["core"]
+	f.edge_color = pal["a"]
+	f.radius = radius
+	f.height = height
+	f.one_shot = true
+	f.duration = hold
+	f.interval = 0.0
+	f.light = false
+	f.particles = q >= 1
+	f.autoplay = delay <= 0.0
+	root.add_child(f)
+	f.global_transform = Transform3D(Basis(), ground + Vector3(0, 0.03, 0))
+	if delay > 0.0:
+		var t := f.create_tween()
+		t.tween_interval(delay)
+		t.tween_callback(f.play)
+	return f
+
+
+## Порыв ветра (StormFX "gust"): линии ветра и то, что он несёт (по стихии el: листья, снег, песок, пепел),
+## дует от at по dir на высоту height. Держится time и гаснет.
+static func gust(root: Node3D, pal: Dictionary, el: String, at: Vector3, dir: Vector3, radius: float, height: float,
+		time: float, q: int = 1) -> Node3D:
+	if not use_third_party:
+		return null
+	var f := StormFX.new()
+	f.kind = "gust"
+	f.style = String(WIND_EL.get(el, "air"))
+	f.seed = _seed_rng.randf() * 10.0
+	if f.style == "air":
+		f.color = Color(pal["c"], 0.9)
+		f.edge_color = Color(pal["a"], 0.35)
+	f.radius = radius
+	f.height = height
+	f.one_shot = true
+	f.appear = 0.2
+	f.duration = maxf(0.1, time - 0.8)
+	f.particles = q >= 1
+	f.light = false
+	root.add_child(f)
+	var d := Vector3(dir.x, 0, dir.z)
+	var b := Basis.looking_at(d.normalized() if d.length() > 0.01 else Vector3.FORWARD, Vector3.UP)
+	f.global_transform = Transform3D(b, at)
+	return f
+
+
 ## Подготовить маски, шум и меши заранее (вход в мир — без задержки на первом эффекте): маски рисуются в фоновом
 ## потоке (WorkerThreadPool), текстуры из них создаёт первый tex() или finish_prewarm().
 static func prewarm() -> void:
@@ -1017,6 +1164,16 @@ static func prewarm() -> void:
 			_task = WorkerThreadPool.add_task(_gen_all.bind(todo), false, "VfxKit masks")
 	for k in ["dot", "plus", "puff", "heart"]:
 		tex(k)
+	if use_third_party:
+		# Шейдеры сторонних блоков — загрузить заранее (первый круг или молния без заминки на загрузку)
+		for sh in ["circle", "ripple", "spark"]:
+			load(MagicArea.SHADERS % sh)
+		for sh in ["strike", "bolt", "spark", "line", "debris"]:
+			load(StormFX.SHADERS % sh)
+	if use_kenney:
+		for fam in KENNEY_SUB:
+			for k in KENNEY_SUB[fam]:
+				tex("k:" + String(k))
 	wall_mesh()
 	wall_mesh(1.08)
 	wall_mesh(2.4)

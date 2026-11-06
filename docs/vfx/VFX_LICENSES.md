@@ -1,7 +1,20 @@
 # Эффекты — лицензии и происхождение
 
-Все эффекты генератора — свой код (`vfx/`), текстуры рисуются кодом при запуске (`VfxKit.tex`), меши — штатные
-примитивы Godot. Сторонних ассетов и кода нет.
+Эффекты генератора — свой код (`vfx/`), маски рисуются кодом при запуске (`VfxKit.tex`), меши — штатные
+примитивы Godot. С VFX 3.0 (0.42) к ним добавлены сторонние пакеты:
+
+| Что | Где | Автор, источник | Лицензия |
+|---|---|---|---|
+| Magic Circles 3D Free (класс `MagicArea`: магический круг и рябь на земле, 8 стихий; шейдеры) | `vfx/third_party/magic_circles/` (без демо; пути шейдеров исправлены под эту папку) | heyheythere — https://heyheythere.itch.io/magic-circles-3d-free | CC BY 4.0 (`LICENSE.txt` рядом). Строка автора — в игре: «Настройки → Прочее» (`SettingsMenu.CREDITS`). |
+| Storm & Wind 3D Free (класс `StormFX`: молния с неба, порыв ветра; шейдеры) | `vfx/third_party/storm_wind/` (без демо; пути шейдеров исправлены) | heyheythere — https://heyheythere.itch.io/storm-wind-3d-free | CC BY 4.0 (`LICENSE.txt` рядом). Строка автора — там же. |
+| Particle Pack 1.1 (дым, пламя, искры, треск разряда, подпалины, земля, следы; 88 текстур) | `vfx/tex/kenney/` (уменьшены до 256 px, форма и яркость перенесены в альфу; `*r.png` — повёрнутые) | Kenney — https://kenney.nl/assets/particle-pack (копия из github.com/Calinou/kenney-particle-pack) | CC0 (`LICENSE.txt` рядом). |
+
+Строки для указания авторов (CC BY 4.0):
+- Magic Circles 3D Free by heyheythere - https://heyheythere.itch.io/magic-circles-3d-free - CC BY 4.0
+- Storm & Wind 3D Free by heyheythere - https://heyheythere.itch.io/storm-wind-3d-free - CC BY 4.0
+
+Не взят: **Basic Godot VFX Pack** — его лицензия запрещает размещать файлы в публичных репозиториях и использовать
+их как входные данные для ИИ (наш репозиторий публичный, код пишет Claude).
 
 Изучены, но не используются (подробно — `VFX_AUDIT.md`):
 

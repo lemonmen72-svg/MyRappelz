@@ -24,6 +24,10 @@ extends RefCounted
 ## Размер окна для «Среднего» размера интерфейса.
 const WINDOW_SIZE := Vector2(720, 600)
 const NOTE_COLOR := Color(1.0, 0.86, 0.55)
+## Авторы сторонних эффектов (vfx/third_party, vfx/tex/kenney).
+const CREDITS := "Эффекты: Magic Circles 3D Free by heyheythere — https://heyheythere.itch.io/magic-circles-3d-free — " \
+	+ "CC BY 4.0; Storm & Wind 3D Free by heyheythere — https://heyheythere.itch.io/storm-wind-3d-free — CC BY 4.0; " \
+	+ "Particle Pack by Kenney (kenney.nl) — CC0."
 const TEXT_COLOR := Color(0.98, 0.96, 0.9)
 const HINT_COLOR := Color(0.78, 0.8, 0.86)
 ## Ширина подписи настройки слева от кнопок, px («Средний»).
@@ -291,6 +295,8 @@ static func _build_other(hud: HUD, page: VBoxContainer) -> void:
 		pack = ("Пакет моделей загружен частично (частей: %d из %d) — остальные модели запасные." % [have,
 			Assets.PACKS.size()]) if have > 0 else "Пакет моделей не загружен — показаны запасные модели (мир, герои, звери, оружие, значки)."
 	page.add_child(_wrap_label(pack, UiScale.FONT_BODY, TEXT_COLOR))
+	# Авторы сторонних эффектов (CC BY 4.0 требует указать автора, ссылку и лицензию)
+	page.add_child(_wrap_label(CREDITS, UiScale.FONT_SMALL, NOTE_COLOR))
 	# Админ-панель для тестирования — только у аккаунта Dedok_max (AdminPanel.enabled; ADMIN_TOOLS = false — убрать)
 	var main_node := hud.get_parent()
 	if AdminPanel.enabled():
