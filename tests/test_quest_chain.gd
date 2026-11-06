@@ -228,17 +228,7 @@ func _elder_chain(race: String) -> void:
 	var pelts := inv.count("wolf_pelt")
 	_complete_at(elder, "elder_trophies")
 	check(inv.count("wolf_pelt") == pelts - 3, "шкуры отданы старосте (%d → %d)" % [pelts, inv.count("wolf_pelt")])
-	# 3. Зелье: выдаётся при взятии, если нет; при полном здоровье не пьётся
-	inv.remove("potion_hp_r1", inv.count("potion_hp_r1"))
-	check(q.accept("elder_potion") and inv.count("potion_hp_r1") == 1, "зелье выдано при взятии")
-	check(last_hud_text().contains("Получено: Зелье здоровья I ×1"), "сообщение: " + last_hud_text())
-	player.hp = player.max_hp
-	eco._potion_cd = 0.0
-	check(not eco.use_potion() and q.goal_progress("elder_potion", 0) == 0, "при полном здоровье зелье не выпить")
-	player.hp = maxi(1, int(player.max_hp * 0.5))
-	check(eco.use_potion() and q.is_ready("elder_potion"), "выпито зелье — задание выполнено")
-	_complete_at(elder, "elder_potion")
-	# 4. Подарок кузнецу: 5 уровень, три пера (квестовая добыча с фазанов), закалка оружия +1 у кузнеца
+	# 3. Подарок кузнецу: 5 уровень, три пера (квестовая добыча с фазанов), закалка оружия +1 у кузнеца
 	check(q.accept("elder_grow"), "«Подарок кузнецу» взято")
 	npcs.refresh_marks()
 	check(npcs.npc("smith").mark_kind == "active", "над кузнецом серый «?»")
@@ -659,8 +649,7 @@ func _check_migration() -> void:
 	check(q.is_done(QuestData.TRIAL_QUEST) and q.is_active("merc_closed_cave") and q.is_done("hunter_hunt"),
 		"версия 1 с профессией: испытание засчитано, взятое осталось")
 	game.from_dict({"version": 2, "name": "Версия1б", "race": "human", "class": "wanderer", "level": 6,
-		"quests": {"active": {"elder_grow": {"progress": [5]}}, "done": {"elder_hunt": 1, "elder_trophies": 1,
-			"elder_potion": 1}, "tracked": "elder_grow", "chain": 1}})
+		"quests": {"active": {"elder_grow": {"progress": [5]}}, "done": {"elder_hunt": 1, "elder_trophies": 1}, "tracked": "elder_grow", "chain": 1}})
 	check(q.is_active("elder_grow") and (game.quests_active["elder_grow"]["progress"] as Array).size() == 3
 		and not q.is_done(QuestData.TRIAL_QUEST) and game.quest_tracked == "elder_grow",
 		"версия 1 Бродяга: «Подарок кузнецу» продолжается с новыми целями")

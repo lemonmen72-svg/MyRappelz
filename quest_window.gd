@@ -84,6 +84,7 @@ func _build() -> void:
 	if not ids.has(selected):
 		selected = String(ids[0]) if not ids.is_empty() else ""
 	_body = main.hud.create_window("Задания", WINDOW_SIZE)
+	UiButtons.decorate_all.call_deferred(buttons)
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", int(UiScale.px(UiScale.GAP)))
 	_body.add_child(tabs)
@@ -137,7 +138,7 @@ func _quest_button(id: String) -> Button:
 	b.clip_text = true
 	b.custom_minimum_size = Vector2(UiScale.px(LIST_W), UiScale.button_h())
 	if id == Game.quest_tracked and tab == "active":
-		b.add_theme_color_override("font_color", Color(0.45, 0.28, 0.02))
+		b.add_theme_color_override("font_color", Color(1.0, 0.82, 0.35))
 	return b
 
 

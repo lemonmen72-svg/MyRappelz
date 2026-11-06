@@ -372,6 +372,7 @@ static func reset_caches() -> void:
 	UiIcons.reset_cache()
 	ItemIcon.reset_cache()
 	SkillTree.reset_cache()
+	Util.refresh_skins()
 
 
 ## Часть, в которой лежит файл (путь res://… или от корня проекта); "" — файл в APK.

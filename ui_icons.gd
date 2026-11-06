@@ -21,6 +21,18 @@ const IDS := [
 	"gold", "map", "joystick_base", "joystick_knob",
 	"quest_available", "quest_active", "quest_complete", "quest_target",
 	"tab_pet_active", "tab_pet_auras", "tab_pet_passive", "tab_pet_gear",
+	# 0.41: вкладки сумки, кнопки окон, быстрые слоты и листание умений (tools/Промты_значки_сумка_кнопки_оружие2.docx)
+	"bagtab_all", "bagtab_gear", "bagtab_loot", "bagtab_cards", "bagtab_jewelry", "bagtab_quest", "bagtab_potions",
+	"bagtab_other",
+	"act_equip", "act_unequip", "act_offhand", "act_use", "act_sell", "act_sell_all", "act_buy", "act_buy_many",
+	"act_move", "act_drop", "act_drop_all", "act_sort", "act_form", "act_read", "act_craft_put", "act_recipes",
+	"act_store", "act_store_all", "act_take", "act_take_all", "act_gold_in", "act_gold_out", "act_forge_put",
+	"act_confirm", "act_cancel", "act_plus", "act_minus", "act_belt_put", "act_belt_take", "act_belt_expand",
+	"act_details", "act_ring2",
+	"act_learn", "act_assign", "act_slot_clear", "act_toggle", "act_summon", "act_recall", "act_release", "act_revive",
+	"act_evolve", "act_pet_gear", "act_quest_take", "act_quest_turnin", "act_track", "act_abandon", "act_trade",
+	"act_bye",
+	"quick_slot_empty", "quick_edit", "skill_swipe", "skill_slot_empty", "auto_attack", "act_bless",
 ]
 ## Подписи значков (подсказка на ПК, подпись по долгому касанию).
 const NAMES := {
@@ -35,6 +47,24 @@ const NAMES := {
 	"quest_complete": "Задание выполнено — можно сдать", "quest_target": "Цель задания",
 	"tab_pet_active": "Активные умения", "tab_pet_auras": "Ауры и бафы", "tab_pet_passive": "Пассивные умения",
 	"tab_pet_gear": "Оружие и доспехи",
+	"bagtab_all": "Все предметы", "bagtab_gear": "Оружие и броня", "bagtab_loot": "Добыча монстров",
+	"bagtab_cards": "Карты питомцев", "bagtab_jewelry": "Украшения", "bagtab_quest": "Предметы заданий",
+	"bagtab_potions": "Зелья и усиления", "bagtab_other": "Остальное",
+	"act_equip": "Надеть", "act_unequip": "Снять", "act_offhand": "Во 2-ю руку", "act_use": "Использовать",
+	"act_sell": "Продать", "act_sell_all": "Продать все", "act_buy": "Купить", "act_buy_many": "Купить несколько",
+	"act_move": "Переместить", "act_drop": "Выбросить", "act_drop_all": "Выбросить все", "act_sort": "Сортировать",
+	"act_form": "Сформировать", "act_read": "Прочитать", "act_craft_put": "В крафт", "act_recipes": "Рецепты",
+	"act_store": "На склад", "act_store_all": "На склад все", "act_take": "В сумку", "act_take_all": "В сумку все",
+	"act_gold_in": "Положить золото", "act_gold_out": "Забрать золото", "act_forge_put": "На наковальню",
+	"act_confirm": "Да", "act_cancel": "Отмена", "act_plus": "Больше", "act_minus": "Меньше",
+	"act_belt_put": "В пояс", "act_belt_take": "Из пояса", "act_belt_expand": "Расширить пояс",
+	"act_details": "Подробнее", "act_ring2": "Во 2-е кольцо", "act_learn": "Изучить", "act_assign": "На кнопку",
+	"act_slot_clear": "Убрать", "act_toggle": "Вкл / выкл", "act_summon": "Призвать", "act_recall": "Отозвать",
+	"act_release": "Отпустить", "act_revive": "Воскресить", "act_evolve": "Эволюция", "act_pet_gear": "Надеть питомцу",
+	"act_quest_take": "Взять задание", "act_quest_turnin": "Сдать задание", "act_track": "Отслеживать",
+	"act_abandon": "Отказаться", "act_trade": "Торговля", "act_bye": "До встречи",
+	"quick_slot_empty": "Быстрый слот", "quick_edit": "Настроить быстрые слоты", "skill_swipe": "Листать умения",
+	"skill_slot_empty": "Пустая ячейка умения", "auto_attack": "Автоатака", "act_bless": "Благословения",
 }
 ## Контур процедурных рисунков (доля размера) и его цвет.
 const OUTLINE := 0.05
@@ -97,6 +127,13 @@ static func icon_button(id: String, side: float) -> Button:
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(UiScale.px(side), UiScale.px(side))
 	b.set_meta("icon_id", id)
+	# Квадратная рамка (0.41): не растягивать широкую рамку кнопок с подписью
+	var off := Util.square_skin(false)
+	b.add_theme_stylebox_override("normal", off)
+	b.add_theme_stylebox_override("hover", off)
+	b.add_theme_stylebox_override("disabled", off)
+	b.add_theme_stylebox_override("pressed", Util.square_skin(true))
+	b.add_theme_stylebox_override("hover_pressed", Util.square_skin(true))
 	return b
 
 
@@ -470,5 +507,254 @@ static func _draw(pt: _Paint, id: String) -> void:
 			pt.seg(Vector2(0.3, 0.78), Vector2(0.78, 0.14), 0.09, light)
 			pt.seg(Vector2(0.22, 0.7), Vector2(0.38, 0.86), 0.07, gold)
 			pt.seg(Vector2(0.3, 0.78), Vector2(0.2, 0.9), 0.07, Color(0.6, 0.4, 0.22))
+		"bagtab_all":
+			_bag(pt, Color(0.8, 0.58, 0.32))
+			pt.circle(Vector2(0.36, 0.28), 0.08, Color(0.6, 0.85, 1.0))
+			pt.circle(Vector2(0.62, 0.26), 0.07, Color(1.0, 0.45, 0.4))
+		"bagtab_gear":
+			pt.poly(_v([Vector2(0.18, 0.18), Vector2(0.62, 0.18), Vector2(0.62, 0.52), Vector2(0.4, 0.82),
+				Vector2(0.18, 0.52)]), Color(0.45, 0.6, 0.95))
+			pt.seg(Vector2(0.36, 0.84), Vector2(0.84, 0.2), 0.09, light)
+			pt.seg(Vector2(0.38, 0.62), Vector2(0.56, 0.8), 0.07, gold)
+		"bagtab_loot":
+			pt.box(Rect2(0.14, 0.58, 0.72, 0.26), 0.1, Color(0.6, 0.45, 0.32))
+			pt.poly(_v([Vector2(0.3, 0.6), Vector2(0.42, 0.14), Vector2(0.52, 0.6)]), Color(0.96, 0.92, 0.8))
+			pt.poly(_v([Vector2(0.5, 0.6), Vector2(0.7, 0.22), Vector2(0.72, 0.6)]), Color(0.92, 0.86, 0.7))
+		"bagtab_cards":
+			pt.box(Rect2(0.16, 0.22, 0.42, 0.6), 0.05, Color(0.55, 0.42, 0.85))
+			pt.box(Rect2(0.42, 0.16, 0.42, 0.6), 0.05, Color(0.98, 0.9, 0.7))
+			_paw(pt, Vector2(0.63, 0.48), 0.28, Color(0.45, 0.3, 0.75))
+		"bagtab_jewelry":
+			pt.arc(Vector2(0.42, 0.58), 0.22, 0.08, 0.0, TAU, gold)
+			pt.poly(_v([Vector2(0.42, 0.22), Vector2(0.53, 0.34), Vector2(0.42, 0.44), Vector2(0.31, 0.34)]),
+				Color(0.4, 0.75, 1.0))
+			pt.circle(Vector2(0.74, 0.3), 0.1, Color(1.0, 0.45, 0.6))
+		"bagtab_quest":
+			_scroll(pt, Color(0.96, 0.88, 0.66))
+			pt.circle(Vector2(0.62, 0.64), 0.12, Color(0.85, 0.15, 0.15))
+			pt.seg(Vector2(0.62, 0.58), Vector2(0.62, 0.66), 0.035, gold)
+		"bagtab_potions":
+			_flask(pt, Vector2(0.38, 0.58), 0.22, Color(1.0, 0.3, 0.35))
+			_flask(pt, Vector2(0.68, 0.64), 0.15, Color(0.35, 0.6, 1.0))
+		"bagtab_other":
+			pt.box(Rect2(0.16, 0.44, 0.68, 0.4), 0.05, Color(0.72, 0.5, 0.28))
+			pt.box(Rect2(0.3, 0.2, 0.26, 0.26), 0.04, Color(0.6, 0.8, 1.0))
+			pt.circle(Vector2(0.68, 0.32), 0.1, Color(0.78, 0.8, 0.86))
+		"act_equip", "act_unequip":
+			_chest(pt, Color(0.6, 0.68, 0.85))
+			if id == "act_equip":
+				_arrow(pt, Vector2(0.5, 0.08), Vector2(0.5, 0.46), 0.1, gold)
+			else:
+				_arrow(pt, Vector2(0.5, 0.5), Vector2(0.5, 0.1), 0.1, gold)
+		"act_offhand":
+			pt.poly(_v([Vector2(0.24, 0.18), Vector2(0.76, 0.18), Vector2(0.76, 0.5), Vector2(0.5, 0.86),
+				Vector2(0.24, 0.5)]), Color(0.55, 0.65, 0.95))
+			pt.circle(Vector2(0.5, 0.42), 0.1, gold)
+		"act_use":
+			_flask(pt, Vector2(0.5, 0.6), 0.24, Color(0.4, 1.0, 0.55))
+			pt.poly(_star(Vector2(0.78, 0.22), 0.12, 0.04, 4), light)
+		"act_sell", "act_sell_all":
+			pt.box(Rect2(0.14, 0.62, 0.72, 0.18), 0.09, Color(0.95, 0.78, 0.6))
+			pt.circle(Vector2(0.5, 0.34), 0.17, gold)
+			if id == "act_sell_all":
+				pt.circle(Vector2(0.3, 0.42), 0.13, gold.darkened(0.1))
+				pt.circle(Vector2(0.7, 0.42), 0.13, gold.darkened(0.1))
+		"act_buy", "act_buy_many":
+			_bag(pt, Color(0.82, 0.6, 0.35))
+			pt.circle(Vector2(0.7, 0.7), 0.15, gold)
+			if id == "act_buy_many":
+				pt.circle(Vector2(0.3, 0.72), 0.13, gold.darkened(0.1))
+		"act_move":
+			for d in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
+				var dv: Vector2 = d
+				_arrow(pt, c + dv * 0.1, c + dv * 0.4, 0.08, light)
+			pt.box(Rect2(0.42, 0.42, 0.16, 0.16), 0.03, gold)
+		"act_drop", "act_drop_all":
+			pt.box(Rect2(0.2, 0.2, 0.36, 0.3), 0.06, Color(0.95, 0.78, 0.6))
+			_arrow(pt, Vector2(0.62, 0.36), Vector2(0.62, 0.86), 0.09, Color(1.0, 0.5, 0.4))
+			if id == "act_drop_all":
+				_arrow(pt, Vector2(0.84, 0.36), Vector2(0.84, 0.76), 0.07, Color(1.0, 0.5, 0.4))
+		"act_sort":
+			for i in 3:
+				pt.seg(Vector2(0.16, 0.28 + 0.2 * float(i)), Vector2(0.62 - 0.14 * float(i), 0.28 + 0.2 * float(i)), 0.08, light)
+			_arrow(pt, Vector2(0.78, 0.2), Vector2(0.78, 0.8), 0.08, gold)
+		"act_form":
+			pt.box(Rect2(0.18, 0.3, 0.38, 0.56), 0.05, Color(0.98, 0.9, 0.7))
+			pt.circle(Vector2(0.68, 0.32), 0.18, Color(0.5, 1.0, 0.75))
+			_paw(pt, Vector2(0.68, 0.33), 0.2, light)
+		"act_read", "act_recipes":
+			pt.poly(_v([Vector2(0.1, 0.26), Vector2(0.5, 0.34), Vector2(0.5, 0.84), Vector2(0.1, 0.76)]),
+				Color(0.96, 0.9, 0.72))
+			pt.poly(_v([Vector2(0.9, 0.26), Vector2(0.5, 0.34), Vector2(0.5, 0.84), Vector2(0.9, 0.76)]),
+				Color(0.9, 0.82, 0.62))
+			if id == "act_recipes":
+				pt.box(Rect2(0.6, 0.44, 0.18, 0.18), 0.03, Color(0.55, 0.75, 1.0))
+			else:
+				pt.circle(Vector2(0.3, 0.52), 0.07, Color(0.6, 0.9, 1.0))
+		"act_craft_put":
+			pt.box(Rect2(0.46, 0.38, 0.4, 0.4), 0.05, Color(0.55, 0.75, 1.0))
+			_arrow(pt, Vector2(0.1, 0.24), Vector2(0.46, 0.5), 0.08, gold)
+		"act_store", "act_store_all", "act_take", "act_take_all":
+			var wood := Color(0.74, 0.5, 0.28)
+			pt.box(Rect2(0.14, 0.5, 0.72, 0.36), 0.05, wood)
+			pt.box(Rect2(0.14, 0.4, 0.72, 0.14), 0.05, wood.lightened(0.12))
+			if id.begins_with("act_store"):
+				_arrow(pt, Vector2(0.5, 0.04), Vector2(0.5, 0.42), 0.09, gold)
+			else:
+				_arrow(pt, Vector2(0.5, 0.44), Vector2(0.5, 0.04), 0.09, gold)
+			if id.ends_with("_all"):
+				pt.circle(Vector2(0.82, 0.18), 0.1, Color(1.0, 0.5, 0.4))
+		"act_gold_in", "act_gold_out":
+			pt.box(Rect2(0.14, 0.52, 0.72, 0.32), 0.05, Color(0.74, 0.5, 0.28))
+			pt.circle(Vector2(0.5, 0.3), 0.16, gold)
+			_arrow(pt, Vector2(0.8, 0.1 if id == "act_gold_in" else 0.5), Vector2(0.8, 0.5 if id == "act_gold_in" else 0.1),
+				0.07, light)
+		"act_forge_put":
+			pt.poly(_v([Vector2(0.12, 0.52), Vector2(0.86, 0.52), Vector2(0.7, 0.66), Vector2(0.72, 0.84),
+				Vector2(0.3, 0.84), Vector2(0.32, 0.66)]), Color(0.62, 0.65, 0.74))
+			pt.seg(Vector2(0.2, 0.44), Vector2(0.8, 0.3), 0.07, light)
+		"act_confirm":
+			var gc := Color(0.45, 1.0, 0.5)
+			pt.seg(Vector2(0.2, 0.52), Vector2(0.42, 0.74), 0.13, gc)
+			pt.seg(Vector2(0.42, 0.74), Vector2(0.82, 0.28), 0.13, gc)
+		"act_cancel":
+			var rc := Color(1.0, 0.55, 0.45)
+			pt.arc(c, 0.28, 0.1, PI * 1.1, PI * 2.6, rc)
+			pt.poly(_v([Vector2(0.12, 0.42), Vector2(0.36, 0.42), Vector2(0.24, 0.62)]), rc)
+		"act_plus", "act_minus":
+			pt.circle(c, 0.38, Color(0.25, 0.3, 0.55))
+			pt.seg(Vector2(0.3, 0.5), Vector2(0.7, 0.5), 0.12, gold)
+			if id == "act_plus":
+				pt.seg(Vector2(0.5, 0.3), Vector2(0.5, 0.7), 0.12, gold)
+		"act_belt_put", "act_belt_take", "act_belt_expand":
+			pt.box(Rect2(0.08, 0.52, 0.84, 0.2), 0.06, Color(0.6, 0.42, 0.25))
+			pt.box(Rect2(0.42, 0.48, 0.16, 0.28), 0.03, gold)
+			if id == "act_belt_expand":
+				pt.seg(Vector2(0.5, 0.12), Vector2(0.5, 0.38), 0.09, Color(0.5, 1.0, 0.55))
+				pt.seg(Vector2(0.37, 0.25), Vector2(0.63, 0.25), 0.09, Color(0.5, 1.0, 0.55))
+			else:
+				pt.box(Rect2(0.62, 0.14, 0.2, 0.3), 0.03, Color(0.55, 0.42, 0.85))
+				_arrow(pt, Vector2(0.36, 0.1 if id == "act_belt_put" else 0.44), Vector2(0.36, 0.44 if id == "act_belt_put" else 0.1),
+					0.07, light)
+		"act_details":
+			pt.arc(Vector2(0.42, 0.42), 0.22, 0.09, 0.0, TAU, gold)
+			pt.seg(Vector2(0.58, 0.58), Vector2(0.82, 0.82), 0.12, gold)
+		"act_ring2":
+			pt.arc(Vector2(0.34, 0.52), 0.18, 0.08, 0.0, TAU, gold.darkened(0.15))
+			pt.arc(Vector2(0.66, 0.52), 0.18, 0.08, 0.0, TAU, gold)
+			pt.circle(Vector2(0.66, 0.32), 0.07, Color(0.45, 0.8, 1.0))
+		"act_learn":
+			pt.poly(_star(Vector2(0.44, 0.56), 0.3, 0.11, 4), Color(1.0, 0.78, 0.35))
+			_arrow(pt, Vector2(0.8, 0.8), Vector2(0.8, 0.2), 0.08, Color(0.5, 1.0, 0.55))
+		"act_assign":
+			pt.arc(Vector2(0.64, 0.6), 0.22, 0.07, 0.0, TAU, light)
+			pt.poly(_star(Vector2(0.3, 0.3), 0.16, 0.06, 4), gold)
+			_arrow(pt, Vector2(0.36, 0.38), Vector2(0.56, 0.54), 0.06, gold)
+		"act_slot_clear", "skill_slot_empty", "quick_slot_empty":
+			pt.arc(c, 0.34, 0.06, 0.0, TAU, Color(0.7, 0.72, 0.85))
+			if id == "act_slot_clear":
+				pt.seg(Vector2(0.38, 0.38), Vector2(0.62, 0.62), 0.08, Color(1.0, 0.5, 0.4))
+				pt.seg(Vector2(0.62, 0.38), Vector2(0.38, 0.62), 0.08, Color(1.0, 0.5, 0.4))
+			elif id == "quick_slot_empty":
+				_flask(pt, Vector2(0.5, 0.55), 0.14, Color(0.7, 0.72, 0.85, 0.6))
+			else:
+				pt.poly(_star(c, 0.16, 0.06, 4), Color(0.7, 0.72, 0.85, 0.6))
+		"act_toggle":
+			pt.arc(c, 0.3, 0.09, -PI * 0.3, PI * 1.3, Color(0.5, 1.0, 0.6))
+			pt.seg(Vector2(0.5, 0.14), Vector2(0.5, 0.48), 0.1, Color(0.5, 1.0, 0.6))
+		"act_summon", "act_recall":
+			pt.arc(Vector2(0.5, 0.74), 0.3, 0.05, 0.0, TAU, Color(0.6, 0.9, 1.0))
+			_paw(pt, Vector2(0.5, 0.42), 0.42, Color(0.62, 0.85, 1.0) if id == "act_summon" else Color(0.62, 0.85, 1.0, 0.5))
+			if id == "act_recall":
+				_arrow(pt, Vector2(0.82, 0.2), Vector2(0.82, 0.6), 0.07, gold)
+		"act_release":
+			pt.box(Rect2(0.14, 0.6, 0.5, 0.2), 0.09, Color(0.95, 0.78, 0.6))
+			_paw(pt, Vector2(0.66, 0.32), 0.3, Color(0.62, 0.85, 1.0))
+		"act_revive":
+			pt.seg(Vector2(0.3, 0.82), Vector2(0.62, 0.22), 0.16, light)
+			pt.arc(Vector2(0.62, 0.22), 0.14, 0.05, 0.0, TAU, gold)
+		"act_evolve":
+			_paw(pt, Vector2(0.22, 0.72), 0.2, Color(0.62, 0.85, 1.0))
+			_paw(pt, Vector2(0.48, 0.58), 0.28, Color(0.62, 0.85, 1.0))
+			_paw(pt, Vector2(0.76, 0.4), 0.36, Color(0.62, 0.85, 1.0))
+			_arrow(pt, Vector2(0.2, 0.4), Vector2(0.4, 0.14), 0.06, gold)
+		"act_pet_gear":
+			_paw(pt, Vector2(0.38, 0.6), 0.4, Color(0.62, 0.85, 1.0))
+			pt.seg(Vector2(0.56, 0.62), Vector2(0.86, 0.16), 0.08, light)
+		"act_quest_take", "act_quest_turnin":
+			_scroll(pt, Color(0.96, 0.88, 0.66))
+			if id == "act_quest_take":
+				pt.seg(Vector2(0.5, 0.32), Vector2(0.5, 0.56), 0.1, Color(1.0, 0.75, 0.15))
+				pt.circle(Vector2(0.5, 0.68), 0.06, Color(1.0, 0.75, 0.15))
+			else:
+				pt.seg(Vector2(0.34, 0.5), Vector2(0.46, 0.62), 0.08, Color(0.3, 0.75, 0.3))
+				pt.seg(Vector2(0.46, 0.62), Vector2(0.68, 0.36), 0.08, Color(0.3, 0.75, 0.3))
+		"act_track":
+			pt.poly(_v([Vector2(0.32, 0.46), Vector2(0.68, 0.46), Vector2(0.5, 0.88)]), Color(1.0, 0.45, 0.35))
+			pt.circle(Vector2(0.5, 0.38), 0.22, Color(1.0, 0.45, 0.35))
+			pt.circle(Vector2(0.5, 0.38), 0.08, light)
+		"act_abandon":
+			_scroll(pt, Color(0.9, 0.82, 0.62))
+			pt.seg(Vector2(0.32, 0.32), Vector2(0.68, 0.68), 0.1, Color(0.9, 0.2, 0.15))
+			pt.seg(Vector2(0.68, 0.32), Vector2(0.32, 0.68), 0.1, Color(0.9, 0.2, 0.15))
+		"act_trade":
+			pt.seg(Vector2(0.5, 0.18), Vector2(0.5, 0.8), 0.06, gold)
+			pt.seg(Vector2(0.18, 0.3), Vector2(0.82, 0.3), 0.06, gold)
+			pt.arc(Vector2(0.24, 0.52), 0.14, 0.05, 0.0, PI, gold)
+			pt.arc(Vector2(0.76, 0.52), 0.14, 0.05, 0.0, PI, gold)
+			pt.box(Rect2(0.34, 0.78, 0.32, 0.08), 0.03, gold)
+		"act_bye":
+			pt.box(Rect2(0.28, 0.4, 0.4, 0.42), 0.15, Color(0.95, 0.8, 0.62))
+			for i in 4:
+				pt.seg(Vector2(0.32 + 0.11 * float(i), 0.42), Vector2(0.3 + 0.12 * float(i), 0.16), 0.08, Color(0.95, 0.8, 0.62))
+		"quick_edit":
+			_flask(pt, Vector2(0.42, 0.58), 0.22, Color(1.0, 0.35, 0.4))
+			pt.circle(Vector2(0.74, 0.3), 0.15, Color(0.82, 0.84, 0.92))
+			pt.circle(Vector2(0.74, 0.3), 0.06, INK)
+		"skill_swipe":
+			for x in [0.3, 0.5, 0.7]:
+				pt.circle(Vector2(float(x), 0.5), 0.07, gold if float(x) == 0.5 else light)
+			pt.arc(c, 0.38, 0.06, PI * 0.8, PI * 1.2, light)
+			pt.arc(c, 0.38, 0.06, -PI * 0.2, PI * 0.2, light)
+		"auto_attack":
+			pt.arc(c, 0.36, 0.07, -PI * 0.25, PI * 1.3, Color(1.0, 0.6, 0.3))
+			pt.seg(Vector2(0.32, 0.7), Vector2(0.68, 0.3), 0.09, light)
+			pt.seg(Vector2(0.28, 0.58), Vector2(0.42, 0.74), 0.07, gold)
+		"act_bless":
+			pt.poly(_star(Vector2(0.5, 0.44), 0.36, 0.2, 12), Color(1.0, 0.85, 0.35))
+			pt.circle(Vector2(0.5, 0.44), 0.16, Color(1.0, 0.97, 0.8))
 		_:
 			pt.circle(c, 0.3, Color(0.7, 0.72, 0.8))
+
+
+## Стрелка от a к b толщиной w (наконечник у b).
+static func _arrow(pt: _Paint, a: Vector2, b: Vector2, w: float, col: Color) -> void:
+	var d := (b - a).normalized()
+	var n := Vector2(-d.y, d.x)
+	pt.seg(a, b - d * w * 1.2, w, col)
+	pt.poly(_v([b, b - d * w * 2.2 + n * w * 1.5, b - d * w * 2.2 - n * w * 1.5]), col)
+
+
+## Сумка (мешок).
+static func _bag(pt: _Paint, bag: Color) -> void:
+	pt.poly(_v([Vector2(0.37, 0.38), Vector2(0.63, 0.38), Vector2(0.72, 0.16), Vector2(0.28, 0.16)]), bag)
+	pt.circle(Vector2(0.5, 0.62), 0.28, bag)
+
+
+## Колба с центром c размера r.
+static func _flask(pt: _Paint, c: Vector2, r: float, col: Color) -> void:
+	pt.box(Rect2(c.x - r * 0.3, c.y - r * 1.6, r * 0.6, r * 0.8), r * 0.1, Color(0.85, 0.88, 0.95))
+	pt.circle(c, r, col)
+
+
+## Свиток.
+static func _scroll(pt: _Paint, paper: Color) -> void:
+	pt.box(Rect2(0.24, 0.2, 0.52, 0.6), 0.03, paper)
+	pt.box(Rect2(0.17, 0.12, 0.66, 0.12), 0.06, paper.darkened(0.1))
+	pt.box(Rect2(0.17, 0.76, 0.66, 0.12), 0.06, paper.darkened(0.1))
+
+
+## Нагрудник.
+static func _chest(pt: _Paint, col: Color) -> void:
+	pt.poly(_v([Vector2(0.18, 0.4), Vector2(0.36, 0.3), Vector2(0.64, 0.3), Vector2(0.82, 0.4),
+		Vector2(0.74, 0.88), Vector2(0.26, 0.88)]), col)

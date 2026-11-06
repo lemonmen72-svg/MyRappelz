@@ -56,6 +56,7 @@ func is_open() -> bool:
 func _build() -> void:
 	buttons.clear()
 	_body = main.hud.create_window("Выбор профессии", WINDOW_SIZE)
+	UiButtons.decorate_all.call_deferred(buttons)
 	# Во всю высоту окна: карточки занимают свободное место, прокрутки нет
 	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var over := ClassData.over_jp(Game.level)

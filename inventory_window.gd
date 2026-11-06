@@ -146,6 +146,12 @@ var drop_count := 1
 var buttons: Dictionary = {}
 ## Сколько ячеек сумки видно без прокрутки (5 рядов по COLS).
 const BAG_VISIBLE := 40
+## Разделы сумки (вкладки-значки bagtab_<раздел>), сторона кнопки для «Среднего».
+const BAG_TABS := ["all", "gear", "loot", "cards", "jewelry", "quest", "potions", "other"]
+const TAB_SIDE := 34.0
+const TAB_SIDE_SMALL := 26.0
+## Открытый раздел (сохраняется между открытиями окна).
+var bag_tab := "all"
 ## Прокрутка сетки сумки (есть, когда ячеек больше BAG_VISIBLE — с 0.40 всегда: в сумке 120).
 var bag_scroll: ScrollContainer = null
 ## Сумка или золото изменились — Economy перестроит окно в _process.
@@ -586,12 +592,37 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 		var cb := _button("Экипировка" if craft_open else "Крафт", "craft_toggle", _on_craft_toggle)
 		UiIcons.add_icon(cb, "menu_bag" if craft_open else "btn_craft")
 		head.add_child(cb)
+	# Разделы сумки (0.41): компактные вкладки-значки; в разделе — только его вещи в своих ячейках
+	var tabs := HBoxContainer.new()
+	tabs.name = "BagTabs"
+	tabs.add_theme_constant_override("separation", int(UiScale.px(4)))
+	parent.add_child(tabs)
+	var side := TAB_SIDE if mode == "bag" and not craft_open else TAB_SIDE_SMALL
+	for t in BAG_TABS:
+		var tb := UiIcons.icon_button("bagtab_" + String(t), side)
+		tb.name = "bagtab_" + String(t)
+		tb.toggle_mode = true
+		tb.button_pressed = bag_tab == String(t)
+		tb.pressed.connect(_on_bag_tab.bind(String(t)))
+		tabs.add_child(tb)
+		buttons["bagtab_" + String(t)] = tb
+	if mode == "bag" and not craft_open:
+		var tab_name := _label(UiIcons.title("bagtab_" + bag_tab), UiScale.FONT_SMALL, MUTED)
+		tab_name.name = "bag_tab_name"
+		tab_name.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		tabs.add_child(tab_name)
 	var grid := GridContainer.new()
 	grid.columns = COLS
 	grid.add_theme_constant_override("h_separation", int(UiScale.px(GAP)))
 	grid.add_theme_constant_override("v_separation", int(UiScale.px(GAP)))
 	var list := inv.cells()
 	var total := inv.cell_count()
+	var shown: Array[int] = []
+	var qitems := quest_items()
+	for i in total:
+		var cid := String((list[i] as Dictionary).get("id", "")) if i < list.size() else ""
+		if bag_tab == "all" or (cid != "" and tab_of(cid, qitems) == bag_tab):
+			shown.append(i)
 	if total > BAG_VISIBLE:
 		# Ячеек больше 40: видно 5 рядов, остальное — прокруткой (окно не растёт)
 		var sc := ScrollContainer.new()
@@ -606,13 +637,60 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 	else:
 		parent.add_child(grid)
 		bag_scroll = null
-	for i in total:
+	for i in shown:
 		var c: Dictionary = list[i] if i < list.size() else {}
 		var id := String(c.get("id", ""))
 		var n := int(c.get("n", 0))
 		var b := _make_cell("bag", i, id, str(n) if n > 1 else "", cell_sz, sel_kind == "cell" and sel_index == i)
 		grid.add_child(b)
 		buttons["cell_%d" % i] = b
+	if shown.is_empty():
+		grid.columns = 1
+		grid.add_child(_label("В этом разделе пусто", UiScale.FONT_TEXT, MUTED))
+
+
+## Раздел сумки предмета id (вкладки): "gear" (оружие, броня, торбы, лом), "loot" (трофеи), "cards" (карты
+## существ), "jewelry", "quest" (документы и то, что нужно взятым заданиям — qitems), "potions" (зелья, свитки),
+## "other" (кубы, прокачка, остальное).
+static func tab_of(id: String, qitems: Dictionary = {}) -> String:
+	var b := ItemData.base_id(id)
+	var t := ItemData.item_type(id)
+	if t == "document" or qitems.has(b) or qitems.has(id):
+		return "quest"
+	match t:
+		"weapon", "armor", "bag", "broken":
+			return "gear"
+		"jewelry":
+			return "jewelry"
+		"card":
+			return "cards"
+		"trophy":
+			return "loot"
+		"consumable":
+			return "potions"
+	return "other"
+
+
+## Предметы, которые нужны взятым заданиям (цели «собрать» и «найти»).
+static func quest_items() -> Dictionary:
+	var res := {}
+	for q in Game.quests_active:
+		for g in QuestData.goals(String(q)):
+			var gd: Dictionary = g
+			if ["collect", "gather"].has(String(gd.get("type", ""))):
+				for it in gd.get("items", []):
+					res[String(it)] = true
+	return res
+
+
+func _on_bag_tab(t: String) -> void:
+	bag_tab = t
+	if sel_kind == "cell" and sel_index >= 0:
+		var c: Dictionary = Game.inventory.cells()[sel_index] if sel_index < Game.inventory.cells().size() else {}
+		var cid := String(c.get("id", ""))
+		if t != "all" and (cid == "" or tab_of(cid, quest_items()) != t):
+			clear_selection()
+	refresh()
 
 
 # ---------- Крафт и кузница ----------
@@ -1820,6 +1898,7 @@ func _button(text: String, node_name: String, cb: Callable) -> Button:
 	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	b.pressed.connect(cb)
 	buttons[node_name] = b
+	UiButtons.decorate(b, node_name)
 	return b
 
 

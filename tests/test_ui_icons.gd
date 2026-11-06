@@ -48,7 +48,7 @@ func run_step() -> void:
 
 
 func _check_textures() -> void:
-	check(UiIcons.IDS.size() == 34, "в контракте 34 значка: %d" % UiIcons.IDS.size())
+	check(UiIcons.IDS.size() == 96, "в контракте 96 значков: %d" % UiIcons.IDS.size())
 	var files := 0
 	for k in UiIcons.IDS:
 		var id := String(k)

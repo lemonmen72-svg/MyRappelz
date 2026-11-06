@@ -232,6 +232,7 @@ func _on_pet_died(p: Pet) -> void:
 func open_window() -> void:
 	window_buttons.clear()
 	var body: VBoxContainer = main.hud.create_window("Питомцы", WINDOW_SIZE)
+	UiButtons.decorate_all.call_deferred(window_buttons)
 	_window_body = body
 	var head := Label.new()
 	head.text = "Коллекция: %d/%d    Свитков воскрешения: %d" % [
@@ -395,6 +396,7 @@ static func slot_strip(rec: Dictionary, icon_px: float) -> HBoxContainer:
 func open_evolve() -> void:
 	window_buttons.clear()
 	var body: VBoxContainer = main.hud.create_window("Эволюция существ", WINDOW_SIZE)
+	UiButtons.decorate_all.call_deferred(window_buttons)
 	_window_body = body
 	var head := Label.new()
 	head.text = "Во 2-ю форму — с %d ур., в 3-ю — со %d. Чем позже, тем сильнее: на %d и %d ур. — сверх-эволюция (+%d%% и +%d%% к статам)." % [

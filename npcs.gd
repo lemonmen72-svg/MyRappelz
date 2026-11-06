@@ -533,6 +533,7 @@ func _build() -> void:
 	buttons.clear()
 	var q: Quests = main.get("quests")
 	_body = main.hud.create_window(NpcData.npc_name(dialog_npc), DIALOG_SIZE)
+	UiButtons.decorate_all.call_deferred(buttons)
 	var sub := _label(String(NpcData.npc(dialog_npc).get("title", "")), UiScale.FONT_BODY, MUTED)
 	_body.add_child(sub)
 	match page:
@@ -635,10 +636,10 @@ func _page_quests() -> void:
 			match q.state(id):
 				"ready":
 					b = _option("?  " + QuestData.quest_name(id) + " — сдать", "dq_" + id, _on_quest.bind(id))
-					b.add_theme_color_override("font_color", Color(0.15, 0.45, 0.12))
+					b.add_theme_color_override("font_color", Color(0.55, 1.0, 0.55))
 				"available":
 					b = _option("!  " + QuestData.quest_name(id), "dq_" + id, _on_quest.bind(id))
-					b.add_theme_color_override("font_color", Color(0.5, 0.3, 0.0))
+					b.add_theme_color_override("font_color", Color(1.0, 0.82, 0.35))
 				"active":
 					b = _option("…  " + QuestData.quest_name(id) + " — в процессе", "dq_" + id, _on_quest.bind(id))
 				_:

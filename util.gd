@@ -29,27 +29,115 @@ static func ui_theme() -> Theme:
 	_theme.set_stylebox("panel", "PanelContainer", panel)
 	_theme.set_stylebox("panel", "Panel", panel)
 	_theme.set_color("font_color", "Label", Color(0.98, 0.96, 0.9))
-	var colors := {
-		"normal": Color(0.95, 0.93, 0.86), "hover": Color(1.0, 0.98, 0.92),
-		"pressed": Color(1.0, 0.82, 0.45), "disabled": Color(0.45, 0.46, 0.52),
-		"focus": Color(0, 0, 0, 0),
-	}
-	for state in colors:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = colors[state]
-		if state == "focus":
-			sb.draw_center = false
-		else:
-			sb.border_color = Color(0.85, 0.68, 0.32)
-			sb.set_border_width_all(2)
-		_theme.set_stylebox(state, "Button", sb)
-	# Тёмный текст на светлых кнопках
+	# Кнопки (0.41, просьба Максима «свой дизайн»): тёмно-синий лак, золотая рамка, светлый текст; главные
+	# (BtnPrimary — «Надеть», «Купить», «Крафт») — золотые, опасные (BtnDanger — «Выбросить», «Отказаться») — алые.
+	# Есть картинки рамок assets/icons/ui_skin/<btn_skin_*>.png — кнопки из них (9-slice), иначе рисованные.
+	_button_styles("Button", "btn_skin", BTN_NAVY)
+	_button_styles("BtnPrimary", "btn_skin_primary", BTN_GOLD)
+	_button_styles("BtnDanger", "btn_skin_danger", BTN_RED)
+	_theme.set_type_variation("BtnPrimary", "Button")
+	_theme.set_type_variation("BtnDanger", "Button")
 	for c in ["font_color", "font_hover_color", "font_focus_color", "font_hover_pressed_color"]:
-		_theme.set_color(c, "Button", Color(0.18, 0.16, 0.28))
-	_theme.set_color("font_pressed_color", "Button", Color(0.3, 0.18, 0.05))
-	_theme.set_color("font_disabled_color", "Button", Color(0.8, 0.8, 0.85))
+		_theme.set_color(c, "Button", Color(0.97, 0.94, 0.84))
+		_theme.set_color(c, "BtnDanger", Color(1.0, 0.95, 0.9))
+		_theme.set_color(c, "BtnPrimary", Color(0.24, 0.13, 0.02))
+	_theme.set_color("font_pressed_color", "Button", Color(1.0, 0.84, 0.42))
+	_theme.set_color("font_pressed_color", "BtnPrimary", Color(0.2, 0.1, 0.0))
+	_theme.set_color("font_pressed_color", "BtnDanger", Color(1.0, 0.9, 0.8))
+	for t in ["Button", "BtnPrimary", "BtnDanger"]:
+		_theme.set_color("font_disabled_color", t, Color(0.6, 0.62, 0.7))
+		_theme.set_color("icon_normal_color", t, Color.WHITE)
+		_theme.set_color("icon_disabled_color", t, Color(1, 1, 1, 0.45))
 	refresh_theme()
 	return _theme
+
+
+## Квадратная рамка кнопки-значка (вкладки, меню, «Закрыть»): картинка tab_skin_on / tab_skin_off или рисованная.
+static func square_skin(on: bool) -> StyleBox:
+	var path := SKIN_DIR + ("tab_skin_on" if on else "tab_skin_off") + ".png"
+	if Assets.exists(path):
+		var tx := StyleBoxTexture.new()
+		tx.texture = load(path)
+		var w := tx.texture.get_width()
+		for side in [SIDE_LEFT, SIDE_RIGHT, SIDE_TOP, SIDE_BOTTOM]:
+			tx.set_texture_margin(side, w * 0.22)
+			tx.set_content_margin(side, w * 0.08)
+		return tx
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.2, 0.22, 0.42) if on else Color(0.12, 0.14, 0.3)
+	sb.border_color = Color(1.0, 0.85, 0.4) if on else Color(0.72, 0.58, 0.28)
+	sb.set_border_width_all(3 if on else 2)
+	sb.set_corner_radius_all(8)
+	sb.anti_aliasing = true
+	for side in [SIDE_LEFT, SIDE_RIGHT, SIDE_TOP, SIDE_BOTTOM]:
+		sb.set_content_margin(side, 4)
+	return sb
+
+
+## Рамки кнопок заново (подключилась часть icons пакета ресурсов — картинки btn_skin_* появились).
+static func refresh_skins() -> void:
+	if _theme == null:
+		return
+	_button_styles("Button", "btn_skin", BTN_NAVY)
+	_button_styles("BtnPrimary", "btn_skin_primary", BTN_GOLD)
+	_button_styles("BtnDanger", "btn_skin_danger", BTN_RED)
+	refresh_theme()
+
+
+## Цвета рисованных кнопок: фон, рамка, нижняя кромка (объём).
+const BTN_NAVY := {"bg": Color(0.13, 0.16, 0.34), "border": Color(0.86, 0.68, 0.3), "edge": Color(0.05, 0.06, 0.15)}
+const BTN_GOLD := {"bg": Color(0.98, 0.76, 0.32), "border": Color(1.0, 0.93, 0.66), "edge": Color(0.55, 0.33, 0.08)}
+const BTN_RED := {"bg": Color(0.62, 0.13, 0.16), "border": Color(0.95, 0.66, 0.36), "edge": Color(0.25, 0.03, 0.05)}
+const SKIN_DIR := "res://assets/icons/ui_skin/"
+
+
+## Стили кнопок типа t: из картинок skin_<состояние> (если есть файл) или рисованные по цветам pal.
+static func _button_styles(t: String, skin: String, pal: Dictionary) -> void:
+	var states := {"normal": skin if skin != "btn_skin" else "btn_skin_normal", "hover": "",
+		"pressed": "btn_skin_pressed" if t == "Button" else "", "disabled": "btn_skin_disabled", "focus": ""}
+	for st in states:
+		if st == "focus":
+			var f := StyleBoxEmpty.new()
+			_theme.set_stylebox("focus", t, f)
+			continue
+		var file := String(states[st])
+		if file == "" and st == "hover":
+			file = String(states["normal"])
+		var path := SKIN_DIR + file + ".png"
+		if file != "" and Assets.exists(path):
+			var tx := StyleBoxTexture.new()
+			tx.texture = load(path)
+			var w := tx.texture.get_width()
+			var h := tx.texture.get_height()
+			tx.texture_margin_left = w * 0.1
+			tx.texture_margin_right = w * 0.1
+			tx.texture_margin_top = h * 0.22
+			tx.texture_margin_bottom = h * 0.22
+			tx.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+			if st == "hover":
+				tx.modulate_color = Color(1.12, 1.12, 1.12)
+			_theme.set_stylebox(st, t, tx)
+			continue
+		var sb := StyleBoxFlat.new()
+		var bg: Color = pal["bg"]
+		match st:
+			"hover":
+				bg = bg.lightened(0.1)
+			"pressed":
+				bg = bg.darkened(0.25)
+			"disabled":
+				bg = Color(0.22, 0.24, 0.32)
+		sb.bg_color = bg
+		sb.border_color = Color(0.45, 0.47, 0.55) if st == "disabled" else (pal["border"] as Color).lightened(
+			0.2 if st == "pressed" else 0.0)
+		sb.set_border_width_all(2)
+		sb.border_width_bottom = 2 if st == "pressed" else 4
+		sb.shadow_color = Color(0, 0, 0, 0.35)
+		sb.shadow_size = 0 if st == "pressed" else 2
+		sb.shadow_offset = Vector2(0, 2)
+		sb.anti_aliasing = true
+		sb.set_meta("edge", pal["edge"])
+		_theme.set_stylebox(st, t, sb)
 
 
 ## Размеры темы по текущему UiScale (шрифт по умолчанию, поля и скругления окон и кнопок).
@@ -63,15 +151,17 @@ static func refresh_theme() -> void:
 		panel.set_corner_radius_all(int(UiScale.px(UiScale.RADIUS)))
 		panel.set_content_margin_all(UiScale.px(UiScale.PAD))
 		panel.shadow_size = int(UiScale.px(6))
-	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
-		var sb := _theme.get_stylebox(state, "Button") as StyleBoxFlat
-		if sb == null:
-			continue
-		sb.set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
-		sb.content_margin_left = UiScale.px(UiScale.BTN_PAD_X)
-		sb.content_margin_right = UiScale.px(UiScale.BTN_PAD_X)
-		sb.content_margin_top = UiScale.px(UiScale.BTN_PAD_Y)
-		sb.content_margin_bottom = UiScale.px(UiScale.BTN_PAD_Y)
+	for t in ["Button", "BtnPrimary", "BtnDanger"]:
+		for state in ["normal", "hover", "pressed", "disabled"]:
+			var sb := _theme.get_stylebox(state, t)
+			if sb == null:
+				continue
+			if sb is StyleBoxFlat:
+				(sb as StyleBoxFlat).set_corner_radius_all(int(UiScale.px(UiScale.BTN_RADIUS)))
+			sb.content_margin_left = UiScale.px(UiScale.BTN_PAD_X)
+			sb.content_margin_right = UiScale.px(UiScale.BTN_PAD_X)
+			sb.content_margin_top = UiScale.px(UiScale.BTN_PAD_Y)
+			sb.content_margin_bottom = UiScale.px(UiScale.BTN_PAD_Y)
 
 
 ## Материал в аниме-стиле (cel-shading): ступенчатый свет и блик, подсветка краёв (rim).

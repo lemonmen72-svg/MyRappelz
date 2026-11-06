@@ -106,6 +106,7 @@ func open(i: int, which: String = "") -> bool:
 	PetSkills.ensure_record(rec)
 	_species = String(rec.get("species", "boar"))
 	var body: VBoxContainer = main.hud.create_window("Существо: %s" % String(rec.get("name", "Питомец")), WINDOW_SIZE)
+	UiButtons.decorate_all.call_deferred(buttons)
 	_body = body
 	_scroll = body.get_parent() as ScrollContainer
 	_add_tabs(body)

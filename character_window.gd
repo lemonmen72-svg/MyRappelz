@@ -57,6 +57,7 @@ func open(which: String = "") -> bool:
 	_pivot = null
 	var body: VBoxContainer = main.hud.create_window("Герой: %s · %s" % [Game.char_name, ClassData.job_name(Game.class_id)],
 		WINDOW_SIZE)
+	UiButtons.decorate_all.call_deferred(buttons)
 	_body = body
 	_add_tabs(body)
 	if tab == "hero":

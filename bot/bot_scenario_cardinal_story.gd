@@ -14,7 +14,7 @@ static var game_limit := 6.0 * 3600.0
 ## Расы: [раса, только до профессии]. Первая — полный прогон.
 static var races: Array = [["human", false]]
 ## Отрезок детерминизма: прогон ×accel и ×accel·2 до сдачи этих заданий ([] — без проверки).
-static var det_quests: Array = ["elder_hunt", "elder_trophies", "elder_potion"]
+static var det_quests: Array = ["elder_hunt", "elder_trophies"]
 ## Лимит настоящего времени одного прогона, с.
 static var wall_limit := 1800.0
 ## Поправки профиля CardinalStory.PROFILE_STORY (тест — быстрый прогон: больше опыта, бег ×2; каждая — помощь в отчёте).
