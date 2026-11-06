@@ -183,7 +183,8 @@ const SPLIT_NAMES := {"walk": "путь", "fight": "бой", "loot": "добыч
 const FEATURE_NAMES := {"job": "Выбор профессии", "dungeon": "Подземелье", "bag": "Торба", "storage": "Склад", "temper": "Закалка",
 	"craft": "Крафт кубом", "craft_powder": "Крафт с порошком", "tame": "Приручение", "form": "Формирование",
 	"pet_gear": "Снаряжение питомцу (оружие)", "pet_armor": "Снаряжение питомцу (доспех)", "evolve": "Эволюция у Кирка",
-	"belt": "Пояс: карта питомца", "belt_expand": "Расширитель пояса"}
+	"belt": "Пояс: карта питомца", "belt_expand": "Расширитель пояса",
+	"chapter1": "Глава I «Шёпот из глубин» (подземелье)"}
 
 
 func report_lines(_bot: TestBot) -> PackedStringArray:
@@ -236,7 +237,7 @@ func report_lines(_bot: TestBot) -> PackedStringArray:
 		# Помощь
 		var hp := PackedStringArray()
 		for k in d["help"]:
-			hp.append("%s ×%d" % [String({"god": "бессмертие", "teleport": "перенос", "xp_pet": "опыт ×N после заданий (питомец)", "speed": "бег ×N"}.get(k, k)), int((d["help"][k] as Dictionary)["n"])])
+			hp.append("%s ×%d" % [String({"god": "бессмертие", "teleport": "перенос", "xp_pet": "опыт ×N после заданий (питомец)", "speed": "бег ×N", "dungeon": "подземелье: HP монстра ×N и бессмертие"}.get(k, k)), int((d["help"][k] as Dictionary)["n"])])
 		out.append("    Помощь (послабления): " + (", ".join(hp) if not hp.is_empty() else "нет") + "; опыт ×%d всё время" % int(d["xp_mult"]))
 		for k in d["help"]:
 			for w in (d["help"][k] as Dictionary)["where"]:

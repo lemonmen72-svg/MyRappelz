@@ -3,7 +3,7 @@ extends "res://tests/test_base.gd"
 ## порядку (QuestData.CH1_CHAIN), количества целей по канону, монстры подземелья — настоящие (убиты в мире подземелья:
 ## событие смерти → Quests.on_mob_killed), убитые до взятия задания не в счёт, свитки вождя и Старшего жреца —
 ## гарантированная квестовая добыча, в сумке открываются окном (Story), признание капитана — окном после его смерти,
-## реплики боссов (MobData.says), награда — один раз, Кардинал острова главу I не берёт.
+## реплики боссов (MobData.says), награда — один раз; Кардинал знает монстров подземелья и их уровни.
 
 const Q := ["merc_dungeon", "ch1_proof", "ch1_chief", "ch1_below", "ch1_last_watch", "ch1_forgotten_name",
 	"ch1_order", "ch1_gifts", "ch1_captain", "ch1_truth", "ch1_horizon"]
@@ -74,9 +74,13 @@ func _data() -> void:
 	check(Story.plain("captain_confession").contains("Мрак никогда не уходил"), "признание капитана — по канону")
 	check(Story.plain("goblin_exodus_scroll").contains("Мёртвые люди ходят по воде"), "свиток вождя — по канону")
 	check(Story.plain("priest_order_scroll").contains("Хранителя Изумрудной Клятвы"), "приказ жреца — по канону")
-	# Кардинал «Прохождение острова» главу I не берёт и не считает
+	# Кардинал проходит и главу I: ходки в подземелье за монстрами её заданий
 	for id in Q:
-		check(not CardinalStory.scope_ids().has(id), "Кардинал острова не считает %s" % id)
+		check(CardinalStory.scope_ids().has(id), "Кардинал проходит %s" % id)
+	check(CardinalStory.dungeon_species(["dg_goblin", "dg_captain"]) and not CardinalStory.dungeon_species(["wolf", "dg_goblin"]),
+		"Кардинал отличает монстров подземелья")
+	check(CardinalStory.dungeon_levels("dg_captain") == [30, 30] and CardinalStory.dungeon_levels("dg_goblin") == [20, 22],
+		"уровни монстров подземелья — по зонам (%s)" % [CardinalStory.dungeon_levels("dg_goblin")])
 
 
 func _kill(type_id: String, n: int = 1) -> Mob:

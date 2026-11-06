@@ -45,6 +45,11 @@ const PROFILE_STORY := {
 	# Бег героя ×N (AdminPanel.speed_mult; 1 — как у игрока). Помощь: только для быстрого прогона в CI (тест), на
 	# телефоне — 1
 	"run_speed": 1,
+	# Подземелье (глава I): монстры там — сила босса острова; чтобы прогон шёл минуты, у монстра, с которым Кардинал
+	# начинает бой, HP × dungeon_hp, и на этом бою — бессмертие (помощь «подземелье»)
+	"dungeon_hp": 0.1,
+	# Ходок в подземелье подряд без единой победы — дальше цели подземелья «застряли» (защита от петли)
+	"dungeon_idle_trips": 3,
 }
 ## Перемотка отдыха (как у CardinalRun): ускорение игры × REST_BOOST, пока рядом нет опасности.
 const REST_BOOST := 8.0
@@ -673,6 +678,17 @@ func _fight(m: Mob, why: String) -> bool:
 		AdminPanel.god = true
 		god_on = true
 		_help("god", "бессмертие: бой с «%s» %d ур. (герой %d ур.)" % [m.mob_name, m.level, Game.level])
+	# Монстр подземелья: HP × dungeon_hp и бессмертие на этом бою (помощь «подземелье»)
+	if MobData.is_dungeon(m.type_id) and _in_dungeon():
+		if not m.has_meta("cardinal_weak"):
+			m.set_meta("cardinal_weak", true)
+			m.max_hp = maxi(1, roundi(float(m.max_hp) * float(profile["dungeon_hp"])))
+			m.hp = mini(m.hp, m.max_hp)
+			_help("dungeon", "«%s» %d ур.: HP ×%.2f, бессмертие на бою (герой %d ур.)" % [m.mob_name, m.level,
+				float(profile["dungeon_hp"]), Game.level])
+		if not AdminPanel.god:
+			AdminPanel.god = true
+			god_on = true
 	_close()
 	_nav.reset()
 	var hp_seen := m.hp
@@ -1145,21 +1161,14 @@ func _qrec(id: String) -> Dictionary:
 	return quests[id]
 
 
-## Задания «Прохождения острова»: все, кроме главы I (её бои — в подземелье; спуск проверяет фича «Подземелье»).
+## Задания прогона: все (с 0.39 — и глава I: бои в подземелье, ходки через портал).
 static func scope_ids() -> Array:
-	var res: Array = []
-	for k in QuestData.all_ids():
-		if not QuestData.CH1_CHAIN.has(String(k)):
-			res.append(k)
-	return res
+	return QuestData.all_ids()
 
 
 ## Хочу ли брать задание (повторяемое — один раз; до профессии — только до неё).
 func _want(id: String) -> bool:
 	var q := _q()
-	# Глава I — бои в подземелье: Кардинал острова берёт только «Следы у скал» (спуск через портал — фича «Подземелье»)
-	if QuestData.CH1_CHAIN.has(id) and id != QuestData.DUNGEON_QUEST:
-		return false
 	if q.times_done(id) > 0:
 		return false
 	if until_job and not ClassData.is_wanderer(Game.class_id):
@@ -1417,14 +1426,9 @@ func _step() -> bool:
 	var p := _p()
 	if p == null:
 		return false
-	# Оказался в подземелье не по цели «спуститься» (зашёл в портал по пути) — назад на остров
-	var wl: Variant = bot.main.get("world")
-	if wl is IslandWorld and (wl as IslandWorld).location() != "island":
-		_help("portal", "случайно в подземелье — назад через портал")
-		var back: Portal = bot.main.get("portal") as Portal
-		if back != null:
-			await _go(back.front_point(), 0.5, "портал на остров")
-		return await _wait_location("island")
+	# В подземелье — только бои заданий главы I; больше нечего делать — назад на остров (сдавать, брать, отдыхать)
+	if _in_dungeon():
+		return await _dungeon_step()
 	# 0. Сумка почти полна — продать лишнее
 	var inv := Game.inventory
 	if inv.capacity - inv.used_cells() < int(profile["bag_reserve"]):
@@ -1583,7 +1587,7 @@ func _grind() -> bool:
 # ==================== Решатели целей ====================
 
 ## Лучшая невыполненная цель взятых заданий: {key, quest, gi, kind, cost, …}.
-func _pick_goal() -> Dictionary:
+func _pick_goal(kinds: Array = []) -> Dictionary:
 	var q := _q()
 	var best: Dictionary = {}
 	var bc := INF
@@ -1600,7 +1604,7 @@ func _pick_goal() -> Dictionary:
 			var st: Dictionary = _goal_state.get(key, {"tries": 0, "prog": -1, "why": ""})
 			st["why"] = String(t.get("why", ""))
 			_goal_state[key] = st
-			if not t.has("kind"):
+			if not t.has("kind") or (not kinds.is_empty() and not kinds.has(String(t["kind"]))):
 				continue
 			t["key"] = key
 			t["quest"] = id
@@ -1625,8 +1629,6 @@ func _solve(id: String, gi: int, g: Dictionary) -> Dictionary:
 	match type:
 		"kill":
 			var sp := QuestData.goal_species(g)
-			if QuestData.CH1_CHAIN.has(id):
-				return {"why": "глава I — бои в подземелье (Кардинал острова их не проходит)"}
 			var lo := int(g.get("min_level", 0))
 			var hi := int(g.get("max_level", 0))
 			return _kill_task(sp, lo, hi)
@@ -1724,6 +1726,9 @@ func _npc_dist(npc_id: String) -> float:
 
 ## Задача «убить» по фильтру: ближайший подходящий зверь, иначе — почему нельзя.
 func _kill_task(species: Array, lo: int, hi: int) -> Dictionary:
+	# Монстры подземелья, а герой на острове — ходка через портал у пещеры
+	if dungeon_species(species) and not _in_dungeon():
+		return _to_dungeon_task(species)
 	var m := _find_mob(species, lo, hi)
 	if m != null and ClassData.is_wanderer(Game.class_id) and (m.is_boss or MobData.is_mini_boss(m.type_id)):
 		return {"why": "ждём профессии: «%s» — вожак" % m.mob_name}
@@ -2044,6 +2049,8 @@ func _do_goal(t: Dictionary) -> bool:
 	var q := _q()
 	var before := q.goal_progress(id, gi)
 	var ok := false
+	if String(t["kind"]) == "to_dungeon":
+		return await _portal_to("dungeon")
 	match String(t["kind"]):
 		"kill":
 			ok = await _kill_one(t["species"], int(t["lo"]), int(t["hi"]), "задание «%s»" % QuestData.quest_name(id))
@@ -2107,6 +2114,124 @@ func _do_goal(t: Dictionary) -> bool:
 			_find("задание «%s»: %s" % [QuestData.quest_name(id), String(_stuck_goals[key])])
 	_goal_state[key] = st
 	return ok
+
+
+## Мир подземелья сейчас (главная сцена — мир локации "dungeon").
+func _in_dungeon() -> bool:
+	if bot == null or bot.main == null or not is_instance_valid(bot.main):
+		return false
+	var w: Variant = bot.main.get("world")
+	return w is IslandWorld and (w as IslandWorld).location() == "dungeon"
+
+
+## Все виды — монстры подземелья (на острове их нет).
+static func dungeon_species(species: Array) -> bool:
+	if species.is_empty():
+		return false
+	for s in species:
+		if not MobData.is_dungeon(String(s)):
+			return false
+	return true
+
+
+## Уровни вида в подземелье [мин, макс] по world/dungeon.json (зоны mob_zones; нет — базовый уровень вида).
+static var _dg_levels: Dictionary = {}
+static func dungeon_levels(sp: String) -> Array:
+	if _dg_levels.is_empty():
+		var cfg: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://world/dungeon.json"))
+		if cfg is Dictionary:
+			for z in (cfg as Dictionary).get("mob_zones", []):
+				var zd: Dictionary = z
+				for e in zd.get("mobs", []):
+					var a: Array = e
+					var lv: Array = [a[2], a[3]] if a.size() >= 4 else zd.get("levels", [20, 20])
+					var id := String(a[0])
+					var cur: Array = _dg_levels.get(id, [999, 0])
+					_dg_levels[id] = [mini(int(cur[0]), int(lv[0])), maxi(int(cur[1]), int(lv[1]))]
+	var base := int(MobData.get_type(sp).get("level", 1))
+	return _dg_levels.get(sp, [base, base])
+
+
+## Ходка в подземелье за видами species (с острова): уровень героя по силам самому сильному из них, портал пускает,
+## подряд не больше dungeon_idle_trips ходок без победы.
+func _to_dungeon_task(species: Array) -> Dictionary:
+	var hi := 0
+	var boss := false
+	for s in species:
+		hi = maxi(hi, int(dungeon_levels(String(s))[1]))
+		boss = boss or MobData.is_boss(String(s)) or MobData.is_mini_boss(String(s))
+	var gap := int(profile["boss_gap"]) if boss else int(profile["level_gap"])
+	if Game.level < hi - gap:
+		return {"why": "ждём уровня: в подземелье %s до %d ур." % [", ".join(PackedStringArray(species)), hi]}
+	if _dg_idle >= int(profile["dungeon_idle_trips"]):
+		return {"why": "подземелье: %d ходок подряд без победы" % _dg_idle}
+	var why := Dungeon.enter_block()
+	if why != "":
+		return {"why": "портал не пускает: " + why}
+	var pt: Portal = bot.main.get("portal") as Portal
+	if pt == null:
+		return {"why": "нет портала в подземелье"}
+	return {"kind": "to_dungeon", "cost": _flat(pt.front_point(), _p().global_position) + 40.0}
+
+
+## Ходок в подземелье подряд без победы; побед на начало ходки.
+var _dg_idle := 0
+var _dg_kills0 := 0
+
+
+## Через портал в локацию loc (остров ↔ подземелье). true — мир loc построен.
+func _portal_to(loc: String) -> bool:
+	var pt: Portal = bot.main.get("portal") as Portal
+	if pt == null:
+		return false
+	if loc == "island":
+		_dg_idle = 0 if kills > _dg_kills0 else _dg_idle + 1
+	_split = "walk"
+	await _go(pt.front_point(), 0.5, "портал")
+	if not await _wait_location(loc):
+		_find("портал не перенёс в «%s» (%s)" % [loc, _last_msg()])
+		return false
+	if loc == "dungeon":
+		_dg_kills0 = kills
+		_dg_trips += 1
+		_feature("dungeon", true, "вход через портал у пещеры, мир подземелья построен")
+	return true
+
+
+## Ходок в подземелье за прогон.
+var _dg_trips := 0
+## Сюжетные окна главы I, что открывались (свитки, признание капитана): Quests.story_shown живёт до смены сцены.
+var stories: Dictionary = {}
+
+
+func _note_stories() -> void:
+	var q := _q()
+	if q == null:
+		return
+	for sid in q.story_shown:
+		if not stories.has(String(sid)):
+			stories[String(sid)] = snappedf(game_t, 0.1)
+			_ev("story", String(sid))
+
+
+## Шаг в подземелье: отдых, бой по цели задания главы I; целей здесь нет (или сумка полна) — назад на остров.
+## Выход и новый вход строят подземелье заново: мини-боссы и капитан, убитые раньше задания, — снова на месте.
+func _dungeon_step() -> bool:
+	var p := _p()
+	if p == null:
+		return false
+	var inv := Game.inventory
+	if inv.capacity - inv.used_cells() >= int(profile["bag_reserve"]):
+		if float(p.hp) < float(p.max_hp) * float(profile["rest_below"]):
+			return await _rest()
+		var task := _pick_goal(["kill"])
+		if not task.is_empty():
+			_last_plan = "dungeon " + String(task.get("key", ""))
+			var ok: bool = await _do_goal(task)
+			_note_stories()
+			return ok
+	_last_plan = "dungeon → остров"
+	return await _portal_to("island")
 
 
 ## Цель «спуститься в подземелье»: к порталу у пещеры, переход (сцена строится заново — ждём мир подземелья),
@@ -2764,6 +2889,16 @@ func _pet_gear(i: int, item: String) -> bool:
 func _features() -> bool:
 	if until_job:
 		return false
+	_note_stories()
+	# Глава I пройдена: свитки и признание капитана открывались окном
+	if not features.has("chapter1") and _q().is_done("ch1_horizon"):
+		var need := ["goblin_exodus_scroll", "priest_order_scroll", "captain_confession"]
+		var miss: Array = []
+		for sid in need:
+			if not stories.has(sid):
+				miss.append(sid)
+		_feature("chapter1", miss.is_empty(), "глава I «Шёпот из глубин» пройдена: ходок в подземелье %d%s" % [_dg_trips,
+			"" if miss.is_empty() else "; не открывались окна: " + ", ".join(PackedStringArray(miss))])
 	var inv := Game.inventory
 	# Торба 1-го ранга у Гордея
 	if not features.has("bag") and Game.gear_in("bag") == "" and Game.gold >= 3000 + 2000:
