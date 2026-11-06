@@ -32,6 +32,8 @@ func hero_level() -> int:
 
 
 func before_start() -> void:
+	# Прогулка ногами до 18 точек (залы, концы мостов, оба конца палубы корабля) — дольше обычных 300 с
+	max_frames = 60 * 600
 	Game.quests_done["sage_to_merc"] = 1
 	Game.quests_done["merc_closed_cave"] = 1
 
@@ -101,6 +103,14 @@ func run_step() -> void:
 				walk_targets.append([String(e["name"]), IslandWorld.v2(e["center"])])
 			for br in (w as DungeonWorld).cfg["bridges"]:
 				walk_targets.append(["конец моста " + str(br["b"]), IslandWorld.v2(br["b"])])
+			# Палуба-полоса (корабль 0.35.3): от носа до двери рубки — оба конца
+			for dk in (w as DungeonWorld).cfg["decks"]:
+				if (dk as Dictionary).has("points"):
+					for dpt in dk["points"]:
+						walk_targets.append(["палуба %s %s" % [String(dk["id"]), str(dpt)], IslandWorld.v2(dpt)])
+			# Корабль — арена босса: зигзагом от борта к борту по всей длине палубы (у бортов не застревает)
+			for zz in [[29.0, 20.0], [35.0, 24.0], [29.0, 30.0], [35.0, 39.5], [29.0, 43.0], [32.0, 47.0]]:
+				walk_targets.append(["палуба корабля у борта " + str(zz), IslandWorld.v2(zz)])
 			wait = 10
 			step = 30
 		30:

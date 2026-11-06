@@ -464,11 +464,15 @@ func _ground_or_deck(p: Vector2) -> float:
 
 
 ## Палубы-острова (площадки мостков, корабль, уступ у портала): своя ровная коллизия — призма по эллипсу палубы
-## (у сетки рельефа 1 м край площадки 2.3 м — ступеньки и скосы, герой на ней спотыкался и съезжал в воду).
+## (у сетки рельефа 1 м край площадки 2.3 м — ступеньки и скосы, герой на ней спотыкался и съезжал в воду); палуба-
+## полоса ("path": корабль 0.35.3) — капсула на каждый отрезок.
 func _deck_collision() -> void:
 	var decks: Array = cfg.get("decks", [])
 	for d in decks:
 		var dk: Dictionary = d
+		if dk.has("points"):
+			_deck_path_collision(dk)
+			continue
 		var c := v2(dk["center"])
 		var r: Array = dk.get("radius", [2, 2])
 		var top := float(dk.get("height", 0.3))
@@ -483,6 +487,32 @@ func _deck_collision() -> void:
 		shape.points = pts
 		var body := StaticBody3D.new()
 		body.name = "Deck_" + String(dk.get("id", ""))
+		body.position = Vector3(c.x, top, c.y)
+		var col := CollisionShape3D.new()
+		col.shape = shape
+		body.add_child(col)
+		add_child(body)
+
+
+func _deck_path_collision(dk: Dictionary) -> void:
+	var pts_in: Array = dk.get("points", [])
+	var half := float(dk.get("width", 4.0)) * 0.5
+	var top := float(dk.get("height", 0.3))
+	for i in range(maxi(1, pts_in.size() - 1)):
+		var a := v2(pts_in[i])
+		var b := v2(pts_in[mini(i + 1, pts_in.size() - 1)])
+		var c := (a + b) * 0.5
+		var pts := PackedVector3Array()
+		for e in [a, b]:
+			for k in 16:
+				var ang := TAU * float(k) / 16.0
+				var q: Vector2 = (e as Vector2) - c + Vector2(cos(ang), sin(ang)) * half
+				pts.append(Vector3(q.x, 0.0, q.y))
+				pts.append(Vector3(q.x, -1.2, q.y))
+		var shape := ConvexPolygonShape3D.new()
+		shape.points = pts
+		var body := StaticBody3D.new()
+		body.name = "Deck_%s_%d" % [String(dk.get("id", "")), i]
 		body.position = Vector3(c.x, top, c.y)
 		var col := CollisionShape3D.new()
 		col.shape = shape

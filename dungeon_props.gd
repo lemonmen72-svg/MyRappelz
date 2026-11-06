@@ -16,7 +16,7 @@ const SOLID := ["dg_spire", "dg_crag", "dg_moss_stones", "dg_amethyst_spires", "
 	"dg_tent", "dg_cauldron", "dg_chest", "dg_chest_open", "dg_crates", "dg_barrel", "dg_bell", "dg_palisade",
 	"dg_barricade", "dg_spikes", "dg_barricade_moss", "dg_totem", "dg_table", "dg_prison", "dg_armory", "dg_obelisk",
 	"dg_monolith", "dg_crypt_altar", "dg_witch_brazier", "dg_throne", "dg_oracle", "dg_coral_altar", "dg_mine",
-	"dg_cannon", "dg_relics", "dg_hoard", "dg_brazier", "dg_siren", "dg_mast", "dg_crows_nest",
+	"dg_cannon", "dg_relics", "dg_hoard", "dg_brazier", "dg_siren",
 	"dg_helm", "dg_leviathan", "dg_cavern", "dg_cliffs", "dg_dripstone"]
 const MAX_LIGHTS := 10
 ## Модель моста на настил мостов и мостков, насколько опустить её (доски модели — у её основания), м.
@@ -38,6 +38,12 @@ const FALLBACK_COLORS := {
 	"rock": Color(0.36, 0.33, 0.42), "wood": Color(0.42, 0.3, 0.2), "glow": Color(0.3, 0.95, 0.55),
 	"gold": Color(0.95, 0.78, 0.3), "bone": Color(0.85, 0.82, 0.7),
 }
+
+## Модели с вырезами (world/dungeon.json "prop_cuts": id → [[x0, y0, z0, x1, y1, z1], …] в осях модели): треугольники
+## с центром внутри коробки убираются — проходы в перилах корабля на стыках его частей и там, где подходит мост
+## (0.35.3: нос, средняя палуба и корма — отдельные модели с закрытыми торцами). Кэш — по id и коробкам.
+static var _cut_meshes := {}
+
 
 class Zone:
 	var origin := Vector3.ZERO
@@ -88,7 +94,7 @@ static func _place(world: DungeonWorld, holder: Node3D, fallback: Node3D, zones:
 	var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(s, s, s)), pos)
 	var size := PropAsset.size(id) * s if PropAsset.has(id) else _fallback_size(id) * s
 	if PropAsset.has(id):
-		var m := PropAsset.mesh(id)
+		var m := mesh_of(world, id)
 		if m != null:
 			var key := Vector2i(floori(pos.x / ZONE), floori(pos.z / ZONE))
 			if not zones.has(key):
@@ -116,6 +122,48 @@ static func _place(world: DungeonWorld, holder: Node3D, fallback: Node3D, zones:
 		col.position.y = box.size.y * 0.5
 		body.add_child(col)
 		holder.add_child(body)
+
+
+## Меш модели id с вырезами из конфига мира (нет вырезов — общий меш PropAsset).
+static func mesh_of(world: IslandWorld, id: String) -> Mesh:
+	var base := PropAsset.mesh(id)
+	var cuts: Dictionary = world.cfg.get("prop_cuts", {}) if world != null else {}
+	if base == null or not cuts.has(id):
+		return base
+	var key := "%s:%d" % [id, str(cuts[id]).hash()]
+	if not _cut_meshes.has(key):
+		_cut_meshes[key] = cut_mesh(base, cuts[id])
+	return _cut_meshes[key]
+
+
+## Копия меша без треугольников, чей центр внутри одной из коробок [x0, y0, z0, x1, y1, z1].
+static func cut_mesh(base: Mesh, boxes: Array) -> ArrayMesh:
+	var out := ArrayMesh.new()
+	for si in base.get_surface_count():
+		var arr := base.surface_get_arrays(si)
+		var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
+		if idx.is_empty():
+			idx.resize(v.size())
+			for k in v.size():
+				idx[k] = k
+		var keep := PackedInt32Array()
+		for t in range(0, idx.size() - 2, 3):
+			var c := (v[idx[t]] + v[idx[t + 1]] + v[idx[t + 2]]) / 3.0
+			var inside := false
+			for b in boxes:
+				var q: Array = b
+				if c.x >= float(q[0]) and c.y >= float(q[1]) and c.z >= float(q[2]) \
+						and c.x <= float(q[3]) and c.y <= float(q[4]) and c.z <= float(q[5]):
+					inside = true
+					break
+			if not inside:
+				keep.append(idx[t])
+				keep.append(idx[t + 1])
+				keep.append(idx[t + 2])
+		arr[Mesh.ARRAY_INDEX] = keep
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return out
 
 
 static func _zone_mesh(holder: Node3D, zone: Zone, node_name := "Props") -> void:

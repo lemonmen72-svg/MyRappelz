@@ -372,7 +372,7 @@ func _make_node(it: Dictionary) -> void:
 	n.name = id
 	if PropAsset.has(id) and PropAsset.mesh(id) != null:
 		var mi := MeshInstance3D.new()
-		mi.mesh = PropAsset.mesh(id)
+		mi.mesh = DungeonProps.mesh_of(world, id)
 		mi.material_override = PropAsset.material(PropAsset.page(id))
 		mi.set_meta("no_outline", true)
 		n.add_child(mi)

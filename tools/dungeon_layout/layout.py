@@ -16,7 +16,7 @@ rng = random.Random(7)
 SOLID = set("""dg_spire dg_crag dg_moss_stones dg_amethyst_spires dg_crystal_purple dg_crystal_blue dg_tent dg_cauldron
 dg_chest dg_chest_open dg_crates dg_barrel dg_bell dg_palisade dg_barricade dg_spikes dg_barricade_moss dg_totem dg_table
 dg_prison dg_armory dg_obelisk dg_monolith dg_crypt_altar dg_witch_brazier dg_throne dg_oracle dg_coral_altar dg_mine
-dg_cannon dg_relics dg_hoard dg_brazier dg_siren dg_mast dg_crows_nest dg_helm dg_leviathan dg_cavern dg_cliffs
+dg_cannon dg_relics dg_hoard dg_brazier dg_siren dg_helm dg_leviathan dg_cavern dg_cliffs
 dg_dripstone""".split())
 LIGHTS = {'dg_brazier', 'dg_cauldron', 'dg_coral_altar', 'dg_witch_brazier', 'dg_spiral', 'dg_chest_open',
 	'dg_harbor_post', 'dg_rune_arch'}
@@ -102,13 +102,12 @@ def keep_structural():
 	for p in CFG['props']:
 		if p[0] == 'dg_mine':
 			p = ['dg_mine', 52.0, -12.6, 180, 1.0, -0.62]
-		# Настил модели (по площади горизонтальных граней: верхняя палуба корабля 3.6 м от основания — 0.9 это днище в
-		# корпусе; нос 1.0, площадка мостков 0.9)
-		# — вровень с палубой-островом, где ходит герой (0.35.3: раньше герой ходил внутри корпуса, на 0.7 м ниже досок)
-		DECK_DY = {'dg_ship_deck': -3.54, 'dg_ship_bow': -0.94, 'dg_pier': -0.86}
+		# Настил площадки мостков (0.9 м от основания модели) — вровень с палубой-островом, где ходит герой.
+		# Корабль (нос, средняя палуба, корма с рубкой) собирает plan.lake (SHIP), здесь его частей нет.
+		DECK_DY = {'dg_pier': -0.86}
 		if p[0] in DECK_DY:
 			p = list(p[:5]) + [DECK_DY[p[0]]]
-		if p[0] in ('dg_ship_deck', 'dg_ship_bow', 'dg_wreck', 'dg_pier', 'dg_ascent', 'dg_mine', 'dg_coral_altar'):
+		if p[0] in ('dg_pier', 'dg_ascent', 'dg_mine', 'dg_coral_altar'):
 			q = list(p) + [0.0, 1.0, 0.0][max(0, len(p) - 3):]
 			q = (q + [0.0] * 6)[:6]
 			keep.append(q)

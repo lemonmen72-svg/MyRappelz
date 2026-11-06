@@ -13,6 +13,8 @@ extends Node
 ## и accounts_dir до добавления теста в дерево — конец теста вместо выхода из игры зовёт device_hook.
 
 const MAX_FRAMES := 60 * 300
+## Предел кадров теста (тест с долгой прогулкой ставит больше — test_dungeon).
+var max_frames := MAX_FRAMES
 ## Хранилище аккаунтов автотестов (Accounts.use_storage): настоящие аккаунты и user://save.json не трогаются.
 const TEST_ACCOUNTS := "user://test_accounts/"
 
@@ -85,7 +87,7 @@ func _process(_delta: float) -> void:
 	if done or main == null or not is_instance_valid(main) or not main.is_inside_tree():
 		return
 	frame += 1
-	if frame > MAX_FRAMES:
+	if frame > max_frames:
 		fail("таймаут на шаге %d" % step)
 		return
 	log_messages()
