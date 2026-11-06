@@ -422,6 +422,24 @@ func accept(id: String) -> bool:
 	return true
 
 
+## Сюжетный текст Story id — окном через delay с (свиток, признание капитана).
+const CONFESSION_DELAY := 3.0
+func show_story(id: String, delay: float = 0.0) -> void:
+	story_shown.append(id)
+	if main == null or main.get("hud") == null:
+		return
+	if delay <= 0.0 or not is_inside_tree():
+		Story.open(main.hud, id)
+		return
+	get_tree().create_timer(delay).timeout.connect(func() -> void:
+		if main != null and is_instance_valid(main) and main.get("hud") != null:
+			Story.open(main.hud, id))
+
+
+## Какие сюжетные тексты показаны за игру (тесты).
+var story_shown: Array = []
+
+
 ## Отказаться от взятого задания (прогресс пропадает, задание можно взять снова).
 func abandon(id: String) -> bool:
 	if not Game.quests_active.has(id):
@@ -515,6 +533,9 @@ func on_mob_killed(mob: Mob) -> void:
 		return
 	var sp := mob.type_id
 	var lvl := mob.level
+	# Глава I: последние слова Проклятого капитана — пока взято «Капитан, который не мог умереть»
+	if sp == "dg_captain" and is_active("ch1_captain"):
+		show_story("captain_confession", CONFESSION_DELAY)
 	_event("kill", func(g: Dictionary) -> bool: return _kill_ok(g, sp, lvl))
 	if _pet_out():
 		_event("pet_kill", func(g: Dictionary) -> bool: return _species_ok(g, sp))
@@ -920,6 +941,11 @@ func _refresh_state_goals(announce: bool) -> void:
 			any = true
 			if announce and v > old:
 				_msg("Задание обновлено: %s %d/%d" % [QuestData.goal_text(g), v, need])
+			# Сюжетный документ (свиток вождя, приказ жреца) попал в сумку — сразу открыть для чтения
+			if announce and v >= need and old < need and String(g.get("type", "")) == "collect":
+				for it in g.get("items", []):
+					if Story.has(String(it)):
+						show_story(String(it), 0.6)
 		if announce and not was_ready and is_ready(id):
 			_msg_ready(id)
 	if any:

@@ -190,6 +190,8 @@ const TYPES := {
 		"color": Color(0.3, 0.45, 0.22), "scale": 1.0, "rarity": "rare", "tameable": false, "dungeon": true,
 		"power": 1.5, "mini_boss": true, "dungeon_hp": 2.0, "respawn": 1200.0, "attack_cd": 1.3,
 		"weapon": "mw_broad_sword", "loot": ["goblin_token", "warlord_tusk"], "mirror": true,
+		"says": {"aggro": ["Думаешь, мы хотели жить в этой проклятой дыре? Там, внизу, мёртвые ходят по воде!",
+			"Нам нужен остров, пока они не поднялись сюда!"]},
 	},
 	"dg_sailor": {
 		"name": "Мёртвый матрос", "gen": "мёртвого матроса", "level": 22, "speed": 3.6, "gold": [24, 46],
@@ -214,6 +216,7 @@ const TYPES := {
 		"color": Color(0.22, 0.3, 0.26), "scale": 1.0, "rarity": "rare", "tameable": false, "dungeon": true,
 		"power": 1.5, "mini_boss": true, "dungeon_hp": 2.0, "respawn": 1200.0, "defense": 1.15, "attack_cd": 1.6,
 		"weapon": "mw_bastard_sword", "loot": ["dead_plate", "black_seal"], "mirror": true, "undead": true, "knight": true,
+		"says": {"aggro": ["Проход… закрыт…"], "half": ["Приказ… должен быть исполнен…"], "death": ["Никто… не пройдёт… к святилищу…"]},
 	},
 	"dg_bone_oracle": {
 		"name": "Костяной жрец", "gen": "костяного жреца", "level": 26, "speed": 3.4, "gold": [30, 56],
@@ -244,6 +247,7 @@ const TYPES := {
 		"color": Color(0.3, 0.5, 0.34), "scale": 1.0, "rarity": "rare", "tameable": false, "dungeon": true,
 		"power": 1.5, "mini_boss": true, "dungeon_hp": 2.0, "respawn": 1200.0, "magic": true, "defense": 0.9,
 		"attack_cd": 1.6, "weapon": "mw_runic_sword", "loot": ["ritual_ash", "sect_sigil"], "mirror": true, "sect": true,
+		"says": {"aggro": ["Ты не понимаешь, куда пришёл. Это место старше твоего народа. Уходи, пока капитан не узнал о тебе."]},
 	},
 	"dg_coral_corsair": {
 		"name": "Коралловый корсар", "gen": "кораллового корсара", "level": 28, "speed": 3.8, "gold": [34, 62],
@@ -275,6 +279,9 @@ const TYPES := {
 		"slam": {"cd": 11.0, "windup": 1.1, "radius": 5.0, "power": 1.4, "text": "Клятва бездны!",
 			"color": Color(0.3, 1.0, 0.62)},
 		"enrage": {"hp": 0.5, "aspd": 1.35, "text": "Клятва сильнее смерти!"},
+		"says": {"aggro": ["Живой человек… На моём корабле? Сколько лет прошло с тех пор, как я видел живое лицо?",
+			"> Твои слуги угрожают острову. Я пришёл остановить тебя.",
+			"Если бы ты знал, сколько раз я сам пытался остановить это проклятие. Но клятва сильнее смерти. Подними оружие."]},
 	},
 	# Питомцы подземелья (этап 3, 0.37): «Обычные», приручаются (синяя карта), в подземелье — его сила (dungeon).
 	# Модель — стадия по уровню (MobStats.stage_for: 22+ — 3-я), оружие скелета — по стадии (weapons).
@@ -366,6 +373,11 @@ static func slam_of(id: String) -> Dictionary:
 	if id == "golem":
 		return {"cd": 8.0, "windup": 0.9, "radius": 4.5, "power": 1.3, "text": "Сотрясение!", "color": Color(1.0, 0.6, 0.3)}
 	return {}
+
+
+## Реплики (поле "says": aggro — вступил в бой, half — половина HP, death — погиб; строка с «> » — отвечает герой).
+static func says_of(id: String, key: String) -> Array:
+	return (get_type(id).get("says", {}) as Dictionary).get(key, [])
 
 
 ## Ярость — вторая фаза (поле "enrage": hp — доля HP, ниже которой удары чаще в aspd раз; text). Нет — пусто.

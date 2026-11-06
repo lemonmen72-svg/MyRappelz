@@ -1134,6 +1134,8 @@ func _card_item(card: VBoxContainer) -> void:
 		acts.append(["Использовать", "act_use", _on_use])
 	elif ItemData.is_soul_card(id):
 		acts.append(["Сформировать", "act_form", _on_form])
+	elif Story.has(id):
+		acts.append(["Прочитать", "act_read", _on_read])
 	# Чарование: вещь или куб — на панель «Крафт»
 	if mode == "bag" and (ItemData.is_enchantable(id) or ItemData.is_cube(id)):
 		acts.append(["В крафт", "act_craft_put", _on_put_selected])
@@ -1606,6 +1608,11 @@ func _on_equip() -> void:
 	else:
 		_equip_cell(sel_index)
 	refresh()
+
+
+## Сюжетный документ — окно с текстом (Story).
+func _on_read() -> void:
+	Story.open(main.hud, sel_id)
 
 
 func _on_use() -> void:

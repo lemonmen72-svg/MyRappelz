@@ -145,6 +145,8 @@ var _slam_windup := 0.0
 var _slam_cfg: Dictionary = {}
 ## Ярость (MobData "enrage": hp — доля HP, aspd — удары чаще во столько раз, text): вторая фаза босса.
 var enraged := false
+## Что уже сказано (реплики MobData.says_of): "aggro", "half".
+var _said: Dictionary = {}
 var _attack_base := 1.3
 var _asleep := false
 var _sleep_check := 0.0
@@ -371,6 +373,9 @@ func _physics_process(delta: float) -> void:
 					dir = Vector3.ZERO
 		_heal(delta, 0.25)
 	elif target != null:
+		if not _said.has("aggro"):
+			_said["aggro"] = true
+			say("aggro")
 		var to := target.global_position - global_position
 		to.y = 0.0
 		face = to
@@ -505,6 +510,34 @@ func _slam() -> void:
 				continue
 			if node.global_position.distance_to(global_position) <= r:
 				node.call("take_damage", _hit_damage(node, float(_slam_cfg["power"])), self)
+
+
+## Реплика зверя (MobData.says_of(вид, key)) внизу экрана: «Имя: «…»», по одной на REPLICA_SEC с; «> » — герой.
+const REPLICA_SEC := 4.2
+func say(key: String) -> void:
+	var lines := MobData.says_of(type_id, key)
+	if lines.is_empty() or not is_inside_tree():
+		return
+	var m := get_tree().get_first_node_in_group("main_scene")
+	if m == null or m.get("hud") == null:
+		return
+	var hud: Node = m.get("hud")
+	for i in lines.size():
+		var l := String(lines[i])
+		var t := ("%s: «%s»" % [Game.char_name if Game.char_name != "" else "Вы", l.substr(2)]) if l.begins_with("> ") \
+			else ("%s: «%s»" % [mob_name, l])
+		if i == 0:
+			hud.call("show_message", t, REPLICA_SEC)
+		else:
+			get_tree().create_timer(REPLICA_SEC * float(i)).timeout.connect(
+				func() -> void:
+					if is_instance_valid(hud):
+						hud.call("show_message", t, REPLICA_SEC))
+	last_said = lines
+
+
+## Последние сказанные реплики (тесты).
+var last_said: Array = []
 
 
 ## Ярость (вторая фаза босса, MobData "enrage"): HP ниже доли — удары чаще, перезарядка удара по площади короче.
@@ -866,8 +899,12 @@ func take_damage(amount: int, attacker: Node3D, crit_hit: bool = false, periodic
 	_update_label()
 	if hp <= 0:
 		_die()
-	elif not enraged:
-		_check_enrage()
+	else:
+		if not enraged:
+			_check_enrage()
+		if not _said.has("half") and float(hp) <= float(max_hp) * 0.5:
+			_said["half"] = true
+			say("half")
 
 
 ## Удар героя с «Тихой поступью» может не отвлечь зверя от питомца, которого тот уже бьёт.
@@ -885,6 +922,7 @@ func _keeps_target(attacker: Node3D) -> bool:
 
 func _die() -> void:
 	is_dead = true
+	say("death")
 	effects.clear()
 	remove_from_group("mobs")
 	collision_layer = 0

@@ -286,7 +286,7 @@ func _end(reason: String) -> void:
 				r["reason"] = _why_open(String(k))
 	bot.note("Кардинал «%s» закончен: %s — игровое %s, настоящее %s (×%.1f), сдано %d из %d, помощь %d, смертей %d" % [
 		title, reason, TestBot.clock(game_t), TestBot.clock(wall_sec()), game_t / maxf(wall_sec(), 0.001), done_count(),
-		QuestData.all_ids().size(), help_count(), deaths])
+		scope_ids().size(), help_count(), deaths])
 
 
 func _alive() -> bool:
@@ -1123,7 +1123,7 @@ func _offhand_wanted() -> bool:
 func _needed_items() -> Dictionary:
 	var res: Dictionary = {}
 	var q := _q()
-	for k in QuestData.all_ids():
+	for k in scope_ids():
 		var id := String(k)
 		if q.is_done(id) and not q.is_active(id):
 			continue
@@ -1145,9 +1145,21 @@ func _qrec(id: String) -> Dictionary:
 	return quests[id]
 
 
+## Задания «Прохождения острова»: все, кроме главы I (её бои — в подземелье; спуск проверяет фича «Подземелье»).
+static func scope_ids() -> Array:
+	var res: Array = []
+	for k in QuestData.all_ids():
+		if not QuestData.CH1_CHAIN.has(String(k)):
+			res.append(k)
+	return res
+
+
 ## Хочу ли брать задание (повторяемое — один раз; до профессии — только до неё).
 func _want(id: String) -> bool:
 	var q := _q()
+	# Глава I — бои в подземелье: Кардинал острова берёт только «Следы у скал» (спуск через портал — фича «Подземелье»)
+	if QuestData.CH1_CHAIN.has(id) and id != QuestData.DUNGEON_QUEST:
+		return false
 	if q.times_done(id) > 0:
 		return false
 	if until_job and not ClassData.is_wanderer(Game.class_id):
@@ -1380,7 +1392,7 @@ func _finished() -> bool:
 
 func _quests_finished() -> bool:
 	var q := _q()
-	for k in QuestData.all_ids():
+	for k in scope_ids():
 		var id := String(k)
 		if not q.is_done(id) and not (_quest_given_up(id)):
 			return false
@@ -1485,7 +1497,7 @@ func _nearest_npc_cost(cond: Callable, turn: bool) -> Array:
 	var p := _p()
 	var best := ""
 	var bd := INF
-	for k in QuestData.all_ids():
+	for k in scope_ids():
 		var id := String(k)
 		if not bool(cond.call(id)):
 			continue
@@ -1509,7 +1521,7 @@ func _nearest_npc_with(cond: Callable, turn: bool) -> String:
 	var p := _p()
 	var best := ""
 	var bd := INF
-	for k in QuestData.all_ids():
+	for k in scope_ids():
 		var id := String(k)
 		if not bool(cond.call(id)):
 			continue
@@ -1531,7 +1543,7 @@ func _nearest_npc_with(cond: Callable, turn: bool) -> String:
 ## Нужен уровень: есть задания, закрытые только уровнем, или цели, отложенные «зверь сильнее героя».
 func _need_levels() -> bool:
 	var q := _q()
-	for k in QuestData.all_ids():
+	for k in scope_ids():
 		var id := String(k)
 		if _want(id) and q.level_locked(id):
 			return true
@@ -1613,6 +1625,8 @@ func _solve(id: String, gi: int, g: Dictionary) -> Dictionary:
 	match type:
 		"kill":
 			var sp := QuestData.goal_species(g)
+			if QuestData.CH1_CHAIN.has(id):
+				return {"why": "глава I — бои в подземелье (Кардинал острова их не проходит)"}
 			var lo := int(g.get("min_level", 0))
 			var hi := int(g.get("max_level", 0))
 			return _kill_task(sp, lo, hi)
@@ -2960,7 +2974,7 @@ func _feature_belt_expand() -> bool:
 func result() -> Dictionary:
 	var qs: Dictionary = {}
 	var q := _q() if bot != null and is_instance_valid(bot) and bot.main != null and is_instance_valid(bot.main) else null
-	for k in QuestData.all_ids():
+	for k in scope_ids():
 		var id := String(k)
 		var r: Dictionary = _qrec(id).duplicate()
 		if q != null and String(r["status"]) != "done":
@@ -2977,7 +2991,7 @@ func result() -> Dictionary:
 		"game_sec": snappedf(game_t, 0.1), "wall_sec": snappedf(wall_sec(), 0.1),
 		"speedup": snappedf(game_t / maxf(wall_sec(), 0.001), 0.01),
 		"start": start, "finish": finish if done else _snapshot(),
-		"quests_done": done_count(), "quests_total": QuestData.all_ids().size(),
+		"quests_done": done_count(), "quests_total": scope_ids().size(),
 		"kills": kills, "kills_by": kills_by, "deaths": deaths, "time_split": t_split,
 		"rest_boost_game": snappedf(boost_game, 0.1),
 		"help": help, "help_total": help_count(), "features": features, "findings": findings,

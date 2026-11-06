@@ -25,6 +25,7 @@ test_dungeon_boss
 test_dungeon_editor
 test_dungeon_mobs
 test_dungeon_pets
+test_dungeon_story
 test_economy
 test_enchant
 test_equipment

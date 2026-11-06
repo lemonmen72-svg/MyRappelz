@@ -597,7 +597,7 @@ func _after_job() -> void:
 	check(q.is_ready("merc_closed_cave") and npcs.buttons.has("complete"), "выслушали Корвена — сразу можно сдать")
 	_press("complete")
 	check(q.is_done("merc_closed_cave") and npcs.reply == QuestData.text("merc_closed_cave", "done"), "«Закрытая пещера» сдано")
-	check(bool(NpcData.talk_entry("merc_chief", "dungeon").get("soon", false)), "подземелье — «скоро»")
+	check(not bool(NpcData.talk_entry("merc_chief", "dungeon").get("soon", false)), "подземелье — открыто (глава I)")
 	npcs.close_dialog()
 	var main_chain: Array = QuestData.PRE_JOB + [QID] + QuestData.BOSS_QUESTS + ["hunter_bosses_done", "hunter_to_sage",
 		"sage_first_skill", "sage_to_merc", "merc_closed_cave"]

@@ -288,6 +288,9 @@ const BASE_ITEMS := {
 	"sect_candle": {"name": "Зелёная свеча", "type": "trophy", "icon": "crystal", "buy": 0, "sell": 310, "color": Color(0.4, 0.95, 0.55), "desc": "Огарок ритуальной свечи: пламя давно погасло, а воск всё ещё светится."},
 	"ritual_ash": {"name": "Ритуальный пепел", "type": "trophy", "icon": "scale", "buy": 0, "sell": 330, "color": Color(0.6, 0.65, 0.6), "desc": "Серый пепел из жаровен святилища, холодный на ощупь."},
 	"sect_sigil": {"name": "Знак Секты Мрака", "type": "trophy", "icon": "spike", "rarity": "unique", "buy": 0, "sell": 1400, "color": Color(0.35, 0.9, 0.5), "desc": "Литой знак — глаз и щупальца — с посоха Старшего жреца. Трофей мини-босса."},
+	# Сюжетные документы главы I (тексты — Story; квестовая добыча, не продаются; в сумке — «Прочитать»)
+	"goblin_exodus_scroll": {"name": "Приказ об исходе", "type": "document", "icon": "scroll", "rarity": "rare", "buy": 0, "sell": 0, "stack": 1, "color": Color(0.7, 0.55, 0.35), "desc": "Грязный свиток из шатра Вождя гоблинов. Каракули, но читать можно."},
+	"priest_order_scroll": {"name": "Распоряжение хранителю святилища", "type": "document", "icon": "scroll", "rarity": "unique", "buy": 0, "sell": 0, "stack": 1, "color": Color(0.35, 0.9, 0.55), "desc": "Свиток Старшего жреца с печатью — глаз над щупальцами. Чернила светятся зелёным."},
 	# Трофеи босса подземелья — Проклятого капитана (0.38)
 	"captain_doubloon": {"name": "Проклятый дублон", "type": "trophy", "icon": "shard", "rarity": "rare", "buy": 0, "sell": 1200, "color": Color(0.9, 0.78, 0.35), "desc": "Золотая монета с зелёным глазом вместо герба: жалованье команды, которой обещали вечность."},
 	"oath_crystal": {"name": "Погасший кристалл клятвы", "type": "trophy", "icon": "crystal", "rarity": "unique", "buy": 0, "sell": 2200, "color": Color(0.35, 1.0, 0.6), "desc": "Изумруд из груди Проклятого капитана. Он погас, но в глубине ещё дрожит слабый свет. Трофей босса."},
@@ -1232,6 +1235,7 @@ const TYPES := {
 	"trophy": {"name": "Трофей", "order": 6, "color": Color(0.85, 0.65, 0.4)},
 	"broken": {"name": "Лом", "order": 7, "color": Color(0.5, 0.5, 0.52)},
 	"upgrade": {"name": "Прокачка", "order": 5, "color": Color(0.85, 0.8, 0.55)},
+	"document": {"name": "Документ", "order": 8, "color": Color(0.82, 0.74, 0.55)},
 }
 ## Редкость: название, ранг (для сортировки), цвет рамки и названия.
 const RARITIES := {
