@@ -60,6 +60,7 @@ test_quests
 test_quests_new
 test_renderer
 test_skill_cast
+test_skill_pages
 test_skills_light_dark_casters
 test_skills_pet_jobs
 test_skills_warrior_shaman
@@ -74,4 +75,3 @@ test_vegetation
 test_vfx
 test_vfx_gen
 test_weapons
-test_skill_pages
