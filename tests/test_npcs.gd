@@ -286,10 +286,10 @@ func _unit_data() -> void:
 			check(String(d.get("label", "")) != "" and String(d.get("text", "")) != "", "%s: пункт %s с текстом" % [id, d.get("id")])
 			if bool(d.get("soon", false)):
 				soon += 1
-		# Дела, которых ещё нет, — с пометкой «скоро» (кузница, подземелье); у мудреца, кладовщика (склад), старост
+		# Дела, которых ещё нет, — с пометкой «скоро»; подземелье у Корвена с 0.38 открыто; у мудреца, кладовщика (склад), старост
 		# и охотницы (задания) пункты рабочие
 		check(soon >= 1 or ["sage", "storekeeper", "smith", "elder_human", "elder_light", "elder_dark", "hunter", "fisher",
-			"veteran", "herbalist", "scribe", "buffer"].has(id)
+			"veteran", "herbalist", "scribe", "buffer", "merc_chief"].has(id)
 			or SHOPS.has(id), "%s: будущее дело с пометкой «скоро»" % id)
 		check(NpcData.is_trader(id) == SHOPS.has(id), "%s: торгует — только лавка" % id)
 	check(String(NpcData.talk_entry("sage", "profession").get("text", "")).contains("десятого уровня")
@@ -306,7 +306,7 @@ func _unit_data() -> void:
 	check(not bool(NpcData.talk_entry("smith", "forge").get("soon", false))
 		and String(NpcData.talk_entry("smith", "forge").get("action", "")) == "forge"
 		and String(NpcData.talk_entry("smith", "forge").get("label", "")) == "Закалка", "у кузнеца «Закалка» — рабочий пункт (без «скоро»)")
-	check(NpcData.talk_entry("merc_chief", "dungeon").get("soon", false), "подземелье — «скоро»")
+	check(not bool(NpcData.talk_entry("merc_chief", "dungeon").get("soon", false)), "подземелье у Корвена — открыто (глава I)")
 
 
 ## Ассортимент: оружие ушло от Гордея к оружейнику, у бронницы — доспехи, у ювелира — украшения; всё 1-го ранга.

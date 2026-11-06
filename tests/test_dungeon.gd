@@ -215,7 +215,10 @@ func run_step() -> void:
 			var pp: Vector3 = main.player.global_position
 			var d := Vector2(pp.x - cave.x, pp.z - cave.z).length()
 			check(d < 14.0, "герой у пещеры острова (%.1f м)" % d)
-			check(main.quests.is_ready(QuestData.DUNGEON_QUEST), "задание можно сдать Корвену")
+			check(main.quests.goal_done(QuestData.DUNGEON_QUEST, 0), "спуск в подземелье засчитан заданию Корвена")
+			# «Следы у скал» (глава I): ещё первый гоблин
+			var gob: Mob = main.spawn_mob("dg_goblin", -1, main.player.global_position + Vector3(4.0, 0.0, 0.0))
+			gob.take_damage(gob.hp + 10, main.player)
 			check(main.quests.complete(QuestData.DUNGEON_QUEST), "задание сдано")
 			check(Dungeon.enter_block() == "", "после сдачи портал по-прежнему пускает")
 			ok_done()
