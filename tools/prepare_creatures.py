@@ -2242,6 +2242,240 @@ def fish_check_clip(meta: dict, name: str, miny: float, end_min: float) -> tuple
 	return ", в воздухе", miny < 0.5 * rest_lo
 
 
+# ---------- Спрут (стиль «octopus») ----------
+# Питомец подземелья «Спрут» (этап 3, 0.37): три стадии — Emerald_Abyss_Octopus, Emerald_Abyssal_Oracle,
+# Abyssal_Crown_Kraken (Meshy с авто-ригом). У Meshy скелет — корень, «тело» с ветвлением, цепочки костей по
+# щупальцам (5–8 костей), вверх — голова (мантия), у кракена ещё зубцы короны, у оракула — плавник-капюшон.
+# Роли (octopus_roles): Root, Body; щупальце — ветка тела, конец которой лежит в стороне от тела и не выше его
+# (Tent<i>_<k>, номера по углу вокруг тела); голова — ветка вверх ближе всех к оси (Head<k>); прочие ветки вверх —
+# Crown<i>_<k>. Клипы процедурные (octopus_clips): щупальце гнётся вокруг оси «вверх × направление щупальца» — в
+# покое поднимаются только кончики (ниже земли не уходят), шаг и бег — волна подъёма по кругу щупалец, удар —
+# передние щупальца взмывают и хлещут вперёд, Death — тело оседает, щупальца раскидываются по земле.
+OCTOPUS_CREATURES = {
+	"octopus": {"style": "octopus", "height": 0.8, "tris": 18000, "idle_T": 2.6,
+		"walk": {"T": 1.3, "speed": 1.0}, "run": {"T": 0.7, "speed": 3.6}},
+	"octopus_2": {"style": "octopus", "height": 0.8, "tris": 24000, "idle_T": 2.8,
+		"walk": {"T": 1.4, "speed": 1.0}, "run": {"T": 0.75, "speed": 3.6}},
+	"octopus_3": {"style": "octopus", "height": 0.8, "tris": 26000, "idle_T": 3.0,
+		"walk": {"T": 1.5, "speed": 1.0}, "run": {"T": 0.8, "speed": 3.6}},
+}
+for _oc in OCTOPUS_CREATURES.values():
+	_oc.update({"tex": 0, "tex_hq": True, "ground_fit": True})
+CREATURES.update(OCTOPUS_CREATURES)
+
+
+def octopus_roles(names: list, parent: np.ndarray, gpos: np.ndarray, height: float) -> dict:
+	B = len(parent)
+	ch = children_of(parent)
+	roots = [b for b in range(B) if parent[b] < 0]
+	if len(roots) != 1:
+		raise ValueError("ждём один корень скелета, найдено %d" % len(roots))
+	root = roots[0]
+	body = max(range(B), key=lambda b: len(ch[b]))
+	if len(ch[body]) < 5:
+		raise ValueError("не нашёл тело спрута (ветвление на щупальца)")
+	pre = path_to(parent, body)[1:-1]
+	bc = gpos[body]
+	tents, ups = [], []
+	for c in ch[body]:
+		sub = subtree(ch, c)
+		far = max(sub, key=lambda x: float(np.linalg.norm((gpos[x] - bc)[[0, 2]])))
+		top = max(sub, key=lambda x: float(gpos[x, 1]))
+		horiz = float(np.linalg.norm((gpos[far] - bc)[[0, 2]]))
+		if horiz > 0.6 * height and gpos[far, 1] < bc[1] + 0.15 * height:
+			tents.append((math.atan2(float(gpos[far, 0] - bc[0]), float(gpos[far, 2] - bc[2])), sub, far))
+		else:
+			ups.append((float(np.linalg.norm((gpos[top] - bc)[[0, 2]])), sub, top))
+	if len(tents) < 4:
+		raise ValueError("щупалец найдено %d" % len(tents))
+	tents.sort(key=lambda x: x[0])
+	nm = {root: "Root", body: "Body"}
+	for i, b in enumerate(pre):
+		nm[b] = "Body%d" % (i + 1) if b != body else "Body"
+	ups.sort(key=lambda x: x[0])
+	head = []
+	crowns = []
+	if ups:
+		head = ups[0][1]
+		for k, b in enumerate(head):
+			nm[b] = "Head%d" % (k + 1)
+		for i, (_, sub, _) in enumerate(ups[1:]):
+			for k, b in enumerate(sub):
+				nm[b] = "Crown%d_%d" % (i + 1, k + 1)
+			crowns.append(sub)
+	tent_list = []
+	for i, (ang, sub, far) in enumerate(tents):
+		chain = path_to(parent, far)
+		chain = chain[chain.index(sub[0]):]
+		for k, b in enumerate(sub):
+			nm[b] = "Tent%d_%d" % (i + 1, k + 1) if b in chain else "Tent%d_x%d" % (i + 1, k + 1)
+		d = gpos[far] - bc
+		d[1] = 0.0
+		d = d / max(float(np.linalg.norm(d)), 1e-6)
+		tent_list.append({"chain": chain, "all": sub, "dir": d, "ang": ang})
+	missing = [names[b] for b in range(B) if b not in nm]
+	if missing:
+		raise ValueError("кости без роли: %s" % missing)
+	head_b = head[0] if head else body
+	roles = {
+		"kind": "octopus", "root": root, "body": body, "pre": pre, "head_chain": head, "crowns": crowns,
+		"tents": tent_list, "legs": {}, "head": head_b, "neck": [], "tail": [], "spine": pre + [body],
+		"chest": body, "hips": body, "ears": {"L": [], "R": []}, "head_extra": [], "extra": [],
+		"back": [], "names": [nm[b] for b in range(B)],
+	}
+	if len(set(roles["names"])) != B:
+		raise ValueError("повтор имён костей: %s" % roles["names"])
+	return roles
+
+
+def octopus_clips(c: Ctx) -> list:
+	"""Клипы спрута: щупальца гнутся вокруг оси (вверх × направление); подъём кончиков — отрицательный угол."""
+	cfg = c.cfg
+	r = c.roles
+	H = float(cfg["height"])
+	W, R = cfg["walk"], cfg["run"]
+	tents = r["tents"]
+	N = len(tents)
+	up = np.array([0.0, 1.0, 0.0])
+	for t in tents:
+		ax = np.cross(up, t["dir"])
+		t["ax"] = ax / max(float(np.linalg.norm(ax)), 1e-6)
+		n = len(t["chain"])
+		g = np.array([0.4 + 1.2 * k / max(n - 1, 1) for k in range(n)])
+		t["gain"] = g / g.sum()
+		t["front"] = float(t["dir"][2])
+	out = []
+
+	def curl(P, t, lift, sway=0.0, lag=0.0, ph=0.0):
+		"""lift > 0 — щупальце поднимается (суммарный угол, рад), sway — в сторону (вокруг вертикали)."""
+		for k, b in enumerate(t["chain"]):
+			w = float(t["gain"][k])
+			a = lift * w if lag == 0.0 else lift * w * (0.5 + 0.5 * math.sin(ph - lag * k))
+			c.rot(P, b, rot_axis(t["ax"], -a) @ ry(sway * w))
+
+	def head(P, pitch=0.0, yaw=0.0):
+		for b in r["head_chain"]:
+			c.rot(P, b, body_rot(pitch / max(len(r["head_chain"]), 1), yaw / max(len(r["head_chain"]), 1), 0.0))
+
+	def crowns(P, ph, amp):
+		for i, sub in enumerate(r["crowns"]):
+			for b in sub:
+				c.rot(P, b, ry(amp * math.sin(ph + i)))
+
+	def body(P, dy=0.0, pitch=0.0, roll=0.0, dz=0.0):
+		c.rot(P, c.root, body_rot(pitch, 0.0, roll))
+		P["root_off"] = P["root_off"] + np.array([0.0, dy, dz])
+
+	Ti = cfg.get("idle_T", 2.6)
+
+	def idle(t):
+		P = c.pose()
+		ph = TAU * t / Ti
+		body(P, dy=0.035 * H * math.sin(ph), pitch=0.03 * math.sin(ph + 0.8))
+		for i, tt in enumerate(tents):
+			pi = ph + TAU * i / N
+			curl(P, tt, 0.28 * (0.5 + 0.5 * math.sin(pi)), sway=0.12 * math.sin(pi + 1.1), lag=0.5, ph=pi)
+		head(P, pitch=0.06 * math.sin(ph + 0.4), yaw=0.05 * math.sin(0.5 * ph))
+		crowns(P, ph, 0.08)
+		return P
+
+	out.append({"name": "Idle", "T": Ti, "loop": True, "fn": idle})
+
+	def crawl(g, amp, bob, lean):
+		T = g["T"]
+
+		def fn(t):
+			P = c.pose()
+			ph = TAU * t / T
+			body(P, dy=bob * H * (0.5 + 0.5 * math.sin(2.0 * ph)), pitch=-lean)
+			for i, tt in enumerate(tents):
+				pi = ph + TAU * (i % 2) / 2.0 + 0.6 * i / N
+				lift = amp * max(0.0, math.sin(pi))
+				# вынос вперёд: щупальце в подъёме тянется к +Z (поворот вокруг вертикали к носу)
+				sway = -0.25 * amp * math.cos(pi) * float(np.sign(tt["dir"][0]) or 1.0) * (1.0 - abs(tt["front"]))
+				curl(P, tt, lift + 0.08, sway=sway, lag=0.6, ph=pi)
+			head(P, pitch=0.05 * math.sin(2.0 * ph))
+			crowns(P, 2.0 * ph, 0.1)
+			return P
+
+		return fn
+
+	out.append({"name": "Walk", "T": W["T"], "loop": True, "fn": crawl(W, 0.55, 0.04, 0.03), "speed": float(W["speed"])})
+	out.append({"name": "Run", "T": R["T"], "loop": True, "fn": crawl(R, 0.8, 0.07, 0.08), "speed": float(R["speed"])})
+
+	def attack(t):
+		# Передние щупальца взмывают (замах) и хлещут вперёд-вниз, тело приподнимается и подаётся вперёд
+		P = c.pose()
+		body(P, dy=keys(t, [(0, 0), (0.3, 0.12 * H), (0.45, 0.02 * H), (0.9, 0)]),
+			pitch=keys(t, [(0, 0), (0.3, 0.18), (0.45, -0.12), (0.9, 0)]),
+			dz=keys(t, [(0, 0), (0.3, -0.05 * H), (0.45, 0.12 * H), (0.9, 0)]))
+		for tt in tents:
+			fw = max(0.0, tt["front"])
+			lift = keys(t, [(0, 0.05), (0.3, 1.4 * fw + 0.15), (0.45, 0.1 * fw), (0.9, 0.05)])
+			curl(P, tt, lift)
+		head(P, pitch=keys(t, [(0, 0), (0.3, 0.12), (0.45, -0.1), (0.9, 0)]))
+		return P
+
+	out.append({"name": "Attack", "T": 0.9, "loop": False, "fn": attack, "hit": 0.45})
+
+	def hit_fn(t):
+		P = c.pose()
+		e = keys(t, [(0, 0), (0.08, 1), (0.4, 0)])
+		body(P, dy=0.05 * H * e, pitch=0.15 * e, dz=-0.08 * H * e)
+		for i, tt in enumerate(tents):
+			curl(P, tt, 0.5 * e * (0.7 + 0.3 * math.sin(i)))
+		return P
+
+	out.append({"name": "Hit", "T": 0.4, "loop": False, "fn": hit_fn})
+
+	Td = 1.6
+
+	def death(t):
+		# Судорога (щупальца вверх), затем тело оседает: основания щупалец приподнимаются, остальное ложится на землю
+		P = c.pose()
+		x = t / Td
+		sp = env(x, 0.0, 0.08, 0.25, 0.45)
+		f = smooth((x - 0.3) / 0.45)
+		body(P, pitch=keys(x, [(0, 0), (0.15, 0.2), (0.7, -0.06), (1.0, -0.05)]),
+			roll=keys(x, [(0, 0), (0.7, 0.08), (1.0, 0.06)]), dy=-0.3 * H * f)
+		for i, tt in enumerate(tents):
+			curl(P, tt, 0.9 * sp * (0.6 + 0.4 * math.sin(3 * i)), sway=0.2 * sp * math.sin(i * 1.7))
+			ch = tt["chain"]
+			for k, b in enumerate(ch):
+				a = 0.55 if k == 0 else (-0.3 if k == 1 else -0.25 / max(len(ch) - 2, 1))
+				c.rot(P, b, rot_axis(tt["ax"], -a * f))
+		head(P, pitch=keys(x, [(0, 0), (0.6, -0.25), (1.0, -0.3)]))
+		return P
+
+	out.append({"name": "Death", "T": Td, "loop": False, "fn": death, "fit_after": 0.7})
+
+	def cast(t):
+		# Тело поднимается, все щупальца — вверх и в стороны, волна по ним
+		P = c.pose()
+		e = keys(t, [(0, 0), (0.18, 1), (0.6, 1), (0.9, 0)])
+		body(P, dy=0.14 * H * e, pitch=0.06 * e)
+		for i, tt in enumerate(tents):
+			curl(P, tt, 0.9 * e, sway=0.15 * e * math.sin(TAU * t / 0.45 + i), lag=0.7, ph=TAU * t / 0.45 + i)
+		head(P, pitch=0.15 * e)
+		crowns(P, TAU * t / 0.3, 0.15 * e)
+		return P
+
+	out.append({"name": "Cast", "T": 0.9, "loop": False, "fn": cast, "cast": 0.45})
+	return out
+
+
+def octopus_meta(meta: dict, rig: Rig, roles: dict) -> None:
+	nm = rig.names
+	meta["kind"] = "octopus"
+	meta["bones"] = {
+		"root": nm[roles["root"]], "body": nm[roles["body"]], "head": nm[roles["head"]], "hips": nm[roles["body"]],
+		"chest": nm[roles["body"]], "spine": [nm[b] for b in roles["spine"]],
+		"head_chain": [nm[b] for b in roles["head_chain"]],
+		"tentacles": [[nm[b] for b in t["chain"]] for t in roles["tents"]],
+		"crowns": [[nm[b] for b in s] for s in roles["crowns"]],
+	}
+
+
 # ---------- Кентавр (стиль «centaur») ----------
 # Скелет Meshy у кентавра собран плохо: у передних конских ног нет своих костей (их вершины висят на кисти руки,
 # древке копья и задней ноге), копьё — на корне или на костях головы и пальцев, большие куски доспеха — на костях
@@ -3270,7 +3504,8 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 	print("== %s: %s" % (cid, src_path))
 	src = load_source(src_path)
 	fish = cfg.get("style") == "fish"
-	yaw = None
+	octo = cfg.get("style") == "octopus"
+	yaw = 0.0 if octo else None
 	if fish:
 		yaw = fish_yaw(src)
 		cfg = fish_cfg(src, cfg, yaw)
@@ -3279,6 +3514,10 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 	centaur = cfg.get("style") == "centaur"
 	if fish:
 		roles = fish_roles(g["names"], g["parent"], g["gpos"], cfg["length"])
+	elif octo:
+		roles = octopus_roles(g["names"], g["parent"], g["gpos"], cfg["height"])
+		print("   щупалец %d (%s), голова %s, корона %d" % (len(roles["tents"]),
+			" ".join(str(len(t["chain"])) for t in roles["tents"]), len(roles["head_chain"]), len(roles["crowns"])))
 	elif centaur:
 		g, roles = centaur_rig(g, cfg)
 	else:
@@ -3320,6 +3559,8 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 		clip_specs = centaur_clips(c)
 	elif fish:
 		clip_specs = fish_clips(c)
+	elif octo:
+		clip_specs = octopus_clips(c)
 	else:
 		clip_specs = bird_clips(c) if cfg["style"] == "bird" else quad_clips(c)
 	clips = [bake(c, cl) for cl in clip_specs]
@@ -3364,6 +3605,8 @@ def build(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 			meta["clips"][cl["name"]].update({"speed": round(cl["speed"], 3), "stride": g2["stride"], "duty": g2["duty"]})
 	if fish:
 		fish_meta(meta, rig, roles, mesh, cfg, clips)
+	if octo:
+		octopus_meta(meta, rig, roles)
 	if centaur:
 		meta["bones"]["torso"] = [nm[b] for b in roles["torso"]]
 		meta["bones"]["arms"] = {s: [nm[b] for b in a["chain"]] for s, a in roles["arms"].items()}
@@ -3478,6 +3721,8 @@ def check(out_dir: str, ids: list, meta_all: dict, preview: str = "") -> bool:
 		face_ok = hz > 0.0 and G0[head][1, 3] > 0.3 * (hi[1] - lo[1])
 		if meta.get("kind") == "biped":
 			face_ok = biped_check_rest(meta, G0, idx)
+		elif meta.get("kind") == "octopus":
+			face_ok = True  # мантия спрута позади глаз (голова z < 0) — морда по ориентации Meshy, +Z
 		print("   голова в покое: %s → морда в %s" % (np.round(G0[head][:3, 3], 3), "+Z" if face_ok else "НЕ +Z (!)"))
 		if fish:
 			ok &= bool(face_ok) and fish_check_rest(meta, lo, hi, G0[head][:3, 3])
@@ -3656,6 +3901,16 @@ DUNGEON_MOBS = {
 		"clips": dict(_ZOMBIE, Attack=("ual2", ["Sword_Regular_A", "Sword_Regular_A_Rec"]))},
 	"dg_elder_priest": {"style": "biped", "height": 2.2, "tris": 26000, "clips": dict(_CASTER)},
 }
+# Питомец подземелья «Скелет» (этап 3, 0.37): стадии — Emerald_Revenant, Emerald_Lich_Warrior, Emerald_Wraith_Knight
+# (вариант «(1)» — латник без оружия в руках). Боец с мечом: стойка и удары мечом UAL; меч в руке — PetData weapon.
+PET_SKELETONS = {
+	"skeleton": {"style": "biped", "height": 1.7, "tris": 22000},
+	"skeleton_2": {"style": "biped", "height": 1.7, "tris": 24000,
+		"clips": {"Attack": ("ual2", ["Sword_Regular_B", "Sword_Regular_B_Rec"])}},
+	"skeleton_3": {"style": "biped", "height": 1.7, "tris": 26000,
+		"clips": {"Attack": ("ual1", ["Sword_Attack"])}},
+}
+DUNGEON_MOBS.update(PET_SKELETONS)
 BIPED_CREATURES.update(DUNGEON_MOBS)
 CREATURES.update(BIPED_CREATURES)
 

@@ -263,6 +263,19 @@ const TYPES := {
 		"power": 1.5, "mini_boss": false, "attack_cd": 1.4, "weapon": "mw_curved_dagger",
 		"loot": ["coral_shard", "sea_bone"], "undead": true,
 	},
+	# Питомцы подземелья (этап 3, 0.37): «Обычные», приручаются (синяя карта), в подземелье — его сила (dungeon).
+	# Модель — стадия по уровню (MobStats.stage_for: 22+ — 3-я), оружие скелета — по стадии (weapons).
+	"skeleton": {
+		"name": "Скелет", "gen": "скелета", "level": 21, "speed": 4.0, "gold": [26, 48],
+		"color": Color(0.82, 0.86, 0.74), "scale": 0.8, "rarity": "uncommon", "dungeon": true, "power": 1.5,
+		"mini_boss": false, "attack_cd": 1.2, "weapons": ["mw_rusty_dagger", "mw_shortsword", "mw_straight_sword"],
+		"loot": ["skeleton_bone", "grave_chain"], "undead": true,
+	},
+	"octopus": {
+		"name": "Спрут", "gen": "спрута", "level": 26, "speed": 3.6, "gold": [30, 56],
+		"color": Color(0.3, 0.72, 0.6), "scale": 0.85, "rarity": "uncommon", "dungeon": true, "power": 1.5,
+		"mini_boss": false, "magic": true, "attack_cd": 1.5, "loot": ["octopus_tentacle", "coral_shard"],
+	},
 	# Кабан и каменный страж — модели из примитивов: в мире больше не появляются (на острове только существа
 	# Максима), данные — для совместимости (старые сохранения, тесты)
 	"golem": {
@@ -317,8 +330,13 @@ static func is_dungeon(id: String) -> bool:
 
 
 ## Оружие в руке модели монстра (id модели assets/handheld, "" — без оружия).
-static func weapon_of(id: String) -> String:
-	return String(get_type(id).get("weapon", ""))
+## У питомцев подземелья (скелет) — по стадии модели: поле weapons [1-я, 2-я, 3-я].
+static func weapon_of(id: String, stage: int = 0) -> String:
+	var d := get_type(id)
+	if d.has("weapons"):
+		var w: Array = d["weapons"]
+		return String(w[clampi(stage, 0, w.size() - 1)])
+	return String(d.get("weapon", ""))
 
 
 ## Минибосс: «Редкий» зверь мира, не босс (вожак анатем, змеекрыл, кентавр); поле "mini_boss" заменяет правило.

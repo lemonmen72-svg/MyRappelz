@@ -95,6 +95,20 @@ const SPECIES := {
 		"hp": 339, "atk": 16, "def": 6,
 		"speed": 5.5, "range": 2.0, "cd": 1.3, "scale": 0.85, "evo_color": Color(0.3, 0.7, 0.65),
 	},
+	# Питомцы подземелья (этап 3, 0.37): «Обычные», как волк. Скелет — боец с мечом (weapons по стадии — модели
+	# assets/handheld/mw_*), Спрут — маг поддержки: вампиризм хозяину, страх, яд, поле с лечением
+	"skeleton": {
+		"role": "fighter", "stages": ["Костяной мечник", "Расколотый страж", "Латник Мрака"],
+		"hp": 125, "atk": 21, "def": 2,
+		"speed": 7.0, "range": 2.0, "cd": 1.0, "scale": 0.85, "evo_color": Color(0.35, 0.95, 0.55),
+		"weapons": ["mw_rusty_dagger", "mw_shortsword", "mw_straight_sword"],
+	},
+	"octopus": {
+		"role": "mage", "stages": ["Спрутёнок глубин", "Изумрудный спрут", "Владыка пучины"],
+		"hp": 175, "atk": 31, "def": 1,
+		"speed": 6.2, "range": 8.0, "cd": 1.5, "scale": 0.8, "evo_color": Color(0.25, 0.9, 0.6),
+		"fx_color": Color(0.3, 1.0, 0.6),
+	},
 	"golem": {
 		"role": "tank", "stages": ["Камушек", "Валунный страж", "Древний колосс"],
 		"hp": 442, "atk": 26, "def": 8,
@@ -105,6 +119,12 @@ const SPECIES := {
 
 static func get_species(id: String) -> Dictionary:
 	return SPECIES.get(id, SPECIES["boar"])
+
+
+## Оружие в руке модели питомца стадии stage (у скелета; у остальных "").
+static func weapon_of(id: String, stage: int) -> String:
+	var w: Array = get_species(id).get("weapons", [])
+	return String(w[clampi(stage, 0, w.size() - 1)]) if not w.is_empty() else ""
 
 
 ## Роль вида: "tank" | "fighter" | "mage" | "healer".

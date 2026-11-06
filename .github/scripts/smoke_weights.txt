@@ -71,3 +71,4 @@ test_mob_range 6
 test_dungeon 40
 test_dungeon_editor 30
 test_dungeon_mobs 15
+test_dungeon_pets 20

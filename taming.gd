@@ -47,6 +47,8 @@ var _rng := RandomNumberGenerator.new()
 ## Зоны острова из конфига (кэш для описаний карт): [{"name", "levels": [мин., макс.], "mobs": [id]}].
 static var _zones: Array = []
 static var _zones_loaded := false
+static var _dg_zones: Array = []
+static var _dg_loaded := false
 
 
 func setup(m: Node) -> void:
@@ -195,7 +197,7 @@ static func _drop_text(card_id: String) -> String:
 ## Где водится вид: «Луга новичков (ур. 1–2), Южные поля (ур. 2–3)» по mob_zones конфига острова.
 static func habitat_text(species: String) -> String:
 	var parts: Array = []
-	for z in zones():
+	for z in zones() + dungeon_zones():
 		var zone: Dictionary = z
 		if (zone["mobs"] as Array).has(species):
 			# Свои уровни вида в зоне ([вид, n, мин, макс]), иначе — уровни зоны
@@ -205,11 +207,13 @@ static func habitat_text(species: String) -> String:
 	return ", ".join(PackedStringArray(parts))
 
 
-## Водится ли вид в зонах острова (нет конфига — считаем, что да).
-static func lives_in_world(species: String) -> bool:
+## Водится ли вид в зонах острова или подземелья (нет конфига — считаем, что да); island_only — только остров.
+static func lives_in_world(species: String, island_only: bool = false) -> bool:
 	var zs := zones()
 	if zs.is_empty():
 		return true
+	if not island_only:
+		zs = zs + dungeon_zones()
 	for z in zs:
 		if ((z as Dictionary)["mobs"] as Array).has(species):
 			return true
@@ -221,14 +225,28 @@ static func zones() -> Array:
 	if _zones_loaded:
 		return _zones
 	_zones_loaded = true
-	_zones = []
 	var cfg: Variant = null
-	if IslandWorld.current != null:
+	if IslandWorld.current != null and IslandWorld.current.location() == "island":
 		cfg = IslandWorld.current.cfg
 	else:
 		cfg = JSON.parse_string(FileAccess.get_file_as_string(IslandWorld.CONFIG_PATH))
+	_zones = _zones_of(cfg, "")
+	return _zones
+
+
+## Зоны подземелья (world/dungeon.json; к имени — « (подземелье)»).
+static func dungeon_zones() -> Array:
+	if _dg_loaded:
+		return _dg_zones
+	_dg_loaded = true
+	_dg_zones = _zones_of(JSON.parse_string(FileAccess.get_file_as_string(DungeonWorld.DUNGEON_CONFIG)), " (подземелье)")
+	return _dg_zones
+
+
+static func _zones_of(cfg: Variant, suffix: String) -> Array:
+	var out: Array = []
 	if not (cfg is Dictionary):
-		return _zones
+		return out
 	for z in (cfg as Dictionary).get("mob_zones", []):
 		if not (z is Dictionary):
 			continue
@@ -243,9 +261,9 @@ static func zones() -> Array:
 			if e.size() >= 4:
 				var old_lv: Array = sp_lv.get(sid, [int(e[2]), int(e[3])])
 				sp_lv[sid] = [mini(int(old_lv[0]), int(e[2])), maxi(int(old_lv[1]), int(e[3]))]
-		_zones.append({"name": String(zone.get("name", "")), "levels": [int(lv[0]), int(lv[1])], "mobs": mobs,
+		out.append({"name": String(zone.get("name", "")) + suffix, "levels": [int(lv[0]), int(lv[1])], "mobs": mobs,
 			"species_levels": sp_lv})
-	return _zones
+	return out
 
 
 ## Строки описания карты для карточки предмета: вид и роль, где водится, тир и шанс, где взять, что делать.

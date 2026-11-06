@@ -737,6 +737,8 @@ func _check_db_extras() -> void:
 		for id in ["item_expert_", "vital_unit_", "fighter_unit_", "card_%s_1", "card_%s_2", "wound_lick_", "creation_",
 				"creation_potion_"]:
 			var sid := (String(id) % sp) if String(id).contains("%s") else String(id) + String(sp)
+			if String(id) == "wound_lick_" and bool((PetSkills.DB_EXTRAS[sp] as Dictionary).get("grave_thirst", false)):
+				sid = "grave_thirst_" + String(sp)  # у скелета вместо «Зализать раны» — «Могильная жажда»
 			check(ids.has(sid) and not PetSkills.get_skill(sid).is_empty(), "%s: есть «%s»" % [sp, sid])
 		for st in PetSkills.BLESS_STATS:
 			check(ids.has("bless_" + String(st)), "%s: «Благословение» %s" % [sp, st])

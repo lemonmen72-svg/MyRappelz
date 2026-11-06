@@ -63,6 +63,11 @@ const DEFAULTS := {
 		"attack_hit_time": 0.23},
 	"anathema_chief": {"height": 2.2, "length": 0.72, "width": 1.31, "walk_speed": 1.16, "run_speed": 6.94,
 		"attack_hit_time": 0.27},
+	# Питомцы подземелья (0.37): Скелет — двуногий («biped»), Спрут — стиль «octopus» (щупальца, prepare_creatures.py)
+	"skeleton": {"height": 1.70, "length": 0.30, "width": 1.71, "walk_speed": 1.04, "run_speed": 6.31,
+		"attack_hit_time": 0.23},
+	"octopus": {"height": 0.80, "length": 1.79, "width": 1.83, "walk_speed": 1.00, "run_speed": 3.60,
+		"attack_hit_time": 0.45},
 	# Монстры подземелья (стиль «biped», модели Максима из «ДАНЖ»; оружие в руке — grips в creatures.json)
 	"dg_goblin": {"height": 1.35, "length": 0.38, "width": 1.39, "walk_speed": 0.67, "run_speed": 4.20,
 		"attack_hit_time": 0.23},

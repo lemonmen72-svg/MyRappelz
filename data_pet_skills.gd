@@ -333,6 +333,112 @@ const SKILLS := {
 		"tiers": [[45, 5], [95, 10], [145, 15]], "bonus": "eva", "value": [2.0, 0.5], "owner": true,
 		"mp": [46.0, 36.0], "upkeep": [3.0, 3.0],
 	},
+	# ---------- Скелет (Skeleton Fighter → Skeleton Warrior → Chaos Knight; числа — вики/база, перезарядки и каст —
+	# наши, как у других видов; справка — tools/rappelz_dungeon_pets_reference.md) ----------
+	"bone_fury": {  # ← Skeleton Fury: 2 удара по 70%…210%
+		"name": "Костяная ярость", "kind": "active", "glyph": "К", "color": Color(0.8, 0.88, 0.7), "jp": 1,
+		"desc": "Два яростных удара клинком подряд.",
+		"tiers": [[10, 5], [60, 10], [110, 15]], "mp": [54.0, 9.0], "cd": 8.0, "cast": 0.5,
+		"dmg": [0.7, 0.1], "hits": 2, "prio": 50,
+	},
+	"rot_cleave": {  # ← Chaos Crash: 180%…460%, скорость атаки цели −11 %…−25 % на 10 с
+		"name": "Гнилой раскол", "kind": "active", "glyph": "Г", "color": Color(0.45, 0.85, 0.45), "jp": 1,
+		"desc": "Тяжёлый удар гнилью: большой урон, и 10 с зверь бьёт реже.",
+		"tiers": [[20, 5], [70, 10], [120, 15]], "pre": ["bone_fury", [1, 6, 11]],
+		"mp": [117.0, 13.0], "cd": 15.0, "cast": 0.75, "dmg": [1.8, 0.2], "aslow": [0.11, 0.01], "prio": 60,
+	},
+	"bone_shudder": {  # ← Skeleton's Shudder: 60%…200%, оглушение 2 с, угроза
+		"name": "Дрожь костей", "kind": "active", "glyph": "Д", "color": Color(0.9, 0.9, 0.6), "jp": 2,
+		"desc": "Скелет сотрясает костями: урон, оглушение на 2 с, и зверь бьёт скелета.",
+		"tiers": [[30, 5], [80, 10], [130, 15]], "mp": [159.0, 9.0], "cd": 20.0, "cast": 0.0,
+		"dmg": [0.6, 0.1], "stun": 2.0, "threat": true, "prio": 70,
+	},
+	"blade_bond": {  # ← Unity: Skeleton (скорость атаки хозяину и питомцу)
+		"name": "Узы клинка", "kind": "toggle", "glyph": "У", "color": Color(0.7, 0.9, 0.65), "jp": 2,
+		"desc": "Пока включено, хозяин и скелет бьют чаще.",
+		"tiers": [[45, 5], [95, 10], [145, 15]], "bonus": "aspd_pct", "value": [0.02, 0.01], "owner": true,
+		"mp": [46.0, 36.0], "upkeep": [3.0, 3.0],
+	},
+	"grim_call": {  # ← Encouragement: Strength (Tier2)
+		"name": "Мрачный клич", "kind": "active", "glyph": "М", "color": Color(0.55, 0.9, 0.55), "jp": 2,
+		"desc": "Скелет поднимает клинок: атака хозяина выше на 15 с.",
+		"tiers": [[0, 0], [85, 5], [135, 10]], "mp": [98.0, 21.0], "cd": 90.0, "cast": 0.5,
+		"buff": "atk", "value": [0.04, 0.015], "time": 15.0, "prio": 85,
+	},
+	"decay_flurry": {  # ← Corrupt Strike: 3 удара по 130%…220%
+		"name": "Шквал тлена", "kind": "active", "glyph": "Ш", "color": Color(0.4, 0.75, 0.4), "jp": 2,
+		"desc": "Три удара клинком, напитанным тленом.",
+		"tiers": [[0, 0], [90, 5], [140, 10]], "mp": [209.0, 19.0], "cd": 45.0, "cast": 0.5,
+		"dmg": [1.3, 0.1], "hits": 3, "prio": 90,
+	},
+	"knight_blade": {  # ← Chaos Knight Blade: по площади 220 %, высокий шанс крита
+		"name": "Клинок латника", "kind": "active", "glyph": "Л", "color": Color(0.3, 0.95, 0.5), "jp": 2,
+		"desc": "Круговой удар изумрудным клинком по всем зверям вокруг цели, часто критический.",
+		"tiers": [[0, 0], [0, 0], [150, 1]], "pre": ["decay_flurry", [0, 0, 6]],
+		"mp": [597.0, 0.0], "cd": 90.0, "cast": 0.75, "dmg": [2.2, 0.0], "radius": 5.0, "crit": 50.0, "prio": 100,
+	},
+	# ---------- Спрут (Octopus → Kraken → Kraken Empress; маг поддержки) ----------
+	"tentacle_whirl": {  # ← Whirlwind Kick: 2 удара щупальцами по 70%…210%
+		"name": "Вихрь щупалец", "kind": "active", "glyph": "В", "color": Color(0.3, 0.8, 0.65), "jp": 1,
+		"desc": "Два хлёстких удара щупальцами по цели.",
+		"tiers": [[10, 5], [60, 10], [110, 15]], "mp": [54.0, 9.0], "cd": 8.0, "cast": 0.5,
+		"dmg": [0.7, 0.1], "hits": 2, "prio": 50,
+	},
+	"ink_veil": {  # ← Shadow Illusion (Tier2): угроза питомца ниже — у нас зверь держит прежнюю цель
+		"name": "Чернильная завеса", "kind": "toggle", "glyph": "Ч", "color": Color(0.35, 0.4, 0.55), "jp": 1,
+		"desc": "Пока включено, зверь, который бьёт хозяина, может не заметить ударов спрута и не переключиться на него.",
+		"tiers": [[15, 5], [65, 10], [115, 15]], "bonus": "veil", "value": [0.3, 0.05],
+		"mp": [10.0, 0.0], "upkeep": [41.0, 15.0],
+	},
+	"blood_thirst": {  # ← Bloodthirst: усиление хозяина — обычные атаки с шансом 31 %…45 % вытягивают HP
+		"name": "Кровавая жажда", "kind": "active", "glyph": "К", "color": Color(0.85, 0.25, 0.3), "jp": 1,
+		"desc": "60 с обычные атаки хозяина с шансом возвращают ему часть здоровья.",
+		"tiers": [[20, 5], [70, 10], [120, 15]], "pre": ["tentacle_whirl", [1, 6, 11]],
+		"mp": [351.0, 39.0], "cd": 120.0, "cast": 0.5, "buff": "leech", "value": [0.02, 0.002],
+		"chance": [0.31, 0.01], "time": 60.0, "prio": 80,
+	},
+	"abyss_wail": {  # ← War Cry: страх 2.2…5.0 с
+		"name": "Вой пучины", "kind": "active", "glyph": "П", "color": Color(0.4, 0.6, 0.85), "jp": 2,
+		"desc": "Спрут издаёт вой из глубин: зверь в страхе убегает и не нападает.",
+		"tiers": [[25, 5], [75, 10], [125, 15]], "mp": [127.0, 7.0], "cd": 60.0, "cast": 0.5,
+		"fear": [2.2, 0.2], "prio": 65,
+	},
+	"venom_blood": {  # ← Blood Curse: тратит HP, 72 %…225 % + яд 10 с, угроза
+		"name": "Ядовитая кровь", "kind": "active", "glyph": "Я", "color": Color(0.5, 0.85, 0.3), "jp": 2,
+		"desc": "Спрут платит своей кровью (5 % HP): урон и яд на 10 с, зверь бьёт спрута.",
+		"tiers": [[30, 5], [80, 10], [130, 15]], "mp": [120.0, 7.0], "cd": 20.0, "cast": 0.0,
+		"dmg": [0.72, 0.11], "dot": [0.2, 0.03], "dot_time": 10.0, "self_hp": 0.05, "threat": true, "prio": 70,
+	},
+	"deep_bond": {  # ← Unity: Octopus: атака и восстановление MP хозяину и питомцу
+		"name": "Узы глубин", "kind": "toggle", "glyph": "У", "color": Color(0.3, 0.75, 0.75), "jp": 2,
+		"desc": "Пока включено, атака хозяина и спрута выше, а MP хозяина восстанавливается быстрее.",
+		"tiers": [[45, 5], [95, 10], [145, 15]], "bonus": "atk_pct", "value": [0.03, 0.006],
+		"bonus2": "mp_regen", "value2": [0.5, 0.18], "owner": true, "mp": [46.0, 36.0], "upkeep": [3.0, 3.0],
+	},
+	"tide_call": {  # ← Encouragement: Intelligence (Tier2)
+		"name": "Зов прилива", "kind": "active", "glyph": "З", "color": Color(0.35, 0.75, 0.95), "jp": 2,
+		"desc": "Спрут зовёт прилив: маг. атака хозяина выше на 15 с.",
+		"tiers": [[0, 0], [85, 5], [135, 10]], "mp": [98.0, 21.0], "cd": 90.0, "cast": 0.5,
+		"buff": "matk", "value": [0.04, 0.015], "time": 15.0, "prio": 85,
+	},
+	"deep_pulse": {  # ← Soul Impact: 3 взрыва по 130 %…220 %
+		"name": "Импульс глубин", "kind": "active", "glyph": "И", "color": Color(0.3, 0.95, 0.65), "jp": 2,
+		"desc": "Три волны силы глубин по зверям вокруг цели.",
+		"tiers": [[0, 0], [90, 5], [140, 10]], "mp": [136.0, 12.0], "cd": 45.0, "cast": 1.0,
+		"dmg": [1.3, 0.1], "hits": 3, "radius": 3.0, "prio": 90,
+	},
+	"abyss_breath": {  # ← Awakening: MP Regen (Tier2)
+		"name": "Дыхание бездны", "kind": "passive", "glyph": "Д", "color": Color(0.35, 0.6, 0.95), "jp": 2,
+		"desc": "MP спрута восстанавливается быстрее.",
+		"tiers": [[0, 0], [0, 0], [140, 1]], "bonus": "mp_regen", "value": [1.0, 0.0],
+	},
+	"corruption_pool": {  # ← Field of Corruption: поле 10 с, 5 раз урон врагам и лечение союзников
+		"name": "Омут порчи", "kind": "active", "glyph": "О", "color": Color(0.3, 0.9, 0.45), "jp": 2,
+		"desc": "Омут порчи вокруг спрута на 10 с: раз в 2 с ранит зверей рядом и лечит спрута и хозяина.",
+		"tiers": [[0, 0], [0, 0], [150, 1]], "pre": ["deep_pulse", [0, 0, 6]],
+		"mp": [388.0, 0.0], "cd": 90.0, "cast": 0.75, "dmg": [0.6, 0.0], "radius": 5.0, "pool": 10.0,
+		"pool_every": 2.0, "pool_heal": 0.4, "prio": 100,
+	},
 	# ---------- Кабан, каменный страж (своё: одно активное по роли); «Свирепый натиск» — и у волка ----------
 	"fierce_rush": {  # ← у волка — Piercing Fangs: 2 укуса по 70%…210% (MP 54…180)
 		"name": "Свирепый натиск", "kind": "active", "glyph": "С", "color": RED, "jp": 1,
@@ -367,6 +473,12 @@ const SPECIES_SKILLS := {
 		"chilling_howl", "mending", "calm_mind", "lunging_bite", "pack_bond", "keen_eye", "alpha_call", "fang_flurry",
 		"feather_step", "moon_frenzy", "ancestor_gift"],
 	"golem": ["inner_fire", "hardening", "vitality", "ground_roar"],
+	"skeleton": ["inner_fire", "hardening", "bone_fury", "provoke", "rot_cleave", "vitality", "deep_spring", "daze",
+		"bone_shudder", "mending", "calm_mind", "blade_bond", "keen_eye", "grim_call", "decay_flurry", "feather_step",
+		"knight_blade", "ancestor_gift"],
+	"octopus": ["inner_fire", "hardening", "tentacle_whirl", "ink_veil", "vitality", "deep_spring", "blood_thirst",
+		"abyss_wail", "mending", "calm_mind", "venom_blood", "deep_bond", "keen_eye", "tide_call", "deep_pulse",
+		"abyss_breath", "corruption_pool", "ancestor_gift"],
 }
 
 
@@ -406,6 +518,14 @@ const DB_EXTRAS := {
 	"wolf": {"expert": [0.9, 0.95, 1.0], "armor": "hunter", "vital": [0.10, 0.12, 0.14],
 		"fighter": [0.10, 0.12, 0.14], "weapon": "melee",
 		"cards": [["agi", [0.10, 0.12, 0.14]], ["avoid", [0.10, 0.12, 0.14]]], "material": "wolf_claw"},
+	# Скелет и Спрут — 2-й тир, как волк (ранги «<Stage N>» базы — по образцу волка)
+	"skeleton": {"expert": [0.9, 0.95, 1.0], "armor": "hunter", "vital": [0.10, 0.12, 0.14],
+		"fighter": [10.0, 12.0, 14.0], "weapon": "dagger",
+		"cards": [["agi", [0.10, 0.12, 0.14]], ["aspd", [0.10, 0.12, 0.14]]], "material": "skeleton_bone",
+		"grave_thirst": true},
+	"octopus": {"expert": [0.9, 0.95, 1.0], "armor": "summoner", "vital": [0.10, 0.12, 0.14],
+		"fighter": [0.10, 0.12, 0.14], "weapon": "magic",
+		"cards": [["int", [0.10, 0.12, 0.14]], ["matk", [0.10, 0.12, 0.14]]], "material": "octopus_tentacle"},
 	"centaur": {"expert": [1.0, 1.0, 1.0], "armor": "warrior", "vital": [0.14, 0.16, 0.18],
 		"fighter": [0.14, 0.16, 0.18], "weapon": "melee",
 		"cards": [["str", [0.14, 0.16, 0.18]], ["atk", [0.14, 0.16, 0.18]]], "material": "horse_hair"},
@@ -420,7 +540,8 @@ const FORM_TIERS := {
 }
 ## Подписи характеристик и чисел для «Способности карты».
 const CARD_NAMES := {"str": "Сила", "vit": "Выносливость", "agi": "Ловкость", "dex": "Меткость", "int": "Интеллект",
-	"wis": "Мудрость", "luck": "Удача", "atk": "атака", "def": "защита", "acc": "точность", "avoid": "избегание"}
+	"wis": "Мудрость", "luck": "Удача", "atk": "атака", "def": "защита", "acc": "точность", "avoid": "избегание",
+	"aspd": "скорость атаки", "matk": "маг. атака"}
 const BLESS_STATS := ["str", "int", "agi", "vit", "dex", "wis"]
 static var _extra: Dictionary = {}
 static var _lists: Dictionary = {}
@@ -429,7 +550,7 @@ static var _lists: Dictionary = {}
 static func _static_init() -> void:
 	_extra.clear()
 	_lists.clear()
-	var arm := {"warrior": "доспех воина", "hunter": "доспех охотника"}
+	var arm := {"warrior": "доспех воина", "hunter": "доспех охотника", "summoner": "доспех призывателя"}
 	for stv in BLESS_STATS:
 		var st := String(stv)
 		var nm := String(CARD_NAMES[st])
@@ -453,10 +574,13 @@ static func _static_init() -> void:
 			"tiers": FORM_TIERS["vital_unit"], "bonus": "vital_unit", "value": d["vital"]}
 		ids.append(vu)
 		var fu := "fighter_unit_" + sp
-		var dagger := String(d["weapon"]) == "dagger"
-		_extra[fu] = {"name": "Боец: кинжал" if dagger else "Боец: ближний бой", "kind": "passive", "glyph": "Б", "color": RED,
-			"jp": 1, "weapon": String(d["weapon"]), "per_form": true,
-			"desc": "Шанс крита питомца выше, когда на нём кинжал." if dagger else "Атака питомца выше, когда на нём оружие ближнего боя.",
+		var wk := String(d["weapon"])
+		var fu_name: String = {"dagger": "Боец: кинжал", "magic": "Чародей: булава и посох"}.get(wk, "Боец: ближний бой")
+		var fu_desc: String = {"dagger": "Шанс крита питомца выше, когда на нём кинжал.",
+			"magic": "Маг. атака питомца выше, когда на нём булава или посох."}.get(wk, "Атака питомца выше, когда на нём оружие ближнего боя.")
+		_extra[fu] = {"name": fu_name, "kind": "passive", "glyph": "Б", "color": RED,
+			"jp": 1, "weapon": wk, "per_form": true,
+			"desc": fu_desc,
 			"tiers": FORM_TIERS["fighter_unit"], "bonus": "fighter_unit", "value": d["fighter"]}
 		ids.append(fu)
 		for k in 2:
@@ -469,12 +593,21 @@ static func _static_init() -> void:
 				"tiers": FORM_TIERS["card_%d" % (k + 1)], "bonus": "card", "value": c[1]}
 			ids.append(cid)
 		var mat := String(d["material"])
-		var wl := "wound_lick_" + sp
-		_extra[wl] = {"name": "Зализать раны", "kind": "active", "glyph": "З", "color": Color(0.4, 0.85, 0.45), "jp": 2,
-			"desc": "Восстановление HP хозяину и питомцу на 30 с. Тратит «%s» из сумки." % ItemData.item_name(mat),
-			"tiers": [[0, 0], [50, 1], [100, 2]], "mp": [30.0, 10.0], "cd": 1200.0, "cast": 0.5, "buff": "regen",
-			"value": [3.0, 3.0], "time": 30.0, "needs": mat, "prio": 5}
-		ids.append(wl)
+		if d.has("grave_thirst"):
+			# Скелет (Vampiric Rage базы): вместо «Зализать раны» — 10 с удары хозяина вытягивают HP, тратит кость
+			var gt := "grave_thirst_" + sp
+			_extra[gt] = {"name": "Могильная жажда", "kind": "active", "glyph": "Ж", "color": Color(0.5, 0.9, 0.45), "jp": 2,
+				"desc": "10 с обычные атаки хозяина часто возвращают ему часть здоровья. Тратит «%s» из сумки." % ItemData.item_name(mat),
+				"tiers": [[0, 0], [50, 1], [100, 2]], "mp": [30.0, 10.0], "cd": 1200.0, "cast": 0.5, "buff": "leech",
+				"value": [0.03, 0.02], "chance": [0.6, 0.2], "time": 10.0, "needs": mat, "prio": 5}
+			ids.append(gt)
+		else:
+			var wl := "wound_lick_" + sp
+			_extra[wl] = {"name": "Зализать раны", "kind": "active", "glyph": "З", "color": Color(0.4, 0.85, 0.45), "jp": 2,
+				"desc": "Восстановление HP хозяину и питомцу на 30 с. Тратит «%s» из сумки." % ItemData.item_name(mat),
+				"tiers": [[0, 0], [50, 1], [100, 2]], "mp": [30.0, 10.0], "cd": 1200.0, "cast": 0.5, "buff": "regen",
+				"value": [3.0, 3.0], "time": 30.0, "needs": mat, "prio": 5}
+			ids.append(wl)
 		var cm := "creation_" + sp
 		_extra[cm] = {"name": "Создание: %s" % ItemData.item_name(mat), "kind": "manual", "glyph": "+", "color": GOLD, "jp": 1,
 			"desc": "Питомец создаёт «%s» (для «Зализать раны»). Раз в 12 часов." % ItemData.item_name(mat),
@@ -887,6 +1020,10 @@ static func bonuses(species: String, skills: Dictionary, toggles: Dictionary, ow
 			continue
 		var key := String(sk["bonus"])
 		res[key] = float(res.get(key, 0.0)) + value(sk["value"], n)
+		# второй бонус того же умения («Узы глубин»: атака и восстановление MP)
+		if sk.has("bonus2"):
+			var k2 := String(sk["bonus2"])
+			res[k2] = float(res.get(k2, 0.0)) + value(sk["value2"], n)
 	return res
 
 
@@ -974,14 +1111,22 @@ static func effect_text(id: String, n: int) -> String:
 			"fighter_unit":
 				if String(sk.get("weapon", "")) == "dagger":
 					parts.append("крит +%s с кинжалом" % _num(v))
+				elif String(sk.get("weapon", "")) == "magic":
+					parts.append("маг. атака +%s с булавой или посохом" % _pct(v))
 				else:
 					parts.append("атака +%s с оружием ближнего боя" % _pct(v))
 			"card":
 				parts.append("в поясе: %s героя +%s" % [String(CARD_NAMES.get(String(sk.get("card", "")), "")), _pct(v)])
+			"aspd_pct":
+				parts.append("скорость атаки +%s" % _pct(v))
+			"veil":
+				parts.append("шанс, что зверь не отвлечётся на питомца, %s" % _pct(v))
 			_:
 				if String(sk["bonus"]).begins_with("stat_"):
 					parts.append("%s +%s" % [String(CARD_NAMES.get(String(sk["bonus"]).substr(5), "")), _num(v)])
-		if bool(sk.get("owner", false)):
+		if sk.has("bonus2") and String(sk["bonus2"]) == "mp_regen":
+			parts.append("MP хозяина +%s/с" % _num(value(sk["value2"], n)))
+		if bool(sk.get("owner", false)) and not parts.is_empty():
 			parts[parts.size() - 1] = parts[parts.size() - 1] + " (и хозяину)"
 		if kind == "toggle":
 			parts.append("включение %d MP, %d MP / 10 с" % [mp_cost(id, n), upkeep(id, n)])
@@ -1011,7 +1156,25 @@ static func effect_text(id: String, n: int) -> String:
 		parts.append("морок %s с" % _num(value(sk["blind"], n)))
 	if sk.has("fear"):
 		parts.append("страх %s с" % _num(value(sk["fear"], n)))
+	if sk.has("aslow"):
+		parts.append("зверь бьёт реже на %s 10 с" % _pct(value(sk["aslow"], n)))
+	if sk.has("dot"):
+		parts.append("яд %s атаки в секунду %s с" % [_pct(value(sk["dot"], n)), _num(float(sk.get("dot_time", 10.0)))])
+	if sk.has("self_hp"):
+		parts.append("тратит %s своего HP" % _pct(float(sk["self_hp"])))
+	if sk.has("crit"):
+		parts.append("шанс крита +%s%%" % _num(float(sk["crit"])))
+	if sk.has("pool"):
+		parts.append("%s с раз в %s с; лечит питомца и хозяина на %s атаки" % [_num(float(sk["pool"])),
+			_num(float(sk.get("pool_every", 2.0))), _pct(float(sk.get("pool_heal", 0.0)))])
 	match String(sk.get("buff", "")):
+		"matk":
+			parts.append("маг. атака хозяина +%s на %s с" % [_pct(value(sk["value"], n)), _num(float(sk["time"]))])
+		"leech":
+			var need := String(sk.get("needs", ""))
+			parts.append("%s с: обычная атака хозяина с шансом %s возвращает %s его макс. HP%s" % [
+				_num(float(sk["time"])), _pct(value(sk.get("chance", [0.0, 0.0]), n)), _pct(value(sk["value"], n)),
+				(", тратит «%s»" % ItemData.item_name(need)) if need != "" else ""])
 		"atk":
 			parts.append("атака хозяина +%s на %s с" % [_pct(value(sk["value"], n)), _num(float(sk["time"]))])
 		"guard":

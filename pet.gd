@@ -84,6 +84,14 @@ var _lick_left := 0.0
 var mp_regen := 1.0
 ## Шанс, что удар питомца переключит зверя на него («Дерзкий вызов»).
 var threat := 0.0
+## «Чернильная завеса» спрута: шанс, что зверь, бьющий хозяина, после удара спрута не переключится на него.
+var veil := 0.0
+## «Омут порчи» спрута (поле вокруг питомца): осталось с, до следующего удара с, умение.
+var _pool_left := 0.0
+var _pool_tick := 0.0
+var _pool_id := ""
+## Доп. шанс крита текущего умения (у «Клинка латника»), %.
+var _skill_crit := 0.0
 var speed := 6.0
 var attack_range := 1.9
 var attack_time := 1.0
@@ -249,6 +257,7 @@ func _physics_process(delta: float) -> void:
 	skill_cd = maxf(0.0, skill_cd - delta)
 	_calm += delta
 	_tick_skills(delta)
+	_tick_pool(delta)
 	if is_down:
 		return
 	if _pending != null:
@@ -485,7 +494,7 @@ func _mitigate(m: Mob, raw: int) -> int:
 ## «Сырой» урон от главной атаки × mult с разбросом и критом (результат крита — в _last_crit).
 func _roll(mult: float) -> int:
 	var base := float(atk) * mult + float(Combat.rand_int(-1, 2))
-	_last_crit = Combat.rand() * 100.0 < crit
+	_last_crit = Combat.rand() * 100.0 < crit + _skill_crit
 	if _last_crit:
 		base *= PetStats.CRIT_MULT
 	return maxi(1, roundi(base))
@@ -790,7 +799,8 @@ func _update_aura() -> void:
 		return
 	var b := PetSkills.bonuses(species, skills, toggles, true)
 	owner_node.set_pet_aura(self, float(b.get("atk_pct", 0.0)), roundi(float(b.get("def_flat", 0.0))),
-		float(b.get("hp_regen", 0.0)), float(b.get("eva", 0.0)) / 100.0)
+		float(b.get("hp_regen", 0.0)), float(b.get("eva", 0.0)) / 100.0, float(b.get("aspd_pct", 0.0)),
+		float(b.get("mp_regen", 0.0)))
 	# Значки «Уз» и у хозяина: те включённые, что дают бонус и ему (поле owner)
 	var on := {}
 	for id in toggles:
@@ -876,6 +886,8 @@ func _support_skills() -> void:
 				continue
 		elif target == null:
 			continue
+		elif sk.has("needs") and not Game.inventory.has(String(sk["needs"])):
+			continue
 		_begin_skill(id, null)
 		return
 
@@ -938,6 +950,17 @@ func _apply_skill(id: String, t: Mob) -> void:
 	var mult := PetSkills.value(sk["dmg"], n) if sk.has("dmg") else 0.0
 	var hits := int(sk.get("hits", 1))
 	var src := StatusEffects.source_pet_skill(species, id)
+	# «Ядовитая кровь»: спрут платит долей своего HP (не ниже 1)
+	if sk.has("self_hp"):
+		hp = maxi(1, hp - roundi(float(max_hp) * float(sk["self_hp"])))
+	# «Омут порчи»: поле вокруг питомца — урон зверям и лечение хозяина и питомца раз в pool_every с
+	if sk.has("pool"):
+		_pool_id = id
+		_pool_left = float(sk["pool"])
+		_pool_tick = 0.0
+		_area_fx(global_position, float(sk.get("radius", 5.0)), fx)
+		return
+	_skill_crit = float(sk.get("crit", 0.0))
 	for m in victims:
 		var sure := Combat.skill_hit_chance(level, m.level)
 		if sure < 1.0 and Combat.rand() >= sure:
@@ -965,6 +988,13 @@ func _apply_skill(id: String, t: Mob) -> void:
 		if sk.has("weaken"):
 			m.weaken(PetSkills.value(sk["weaken"], n), DEBUFF_TIME, src)
 			Util.float_text(parent, above, "Ослаблен", Color(1.0, 0.7, 0.5))
+		if sk.has("aslow"):
+			JobFxNeophyte.apply_mod(m, "aslow", PetSkills.value(sk["aslow"], n), DEBUFF_TIME, src)
+			Util.float_text(parent, above, "Бьёт реже", Color(0.85, 0.75, 1.0))
+		if sk.has("dot"):
+			# яд: доля атаки питомца в секунду, dot_time с
+			var dps := float(atk) * PetSkills.value(sk["dot"], n)
+			m.add_dot("pet_" + id, dps, float(sk.get("dot_time", 10.0)), self, false, src)
 		if sk.has("stun"):
 			m.stun(float(sk["stun"]), src)
 			Util.float_text(parent, above, "Оглушён!", Color(1, 1, 0.5))
@@ -978,6 +1008,35 @@ func _apply_skill(id: String, t: Mob) -> void:
 			m.taunt(self, 4.0, src)
 		else:
 			_threat_hit(m)
+	_skill_crit = 0.0
+
+
+## «Омут порчи»: раз в pool_every с — урон зверям в радиусе и лечение питомца и хозяина рядом (pool_heal — доля атаки).
+func _tick_pool(delta: float) -> void:
+	if _pool_left <= 0.0:
+		return
+	_pool_left -= delta
+	_pool_tick -= delta
+	if _pool_tick > 0.0:
+		return
+	var sk := PetSkills.get_skill(_pool_id)
+	var n := int(skills.get(_pool_id, 0))
+	if sk.is_empty() or n <= 0:
+		_pool_left = 0.0
+		return
+	_pool_tick = float(sk.get("pool_every", 2.0))
+	var r := float(sk.get("radius", 5.0))
+	_area_fx(global_position, r, _skill_color(sk))
+	var mult := PetSkills.value(sk["dmg"], n) if sk.has("dmg") else 0.0
+	for m in _mobs_near(global_position, r):
+		if mult > 0.0:
+			m.take_damage(_mitigate(m, _roll(mult)), self, _last_crit)
+			_threat_hit(m)
+	var h := maxi(1, roundi(float(atk) * float(sk.get("pool_heal", 0.0))))
+	if float(sk.get("pool_heal", 0.0)) > 0.0:
+		heal(h)
+		if owner_node.hp > 0 and owner_node.global_position.distance_to(global_position) <= r:
+			owner_node.heal(h)
 
 
 ## Следующий удар серии (двойной, тройной). target_ref без типа: зверь мог уже исчезнуть.
@@ -1015,6 +1074,23 @@ func _apply_buff(sk: Dictionary, n: int, id: String = "") -> void:
 			if owner_node.hp > 0:
 				owner_node.heal(maxi(1, roundi(float(owner_node.max_hp) * v)) + heal_power)
 			heal(maxi(1, roundi(float(max_hp) * v)))
+		"matk":
+			# «Зов прилива» спрута: маг. атака хозяина выше на time с
+			if owner_node.has_method("add_timed_bonus"):
+				owner_node.add_timed_bonus(id, float(sk.get("time", 15.0)), {"matk_pct": v},
+					StatusEffects.source_pet_skill(species, id))
+			Util.float_text(parent, head, "Маг. атака +%d%%" % roundi(v * 100.0), c)
+		"leech":
+			# «Кровавая жажда» спрута, «Могильная жажда» скелета (тратит кость): обычные атаки хозяина с шансом
+			# возвращают долю его макс. HP
+			var need_l := String(sk.get("needs", ""))
+			if need_l != "" and not Game.inventory.remove(need_l):
+				return
+			if owner_node.has_method("add_timed_bonus"):
+				var ch := PetSkills.value(sk.get("chance", [0.3, 0.0]), n)
+				owner_node.add_timed_bonus(id, float(sk.get("time", 60.0)), {"leech_chance": ch, "leech_hp": v},
+					StatusEffects.source_pet_skill(species, id))
+			Util.float_text(parent, head, "Кровавая жажда", c)
 		"regen":
 			# «Зализать раны» (Wound Lick базы): восстановление HP хозяину и питомцу на time с, материал вида тратится
 			var need := String(sk.get("needs", ""))
@@ -1225,6 +1301,7 @@ func _apply_stats() -> void:
 	hp_regen = float(s["hp_regen"])
 	mp_regen = float(s["mp_regen"])
 	threat = float(s["threat"])
+	veil = float(s.get("veil", 0.0))
 	speed = float(s["speed"])
 	attack_range = float(s["range"])
 	attack_time = float(s["cd"])
@@ -1320,6 +1397,8 @@ func _build_model() -> void:
 	model_id = CreatureAsset.model_for(species, stage)
 	_mat = CreatureModels.build(_model, species, _color, _scale, PetData.asset_tint(species, stage), stage)
 	_asset = CreatureModels.asset_of(_model)
+	if _asset != null:
+		_asset.hold_weapon(PetData.weapon_of(species, stage))
 	if _asset != null:
 		_asset.anim_actor = "pet"
 	CreatureModels.decorate_pet(_model, species, _scale, stage, role)

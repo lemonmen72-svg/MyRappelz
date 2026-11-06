@@ -149,6 +149,10 @@ const PACKS := {
 		"assets/creatures/flyfish*.png",
 		"assets/creatures/anathema*.glb",
 		"assets/creatures/anathema*.png",
+		"assets/creatures/skeleton.glb",
+		"assets/creatures/skeleton.png",
+		"assets/creatures/octopus.glb",
+		"assets/creatures/octopus.png",
 	],
 	# Оружие 1-го ранга и предметы жителей (handheld.json — в APK). Оружие 2-го ранга — handheld_r2.
 	"handheld": [

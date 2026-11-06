@@ -161,6 +161,10 @@ var aura_def := 0
 var aura_regen := 0.0
 ## Уклонение от «Уз стаи» волка (доля).
 var aura_eva := 0.0
+## Скорость атаки от «Уз клинка» скелета (доля) и MP в секунду от «Уз глубин» спрута.
+var aura_aspd := 0.0
+var aura_mp := 0.0
+var _aura_mp_acc := 0.0
 ## Кто поставил бонусы: id объекта питомца (0 — никто).
 var _aura_src := 0
 ## Действующие эффекты для HUD (значки у полоски HP): усиления выше (atk, speed, guard, shade — сверяются
@@ -328,7 +332,7 @@ func recalc_stats() -> void:
 	crit += _bv(b, "crit")
 	speed *= 1.0 + _bv(b, "speed_pct") + float(gb.get("speed", 0.0))
 	# Как в Rappelz: прибавки скорости атаки от оружия и умений складываются со скоростью от Ловкости
-	aspd = maxf(0.2, stat_aspd + weapon_aspd + _bv(b, "aspd") + float(gb.get("aspd", 0.0)))
+	aspd = maxf(0.2, stat_aspd + weapon_aspd + _bv(b, "aspd") + float(gb.get("aspd", 0.0)) + aura_aspd)
 	attack_time /= aspd
 	# Скорость каста (посохи): обычная магическая атака и пауза после заклинания короче
 	cast_speed += _bv(b, "cast") + float(gb.get("cast", 0.0))
@@ -348,6 +352,9 @@ func recalc_stats() -> void:
 	avoid += roundi(_bv(b, "avoid_flat"))
 	# Пояс: «Способность карты» на атаку, защиту, точность, избегание — доля итогового числа
 	atk = roundi(float(atk) * (1.0 + float(belt_bonus.get("atk_pct", 0.0))))
+	matk = roundi(float(matk) * (1.0 + float(belt_bonus.get("matk_pct", 0.0))))
+	if belt_bonus.has("aspd_pct"):
+		attack_time /= 1.0 + float(belt_bonus["aspd_pct"])
 	defense = roundi(float(defense) * (1.0 + float(belt_bonus.get("def_pct", 0.0))))
 	if accuracy >= 0:
 		accuracy = roundi(float(accuracy) * (1.0 + float(belt_bonus.get("acc_pct", 0.0))))
@@ -732,6 +739,14 @@ func _tick_mp(delta: float) -> void:
 			mp = mini(max_mp, mp + m)
 			_mp_acc -= m
 			stats_changed.emit()
+	# «Узы глубин» спрута: MP в секунду и в бою
+	if aura_mp > 0.0 and mp < max_mp:
+		_aura_mp_acc += delta * aura_mp
+		if _aura_mp_acc >= 1.0:
+			var am := int(_aura_mp_acc)
+			mp = mini(max_mp, mp + am)
+			_aura_mp_acc -= am
+			stats_changed.emit()
 	if toggle_upkeep() <= 0:
 		_upkeep_acc = 0.0
 		return
@@ -808,12 +823,17 @@ func set_toggle(id: String, on: bool) -> String:
 
 
 ## Бонусы хозяину от включённых умений питомца src (атака — доля, защита, HP в секунду).
-func set_pet_aura(src: Object, atk_pct: float, def_bonus: int, regen: float, eva_bonus: float = 0.0) -> void:
+func set_pet_aura(src: Object, atk_pct: float, def_bonus: int, regen: float, eva_bonus: float = 0.0,
+		aspd_bonus: float = 0.0, mp_bonus: float = 0.0) -> void:
 	_aura_src = src.get_instance_id() if src != null else 0
 	aura_atk = atk_pct
 	aura_def = def_bonus
 	aura_regen = regen
 	aura_eva = eva_bonus
+	aura_mp = mp_bonus
+	if not is_equal_approx(aura_aspd, aspd_bonus):
+		aura_aspd = aspd_bonus
+		recalc_stats()
 	stats_changed.emit()
 
 

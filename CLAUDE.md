@@ -1317,6 +1317,42 @@ Corsair Revenant), сабля — Verdant Oathblade; значки добычи �
   в игру не идут (`.gdignore`). Мосты и причалы — BagaPie, каркас залов — BlenderLevelArchitect; текстуры
   BlenderLevelArchitect не берём (лицензия не указана).
 
+## 0.37: подземелье, этап 3 — питомцы Скелет и Спрут
+Справка и план — `tools/rappelz_dungeon_pets_reference.md`; значки и состав умений — по базе
+(`tools/Промты_значки_спрут_и_скелет.docx`: где они расходятся со справкой, взят документ).
+- **Модели** (`assets/creatures/`): Скелет `skeleton` ← Emerald_Revenant, `skeleton_2` ← Emerald_Lich_Warrior,
+  `skeleton_3` ← Emerald_Wraith_Knight «(1)» (латник без оружия) — стиль «biped» (`PET_SKELETONS`: 1.7 м, клипы UAL,
+  меч в руке по стадии — `PetData.weapons` / `MobData.weapons`: `mw_rusty_dagger`, `mw_shortsword`,
+  `mw_straight_sword`); Спрут `octopus` ← Emerald_Abyss_Octopus, `octopus_2` ← Emerald_Abyssal_Oracle, `octopus_3` ←
+  Abyssal_Crown_Kraken — **новый стиль «octopus»** в `tools/prepare_creatures.py` (`OCTOPUS_CREATURES`,
+  `octopus_roles`, `octopus_clips`, `octopus_meta`): Root, Body, голова (`Head*`, мантия), щупальца `Tent<i>_<k>` —
+  ветки тела, чей конец в стороне и не выше тела (по углу вокруг тела), прочие ветки вверх — `Crown*` (корона
+  кракена, капюшон оракула); клипы процедурные — щупальце гнётся вокруг оси «вверх × направление» (в покое
+  поднимаются только кончики), шаг и бег — волна подъёма по кругу, удар — передние хлещут вперёд, Death — тело
+  оседает, основания щупалец приподняты, остальное на земле (`fit_after`); `ground_fit` — меш не уходит под землю.
+  Высота 0.8 м, ширина ≈ 1.8–2.3 м, 18 / 24 / 26 тыс. треуг., текстура 2048. В `creatures.json` — `kind: "octopus"`,
+  `bones.tentacles`, `head_chain`, `crowns`. Первые стадии — часть `creatures_base`, `_2`/`_3` — `creatures`.
+- **Данные**: `PetStats.FORMS` — StatResource 2401–2403 и 3501–3503 + CreatureLevelBonus (1:1); `PetData.SPECIES`
+  («Костяной мечник → Расколотый страж → Латник Мрака», боец; «Спрутёнок глубин → Изумрудный спрут → Владыка
+  пучины», маг). Карты `card_skeleton(_soul)`, `card_octopus(_soul)` — синие, у Кирка нет (только добыча, `buy` 0).
+  Материалы `skeleton_bone`, `octopus_tentacle`, зелья вида (`ItemData.CREATURE_POTIONS`, числа — по образцу волка).
+  Дикие — `MobData` `skeleton` / `octopus` («Обычные», сила подземелья `dungeon`, приручаются): склеп (4, 20–23 ур.) и
+  сокровищница (3, 26–28). `Taming.dungeon_zones` / `habitat_text` — и зоны подземелья, `lives_in_world(вид, island_only)`
+  (награды заданий — только виды острова).
+- **Умения** (`PetSkills`, 18 древа + умения базы; tiers — уровни вики 1:1): Скелет — «Костяная ярость», «Гнилой
+  раскол» (зверь бьёт реже — `aslow`, `JobFxNeophyte.apply_mod`), «Дрожь костей», «Узы клинка» (скорость атаки хозяину и
+  скелету — бонус `aspd_pct`, `Player.aura_aspd`), «Мрачный клич», «Шквал тлена», «Лёгкое перо», «Клинок латника» (по
+  площади, `crit` +50 %); база: доспех охотника, «Боец: кинжал» (крит), карты — Ловкость и скорость атаки (`aspd_pct`
+  пояса), вместо «Зализать раны» — «Могильная жажда» `grave_thirst_skeleton` (10 с вампиризм хозяину, тратит кость; поле
+  DB_EXTRAS `grave_thirst`). Спрут — «Вихрь щупалец», «Чернильная завеса» (бонус `veil`: зверь, бьющий хозяина, с шансом
+  не переключается на спрута — `Mob._keeps_target`), «Кровавая жажда» (усиление хозяину `leech`: `leech_chance` /
+  `leech_hp`, `HeroSkillFx.on_basic_hit`), «Вой пучины» (страх), «Ядовитая кровь» (`self_hp` 5 %, яд `dot`), «Узы глубин»
+  (атака + MP хозяину — `bonus2`/`value2`, `Player.aura_mp`), «Зов прилива» (усиление `matk`), «Импульс глубин»,
+  «Дыхание бездны», «Омут порчи» (поле `pool` вокруг спрута: раз в `pool_every` с урон и лечение — `Pet._tick_pool`);
+  база: доспех призывателя (`summoner`), «Чародей: булава и посох» (`weapon: "magic"` — маг. атака, `PetGear.MAGIC`),
+  карты — Интеллект и маг. атака (`matk_pct` пояса). Значки — `assets/icons/pets/skeleton|octopus` (по 26, листы Максима).
+- Тест `tests/test_dungeon_pets.gd` (формы, умения и значки, карты, зоны, модели стадий, меч, все новые механики).
+
 ## Сюжет мира
 Решение Максима: **`docs/story/DUNGEON_CHAPTER1_STORY.md` — канон и начало истории всего мира Dark Pact** (глава I «Шёпот
 из глубин»: гоблины в пещере острова → нежить → Секта Мрака → проклятый капитан → Великий Пакт трёх рас, путь на

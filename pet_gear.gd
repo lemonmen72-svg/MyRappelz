@@ -17,6 +17,8 @@ const UNIT_CARD := "unit_card"
 const CHALK := "restore_chalk"
 ## Оружие ближнего боя (для «Боец: ближний бой»).
 const MELEE := ["sword_1h", "sword_2h", "dagger", "mace_1h", "mace_2h", "axe_1h", "axe_2h", "spear"]
+## «Чародей: булава и посох» (спрут): маг. атака выше с булавой или посохом.
+const MAGIC := ["mace_1h", "mace_2h", "staff_1h", "staff_2h"]
 
 
 ## Надетое в ячейке slot записи rec ("" — пусто).
@@ -128,6 +130,9 @@ static func apply(rec: Dictionary, r: Dictionary) -> void:
 		if String(fsk.get("weapon", "")) == "dagger":
 			if kind == "dagger":
 				r["crit"] = snappedf(float(r.get("crit", 0.0)) + fv, 0.1)
+		elif String(fsk.get("weapon", "")) == "magic":
+			if MAGIC.has(kind):
+				r["matk"] = roundi(float(r["matk"]) * (1.0 + fv))
 		elif MELEE.has(kind):
 			r["patk"] = roundi(float(r["patk"]) * (1.0 + fv))
 	# «Живучесть»: доспех своего варианта — макс. HP + доля
@@ -173,8 +178,9 @@ static func unit_text(rec: Dictionary, id: String) -> String:
 		var fsk := PetSkills.get_skill(fu)
 		if fsk.is_empty():
 			return ""
-		var dagger := String(fsk.get("weapon", "")) == "dagger"
-		var fits := ItemData.weapon_kind(id) == "dagger" if dagger else MELEE.has(ItemData.weapon_kind(id))
+		var wk := String(fsk.get("weapon", ""))
+		var kind := ItemData.weapon_kind(id)
+		var fits := kind == "dagger" if wk == "dagger" else (MAGIC.has(kind) if wk == "magic" else MELEE.has(kind))
 		if not fits:
 			return ""
 		if fn <= 0:

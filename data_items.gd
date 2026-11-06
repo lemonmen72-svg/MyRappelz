@@ -48,6 +48,15 @@ const BASE_ITEMS := {
 		"name": "Карта существа: Волк", "type": "card", "species": "wolf", "icon": "card", "stack": 20,
 		"buy": 20000, "sell": 5000, "color": Color(0.66, 0.68, 0.74), "desc": "Чистая карта: ловит дух волка.",
 	},
+	# Питомцы подземелья (0.37): карты только выпадают из своих зверей подземелья (у Кирка их нет)
+	"card_skeleton": {
+		"name": "Карта существа: Скелет", "type": "card", "species": "skeleton", "icon": "card", "stack": 20,
+		"buy": 0, "sell": 5000, "color": Color(0.82, 0.86, 0.74), "desc": "Чистая карта: ловит дух скелета.",
+	},
+	"card_octopus": {
+		"name": "Карта существа: Спрут", "type": "card", "species": "octopus", "icon": "card", "stack": 20,
+		"buy": 0, "sell": 5000, "color": Color(0.3, 0.72, 0.6), "desc": "Чистая карта: ловит дух спрута.",
+	},
 	"card_centaur": {
 		"name": "Карта существа: Кентавр", "type": "card", "species": "centaur", "icon": "card", "stack": 20,
 		"buy": 80000, "sell": 20000, "color": Color(0.78, 0.58, 0.38), "desc": "Чистая карта: ловит дух кентавра.",
@@ -67,6 +76,14 @@ const BASE_ITEMS := {
 	"card_wolf_soul": {
 		"name": "Карта волка (с душой)", "type": "card", "species": "wolf", "soul": true, "icon": "card",
 		"stack": 1, "buy": 0, "sell": 5000, "color": Color(0.66, 0.68, 0.74), "desc": "В карте спит пойманная душа волка.",
+	},
+	"card_skeleton_soul": {
+		"name": "Карта скелета (с душой)", "type": "card", "species": "skeleton", "soul": true, "icon": "card",
+		"stack": 1, "buy": 0, "sell": 5000, "color": Color(0.82, 0.86, 0.74), "desc": "В карте спит пойманная душа скелета.",
+	},
+	"card_octopus_soul": {
+		"name": "Карта спрута (с душой)", "type": "card", "species": "octopus", "soul": true, "icon": "card",
+		"stack": 1, "buy": 0, "sell": 5000, "color": Color(0.3, 0.72, 0.6), "desc": "В карте спит пойманная душа спрута.",
 	},
 	"card_centaur_soul": {
 		"name": "Карта кентавра (с душой)", "type": "card", "species": "centaur", "soul": true, "icon": "card",
@@ -312,6 +329,10 @@ const UPGRADE_ITEMS := {
 	# Материалы существ (Creation базы): у пантеры, черепахи, фазана и кентавра — их трофеи; у волка — коготь
 	"wolf_claw": {"name": "Волчий коготь", "type": "trophy", "icon": "fang", "buy": 0, "sell": 25, "color": Color(0.75, 0.75, 0.8),
 		"desc": "Крепкий коготь волка. Нужен для умения волка «Зализать раны»; торговец купит как трофей."},
+	"skeleton_bone": {"name": "Кость скелета", "type": "trophy", "icon": "fang", "buy": 0, "sell": 300, "color": Color(0.86, 0.88, 0.76),
+		"desc": "Прочная кость со слабым зелёным свечением. Нужна для умения скелета «Зализать раны»; торговец купит как трофей."},
+	"octopus_tentacle": {"name": "Щупальце спрута", "type": "trophy", "icon": "fin", "buy": 0, "sell": 320, "color": Color(0.35, 0.75, 0.6),
+		"desc": "Упругое щупальце с присосками. Нужно для умения спрута «Зализать раны»; торговец купит как трофей."},
 	# Находки заданий (QuestFind: светящиеся травы на земле, пока задание взято) — задания Травницы Мирты
 	"herb_silverleaf": {"name": "Серебролист", "type": "trophy", "icon": "feather", "buy": 0, "sell": 20,
 		"color": Color(0.55, 0.95, 0.7),
@@ -361,6 +382,9 @@ const CREATURE_POTIONS := {
 	"pheasant": {"name": "Зелье фазана", "bonus": {"acc_flat": 22.0}, "what": "точность +22"},
 	"wolf": {"name": "Зелье волка", "bonus": {"atk_flat": 105.0, "avoid_flat": 25.0}, "what": "физ. атака +105, избегание +25"},
 	"centaur": {"name": "Зелье кентавра", "bonus": {"atk_flat": 230.0}, "what": "физ. атака +230"},
+	# Скелет и Спрут (0.37): числа — по образцу зелья волка того же тира
+	"skeleton": {"name": "Зелье скелета", "bonus": {"atk_flat": 120.0}, "what": "физ. атака +120"},
+	"octopus": {"name": "Зелье спрута", "bonus": {"atk_flat": 60.0, "acc_flat": 20.0}, "what": "физ. атака +60, точность +20"},
 }
 const CREATURE_POTION_TIME := 3600.0
 

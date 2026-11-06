@@ -299,7 +299,7 @@ static func quest_chances(hero_lvl: int, class_id: String = "", rng: RandomNumbe
 	var species: Array = []
 	for k in MobData.TYPES:
 		var sp := String(k)
-		if MobData.tameable(sp) and ItemData.card_for(sp) != "" and Taming.lives_in_world(sp):
+		if MobData.tameable(sp) and ItemData.card_for(sp) != "" and Taming.lives_in_world(sp, true):
 			species.append(sp)
 	if not species.is_empty():
 		var sp := String(species[_randi(rng, species.size())])

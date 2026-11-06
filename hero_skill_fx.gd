@@ -325,6 +325,10 @@ func job_special(handler: String, sid: String, n: int, t: Mob, e: Dictionary) ->
 func on_basic_hit(t: Mob, dealt: int) -> void:
 	if t == null or not is_instance_valid(t):
 		return
+	# «Кровавая жажда» спрута (усиление на время): обычная атака с шансом возвращает долю макс. HP героя
+	var lc := bonus("leech_chance")
+	if lc > 0.0 and dealt > 0 and p.hp > 0 and Combat.rand() < lc:
+		p.heal(maxi(1, roundi(float(p.max_hp) * bonus("leech_hp"))))
 	for scr in job_scripts():
 		scr.call("on_basic_hit", self, t, dealt)
 

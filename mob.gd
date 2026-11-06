@@ -193,7 +193,7 @@ func _ready() -> void:
 	_mat = CreatureModels.build(_model, model_species, color, body_scale, Color.WHITE, model_stage)
 	_asset = CreatureModels.asset_of(_model)
 	if _asset != null:
-		_asset.hold_weapon(MobData.weapon_of(type_id))
+		_asset.hold_weapon(MobData.weapon_of(type_id, model_stage))
 	CreatureModels.add_collision(self, model_id, body_scale)
 	_height = CreatureModels.height(model_id, body_scale)
 	if MobData.flying(type_id):
@@ -839,6 +839,11 @@ func take_damage(amount: int, attacker: Node3D, crit_hit: bool = false, periodic
 
 ## Удар героя с «Тихой поступью» может не отвлечь зверя от питомца, которого тот уже бьёт.
 func _keeps_target(attacker: Node3D) -> bool:
+	# «Чернильная завеса» спрута: зверь, бьющий хозяина, с шансом не переключается на ударившего спрута
+	if attacker != null and attacker.is_in_group("pets") and target != null and is_instance_valid(target) \
+			and target != attacker and not target.is_in_group("pets"):
+		var vl := float(attacker.get("veil")) if attacker.get("veil") != null else 0.0
+		return vl > 0.0 and Combat.rand() < clampf(vl, 0.0, 1.0)
 	if target == null or not is_instance_valid(target) or target == attacker or not target.is_in_group("pets"):
 		return false
 	var st := _stealth_of(attacker)

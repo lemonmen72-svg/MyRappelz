@@ -197,7 +197,7 @@ static func build(root: Node3D, species: String, color: Color, s: float, tint: C
 		"anathema", "anathema_blade", "anathema_chief":
 			_lizard(root, rig, species, color, s)
 		_:
-			if species.begins_with("dg_"):
+			if species.begins_with("dg_") or species == "skeleton":
 				# Монстры подземелья без пакета ресурсов — двуногий из примитивов (как анатема)
 				_lizard(root, rig, species, color, s)
 			else:
