@@ -81,6 +81,13 @@ def gh(x, z, arr=None):
 	return p * (1 - fv) + q * fv
 
 
+def cell_top(x, z):
+	"""Самый высокий угол клетки сетки (как DungeonWorld._cell_top)."""
+	i0 = min(max(int(math.floor((x - OX) / STEP)), 0), NX - 2)
+	j0 = min(max(int(math.floor((z - OZ) / STEP)), 0), NZ - 2)
+	return max(H[j0 * NX + i0], H[j0 * NX + i0 + 1], H[(j0 + 1) * NX + i0], H[(j0 + 1) * NX + i0 + 1])
+
+
 def kind(x, z):
 	"""Что под точкой: floor (проходимо: пол, берег, палуба), water, wall."""
 	k = node(x, z)
@@ -627,9 +634,29 @@ def settle_floor(it, allow, quiet=False):
 	poly = it.contact()
 	cx = sum(p[0] for p in poly) / len(poly)
 	cz = sum(p[1] for p in poly) / len(poly)
-	hs = [gh(p[0], p[1]) for p in poly_samples(poly, (cx, cz), 0.3)]
+	pts = poly_samples(poly, (cx, cz), 0.3)
+	hs = [gh(p[0], p[1]) for p in pts]
 	e = model_of(it.id)
+	if it.id in FLAT and len(pts) >= 4:
+		lay_flat(it, pts, hs, e)
+		return
 	it.y = min(hs) - 0.03 - e['ymin'] * it.s * it.sy
+
+
+def lay_flat(it, pts, hs, e):
+	"""Плоское (ковры, кости, золото) — по плоскости пола под следом (наклон X/Z модели) и чуть выше её самой
+	высокой точки, но не больше 0.12 м: на волнистом полу при «самой низкой точке» ковры наполовину тонули."""
+	A = np.array([[p[0] - it.x, p[1] - it.z, 1.0] for p in pts])
+	sol, *_ = np.linalg.lstsq(A, np.array(hs), rcond=None)
+	ga, gb, c = sol
+	r = math.radians(it.yaw)
+	# градиент в осях модели (после поворота): x модели = (cos, −sin), z модели = (sin, cos)
+	lx = ga * math.cos(r) - gb * math.sin(r)
+	lz = ga * math.sin(r) + gb * math.cos(r)
+	it.rz = math.degrees(math.atan(lx))
+	it.rx = -math.degrees(math.atan(lz))
+	resid = max(h - (ga * (p[0] - it.x) + gb * (p[1] - it.z) + c) for p, h in zip(pts, hs))
+	it.y = c + min(max(resid, 0.0), 0.12) - 0.01 - e['ymin'] * it.s * it.sy
 
 
 ## Высоты крепления на стене, которые пробуются (основание над полом, м): выбирается та, где тыльная сторона ближе
@@ -901,6 +928,13 @@ ROPE_RECT = (3072 + 848, 30, 3072 + 878, 690)
 OVER_WATER = 0.3
 
 
+def ground_is_deck(br, t):
+	"""Точка моста на палубе-острове (площадка причала, корабль) — там пролёт нужен до самого конца."""
+	x = br['a'][0] + (br['b'][0] - br['a'][0]) * t
+	z = br['a'][1] + (br['b'][1] - br['a'][1]) * t
+	return DK[node(x, z)] >= 0
+
+
 def ground_or_deck(p, surf):
 	for d in CFG['decks']:
 		if 'surface' in d or d.get('id') == 'ship':
@@ -934,12 +968,23 @@ def shape_sd(d, p):
 	return (k - 1.0) * min(r[0], r[1])
 
 
-def bridge_profile(br, surf, n=16):
-	"""Настил как DungeonWorld._find_dungeon_bridges: прямая от конца к концу, над водой не ниже воды + OVER_WATER."""
+def bridge_profile(br, surf):
+	"""Как DungeonWorld.bridge_profile: точка на каждые 0.5 м, прямая от конца к концу, над водой не ниже воды +
+	OVER_WATER, сглажено, и не ниже земли под мостом (по оси и в 0.3 м по бокам) + 0.02."""
 	a, b = br['a'], br['b']
 	ya = ground_or_deck(a, surf) - 0.03
 	yb = ground_or_deck(b, surf) - 0.03
-	d = [ya + (yb - ya) * i / n for i in range(n + 1)]
+	L = math.hypot(b[0] - a[0], b[1] - a[1])
+	n = max(16, int(math.ceil(L / 0.5)))
+	dx, dz = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+	sw = min(0.3, br['width'] * 0.5)
+	sx, sz = -dz * sw, dx * sw
+	d, g = [], []
+	for i in range(n + 1):
+		t = i / n
+		x, z = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+		d.append(ya + (yb - ya) * t)
+		g.append(max(cell_top(x, z), cell_top(x + sx, z + sz), cell_top(x - sx, z - sz)))
 	for i in range(1, n):
 		d[i] = max(d[i], WATER_Y + OVER_WATER)
 	for _ in range(2):
@@ -947,7 +992,9 @@ def bridge_profile(br, surf, n=16):
 		for i in range(1, n):
 			sm[i] = max(d[i - 1] * 0.25 + d[i] * 0.5 + d[i + 1] * 0.25, WATER_Y + OVER_WATER - 0.05)
 		d = sm
-	return d
+	for i in range(1, n):
+		d[i] = max(d[i], g[i] + 0.02)
+	return d, g
 
 
 class Geo:
@@ -1022,7 +1069,7 @@ def build_bridges(surf):
 	r = random.Random(5)
 	for bi, b in enumerate(CFG['bridges']):
 		br = {'a': b['a'], 'b': b['b'], 'width': float(b.get('width', 3.2))}
-		prof = bridge_profile(br, surf)
+		prof, grd = bridge_profile(br, surf)
 		n = len(prof) - 1
 		a2, b2 = np.array(br['a'], float), np.array(br['b'], float)
 		L = float(np.linalg.norm(b2 - a2))
@@ -1043,11 +1090,21 @@ def build_bridges(surf):
 			return d / np.linalg.norm(d)
 
 		side3 = np.array([side2[0], 0.0, side2[1]])
+		# пролёт — где настил выше земли больше чем на 0.15 м (над водой), + 1.2 м на берег; дальше по земле идут
+		# без моста (0.35.4: перила над сушей торчали из земли — «лишние перила»)
+		over = [i for i in range(n + 1) if prof[i] - grd[i] > 0.15 or ground_is_deck(br, i / n)]
+		if over:
+			t0 = max(0.0, over[0] / n - 1.2 / L)
+			t1 = min(1.0, over[-1] / n + 1.2 / L)
+		else:
+			t0, t1 = 0.0, 1.0
+		span = t1 - t0
+		Ls = L * span
 		# доски поперёк
 		pw, gap = 0.27, 0.035
-		k = int(L / (pw + gap))
+		k = max(1, int(Ls / (pw + gap)))
 		for i in range(k):
-			t = (i + 0.5) / k
+			t = t0 + span * (i + 0.5) / k
 			fw = slope_at(t)
 			up = np.cross(side3, fw)
 			up /= np.linalg.norm(up)
@@ -1059,11 +1116,11 @@ def build_bridges(surf):
 			c = pt(t, jit, -0.035 + r.uniform(-0.008, 0.008))
 			g.box(c, sd, up, fw, W + r.uniform(-0.05, 0.12), 0.07, pw, PLANK_RECT, 'u', r)
 		# продольные балки под досками и перила
-		segs = max(2, int(L / 1.5))
+		segs = max(2, int(Ls / 1.5))
 		for s_ in range(segs):
-			t0, t1 = s_ / segs, (s_ + 1) / segs
+			u0, u1 = t0 + span * s_ / segs, t0 + span * (s_ + 1) / segs
 			for off in (-W / 2 + 0.35, W / 2 - 0.35):
-				p0, p1 = pt(t0, off, -0.17), pt(t1, off, -0.17)
+				p0, p1 = pt(u0, off, -0.17), pt(u1, off, -0.17)
 				d = p1 - p0
 				ln = np.linalg.norm(d)
 				fw = d / ln
@@ -1073,10 +1130,10 @@ def build_bridges(surf):
 					up = -up
 				g.box((p0 + p1) / 2, fw, up, side3, ln + 0.02, 0.18, 0.16, POST_RECT, 'u', r)
 		# сваи парами (в воде — до дна, на полу — в пол), поверху перила, между сваями — верёвка
-		npost = max(2, int(round(L / 2.6)) + 1)
+		npost = max(2, int(round(Ls / 2.6)) + 1)
 		tops = {}
 		for pi in range(npost):
-			t = pi / (npost - 1)
+			t = t0 + span * pi / (npost - 1)
 			for sgn in (-1, 1):
 				off = sgn * (W / 2 + 0.06)
 				top = pt(t, off, 0.95)

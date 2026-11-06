@@ -504,7 +504,11 @@ func _compute_walkable() -> void:
 				var slope := maxf(maxf(absf(hx - h), absf(hz - h)), maxf(absf(hx0 - h), absf(hz0 - h)))
 				ok = slope < MAX_STEP * step
 			walk[k] = 1 if ok else 0
-	# Мосты проходимы
+	_bridges_walkable()
+
+
+## Мосты проходимы (узлы под настилом; подземелье зовёт ещё раз после своей разметки края — DungeonWorld).
+func _bridges_walkable() -> void:
 	for b in bridges:
 		var a3: Vector3 = b["a"]
 		var b3: Vector3 = b["b"]
@@ -682,7 +686,7 @@ func _deck_mesh(br: Dictionary, center: Vector3) -> Array:
 	# Плоские нормали — как у прежнего настила-коробки (рёбра досок не скругляются светом)
 	st.set_smooth_group(-1)
 	var faces := PackedVector3Array()
-	var n := BRIDGE_SAMPLES
+	var n := maxi(BRIDGE_SAMPLES, (br.get("deck", PackedFloat32Array()) as PackedFloat32Array).size() - 1)
 	for i in n:
 		var p0 := bridge_point(br, float(i) / float(n)) - center
 		var p1 := bridge_point(br, float(i + 1) / float(n)) - center

@@ -125,11 +125,23 @@ func run_step() -> void:
 						while zq2 < zs[zs.size() - 3]:
 							for off in [3.0, 2.5, 2.0, 1.5]:
 								var q := Vector2(32.0 + side * off, zq2)
-								if not is_nan(DungeonWorld.surface_at(dd, q)) and w.is_walkable(q.x, q.y):
+								var roomy := true
+								for dq in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+									if is_nan(DungeonWorld.surface_at(dd, q + dq)):
+										roomy = false
+								if roomy and w.is_walkable(q.x, q.y):
 									walk_targets.append(["палуба корабля у борта " + str(q), q])
 									break
 							side = -side
 							zq2 += 4.5
+			# Каждый мост — строго по оси с берега на берег в обе стороны (0.35.4: у конца настила была ступенька в берег,
+			# герой упирался, хотя путь в обход находился)
+			for br in (w as DungeonWorld).cfg["bridges"]:
+				var ba := IslandWorld.v2(br["a"])
+				var bb := IslandWorld.v2(br["b"])
+				var dv := (bb - ba).normalized() * 1.5
+				walk_targets.append(["по мосту %s → %s" % [str(br["a"]), str(br["b"])], bb + dv, ba - dv])
+				walk_targets.append(["по мосту %s → %s" % [str(br["b"]), str(br["a"])], ba - dv, bb + dv])
 			wait = 10
 			step = 30
 		30:
@@ -143,13 +155,19 @@ func run_step() -> void:
 			main.player.global_position = w_start
 			main.player.velocity = Vector3.ZERO
 			var c: Vector2 = walk_targets[wi][1]
-			CardinalNav.ensure(w, get_tree())
-			wpath = CardinalNav.path(w_start, Vector3(c.x, 0, c.y))
-			wpath.append(Vector3(c.x, 0, c.y))
+			if (walk_targets[wi] as Array).size() > 2:
+				# прямо: из точки у начала к цели, без поиска пути
+				var st: Vector2 = walk_targets[wi][2]
+				main.player.global_position = Vector3(st.x, w.height_at(st.x, st.y) + 0.3, st.y)
+				wpath = [Vector3(c.x, 0, c.y)]
+			else:
+				CardinalNav.ensure(w, get_tree())
+				wpath = CardinalNav.path(w_start, Vector3(c.x, 0, c.y))
+				wpath.append(Vector3(c.x, 0, c.y))
 			wpi = 0
 			w_t0 = frame
 			w_moved = frame
-			w_last = w_start
+			w_last = main.player.global_position
 			step = 31
 		31:
 			var p: Player = main.player
@@ -327,6 +345,7 @@ func _check_world(w: DungeonWorld) -> void:
 	for k in w.walk.size():
 		if w.floor_sd[k] > 0.6 and w.water_sd[k] > 0.6 and w.deck_of[k] < 0:
 			rim += 1
-			if w.walk[k] == 1:
+			var pk := w.origin + Vector2(k % w.nx, k / w.nx) * w.step
+			if w.walk[k] == 1 and not w._on_bridge(Vector3(pk.x, 0, pk.y)):
 				bad += 1
 	check(rim > 100 and bad == 0, "скальный край и пустота непроходимы (%d узлов, проходимых %d)" % [rim, bad])

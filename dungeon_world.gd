@@ -66,6 +66,9 @@ func build(rng: RandomNumberGenerator) -> void:
 	_compute_walkable()
 	_rim_unwalkable()
 	_surface_walkable()
+	# полоса берега между полом и водой (_rim_unwalkable) закрывала узлы мостов у берега — герой упирался в
+	# невидимую стену на настиле (0.35.4, скриншоты Максима)
+	_bridges_walkable()
 	_dungeon_environment()
 	_build_collision()
 	_deck_collision()
@@ -483,22 +486,48 @@ func _find_dungeon_bridges() -> void:
 		# (_deck_profile) берёт высоту земли по ширине моста — у края пола это скальная стена: настил у начала
 		# мостков к кораблю вздымался на 2 м (0.35, «до босса не добраться»)
 		var over := float(cfg.get("bridge_over_water", BRIDGE_OVER_WATER))
-		var deck := PackedFloat32Array()
-		deck.resize(BRIDGE_SAMPLES + 1)
-		var ya := _ground_or_deck(pa) - 0.03
-		var yb := _ground_or_deck(pb) - 0.03
-		for i in BRIDGE_SAMPLES + 1:
-			deck[i] = lerpf(ya, yb, float(i) / float(BRIDGE_SAMPLES))
-		# Над водой — не ниже BRIDGE_OVER_WATER: верёвочная модель провисает, и середина пролёта уходила под воду
-		for i in range(1, deck.size() - 1):
-			deck[i] = maxf(deck[i], water_y + over)
-		for _pass in 2:
-			var sm := deck.duplicate()
-			for i in range(1, deck.size() - 1):
-				sm[i] = maxf(deck[i - 1] * 0.25 + deck[i] * 0.5 + deck[i + 1] * 0.25, water_y + over - 0.05)
-			deck = sm
-		br["deck"] = deck
+		br["deck"] = bridge_profile(pa, pb, float(br["width"]), _ground_or_deck(pa) - 0.03, _ground_or_deck(pb) - 0.03, over)
 		bridges.append(br)
+
+
+## Профиль настила моста подземелья (точка на каждые BRIDGE_STEP м): прямая от конца к концу, над водой не ниже воды +
+## over, сглажено, и **не ниже земли под мостом** (0.35.4: у берега земля бывала выше прямой — настил уходил под берег,
+## получалась ступенька 0.2 м, герой упирался; доски и перила там рисуются только над водой — модель dg_bridges).
+## Земля — по оси и в 0.3 м по бокам; та же функция — в tools/dungeon_layout/blender_scene.py (bridge_profile).
+const BRIDGE_STEP := 0.5
+
+
+## Самый высокий угол клетки сетки под точкой: физика рельефа — треугольники, на крутом берегу треугольник выше
+## билинейной высоты до 0.2 м (ступенька у конца моста).
+func _cell_top(x: float, z: float) -> float:
+	var i0 := clampi(int(floorf((x - origin.x) / step)), 0, nx - 2)
+	var j0 := clampi(int(floorf((z - origin.y) / step)), 0, nz - 2)
+	return maxf(maxf(heights[_idx(i0, j0)], heights[_idx(i0 + 1, j0)]),
+		maxf(heights[_idx(i0, j0 + 1)], heights[_idx(i0 + 1, j0 + 1)]))
+
+
+func bridge_profile(pa: Vector2, pb: Vector2, width: float, ya: float, yb: float, over: float) -> PackedFloat32Array:
+	var n := maxi(BRIDGE_SAMPLES, int(ceilf(pa.distance_to(pb) / BRIDGE_STEP)))
+	var side := (pb - pa).normalized().orthogonal() * minf(0.3, width * 0.5)
+	var deck := PackedFloat32Array()
+	var ground := PackedFloat32Array()
+	deck.resize(n + 1)
+	ground.resize(n + 1)
+	for i in n + 1:
+		var t := float(i) / float(n)
+		var q := pa.lerp(pb, t)
+		deck[i] = lerpf(ya, yb, t)
+		ground[i] = maxf(_cell_top(q.x, q.y), maxf(_cell_top(q.x + side.x, q.y + side.y), _cell_top(q.x - side.x, q.y - side.y)))
+	for i in range(1, n):
+		deck[i] = maxf(deck[i], water_y + over)
+	for _pass in 2:
+		var sm := deck.duplicate()
+		for i in range(1, n):
+			sm[i] = maxf(deck[i - 1] * 0.25 + deck[i] * 0.5 + deck[i + 1] * 0.25, water_y + over - 0.05)
+		deck = sm
+	for i in range(1, n):
+		deck[i] = maxf(deck[i], ground[i] + 0.02)
+	return deck
 
 
 ## Высота земли, а на палубе-острове — ровно высота палубы (конец моста встаёт вровень с площадкой, без ступеньки).

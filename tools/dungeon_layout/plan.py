@@ -379,6 +379,43 @@ def lake():
 	put('dg_raft', 4.0, 26.0, 60, 1.0)
 	put('dg_mast_relic', 58.0, 28.0, 120, 1.0)
 	put('dg_anchor', 21.0, 42.0, 20, 1.1)
+	water_corals(18, (-34.0, 0.0, 80.0, 64.0))
+	Z('halls')
+	water_corals(5, (-62.0, -6.0, -2.0, 2.0), gap=5.0, deep=1.0)
+	Z('boss')
+	water_corals(2, (-62.0, -45.0, -50.0, -36.0), gap=3.0, deep=0.8)
+	water_corals(2, (-41.0, -45.0, -28.0, -36.0), gap=3.0, deep=0.8)
+
+
+def seg_dist(p, a, b):
+	ax, az = b[0] - a[0], b[1] - a[1]
+	L2 = max(ax * ax + az * az, 1e-6)
+	t = min(max(((p[0] - a[0]) * ax + (p[1] - a[1]) * az) / L2, 0.0), 1.0)
+	return math.hypot(p[0] - a[0] - ax * t, p[1] - a[1] - az * t)
+
+
+def water_corals(n, box, gap=4.5, deep=1.2):
+	"""Кораллы в воде (0.35.4, Максим: «в воду добавь побольше кораллов»): n штук в box (x0, z0, x1, z1) на дне
+	(глубже deep от кромки), не ближе 4 м к мостам, не у корабля, не ближе gap друг к другу и к прежним."""
+	x0, z0, x1, z1 = box
+	got = 0
+	taken = [(p[1], p[2]) for p in PLACED if p[0] in ('dg_coral', 'dg_kelp', 'dg_dripstone', 'dg_crystal_blue',
+		'dg_crystal_purple', 'dg_leviathan', 'dg_raft', 'dg_rowboat', 'dg_anchor', 'dg_mast_relic')]
+	for _ in range(4000):
+		if got >= n:
+			break
+		x, z = rng.uniform(x0, x1), rng.uniform(z0, z1)
+		if at('ws', x, z) > -deep or at('dk', x, z) >= 0:
+			continue
+		if 25.0 < x < 39.0 and 8.0 < z < 62.0:
+			continue
+		if any(seg_dist((x, z), b['a'], b['b']) < 4.0 + b.get('width', 3.2) * 0.5 for b in CFG['bridges']):
+			continue
+		if any(math.hypot(x - a, z - b) < gap for a, b in taken):
+			continue
+		put('dg_coral', x, z, rng.uniform(0, 360), 2.0)
+		taken.append((x, z))
+		got += 1
 
 
 # Корабль: [id, x, z, поворот, масштаб, сдвиг высоты]. Ось — x = 32, с севера на юг. Нос (0.35.4) — на 2 м ближе:
@@ -405,6 +442,11 @@ PRIORITY = [('entrance', 'dg_brazier'), ('entrance', 'dg_brazier'), ('keep', 'dg
 	('lake', 'dg_harbor_post')]
 
 
+HERO_H = 1.7
+MIN_HEIGHT = {'dg_crystal_blue': 1.5 * HERO_H, 'dg_crystal_purple': 1.5 * HERO_H, 'dg_coral': 1.5 * HERO_H,
+	'dg_monolith': 3.0 * HERO_H}
+
+
 ## Версия раскладки (world/dungeon.json layout_version): новая встроенная раскладка — +1, тогда файл редактора
 ## объектов (DungeonEditor) от прежней перестаёт действовать.
 LAYOUT_VERSION = 3
@@ -415,6 +457,21 @@ def write():
 	for w in ZONES:
 		ZONES[w]()
 	items = [p + ['keep'] for p in keep_structural()] + PLACED
+	# нижние пределы высоты (0.35.4, слова Максима): кристаллы и кораллы — 1.5 роста героя, камни с зелёным знаком — 3
+	for p in items:
+		want = MIN_HEIGHT.get(p[0])
+		if not want:
+			continue
+		sy = p[7] if len(p) > 7 else 1.0
+		h = P[p[0]]['size'][1] * p[4] * sy
+		if h >= want:
+			continue
+		if p[0] == 'dg_monolith':
+			while len(p) < 9:
+				p.append(1.0 if len(p) == 7 else False)
+			p[4], p[7] = 1.7, round(want / (P[p[0]]['size'][1] * 1.7), 3)
+		else:
+			p[4] = round(want / (P[p[0]]['size'][1] * sy), 3)
 	first = []
 	rest = list(items)
 	for zn, id_ in PRIORITY:
