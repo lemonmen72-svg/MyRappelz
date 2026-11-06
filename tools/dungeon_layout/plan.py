@@ -348,8 +348,8 @@ def lake():
 	put('dg_mast', 32.0, 33.0, 0, 3.2)
 	put('dg_crows_nest', 32.0, 22.5, 0, 3.4)
 	put('dg_siren', 32.0, 59.6, 0, 1.5)
-	# На палубе — круг секты (руна и свечи кольцом), пушки у бортов, штурвал и бочки у двери рубки
-	put('dg_spiral', 32.0, 28.0, 90, 1.4)
+	# На палубе — круг секты (свечи кольцом; плита-руна стоит торчком — не берём), пушки у бортов, штурвал и бочки у
+	# двери рубки
 	for k in range(8):
 		x, z = near(32.0, 28.0, 2.3, k * 45 + 22.5)
 		put('dg_candles', x, z, rng.uniform(0, 360), 1.1)
@@ -394,7 +394,7 @@ ROUTES = {'boss': [((-42.5, -30.0), (-45.5, -50.0), 'вход → алтарь')
 
 PRIORITY = [('entrance', 'dg_brazier'), ('entrance', 'dg_brazier'), ('keep', 'dg_coral_altar'), ('boss', 'dg_witch_brazier'),
 	('boss', 'dg_witch_brazier'), ('crypt', 'dg_witch_brazier'), ('goblin', 'dg_cauldron'), ('treasury', 'dg_chest_open'),
-	('lake', 'dg_harbor_post'), ('lake', 'dg_spiral')]
+	('lake', 'dg_harbor_post')]
 
 
 ## Версия раскладки (world/dungeon.json layout_version): новая встроенная раскладка — +1, тогда файл редактора
