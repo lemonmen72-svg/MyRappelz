@@ -443,9 +443,9 @@ func _build_cases(w: IslandWorld) -> void:
 		var dir := _open_dir(w, mp, 6.0, fps, veg)
 		var s_mob := mp + dir * 6.0
 		cases.append({"name": "бой на месте", "mode": "stand", "start": w.ground(s_mob.x, s_mob.z, 0.1), "input": Vector2(-dir.x, -dir.z),
-			"frames": 60 * 12, "from": 120, "mob": m})
+			"frames": 60 * 12, "from": 120, "mob": m, "mob_at": mp})
 		cases.append({"name": "бой по кругу", "mode": "circle", "start": w.ground(s_mob.x, s_mob.z, 0.1), "input": Vector2(-dir.x, -dir.z),
-			"frames": 60 * 6, "from": 60, "mob": m, "center": mp})
+			"frames": 60 * 6, "from": 60, "mob": m, "center": mp, "mob_at": mp})
 
 
 ## Коллизии растительности: [[центр Vector2, радиус]] (капсулы в VegetationColliders).
@@ -693,6 +693,10 @@ func _prepare_mob(player: Player, c: Dictionary) -> void:
 		return
 	mob = m as Mob
 	mob.returning = false
+	# Зверь за прошлые отрезки мог отбрести — ставим на место, от которого проверен свободный путь к герою
+	if c.has("mob_at"):
+		mob.global_position = c["mob_at"]
+		mob.velocity = Vector3.ZERO
 	mob.home = mob.global_position
 	mob.max_hp = 1000000
 	mob.hp = mob.max_hp
