@@ -44,7 +44,10 @@ static func ensure(w: IslandWorld, tree: SceneTree) -> void:
 			if walk[j * w.nx + i] == 0:
 				a.set_point_solid(Vector2i(i, j), true)
 	blocked_cells = 0
-	for n in tree.root.find_children("*", "CollisionShape3D", true, false):
+	# Только тела сцены этого мира: при смене локации прежняя сцена ещё в дереве (queue_free) — её постройки легли бы на
+	# сетку нового мира и перегородили проходы
+	var scene: Node = w.get_parent() if w.get_parent() != null else tree.root
+	for n in scene.find_children("*", "CollisionShape3D", true, false):
 		var cs := n as CollisionShape3D
 		if cs == null or cs.disabled or cs.shape == null:
 			continue
