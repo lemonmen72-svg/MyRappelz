@@ -102,6 +102,11 @@ def keep_structural():
 	for p in CFG['props']:
 		if p[0] == 'dg_mine':
 			p = ['dg_mine', 52.0, -12.6, 180, 1.0, -0.62]
+		# Настил модели (по площади горизонтальных граней: корабль 0.9 м от основания, нос 1.0, площадка мостков 0.9)
+		# — вровень с палубой-островом, где ходит герой (0.35.3: раньше герой ходил внутри корпуса, на 0.7 м ниже досок)
+		DECK_DY = {'dg_ship_deck': -0.86, 'dg_ship_bow': -0.94, 'dg_pier': -0.86}
+		if p[0] in DECK_DY:
+			p = list(p[:5]) + [DECK_DY[p[0]]]
 		if p[0] in ('dg_ship_deck', 'dg_ship_bow', 'dg_wreck', 'dg_pier', 'dg_ascent', 'dg_mine', 'dg_coral_altar'):
 			q = list(p) + [0.0, 1.0, 0.0][max(0, len(p) - 3):]
 			q = (q + [0.0] * 6)[:6]
