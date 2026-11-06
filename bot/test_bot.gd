@@ -137,6 +137,10 @@ var started_text := ""
 var total_time := 0.0
 var active_time := 0.0
 var cool_time := 0.0
+## Щадящий режим (0.40.1): пауза кончилась, а телефон не остыл (статус MODERATE держится и в простое — телефон
+## нагрет ещё до теста) — дальше не ждать снова, а снизить нагрузку (BotScenario.on_hot: Кардинал — ускорение
+## ×GENTLE_ACCEL) и продолжать; новая пауза — только если запас дошёл до HEADROOM_HOT (или статус ≥ STOP — остановка).
+var gentle := false
 var steps_total := 0
 var measures_total := 0
 ## Отметка в логе Godot (хвост лога в отчёте — с неё).
@@ -671,6 +675,8 @@ func _watch(dt: float, fdt: float) -> void:
 		stop("Тест остановлен: телефон перегрелся (статус температуры %d — %s)" % [_status, status_name(_status)], "hot")
 		return
 	if _status >= STATUS_HOT or _headroom >= HEADROOM_HOT:
+		if gentle and _headroom >= 0 and _headroom < HEADROOM_HOT:
+			return
 		_begin_cooling("thermal")
 		return
 	# Без данных о температуре — по времени кадра (смены настроек и загрузки — короткие заминки, не в счёт)
@@ -734,6 +740,11 @@ func _tick_cooling(dt: float) -> void:
 	if (cool and _cool_t >= cool_min) or _cool_t >= cool_max:
 		if not cool:
 			note("За %s не остыл (статус %d) — продолжаю" % [clock(cool_max), _status])
+			if not gentle:
+				gentle = true
+				var how := scenario.on_hot(self) if scenario != null else ""
+				note("Щадящий режим: паузы — только при запасе от %s%s" % [BotReport.headroom_text(HEADROOM_HOT),
+					(", " + how) if how != "" else ""])
 		else:
 			note("Остыл за %s (статус %d, запас %s)" % [clock(_cool_t), _status, BotReport.headroom_text(_headroom)])
 		_end_cooling()

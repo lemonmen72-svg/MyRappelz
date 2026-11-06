@@ -75,6 +75,18 @@ func _queue(bot: TestBot, run_id: String, run_title: String, race: String, short
 	bot.wait_until("Кардинал: прогон «%s» закончен" % run_title, func() -> bool: return r.done, r.game_limit + 600.0)
 
 
+## Щадящий режим TestBot: ускорение прогонов — не выше GENTLE_ACCEL (идущий и следующие).
+const GENTLE_ACCEL := 8.0
+
+
+func on_hot(_bot: TestBot) -> String:
+	var was := Engine.time_scale
+	for r in runs + det_runs:
+		r.accel = minf(r.accel, GENTLE_ACCEL)
+	var k := CardinalMove.ease_off(GENTLE_ACCEL)
+	return "ускорение Кардинала ×%.0f → ×%.0f" % [was, k] if k > 0.0 else "ускорение Кардинала не выше ×%.0f" % GENTLE_ACCEL
+
+
 func on_finish(_bot: TestBot) -> void:
 	for r in det_runs + runs:
 		if not r.done:

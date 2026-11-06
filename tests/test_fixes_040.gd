@@ -61,6 +61,12 @@ func run_step() -> void:
 			step = 6
 		6:
 			_resume_done()
+			_gentle()
+			_auto_start()
+			wait = 90
+			step = 7
+		7:
+			_auto_done()
 			ok_done()
 
 
@@ -270,3 +276,92 @@ func _resume_done() -> void:
 	# Погиб — в сохранение места нет (возрождение в деревне)
 	p.hp = 0
 	check(Game.to_dict().get("pos", {}).is_empty(), "погибший — без места выхода")
+
+
+# ---------- Тест-бот: щадящий режим (отчёт 0.40.0: телефон не остывал в паузе — бот сдался на 49 из 68) ----------
+
+var _st := 2
+var _hr := 900
+
+
+func _gentle() -> void:
+	var bot := TestBot.new()
+	bot.scenario = BotScenarioCardinalStory.new()
+	bot.status_source = func() -> int: return _st
+	bot.headroom_source = func() -> int: return _hr
+	bot.cool_min = 0.1
+	bot.cool_max = 0.3
+	bot.poll = 0.05
+	main.get_tree().root.add_child(bot)
+	var ts := Engine.time_scale
+	var ticks := Engine.physics_ticks_per_second
+	Engine.time_scale = 32.0
+	Engine.physics_ticks_per_second = 60 * 32
+	bot.state = "running"
+	bot._watch(0.1, 0.016)
+	check(bot.state == "cooling", "статус 2 — пауза на остывание")
+	for i in 5:
+		if bot.state == "cooling":
+			bot._tick_cooling(0.1)
+	check(bot.state == "running" and bot.gentle, "не остыл за паузу — щадящий режим, тест продолжается")
+	check(is_equal_approx(Engine.time_scale, 8.0) and Engine.physics_ticks_per_second == 60 * 8,
+		"нагрузка ниже: ускорение ×32 → ×%.0f, тиков %d" % [Engine.time_scale, Engine.physics_ticks_per_second])
+	check("\n".join(bot.journal).contains("Щадящий режим"), "в журнале — щадящий режим")
+	bot._watch(0.1, 0.016)
+	check(bot.state == "running", "статус 2 при запасе 0.90 — без новой паузы")
+	_hr = 960
+	bot._watch(0.1, 0.016)
+	check(bot.state == "cooling", "запас дошёл до 0.96 — пауза")
+	bot._end_cooling()
+	Engine.time_scale = ts
+	Engine.physics_ticks_per_second = ticks
+	main.get_tree().paused = false
+	main.get_tree().root.disable_3d = false
+	bot.queue_free()
+
+
+# ---------- Автоатака: удержание «Атаки» включает и выключает ----------
+
+var _wolf: Mob = null
+var _wolf_hp := 0
+
+
+func _auto_start() -> void:
+	var p: Player = main.player
+	AdminPanel.god = true
+	_wolf = main.spawn_mob("wolf", 30, p.global_position + Vector3(0, 0, 1.6))
+	_wolf.max_hp = 10000000
+	_wolf.hp = _wolf.max_hp
+	_wolf_hp = _wolf.hp
+	p.current_target = _wolf
+	check(not main.auto_attack, "автоатака по умолчанию выключена")
+	# Удержание дольше AUTO_HOLD — включилась, отпустили — осталась включённой
+	main.hud._buttons["attack"]["touch"] = 7
+	for i in 6:
+		main._auto_attack_tick(0.15)
+	main.hud._buttons["attack"]["touch"] = -1
+	main._auto_attack_tick(0.016)
+	check(main.auto_attack, "удержание «Атаки» — автоатака включена")
+	check(main.hud._msg_label.text.contains("Автоатака включена"), "сообщение: %s" % main.hud._msg_label.text)
+	# Короткое нажатие не переключает
+	main.hud._buttons["attack"]["touch"] = 7
+	main._auto_attack_tick(0.2)
+	main.hud._buttons["attack"]["touch"] = -1
+	main._auto_attack_tick(0.016)
+	check(main.auto_attack, "короткое нажатие автоатаку не выключает")
+
+
+func _auto_done() -> void:
+	check(_wolf != null and is_instance_valid(_wolf) and _wolf.hp < _wolf_hp, "кнопку не держат — герой бьёт сам (HP волка %d → %d)"
+		% [_wolf_hp, _wolf.hp if _wolf != null and is_instance_valid(_wolf) else -1])
+	main.hud._buttons["attack"]["touch"] = 7
+	for i in 6:
+		main._auto_attack_tick(0.15)
+	main.hud._buttons["attack"]["touch"] = -1
+	main._auto_attack_tick(0.016)
+	check(not main.auto_attack, "снова удержание — автоатака выключена")
+	var hp := _wolf.hp
+	await main.get_tree().create_timer(1.5).timeout
+	if is_instance_valid(_wolf):
+		check(_wolf.hp == hp or _wolf.target == main.player, "выключена — герой не бьёт выбранную цель сам")
+		_wolf.consume()

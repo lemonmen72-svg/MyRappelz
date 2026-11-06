@@ -111,6 +111,13 @@ var cam_focus := Vector3.INF
 ## Свободная камера редактора объектов подземелья (DungeonEditor): камера следит за его точкой обзора, герой стоит,
 ## камера дальше и круче обычного.
 var edit_cam := false
+## Автоатака (просьба Максима после 0.40.0): удержание «Атаки» AUTO_HOLD с включает — герой бьёт сам, кнопку держать
+## не нужно; снова удержание — выключает. Бьёт выбранную цель или зверя, напавшего на героя, если он в досягаемости;
+## к цели не идёт (это решает игрок). Кнопка — с кольцом, пока автоатака включена.
+const AUTO_HOLD := 0.7
+var auto_attack := false
+var _atk_hold := 0.0
+var _atk_switched := false
 
 ## Экран до мира (вход, выбор или создание персонажа; null — мир).
 var screen: Node = null
@@ -585,6 +592,37 @@ func reset_mobs() -> int:
 	return _slots.size()
 
 
+## Удержание «Атаки»: дольше AUTO_HOLD — автоатака вкл./выкл. (одно переключение за удержание).
+func _auto_attack_tick(delta: float) -> void:
+	if hud.is_held("attack"):
+		_atk_hold += delta
+		if _atk_hold >= AUTO_HOLD and not _atk_switched:
+			_atk_switched = true
+			set_auto_attack(not auto_attack)
+	else:
+		_atk_hold = 0.0
+		_atk_switched = false
+
+
+func set_auto_attack(on: bool) -> void:
+	auto_attack = on
+	hud.set_button_color("attack", HUD.PET_MODE_ON if on else hud.button_color("attack"))
+	hud.show_message("Автоатака включена — удержите «Атаку», чтобы выключить" if on else "Автоатака выключена", 2.5)
+
+
+## Цель автоатаки: выбранная цель или зверь, напавший на героя, — живые и в досягаемости удара.
+func _auto_target() -> Mob:
+	var r := player.attack_range
+	var t := player.current_target
+	if t != null and is_instance_valid(t) and not t.is_dead and player.global_position.distance_to(t.global_position) <= r:
+		return t
+	for n in get_tree().get_nodes_in_group("mobs"):
+		var m := n as Mob
+		if m != null and not m.is_dead and m.target == player and player.global_position.distance_to(m.global_position) <= r:
+			return m
+	return null
+
+
 func _on_action(id: String) -> void:
 	match id:
 		"attack":
@@ -636,7 +674,10 @@ func _process(delta: float) -> void:
 	var dir := Vector3(mv.x, 0.0, mv.y).rotated(Vector3.UP, cam_yaw)
 	# Редактор объектов: джойстик ведёт его камеру, герой стоит
 	player.move_input = Vector2.ZERO if edit_cam else Vector2(dir.x, dir.z)
+	_auto_attack_tick(delta)
 	if hud.is_held("attack") and not edit_cam:
+		player.try_attack()
+	elif auto_attack and not edit_cam and _auto_target() != null:
 		player.try_attack()
 	for b in SKILL_BUTTONS:
 		var bid := String(b[0])

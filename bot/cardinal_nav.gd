@@ -262,6 +262,21 @@ static func path(from: Vector3, to: Vector3) -> PackedVector3Array:
 	return res
 
 
+## Сколько метров от p до ближайшей свободной клетки (0 — p свободна; INF — нет в пределах r м). Зверь над водой
+## (летучая рыба) дальше досягаемости удара — к нему с берега не подойти.
+static func gap_to_free(p: Vector3, r: float = 6.0) -> float:
+	if _astar == null or _w == null or not is_instance_valid(_w):
+		return 0.0
+	var c := _cell(p)
+	if not _astar.is_point_solid(c):
+		return 0.0
+	var cells := int(ceil(r / _w.step))
+	var q := _free_near(c, cells)
+	if q == c:
+		return INF
+	return Vector2(q - c).length() * _w.step
+
+
 ## Свободна ли клетка точки p (для обхода).
 static func free_at(p: Vector3) -> bool:
 	if _astar == null or _w == null or not is_instance_valid(_w):

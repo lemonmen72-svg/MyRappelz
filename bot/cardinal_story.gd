@@ -853,6 +853,10 @@ func _set_boost(on: bool) -> void:
 # ==================== Звери: поиск ====================
 
 ## Ближайший живой зверь по фильтру: виды (пусто — любые), уровни, боссы — только если вид — босс.
+## Зверь дальше этого от проходимой земли (над водой) — цель не выбирается.
+const REACH_GAP := 2.0
+
+
 func _find_mob(species: Array, lo: int, hi: int, allow_strong: bool = false) -> Mob:
 	var p := _p()
 	var best: Mob = null
@@ -875,6 +879,9 @@ func _find_mob(species: Array, lo: int, hi: int, allow_strong: bool = false) -> 
 		if m.is_boss and Game.level < m.level - int(profile["boss_gap"]):
 			continue
 		if not m.is_boss and _in_danger(m.global_position):
+			continue
+		# Над водой дальше удара от берега (летучие рыбы над рекой) — не подойти; выберем ту, что ближе к берегу
+		if CardinalNav.gap_to_free(m.global_position) > REACH_GAP:
 			continue
 		var d := _flat(m.global_position, p.global_position)
 		if d < bd:

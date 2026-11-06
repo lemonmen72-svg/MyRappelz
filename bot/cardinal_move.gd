@@ -52,6 +52,18 @@ static func speed_up(bot: TestBot, accel: float) -> Dictionary:
 	return saved
 
 
+## Щадящий режим (телефон не остывает): ускорение не выше max_accel, идущий прогон продолжается.
+## Вернёт новое ускорение (0 — и так не выше).
+static func ease_off(max_accel: float) -> float:
+	if Engine.time_scale <= max_accel + 0.01:
+		return 0.0
+	var base := int(round(float(Engine.physics_ticks_per_second) / Engine.time_scale))
+	Engine.time_scale = max_accel
+	Engine.physics_ticks_per_second = maxi(base, 1) * int(round(max_accel))
+	Engine.max_physics_steps_per_frame = maxi(8, int(ceil(max_accel * 4.0)))
+	return max_accel
+
+
 ## Вернуть настройки движка, сохранённые speed_up.
 static func restore(bot: TestBot, saved: Dictionary) -> void:
 	Engine.time_scale = float(saved.get("time_scale", 1.0))
