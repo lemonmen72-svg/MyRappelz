@@ -92,6 +92,9 @@ func _check_sizes() -> void:
 	var big := 0
 	var props: Dictionary = pr.get("props", {})
 	for id in props.keys():
+		# мосты подземелья (blender_scene.py) — своей клетки нет, текстура — доски клетки моста страницы dg_b
+		if bool((props[id] as Dictionary).get("world", false)):
+			continue
 		var slot: Array = (props[id] as Dictionary).get("slot", [0, 0, 0])
 		check(int(slot[2]) >= 1024, "%s: клетка атласа %d (≥ 1024)" % [id, int(slot[2])])
 		if int(slot[2]) >= 2048:
