@@ -28,6 +28,7 @@ extends RefCounted
 ##     любого вида MobData уровня N в 5 м перед героем (свой зверь, slot −1 — не возрождается); скорость бега героя
 ##     ×1/×2/×3 (только на эту игру); перенос в точку — постройки и места острова и зоны зверей из
 ##     world/training_island.json (свободная ровная точка рядом; деревни и город — точки старта рас).
+##     «Редактор объектов подземелья» (DungeonEditor, только в подземелье), «Отправить файл» раскладки, «Сбросить».
 ##   «Тест-бот» (TestBot, папка bot/): режим («Производительность», «Быстрый», «Полный», «По разделам» — с выбором
 ##     разделов переключателями, выбор запоминается),
 ##     «Начать» (бот играет отдельным тестовым героем в своём хранилище — сохранения игрока не трогает; по окончании
@@ -47,7 +48,8 @@ extends RefCounted
 ##     "pet_lvl_plus10", "pet_lvl_<1|30|50|60|100|115>", "pet_evolve", "pet_devolve", "pet_xp_up", "pet_full",
 ##     "pet_revive", "pets_clear", "pets_clear_yes", "pets_clear_no";
 ##   «Мир»: "kill_target", "kill_around", "respawn_all", "mob_lvl_minus5", "mob_lvl_minus", "mob_lvl_plus",
-##     "mob_lvl_plus5", "mob_lvl_hero", "spawn_<вид>", "speed_<1|2|3>", "loc_island", "loc_dungeon" (go_location), "tp_poi_<id>", "tp_zone_<id>" (teleports());
+##     "mob_lvl_plus5", "mob_lvl_hero", "spawn_<вид>", "speed_<1|2|3>", "loc_island", "loc_dungeon" (go_location),
+##     "editor_start", "editor_share", "editor_reset", "editor_reset_yes", "editor_reset_no" (DungeonEditor), "tp_poi_<id>", "tp_zone_<id>" (teleports());
 ##   «Тест-бот»: "bot_mode_<id>" (BotScenario.MODES; «скоро» — недоступны), "bot_sec_<раздел>" (режим «По разделам»:
 ##     переключатели разделов BotSection.SECTIONS), "bot_start", "bot_stop", "bot_open", "bot_share",
 ##     "anim_system", "anim_combat_idle" (система анимаций 1.0 и боевая стойка — выключатели отката).
@@ -91,7 +93,7 @@ static var speed_mult := 1
 static var spawn_level := 5
 ## Режим тест-бота на вкладке «Тест-бот» (BotScenario.MODES).
 static var bot_mode := "perf"
-## Ждёт подтверждения: "clear_bag" | "pets_clear" | "".
+## Ждёт подтверждения: "clear_bag" | "pets_clear" | "editor_reset" | "".
 static var _confirm := ""
 static var _scroll: ScrollContainer = null
 
@@ -770,6 +772,25 @@ static func _build_world(main: Node, body: VBoxContainer) -> void:
 	_choice(lc, "loc_island", "Остров", here == "island", func() -> void: AdminPanel.go_location(main, "island"))
 	_choice(lc, "loc_dungeon", "Подземелье", here == "dungeon", func() -> void: AdminPanel.go_location(main, "dungeon"))
 
+	_head(body, "Редактор объектов подземелья (сами ставите, двигаете, крутите; файл — «Отправить»)")
+	var er := _row(body)
+	_btn(er, "editor_start", "Открыть редактор", func() -> void: AdminPanel.editor_start(main), 180.0)
+	_btn(er, "editor_share", "Отправить файл", func() -> void: AdminPanel._done(main, DungeonEditor.share_file()), 160.0)
+	if _confirm == "editor_reset":
+		_btn(er, "editor_reset_yes", "Да, сбросить", func() -> void: AdminPanel.editor_reset(main), 140.0)
+		_btn(er, "editor_reset_no", "Отмена", func() -> void: AdminPanel.ask(main, ""), 110.0)
+	else:
+		_btn(er, "editor_reset", "Сбросить мою раскладку…", func() -> void: AdminPanel.ask(main, "editor_reset"), 200.0)
+	(buttons["editor_start"] as Button).disabled = here != "dungeon"
+	(buttons["editor_share"] as Button).disabled = not DungeonEditor.has_file()
+	var ef := DungeonEditor.read_file()
+	var ftxt := "Своей раскладки нет — встроенная."
+	if not ef.is_empty():
+		var stale := here == "dungeon" and int(ef.get("layout_version", -1)) != DungeonEditor.layout_version(IslandWorld.current)
+		ftxt = "Ваша раскладка: %d объектов, сохранена %s%s." % [int(ef.get("count", 0)), String(ef.get("saved", "?")),
+			" — от прежней раскладки, не действует" if stale else ""]
+	body.add_child(_text(ftxt + (" Редактор — только в подземелье." if here != "dungeon" else ""), UiScale.FONT_SMALL, MUTED))
+
 	_head(body, "Перенестись")
 	var tg := _grid(body, 3)
 	for e in teleports():
@@ -922,6 +943,26 @@ static func go_location(main: Node, to: String) -> void:
 		return
 	main.hud.close_window()
 	main.travel(to)
+
+
+## Редактор объектов подземелья (DungeonEditor): окно закрывается, справа — панель редактора.
+static func editor_start(main: Node) -> DungeonEditor:
+	main.hud.close_window()
+	return DungeonEditor.start(main)
+
+
+## Своя раскладка удаляется — при следующем входе в подземелье встроенная (сцена заново, если вы в подземелье).
+static func editor_reset(main: Node) -> void:
+	_confirm = ""
+	DungeonEditor.reset_file()
+	_done(main, "Раскладка сброшена на встроенную")
+	if IslandWorld.current is DungeonWorld:
+		main.hud.close_window()
+		var p: Node3D = main.get("player")
+		DungeonEditor.return_pos = p.global_position if p != null else Vector3.ZERO
+		DungeonEditor.return_yaw = float(main.get("cam_yaw"))
+		Game.arrive = "editor"
+		main.call("restart_scene")
 
 
 ## Перенести героя (и призванного питомца) к точке c: свободное ровное место рядом. Возвращает, куда.

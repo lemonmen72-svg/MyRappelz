@@ -4,6 +4,7 @@
 	"bounds": [-92.0, -70.0, 92.0, 70.0],
 	"grid_step": 1.0,
 	"floor_y": 0.0,
+	"layout_version": 1,
 	"rim_h": 7.0,
 	"rim_w": 3.0,
 	"void_y": -14.0,

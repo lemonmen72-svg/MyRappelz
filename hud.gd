@@ -119,6 +119,11 @@ const CAST_Y := 0.7
 const CAST_COLOR := Color(1.0, 0.78, 0.3)
 
 var move_vec := Vector2.ZERO
+## Режим расстановки (DungeonEditor): круглые кнопки, меню, команды питомца, цель и прочие блокеры (трекер) скрыты,
+## касания кнопок не нажимают; claim_touch(палец, точка) → true — касание забрал редактор (камера не вращается,
+## джойстик не начинается).
+var edit_mode := false
+var claim_touch := Callable()
 
 ## id -> {"panel": Panel, "label": Label, "offset": Vector2, "r": float, "hold": bool, "touch": int,
 ## "color": Color (заливка), "blocked": bool (не подходит оружию — затемнена),
@@ -632,6 +637,18 @@ func take_camera_zoom() -> float:
 	var z := _cam_zoom
 	_cam_zoom = 1.0
 	return z
+
+
+## Режим расстановки: спрятать всё, что мешает смотреть и может нажаться (каждый кадр — модули показывают своё).
+func _hide_for_edit() -> void:
+	for id in _buttons:
+		(_buttons[id]["panel"] as Panel).visible = false
+	_menu.visible = false
+	_pet_btns.visible = false
+	_target_box.visible = false
+	for c in _blockers:
+		if is_instance_valid(c) and not c.has_meta("editor"):
+			c.visible = false
 
 
 # ---------- Окна ----------
@@ -1187,6 +1204,8 @@ func _release_all() -> void:
 
 
 func _button_at(p: Vector2) -> String:
+	if edit_mode:
+		return ""
 	for id in _buttons:
 		var b: Dictionary = _buttons[id]
 		var panel: Panel = b["panel"]
@@ -1222,9 +1241,12 @@ func _input(event: InputEvent) -> void:
 			var p := te.position
 			if _show_fx_tip(p):
 				return
-			var id := _button_at(p)
-			if id == "" and over_blocker(p):
+			# Блокер (трекер, панель редактора объектов) — поверх кнопок: касание по нему не нажимает кнопку под ним
+			if over_blocker(p):
 				return
+			if claim_touch.is_valid() and bool(claim_touch.call(te.index, p)):
+				return
+			var id := _button_at(p)
 			if id != "":
 				if _buttons[id]["hold"]:
 					_buttons[id]["touch"] = te.index
@@ -1288,6 +1310,8 @@ func _process(delta: float) -> void:
 
 	_refresh_target()
 	_keep_window_on_screen()
+	if edit_mode:
+		_hide_for_edit()
 	if _hold_btn != null:
 		if not is_instance_valid(_hold_btn) or not _hold_btn.is_visible_in_tree():
 			_hold_btn = null

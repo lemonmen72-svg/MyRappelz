@@ -26,6 +26,8 @@ const SHOTS := [
 
 var idx := 0
 var dir := ""
+## SHOTS_EDITOR=1 — кадры с открытым редактором объектов (DungeonEditor): HUD и панель видны, выбран ближний.
+var ed_shot := -1
 
 
 func race_class() -> Array:
@@ -99,6 +101,16 @@ func run_step() -> void:
 			wait = 45
 			step = 4
 		4:
+			if OS.get_environment("SHOTS_EDITOR") != "" and ed_shot != idx:
+				main.hud.visible = true
+				var ed := DungeonEditor.start(main)
+				ed.pivot = main.player.global_position
+				ed.catalog_open = String((_shots()[idx] as Array)[0]).contains("cat")
+				if not ed.catalog_open:
+					ed.select_nearest()
+				ed_shot = idx
+				wait = 15
+				return
 			_save(String((_shots()[idx] as Array)[0]))
 			idx += 1
 			step = 3

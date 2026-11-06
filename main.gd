@@ -108,6 +108,9 @@ var cam_pitch := atan2(9.0, 8.5)
 var cam_dist := CAM_DIST
 ## Сглаженная точка слежения камеры (см. CAM_Y_RATE); Vector3.INF — ещё не задана.
 var cam_focus := Vector3.INF
+## Свободная камера редактора объектов подземелья (DungeonEditor): камера следит за его точкой обзора, герой стоит,
+## камера дальше и круче обычного.
+var edit_cam := false
 
 ## Экран до мира (вход, выбор или создание персонажа; null — мир).
 var screen: Node = null
@@ -350,6 +353,10 @@ func _build_player() -> void:
 	if Game.arrive == "portal" and portal != null:
 		var ep := portal.exit_point()
 		player.position = world.ground(ep.x, ep.z, 0.2)
+	# Вышел из редактора объектов подземелья — там же, где был (DungeonEditor.exit_editor)
+	elif Game.arrive == "editor" and world is DungeonWorld:
+		player.position = DungeonEditor.return_pos + Vector3(0, 0.2, 0)
+		cam_yaw = DungeonEditor.return_yaw
 	Game.arrive = ""
 	add_child(player)
 	player.stats_changed.connect(func():
@@ -592,16 +599,17 @@ func _process(delta: float) -> void:
 	# Камера: перетаскивание по экрану вне кнопок и джойстика
 	var drag := hud.take_camera_drag()
 	cam_yaw -= drag.x * CAM_SENS
-	cam_pitch = clampf(cam_pitch + drag.y * CAM_SENS, CAM_PITCH_MIN, CAM_PITCH_MAX)
-	cam_dist = clampf(cam_dist * hud.take_camera_zoom(), CAM_DIST_MIN, CAM_DIST_MAX)
+	cam_pitch = clampf(cam_pitch + drag.y * CAM_SENS, CAM_PITCH_MIN, DungeonEditor.EDIT_PITCH_MAX if edit_cam else CAM_PITCH_MAX)
+	cam_dist = clampf(cam_dist * hud.take_camera_zoom(), CAM_DIST_MIN, DungeonEditor.EDIT_DIST_MAX if edit_cam else CAM_DIST_MAX)
 
 	# Движение относительно камеры: «вверх» на джойстике — от камеры вперёд
 	var mv := hud.move_vec
 	if mv.length() < 0.15:
 		mv = Vector2.ZERO
 	var dir := Vector3(mv.x, 0.0, mv.y).rotated(Vector3.UP, cam_yaw)
-	player.move_input = Vector2(dir.x, dir.z)
-	if hud.is_held("attack"):
+	# Редактор объектов: джойстик ведёт его камеру, герой стоит
+	player.move_input = Vector2.ZERO if edit_cam else Vector2(dir.x, dir.z)
+	if hud.is_held("attack") and not edit_cam:
 		player.try_attack()
 	for b in SKILL_BUTTONS:
 		var bid := String(b[0])
@@ -680,6 +688,9 @@ func refresh_tame_icon(t: Node3D) -> void:
 
 ## Точка слежения камеры: x, z — где нарисован герой, высота — сглажена (CAM_Y_RATE, CAM_Y_LAG).
 func _update_cam_focus(delta: float) -> void:
+	if edit_cam and DungeonEditor.current != null:
+		cam_focus = DungeonEditor.current.pivot
+		return
 	var v := player.visual_position()
 	if not cam_focus.is_finite() or cam_focus.distance_to(v) > CAM_SNAP:
 		cam_focus = v

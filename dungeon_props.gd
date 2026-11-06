@@ -55,7 +55,8 @@ static func build(world: DungeonWorld, _rng: RandomNumberGenerator) -> void:
 	holder.add_child(fallback)
 	var lights := 0
 	var placed := 0
-	for e in world.cfg.get("props", []):
+	# Раскладка редактора объектов у администратора (DungeonEditor.props_for), иначе world/dungeon.json "props"
+	for e in DungeonEditor.props_for(world):
 		var a: Array = e
 		var id := String(a[0])
 		var x := float(a[1])
@@ -70,9 +71,13 @@ static func build(world: DungeonWorld, _rng: RandomNumberGenerator) -> void:
 		if LIGHTS.has(id) and lights < MAX_LIGHTS:
 			_light(holder, id, pos, s)
 			lights += 1
-	placed += _bridge_decks(world, holder, fallback, zones)
+	# Мосты — свои меши участков (редактор объектов DungeonEditor прячет склеенные объекты, мосты остаются)
+	var bridge_zones := {}
+	placed += _bridge_decks(world, holder, fallback, bridge_zones)
 	for key in zones:
 		_zone_mesh(holder, zones[key])
+	for key in bridge_zones:
+		_zone_mesh(holder, bridge_zones[key], "Bridges")
 	holder.set_meta("placed", placed)
 	holder.set_meta("lights", lights)
 
@@ -113,7 +118,7 @@ static func _place(world: DungeonWorld, holder: Node3D, fallback: Node3D, zones:
 		holder.add_child(body)
 
 
-static func _zone_mesh(holder: Node3D, zone: Zone) -> void:
+static func _zone_mesh(holder: Node3D, zone: Zone, node_name := "Props") -> void:
 	var mesh := ArrayMesh.new()
 	for pg in zone.items:
 		var st := SurfaceTool.new()
@@ -126,7 +131,7 @@ static func _zone_mesh(holder: Node3D, zone: Zone) -> void:
 	if mesh.get_surface_count() == 0:
 		return
 	var mi := MeshInstance3D.new()
-	mi.name = "Props"
+	mi.name = node_name
 	mi.mesh = mesh
 	mi.position = zone.origin
 	mi.set_meta("no_outline", true)
