@@ -144,7 +144,9 @@ var moving := false
 var drop_confirm := false
 var drop_count := 1
 var buttons: Dictionary = {}
-## Прокрутка сетки сумки (есть, когда с торбой ячеек больше Inventory.CAPACITY).
+## Сколько ячеек сумки видно без прокрутки (5 рядов по COLS).
+const BAG_VISIBLE := 40
+## Прокрутка сетки сумки (есть, когда ячеек больше BAG_VISIBLE — с 0.40 всегда: в сумке 120).
 var bag_scroll: ScrollContainer = null
 ## Сумка или золото изменились — Economy перестроит окно в _process.
 var dirty := false
@@ -502,8 +504,7 @@ func _build_storage(parent: VBoxContainer) -> void:
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", int(UiScale.px(10)))
 	parent.add_child(head)
-	var used := _label("На складе: %d/%d" % [st.used_cells(), Inventory.CAPACITY], UiScale.FONT_HEAD,
-		BAD if st.is_full() else MUTED)
+	var used := _label("На складе: %d" % st.used_cells(), UiScale.FONT_HEAD, MUTED)
 	used.name = "store_used_label"
 	used.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(used)
@@ -512,9 +513,20 @@ func _build_storage(parent: VBoxContainer) -> void:
 	grid.columns = COLS
 	grid.add_theme_constant_override("h_separation", int(UiScale.px(GAP)))
 	grid.add_theme_constant_override("v_separation", int(UiScale.px(GAP)))
-	parent.add_child(grid)
 	var list := st.cells()
 	var total := st.cell_count()
+	if total > Inventory.STORAGE_CAPACITY:
+		# Склад без предела: видно 5 рядов, остальное — прокруткой
+		var sc := ScrollContainer.new()
+		sc.name = "StoreScroll"
+		sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		var cs := UiScale.px(STORE_CELL)
+		sc.custom_minimum_size = Vector2(COLS * (cs + UiScale.px(GAP)) + UiScale.px(12),
+			float(Inventory.STORAGE_CAPACITY) / float(COLS) * (cs + UiScale.px(GAP)))
+		parent.add_child(sc)
+		sc.add_child(grid)
+	else:
+		parent.add_child(grid)
 	for i in total:
 		var c: Dictionary = list[i] if i < list.size() else {}
 		var id := String(c.get("id", ""))
@@ -580,12 +592,12 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 	grid.add_theme_constant_override("v_separation", int(UiScale.px(GAP)))
 	var list := inv.cells()
 	var total := inv.cell_count()
-	if total > Inventory.CAPACITY:
-		# С торбой ячеек больше 40: видно 5 рядов, остальное — прокруткой (окно не растёт)
+	if total > BAG_VISIBLE:
+		# Ячеек больше 40: видно 5 рядов, остальное — прокруткой (окно не растёт)
 		var sc := ScrollContainer.new()
 		sc.name = "BagScroll"
 		sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		var rows := float(Inventory.CAPACITY) / float(COLS)
+		var rows := float(BAG_VISIBLE) / float(COLS)
 		sc.custom_minimum_size = Vector2(COLS * (cell_sz + UiScale.px(GAP)) + UiScale.px(12),
 			rows * (cell_sz + UiScale.px(GAP)))
 		parent.add_child(sc)

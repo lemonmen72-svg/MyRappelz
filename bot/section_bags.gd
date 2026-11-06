@@ -47,11 +47,11 @@ func _buy() -> void:
 func _equip() -> void:
 	var p := player()
 	var err := p.equip_gear("bag_r1")
-	check(err == "" and Game.inventory.capacity == Inventory.CAPACITY + 8, "торба надета: ячеек %d (%s)" % [
+	check(err == "" and Game.inventory.capacity == Inventory.CAPACITY + ItemData.bag_slots("bag_r1"), "торба надета: ячеек %d (%s)" % [
 		Game.inventory.capacity, err])
 	Game.inventory.add("bag_r3")
 	err = p.equip_gear("bag_r3")
-	check(err == "" and Game.inventory.capacity == Inventory.CAPACITY + 24, "торба 3-го ранга: ячеек %d" % Game.inventory.capacity)
+	check(err == "" and Game.inventory.capacity == Inventory.CAPACITY + ItemData.bag_slots("bag_r3"), "торба 3-го ранга: ячеек %d" % Game.inventory.capacity)
 	economy().open_bag()
 
 

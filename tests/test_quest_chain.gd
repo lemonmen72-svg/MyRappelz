@@ -355,8 +355,8 @@ func _storage_details() -> void:
 	var inv: Inventory = game.inventory
 	var st: Inventory = game.storage
 	var win: InventoryWindow = eco.window
-	check(win.buttons.has("store_0") and win.buttons.has("store_%d" % (Inventory.CAPACITY - 1)), "на складе %d ячеек"
-		% Inventory.CAPACITY)
+	check(win.buttons.has("store_0") and win.buttons.has("store_%d" % (Inventory.STORAGE_CAPACITY - 1)), "на складе %d ячеек"
+		% Inventory.STORAGE_CAPACITY)
 	# Стопки: перья складываются в одну стопку
 	check(eco.deposit(inv.find_cell("pheasant_feather"), 2) == 2 and st.count("pheasant_feather") == 3
 		and st.used_cells() == 1, "перья на складе одной стопкой: %d" % st.count("pheasant_feather"))
@@ -380,18 +380,25 @@ func _storage_details() -> void:
 	check(eco.withdraw(st.find_cell("mirror_card"), -1) == 0 and last_hud_text().contains("Сумка полна")
 		and st.count("mirror_card") == 2, "в полную сумку со склада не забрать")
 	inv.remove("sword_steel", inv.count("sword_steel"))
-	# Склад полон — не положить
-	st.add("sword_steel", Inventory.CAPACITY - st.used_cells())
-	check(st.is_full(), "склад полон")
-	check(eco.deposit(inv.find_cell("pheasant_feather"), 1) == 0 and last_hud_text().contains("Склад полон"), "на полный склад не положить")
+	# Склад без предела (0.40): 60 ячеек занято — не полон, видно до свободного ряда, положить можно
+	st.add("sword_steel", 60 - st.used_cells())
+	check(not st.is_full() and st.cell_count() >= 64 and st.cell_count() % Inventory.ROW == 0,
+		"склад без предела: занято %d, ячеек %d" % [st.used_cells(), st.cell_count()])
+	var pf := inv.count("pheasant_feather")
+	check(eco.deposit(inv.find_cell("pheasant_feather"), 1) == 1 and inv.count("pheasant_feather") == pf - 1,
+		"на большой склад положено")
+	win.refresh()
+	check(win.buttons.has("store_%d" % (st.cell_count() - 1)), "сетка склада выросла до %d ячеек" % st.cell_count())
 	st.remove("sword_steel", st.count("sword_steel"))
+	st.remove("pheasant_feather", 1)
+	inv.add("pheasant_feather", 1)
 	# Окно: карточки и перетаскивание
 	inv.add("shell_plate", 2)
 	win.refresh()
 	var bc := inv.find_cell("shell_plate")
 	win.select_cell(bc)
 	check(win.buttons.has("act_store") and win.buttons.has("act_store_all"), "карточка вещи из сумки: «На склад»")
-	var sb: Button = win.buttons["store_%d" % (Inventory.CAPACITY - 1)]
+	var sb: Button = win.buttons["store_%d" % (Inventory.STORAGE_CAPACITY - 1)]
 	check(sb.call("_can_drop_data", Vector2.ZERO, {"inv_cell": bc}), "из сумки можно перетащить на склад")
 	sb.call("_drop_data", Vector2.ZERO, {"inv_cell": bc})
 	check(st.count("shell_plate") == 2 and inv.count("shell_plate") == 0, "перетащено на склад")

@@ -350,6 +350,19 @@ func _build_hud() -> void:
 	refresh_tame_icon(null)
 
 
+## Сохранённая точка выше земли не больше чем на столько — мост, палуба (выше — земля под ней).
+const RESUME_ABOVE := 8.0
+
+
+## Точка выхода из игры годится для входа: та же локация, проходимо.
+func resume_ok(sp: Dictionary) -> bool:
+	if not (sp.has("loc") and sp.has("x") and sp.has("y") and sp.has("z")) or world == null:
+		return false
+	if String(sp["loc"]) != world.location():
+		return false
+	return world.is_walkable(float(sp["x"]), float(sp["z"]))
+
+
 func _build_player() -> void:
 	player = Player.new()
 	player.position = world.spawn_point(Game.race_id)
@@ -361,8 +374,15 @@ func _build_player() -> void:
 	elif Game.arrive == "editor" and world is DungeonWorld:
 		player.position = DungeonEditor.return_pos + Vector3(0, 0.2, 0)
 		cam_yaw = DungeonEditor.return_yaw
+	# Обычный вход в игру — там, где герой вышел (Game.saved_pos), если точка в этой локации и проходима
+	elif Game.arrive == "" and resume_ok(Game.saved_pos):
+		var sp: Dictionary = Game.saved_pos
+		var g := world.ground(float(sp["x"]), float(sp["z"]), 0.2)
+		var y := float(sp["y"]) + 0.2
+		player.position = Vector3(g.x, y if y > g.y and y < g.y + RESUME_ABOVE else g.y, g.z)
 	Game.arrive = ""
 	add_child(player)
+	Game.hero_ref = weakref(player)
 	if Game.carry_buffs.has("hero"):
 		player.import_timed(Game.carry_buffs["hero"])
 		Game.carry_buffs.erase("hero")

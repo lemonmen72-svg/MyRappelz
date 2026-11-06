@@ -2220,8 +2220,11 @@ func _dungeon_step() -> bool:
 	var p := _p()
 	if p == null:
 		return false
-	# Сумка забита и есть что продать — сначала на остров к торговцу (добыча и знаки иначе останутся лежать)
+	# Сумка почти полна — выбросить самое дешёвое лишнее прямо здесь (кнопкой «Выбросить все» в сумке): ходка на
+	# остров к торговцу строит подземелье заново, и квестовая добыча, что не влезла, пропала бы вместе с ним
 	var inv := Game.inventory
+	if inv.capacity - inv.used_cells() < int(profile["bag_reserve"]) and not _junk_cells().is_empty():
+		await _discard_junk(int(profile["bag_reserve"]))
 	if inv.used_cells() < inv.capacity or _junk_cells().is_empty():
 		if float(p.hp) < float(p.max_hp) * float(profile["rest_below"]):
 			return await _rest()
@@ -2233,6 +2236,45 @@ func _dungeon_step() -> bool:
 			return ok
 	_last_plan = "dungeon → остров"
 	return await _portal_to("island")
+
+
+## Выбросить лишнее из сумки (самое дешёвое — сначала), пока свободных ячеек меньше free: сумка → ячейка → «Выбросить все».
+func _discard_junk(free: int) -> int:
+	var inv := Game.inventory
+	_close()
+	_action("bag_window")
+	var w := _win()
+	if w == null:
+		return 0
+	var n := 0
+	for _i in 40:
+		if inv.capacity - inv.used_cells() >= free:
+			break
+		var cells := _junk_cells()
+		if cells.is_empty():
+			break
+		var best := -1
+		var bv := INF
+		for c in cells:
+			var cell := inv.cell(int(c))
+			var v := float(ItemData.get_item(String(cell["id"])).get("sell", 0)) * float(cell.get("n", 1))
+			if v < bv:
+				bv = v
+				best = int(c)
+		var id := String(inv.cell(best)["id"])
+		if not _press(w.buttons, "cell_%d" % best):
+			break
+		if not _press(w.buttons, "act_drop_all") and not _press(w.buttons, "act_drop"):
+			break
+		n += 1
+		_ev("sell", "выброшено «%s» в подземелье (сумка почти полна)" % ItemData.item_name(id))
+		if not await _tick():
+			break
+		w = _win()
+		if w == null:
+			break
+	_close()
+	return n
 
 
 ## Цель «спуститься в подземелье»: к порталу у пещеры, переход (сцена строится заново — ждём мир подземелья),

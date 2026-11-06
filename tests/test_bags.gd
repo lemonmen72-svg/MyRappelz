@@ -39,7 +39,7 @@ func _unit_items() -> void:
 	for r in range(1, ItemData.BAG_RANKS + 1):
 		var id := ItemData.bag_id(r)
 		check(ItemData.is_bag(id) and ItemData.is_gear(id), "%s — торба" % id)
-		check(ItemData.bag_slots(id) == 8 * r, "%s: +%d ячеек" % [id, ItemData.bag_slots(id)])
+		check(ItemData.bag_slots(id) == 24 * r, "%s: +%d ячеек" % [id, ItemData.bag_slots(id)])
 		check(ItemData.level_block(id, 1) == "", "%s — без ограничения по уровню" % id)
 		check(ItemData.gear_slots_for(id) == ["bag"], "%s надевается в «Торбу»" % id)
 		check(ItemData.stack_size(id) == 1 and not ItemData.is_enchantable(id), "%s по одной, не точится" % id)
@@ -62,9 +62,9 @@ func _buy_and_equip() -> void:
 	check(inv.has("bag_r3"), "торба в сумке")
 	var err: String = main.player.equip_gear("bag_r3")
 	check(err == "", "торба надета на 3 ур. героя: %s" % err)
-	check(game.gear_in("bag") == "bag_r3" and inv.capacity == Inventory.CAPACITY + 24, "вместимость %d" % inv.capacity)
+	check(game.gear_in("bag") == "bag_r3" and inv.capacity == Inventory.CAPACITY + 72, "вместимость %d" % inv.capacity)
 	check(inv.find_cell("bag_r3") == -1, "надетая торба ячейку не занимает")
-	check(inv.cell_count() == Inventory.CAPACITY + 24, "ячеек показано %d" % inv.cell_count())
+	check(inv.cell_count() == Inventory.CAPACITY + 72, "ячеек показано %d" % inv.cell_count())
 
 
 func _bag_rules() -> void:
@@ -78,7 +78,7 @@ func _bag_rules() -> void:
 	inv.add("bag_r1")
 	check(game.gear_block("bag_r1", "bag") != "", "сменить на меньшую нельзя: %s" % game.gear_block("bag_r1", "bag"))
 	inv.add("bag_r7")
-	check(game.equip_gear("bag_r7") == "" and inv.capacity == Inventory.CAPACITY + 56, "на большую — можно: %d" % inv.capacity)
+	check(game.equip_gear("bag_r7") == "" and inv.capacity == Inventory.CAPACITY + 168, "на большую — можно: %d" % inv.capacity)
 	check(inv.has("bag_r3") and inv.find_cell("bag_r3") >= 0, "прежняя торба — в ячейке сумки")
 	# Освободить и снять: вещи из дальних ячеек переезжают внутрь 40
 	inv.remove("sword_steel", inv.count("sword_steel"))
@@ -96,7 +96,7 @@ func _bag_rules() -> void:
 func _save_load() -> void:
 	var d: Dictionary = game.to_dict()
 	game.from_dict(JSON.parse_string(JSON.stringify(d)))
-	check(game.gear_in("bag") == "bag_r3" and game.inventory.capacity == Inventory.CAPACITY + 24,
+	check(game.gear_in("bag") == "bag_r3" and game.inventory.capacity == Inventory.CAPACITY + 72,
 		"после загрузки торба надета, вместимость %d" % game.inventory.capacity)
 	main.player.recalc_stats()
 

@@ -13,10 +13,14 @@ extends RefCounted
 
 signal changed
 
-## Вместимость сумки без торбы (и склада), ячеек.
-const CAPACITY := 40
+## Вместимость сумки без торбы, ячеек (0.40: ×3 — просьба Максима, было 40).
+const CAPACITY := 120
+## Склад: ячеек видно не меньше этого; сам склад без предела (unlimited — слова Максима 0.40 «склад у нас бесконечный»).
+const STORAGE_CAPACITY := 40
+## Ширина ряда сетки (окно сумки и склада) — без предела вместимость растёт рядами.
+const ROW := 8
 
-## Вместимость этой сумки: CAPACITY + ячейки надетой торбы (ставит Game._sync_worn; у склада — CAPACITY).
+## Вместимость этой сумки: CAPACITY + ячейки надетой торбы (ставит Game._sync_worn; у склада — STORAGE_CAPACITY).
 var capacity := CAPACITY:
 	set(v):
 		if v != capacity:
@@ -41,6 +45,9 @@ var worn: Dictionary = {}:
 	set(v):
 		worn = v
 		_dirty = true
+
+## Без предела вместимости (склад): никогда не полон, ячеек — до последней занятой + свободный ряд.
+var unlimited := false
 
 var _cells: Array = []
 var _dirty := true
@@ -142,6 +149,12 @@ func cell(i: int) -> Dictionary:
 ## Сколько ячеек показывать: вместимость (или больше, если сумка переполнена принудительно).
 func cell_count() -> int:
 	_sync()
+	if unlimited:
+		var last := -1
+		for i in _cells.size():
+			if not (_cells[i] as Dictionary).is_empty():
+				last = i
+		return maxi(capacity, (last + 1 + ROW - 1) / ROW * ROW + ROW)
 	return maxi(capacity, _cells.size())
 
 
@@ -156,14 +169,19 @@ func used_cells() -> int:
 
 
 func is_full() -> bool:
-	return used_cells() >= capacity
+	return not unlimited and used_cells() >= capacity
+
+
+## Свободных ячеек (без предела — сколько угодно).
+func _free_cells() -> int:
+	return 1 << 24 if unlimited else maxi(0, capacity - used_cells())
 
 
 ## Сколько штук предмета ещё поместится: место в неполных стопках и свободные ячейки.
 func room_for(id: String) -> int:
 	_sync()
 	var st := ItemData.stack_size(id)
-	var room := maxi(0, capacity - used_cells()) * st
+	var room := _free_cells() * st
 	for c in _cells:
 		var d: Dictionary = c
 		if not d.is_empty() and String(d["id"]) == id:
@@ -175,7 +193,7 @@ func room_for(id: String) -> int:
 ## остальное — в свободные ячейки.
 func room_for_all(add_items: Dictionary) -> bool:
 	_sync()
-	var free := maxi(0, capacity - used_cells())
+	var free := _free_cells()
 	for k in add_items:
 		var id := String(k)
 		var n := int(add_items[k])
@@ -376,7 +394,7 @@ func _sync() -> void:
 ## Пустые ячейки сверх вместимости в конце не нужны; стопки за краем (сняли торбу) переезжают в свободные ячейки
 ## внутри вместимости, если там есть место.
 func _trim() -> void:
-	if _cells.size() > capacity:
+	if not unlimited and _cells.size() > capacity:
 		var free := 0
 		for i in range(capacity - 1, -1, -1):
 			if i < _cells.size() and (_cells[i] as Dictionary).is_empty():

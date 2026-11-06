@@ -87,6 +87,11 @@ var location := "island"
 ## PetManager._spawn); не сохраняется. Жалоба Максима 0.39: благословения жрицы пропадали в подземелье.
 var carry_buffs: Dictionary = {}
 var arrive := ""
+## Где герой вышел из игры (просьба Максима 0.40: при перезапуске — там же, а не в деревне): {loc, x, y, z} — ключ
+## сохранения "pos" (у старых нет — точка старта). Пишет to_dict по живому герою (hero_ref, ставит main), ставит
+## main._build_player, если пришёл не через портал, точка в той же локации и проходима; погиб — точка старта.
+var saved_pos: Dictionary = {}
+var hero_ref: WeakRef = null
 ## Золото нового героя: цены у жителей — как в базе оригинала (зелье 200, оружие 500–750), золота хватает на зелья
 ## и первые покупки (0.31; раньше 50 при ценах ×20 ниже).
 const START_GOLD := 1000
@@ -98,8 +103,16 @@ var quests_done: Dictionary = {}
 var quest_tracked := ""
 var quests_time: Dictionary = {}
 ## Склад у Кладовщика Тобина (Economy.deposit / withdraw, окно — InventoryWindow "storage"): те же ячейки и стопки,
-## что в сумке, Inventory.CAPACITY ячеек. В сохранении — ключ "storage" {"items", "cells"}; у старых сохранений пуст.
-var storage := Inventory.new()
+## что в сумке, ячеек без предела (видно рядами, всегда есть свободный ряд). В сохранении — ключ "storage" {"items", "cells"}; у старых сохранений пуст.
+var storage := _new_storage()
+
+
+static func _new_storage() -> Inventory:
+	var s := Inventory.new()
+	s.capacity = Inventory.STORAGE_CAPACITY
+	s.unlimited = true
+	return s
+
 ## Золото на складе (Economy.deposit_gold / withdraw_gold; ключ сохранения "storage_gold", у старых — 0).
 var storage_gold := 0
 ## Множитель опыта за зверей (админ-панель, вкладка «Опыт»: 1, 2, 5, 10, 20, 50): герою и питомцу
@@ -128,6 +141,8 @@ func reset() -> void:
 	has_character = false
 	location = "island"
 	arrive = ""
+	saved_pos = {}
+	hero_ref = null
 	char_name = ""
 	race_id = ""
 	class_id = ""
@@ -562,8 +577,22 @@ func to_dict() -> Dictionary:
 		"storage_gold": storage_gold,
 		"belt_slots": belt_slots,
 		"location": location,
+		"pos": hero_pos(),
 		"xp_mult": xp_mult,
 	}
+
+
+## Место героя для сохранения: живой герой в мире — его точка и локация мира; иначе — прежнее (saved_pos).
+func hero_pos() -> Dictionary:
+	var h: Node3D = hero_ref.get_ref() as Node3D if hero_ref != null else null
+	var w := IslandWorld.current
+	if h == null or not is_instance_valid(h) or not h.is_inside_tree() or w == null or not is_instance_valid(w):
+		return saved_pos.duplicate()
+	if int(h.get("hp")) <= 0:
+		return {}
+	var g := h.global_position
+	saved_pos = {"loc": w.location(), "x": snappedf(g.x, 0.01), "y": snappedf(g.y, 0.01), "z": snappedf(g.z, 0.01)}
+	return saved_pos.duplicate()
 
 
 func from_dict(d: Dictionary) -> void:
@@ -686,6 +715,8 @@ func from_dict(d: Dictionary) -> void:
 	storage_gold = maxi(0, int(d.get("storage_gold", 0)))
 	belt_slots = clampi(int(d.get("belt_slots", 1)), 1, PetBelt.MAX_SLOTS)
 	location = "dungeon" if String(d.get("location", "island")) == "dungeon" else "island"
+	var sp: Variant = d.get("pos", {})
+	saved_pos = (sp as Dictionary).duplicate() if sp is Dictionary else {}
 	PetBelt.ensure()
 	# Оружие (переведённые герои — стартовый набор Наёмника, см. ensure_hero). Вторая рука — "offhand"
 	# (раньше "shield"); прежняя пара клинков одним предметом (ItemData.PAIRED) — тот же клинок в обеих руках

@@ -9,6 +9,7 @@ var goal := Vector3.ZERO
 var d0 := 0.0
 var first_main: Node = null
 var hp_before := 0
+var resume_at := Vector3.ZERO
 
 
 func race_class() -> Array:
@@ -51,6 +52,15 @@ func run_step() -> void:
 			step = 4
 		4:
 			_carry_done()
+			_resume_start()
+			step = 5
+		5:
+			if main == first_main or not bool(main.get("_started")):
+				return
+			wait = 10
+			step = 6
+		6:
+			_resume_done()
 			ok_done()
 
 
@@ -219,3 +229,44 @@ func _carry_done() -> void:
 	check(p.effects.has("buff:bless_might"), "значок благословения на месте")
 	var pet: Pet = main.pets.active_pet
 	check(pet != null and pet.hero_buffs.has("bless_might"), "благословение на волке после портала")
+
+
+# ---------- 7. Вход в игру — там, где вышел ----------
+
+func _resume_start() -> void:
+	var p: Player = main.player
+	var w: IslandWorld = main.world
+	var sp := w.spawn_point(Game.race_id)
+	var at := Vector3.INF
+	for r in [40.0, 30.0, 50.0, 25.0]:
+		for k in 8:
+			var a := k * PI / 4.0
+			var q := Vector3(sp.x + cos(a) * r, 0.0, sp.z + sin(a) * r)
+			if w.is_walkable(q.x, q.z):
+				at = w.ground(q.x, q.z, 0.2)
+				break
+		if at != Vector3.INF:
+			break
+	check(at != Vector3.INF, "есть проходимая точка вдали от деревни")
+	p.global_position = at
+	var d: Dictionary = Game.to_dict()
+	var pos: Dictionary = d.get("pos", {})
+	check(String(pos.get("loc", "")) == "island" and Vector2(float(pos.get("x", 0)) - at.x, float(pos.get("z", 0)) - at.z).length() < 0.1,
+		"в сохранении — место героя: %s" % [pos])
+	check(main.resume_ok(pos), "точка годится для входа")
+	check(not main.resume_ok({"loc": "dungeon", "x": at.x, "y": at.y, "z": at.z}), "точка другой локации — нет")
+	resume_at = at
+	# Перезапуск: состояние — из сохранения (как вход в игру)
+	Game.from_dict(JSON.parse_string(JSON.stringify(d)))
+	Game.arrive = ""
+	first_main = main
+	main.restart_scene()
+
+
+func _resume_done() -> void:
+	var p: Player = main.player
+	var d := Vector2(p.global_position.x - resume_at.x, p.global_position.z - resume_at.z).length()
+	check(d < 1.0, "после перезапуска герой там же, где вышел (%.2f м)" % d)
+	# Погиб — в сохранение места нет (возрождение в деревне)
+	p.hp = 0
+	check(Game.to_dict().get("pos", {}).is_empty(), "погибший — без места выхода")
