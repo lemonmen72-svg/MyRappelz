@@ -262,7 +262,8 @@ func _unit_bosses() -> void:
 	var per := {}
 	for k in MobData.TYPES:
 		var id := String(k)
-		if not MobData.is_boss(id):
+		# Босс подземелья (капитан) — не существо острова: его проверяет test_dungeon_boss
+		if not MobData.is_boss(id) or MobData.is_dungeon(id):
 			continue
 		var sp := MobData.species_of(id)
 		check(FAMILIES.has(sp), "босс %s — существо острова (%s)" % [id, sp])
@@ -364,7 +365,7 @@ func _unit_zones() -> void:
 		check(all_n >= 6 and float(lo_n) >= 0.4 * float(all_n), "у %s звери 1–2 ур. — больше всего: %d из %d"
 			% [vz["id"], lo_n, all_n])
 	for k in MobData.TYPES:
-		if MobData.is_boss(String(k)):
+		if MobData.is_boss(String(k)) and not MobData.is_dungeon(String(k)):
 			check(int(bosses.get(String(k), 0)) == 1, "босс %s на острове — один" % k)
 
 
@@ -418,7 +419,7 @@ func _regen_start() -> void:
 func _world_bosses() -> void:
 	for k in MobData.TYPES:
 		var id := String(k)
-		if not MobData.is_boss(id):
+		if not MobData.is_boss(id) or MobData.is_dungeon(id):
 			continue
 		var b := find_mob(id)
 		check(b != null and b.is_boss and b.rarity == "unique", "босс %s в мире" % id)

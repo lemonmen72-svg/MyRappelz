@@ -5800,6 +5800,165 @@
 		},
 		"source": "Meshy_AI_Emerald_Lichwarden_20261105_character.glb"
 	},
+	"dg_captain": {
+		"kind": "biped",
+		"grips": {
+			"R": {
+				"pos": [
+					0.0361,
+					0.2034,
+					-0.0267
+				],
+				"dir": [
+					-0.9398,
+					0.2955,
+					-0.1717
+				]
+			},
+			"L": {
+				"pos": [
+					-0.0,
+					0.1882,
+					-0.0157
+				],
+				"dir": [
+					0.9889,
+					0.1483,
+					0.0049
+				]
+			}
+		},
+		"height": 2.0,
+		"length": 0.569,
+		"width": 1.937,
+		"bounds": [
+			[
+				-0.969,
+				0.0,
+				-0.284
+			],
+			[
+				0.969,
+				2.0,
+				0.284
+			]
+		],
+		"walk_speed": 1.084,
+		"run_speed": 7.048,
+		"attack_hit_time": 0.633,
+		"cast_time": 0.7,
+		"clips": {
+			"Idle": {
+				"length": 1.667,
+				"loop": true,
+				"source": "ual1:Sword_Idle"
+			},
+			"Walk": {
+				"length": 1.333,
+				"loop": true,
+				"source": "ual1:Walk_Loop",
+				"speed": 1.084
+			},
+			"Run": {
+				"length": 0.933,
+				"loop": true,
+				"source": "ual1:Jog_Fwd_Loop",
+				"speed": 7.048
+			},
+			"Attack": {
+				"length": 2.0,
+				"loop": false,
+				"source": "ual2:Sword_Regular_C"
+			},
+			"Hit": {
+				"length": 0.333,
+				"loop": false,
+				"source": "ual1:Hit_Chest"
+			},
+			"Death": {
+				"length": 2.4,
+				"loop": false,
+				"source": "ual1:Death01"
+			},
+			"Cast": {
+				"length": 1.533,
+				"loop": false,
+				"source": "ual1:Sword_Attack"
+			}
+		},
+		"head_rest": [
+			0.012,
+			1.723,
+			0.043
+		],
+		"tris": 27205,
+		"verts": 34354,
+		"bones": {
+			"root": "Root",
+			"hips": "Hips",
+			"chest": "Chest",
+			"head": "Head",
+			"spine": [
+				"Spine1",
+				"Spine2",
+				"Spine3",
+				"Chest"
+			],
+			"neck": [
+				"Neck"
+			],
+			"legs": {
+				"L": [
+					"LegL1",
+					"LegL2",
+					"LegL3",
+					"LegL4",
+					"LegL5"
+				],
+				"R": [
+					"LegR1",
+					"LegR2",
+					"LegR3",
+					"LegR4",
+					"LegR5"
+				]
+			},
+			"feet": {
+				"L": "LegL4",
+				"R": "LegR4"
+			},
+			"arms": {
+				"L": [
+					"ShoulderL",
+					"ArmL1",
+					"ArmL2",
+					"HandL",
+					"HandL_1",
+					"HandL_2",
+					"HandL_3",
+					"HandL_4"
+				],
+				"R": [
+					"ShoulderR",
+					"ArmR1",
+					"ArmR2",
+					"HandR",
+					"HandR_1",
+					"HandR_2",
+					"HandR_3",
+					"HandR_4"
+				]
+			},
+			"hands": {
+				"L": "HandL",
+				"R": "HandR"
+			},
+			"other": [
+				"HeadEnd"
+			]
+		},
+		"source": "Meshy_AI_Emerald_Corsair_Revenant_20261105_character.glb"
+	},
 	"skeleton": {
 		"kind": "biped",
 		"grips": {

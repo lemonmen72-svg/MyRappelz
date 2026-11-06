@@ -263,6 +263,19 @@ const TYPES := {
 		"power": 1.5, "mini_boss": false, "attack_cd": 1.4, "weapon": "mw_curved_dagger",
 		"loot": ["coral_shard", "sea_bone"], "undead": true,
 	},
+	# Босс подземелья (этап 4, 0.38; решения Максима): проклятый капитан «Изумрудной клятвы» — модель Emerald Corsair
+	# Revenant (без щупалец), сабля Verdant Oathblade (mw_oathblade); сила подземелья, HP ×4 (dungeon_hp), возрождение
+	# 40 мин. Стоит на палубе корабля в гроте (зона dg_captain, "fixed"). Удар по площади «Клятва бездны» и ярость с
+	# половины HP — вторая фаза (канон — docs/story/DUNGEON_CHAPTER1_STORY.md, «Проклятый капитан»).
+	"dg_captain": {
+		"name": "Проклятый капитан", "gen": "проклятого капитана", "level": 30, "speed": 4.2, "gold": [200, 400],
+		"color": Color(0.24, 0.5, 0.42), "scale": 1.0, "rarity": "unique", "tameable": false, "dungeon": true,
+		"boss": true, "power": 1.5, "dungeon_hp": 4.0, "respawn": 2400.0, "attack_cd": 1.3, "weapon": "mw_oathblade",
+		"loot": ["captain_doubloon", "brine_rag"], "special": ["oath_crystal", "captain_logbook"], "undead": true,
+		"slam": {"cd": 11.0, "windup": 1.1, "radius": 5.0, "power": 1.4, "text": "Клятва бездны!",
+			"color": Color(0.3, 1.0, 0.62)},
+		"enrage": {"hp": 0.5, "aspd": 1.35, "text": "Клятва сильнее смерти!"},
+	},
 	# Питомцы подземелья (этап 3, 0.37): «Обычные», приручаются (синяя карта), в подземелье — его сила (dungeon).
 	# Модель — стадия по уровню (MobStats.stage_for: 22+ — 3-я), оружие скелета — по стадии (weapons).
 	"skeleton": {
@@ -337,6 +350,27 @@ static func weapon_of(id: String, stage: int = 0) -> String:
 		var w: Array = d["weapons"]
 		return String(w[clampi(stage, 0, w.size() - 1)])
 	return String(d.get("weapon", ""))
+
+
+## Удар по площади вида (поле "slam"; у каменного стража — свои числа): cd, windup, radius, power, text,
+## color. Нет — пусто.
+static func slam_of(id: String) -> Dictionary:
+	var d := get_type(id)
+	if d.has("slam"):
+		var sl: Dictionary = (d["slam"] as Dictionary).duplicate()
+		for k in ["cd", "windup", "radius", "power"]:
+			sl[k] = float(sl.get(k, 0.0))
+		sl["text"] = String(sl.get("text", "Удар!"))
+		sl["color"] = sl.get("color", Color(1.0, 0.65, 0.3))
+		return sl
+	if id == "golem":
+		return {"cd": 8.0, "windup": 0.9, "radius": 4.5, "power": 1.3, "text": "Сотрясение!", "color": Color(1.0, 0.6, 0.3)}
+	return {}
+
+
+## Ярость — вторая фаза (поле "enrage": hp — доля HP, ниже которой удары чаще в aspd раз; text). Нет — пусто.
+static func enrage_of(id: String) -> Dictionary:
+	return get_type(id).get("enrage", {})
 
 
 ## Минибосс: «Редкий» зверь мира, не босс (вожак анатем, змеекрыл, кентавр); поле "mini_boss" заменяет правило.

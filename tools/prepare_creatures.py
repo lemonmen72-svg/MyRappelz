@@ -3900,6 +3900,10 @@ DUNGEON_MOBS = {
 	"dg_sect_wraith": {"style": "biped", "height": 1.95, "tris": 20000,
 		"clips": dict(_ZOMBIE, Attack=("ual2", ["Sword_Regular_A", "Sword_Regular_A_Rec"]))},
 	"dg_elder_priest": {"style": "biped", "height": 2.2, "tris": 26000, "clips": dict(_CASTER)},
+	# Босс подземелья (этап 4, 0.38): Проклятый капитан ← Emerald_Corsair_Revenant; в игре ×BOSS_SCALE 1.35 (≈ 2.7 м).
+	# Удар — косой взмах саблей, «Клятва бездны» (Cast) — рубящий удар сверху.
+	"dg_captain": {"style": "biped", "height": 2.0, "tris": 28000,
+		"clips": {"Attack": ("ual2", ["Sword_Regular_C"]), "Cast": ("ual1", ["Sword_Attack"])}},
 }
 # Питомец подземелья «Скелет» (этап 3, 0.37): стадии — Emerald_Revenant, Emerald_Lich_Warrior, Emerald_Wraith_Knight
 # (вариант «(1)» — латник без оружия в руках). Боец с мечом: стойка и удары мечом UAL; меч в руке — PetData weapon.

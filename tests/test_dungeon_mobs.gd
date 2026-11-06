@@ -165,6 +165,9 @@ func _placement() -> void:
 		var slot: Dictionary = (main.get("_slots") as Array)[mob.slot] if mob.slot >= 0 else {}
 		var zone := String(slot.get("zone", ""))
 		var p: Vector3 = slot.get("pos", mob.global_position)
+		# Босс на палубе корабля (зона "fixed") — проверяет test_dungeon_boss
+		if bool(_zone_cfg(w, zone).get("fixed", false)):
+			continue
 		var room := w.room_at(p.x, p.z)
 		if not w._mob_spot_ok(p.x, p.z, solids, por) or room != String(ZONE_ROOM.get(zone, "?")):
 			bad += 1
@@ -182,3 +185,10 @@ func _placement() -> void:
 			break
 	var island := FileAccess.get_file_as_string("res://world/training_island.json")
 	check(not island.contains("\"dg_"), "на острове монстров подземелья нет")
+
+
+func _zone_cfg(w: DungeonWorld, id: String) -> Dictionary:
+	for z in w.cfg.get("mob_zones", []):
+		if String((z as Dictionary).get("id", "")) == id:
+			return z
+	return {}

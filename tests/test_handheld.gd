@@ -25,7 +25,7 @@ const LENGTHS := {
 	# оружие монстров подземелья (0.36, MobData weapon)
 	"mw_axe": 0.8, "mw_bastard_sword": 1.25, "mw_broad_sword": 1.05, "mw_cleaver": 0.6, "mw_curved_dagger": 0.5,
 	"mw_cutlass": 0.9, "mw_knight_sword": 1.0, "mw_longsword": 1.1, "mw_ritual_dagger": 0.45, "mw_runic_sword": 1.05,
-	"mw_rusty_dagger": 0.42, "mw_scythe": 1.3, "mw_shortsword": 0.75, "mw_straight_sword": 0.95,
+	"mw_rusty_dagger": 0.42, "mw_scythe": 1.3, "mw_shortsword": 0.75, "mw_straight_sword": 0.95, "mw_oathblade": 1.0,
 }
 ## Предметы жителей (договорённость с моделями жителей: id не менять).
 const NPC_IDS := ["npc_grimoire", "npc_cane", "npc_wand", "npc_longbow", "npc_hammer", "npc_quiver", "npc_keys",

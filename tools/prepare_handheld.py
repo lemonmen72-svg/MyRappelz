@@ -207,6 +207,9 @@ ITEMS = {
 		grip=0.13),
 	"mw_straight_sword": dict(src="Rusty_Straight_Sword", kind="npc", frame="blade", length=0.95, tris=8500,
 		tex=TEX_ONE, grip=0.12),
+	# Сабля босса подземелья — Проклятого капитана (0.38): Verdant Oathblade
+	"mw_oathblade": dict(src="Verdant_Oathblade", kind="npc", frame="blade", length=1.0, tris=12000, tex=TEX_BIG,
+		grip=0.15, rot=180),
 }
 
 # Арбалет: ложе на столько выше точки хвата (кулак под ложем, как у процедурного _crossbow_mesh)

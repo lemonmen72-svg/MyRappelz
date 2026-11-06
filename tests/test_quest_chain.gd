@@ -106,7 +106,7 @@ func _unit() -> void:
 	# Вожаки: по заданию на каждого босса острова
 	var bosses: Array = []
 	for k in MobData.TYPES:
-		if MobData.is_boss(String(k)):
+		if MobData.is_boss(String(k)) and not MobData.is_dungeon(String(k)):
 			bosses.append(String(k))
 	check(bosses.size() == 7 and QuestData.BOSS_QUESTS.size() == 7, "семь вожаков — семь заданий")
 	for k in QuestData.BOSS_QUESTS:

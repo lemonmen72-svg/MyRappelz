@@ -2605,6 +2605,48 @@
 			"tex": 1024,
 			"flipped": 8,
 			"src": "Rusty_Straight_Sword"
+		},
+		"mw_oathblade": {
+			"kind": "npc",
+			"frame": "blade",
+			"length": 1.0,
+			"size": [
+				0.1943,
+				0.999,
+				0.0941
+			],
+			"min": [
+				-0.1342,
+				-0.15,
+				-0.0468
+			],
+			"max": [
+				0.0602,
+				0.849,
+				0.0473
+			],
+			"grip": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"grip2": null,
+			"tip": [
+				-0.09,
+				0.848,
+				0.0003
+			],
+			"butt": [
+				-0.036,
+				-0.148,
+				0.0003
+			],
+			"tris": 11992,
+			"verts": 19843,
+			"src_tris": 31340,
+			"tex": 2048,
+			"flipped": 5,
+			"src": "Verdant_Oathblade"
 		}
 	},
 	"about": "tools/prepare_handheld.py: начало координат — точка хвата; frame blade — ось +Y, лезвие к +X, плоскость клинка XY; bow — плечи ±Y, тетива +Z; crossbow — вперёд −Z, верх +Y; shield — лицо +Z, верх +Y; book — обложка +Z, верх +Y, корешок −X"

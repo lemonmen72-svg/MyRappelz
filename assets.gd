@@ -249,6 +249,8 @@ const PACKS := {
 		"assets/creatures/dg_rot_corsair.png",
 		"assets/creatures/dg_reef_wraith.glb",
 		"assets/creatures/dg_reef_wraith.png",
+		"assets/creatures/dg_captain.glb",
+		"assets/creatures/dg_captain.png",
 		"assets/handheld/mw_*.glb",
 		"assets/handheld/mw_*.png",
 	],

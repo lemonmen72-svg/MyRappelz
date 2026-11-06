@@ -97,6 +97,8 @@ const DEFAULTS := {
 		"attack_hit_time": 0.23},
 	"dg_reef_wraith": {"height": 1.90, "length": 0.42, "width": 1.90, "walk_speed": 1.01, "run_speed": 6.10,
 		"attack_hit_time": 0.57},
+	"dg_captain": {"height": 2.00, "length": 0.57, "width": 1.94, "walk_speed": 1.08, "run_speed": 7.05,
+		"attack_hit_time": 0.63},
 }
 ## Окончания моделей стадий эволюции: стадия 1 (в коде 0..2) → "_2", стадия 2 → "_3".
 const STAGE_SUFFIX := ["", "_2", "_3"]

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Промты ChatGPT на значки трофеев монстров подземелья (этап 2, 0.36): 12 предметов ItemData (goblin_token …
-# sect_sigil). Пишет tools/Промты_значки_добычи_подземелья.docx. Запуск из корня: python3 -I tools/make_dungeon_loot_icons_doc.py
+# sect_sigil; лист 2 — 3 трофея босса-капитана, 0.38). Пишет tools/Промты_значки_добычи_подземелья.docx. Запуск из корня: python3 -I tools/make_dungeon_loot_icons_doc.py
 # (нужен python-docx). Лист — 4 × 3 плитки на белом фоне; нарезка:
 #   python3 -I tools/cut_icon_sheet.py <лист.png> assets/icons/items <id через запятую> [--cols 4]
 import os
@@ -47,37 +47,63 @@ ITEMS = [
 		"as the pupil, bright green glow and golden trim", "Старший жрец"),
 ]
 
+# Лист 2 (0.38): трофеи босса подземелья — Проклятого капитана, сетка 3 × 1
+BOSS_ITEMS = [
+	("captain_doubloon", "Проклятый дублон", "редкая", "a heavy old gold doubloon coin, an emerald-green eye stamped "
+		"instead of a royal crest, sea-green patina in the grooves, a faint green glow", "Проклятый капитан"),
+	("oath_crystal", "Погасший кристалл клятвы", "уникальная", "a large faceted emerald crystal in a broken dark-silver "
+		"setting with torn chain links, mostly dull and dark, a weak green light deep inside", "Проклятый капитан"),
+	("captain_logbook", "Судовой журнал капитана", "уникальная", "a swollen water-damaged leather ship logbook with brass "
+		"corners, a green eye-and-tentacles mark burned into the cover, seaweed on the strap", "Проклятый капитан"),
+]
 
-def main():
-	doc = Document()
-	st = doc.styles["Normal"]
-	st.font.name = "Calibri"
-	st.font.size = Pt(10.5)
-	doc.add_heading("Dark Pact — значки трофеев монстров подземелья (0.36)", 0)
-	doc.add_paragraph("Один лист ChatGPT: 12 значков сеткой 4 × 3, по порядку таблицы (слева направо, сверху вниз). "
-		"В игре они пока процедурные (ItemIcon по полю icon), с картинкой станут настоящими. Готовый лист — пришли мне, "
-		"нарежу командой:")
-	doc.add_paragraph("python3 -I tools/cut_icon_sheet.py <лист.png> assets/icons/items " + ",".join(i[0] for i in ITEMS)
-		+ " --cols 4")
-	doc.add_heading("Промт листа (вставить в ChatGPT целиком)", 1)
-	lines = [STYLE, THEME, "Draw a sheet of 12 icons in a 4 x 3 grid, in this exact order (left to right, top to bottom):"]
-	for n, it in enumerate(ITEMS, 1):
+
+def sheet(doc, items, cols, rows, size):
+	lines = [STYLE, THEME, "Draw a sheet of %d icons in a %d x %d grid, in this exact order (left to right, top to bottom):"
+		% (len(items), cols, rows)]
+	for n, it in enumerate(items, 1):
 		frame = {"обычная": "grey frame", "редкая": "blue frame", "уникальная": "golden frame"}[it[2]]
 		lines.append("%d. %s (%s)." % (n, it[3], frame))
-	lines.append("Square sheet, 1536 x 1152 px or larger. No captions, no numbers on the sheet.")
+	lines.append("Sheet %s px or larger. No captions, no numbers on the sheet." % size)
 	doc.add_paragraph("\n".join(lines))
-	doc.add_heading("Что на каждой плитке", 1)
+
+
+def table(doc, items):
 	t = doc.add_table(rows=1, cols=5)
 	t.style = "Table Grid"
 	for c, h in enumerate(["№", "id (имя файла)", "Предмет", "Рамка", "Кто роняет"]):
 		t.rows[0].cells[c].text = h
-	for n, it in enumerate(ITEMS, 1):
+	for n, it in enumerate(items, 1):
 		r = t.add_row().cells
 		r[0].text = str(n)
 		r[1].text = it[0]
 		r[2].text = it[1]
 		r[3].text = it[2]
 		r[4].text = it[4]
+
+
+def main():
+	doc = Document()
+	st = doc.styles["Normal"]
+	st.font.name = "Calibri"
+	st.font.size = Pt(10.5)
+	doc.add_heading("Dark Pact — значки трофеев подземелья (0.36–0.38)", 0)
+	doc.add_paragraph("Лист 1 ChatGPT: 12 значков сеткой 4 × 3, по порядку таблицы (слева направо, сверху вниз). "
+		"В игре они пока процедурные (ItemIcon по полю icon), с картинкой станут настоящими. Готовый лист — пришли мне, "
+		"нарежу командой:")
+	doc.add_paragraph("python3 -I tools/cut_icon_sheet.py <лист.png> assets/icons/items " + ",".join(i[0] for i in ITEMS)
+		+ " --cols 4")
+	doc.add_heading("Лист 1 — монстры подземелья (вставить в ChatGPT целиком)", 1)
+	sheet(doc, ITEMS, 4, 3, "1536 x 1152")
+	doc.add_heading("Что на каждой плитке листа 1", 1)
+	table(doc, ITEMS)
+	doc.add_heading("Лист 2 — трофеи Проклятого капитана (0.38)", 1)
+	doc.add_paragraph("Отдельный лист, 3 значка в ряд. Нарезка:")
+	doc.add_paragraph("python3 -I tools/cut_icon_sheet.py <лист.png> assets/icons/items " + ",".join(i[0] for i in BOSS_ITEMS)
+		+ " --cols 3")
+	sheet(doc, BOSS_ITEMS, 3, 1, "1536 x 512")
+	doc.add_heading("Что на каждой плитке листа 2", 1)
+	table(doc, BOSS_ITEMS)
 	doc.save(DOCX)
 	print("записан", DOCX)
 

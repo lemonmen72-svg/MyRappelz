@@ -77,7 +77,8 @@
 		{"id": "dg_dead_knight", "name": "Сердце склепа", "center": [7.9, -42.0], "radius": 4.0, "levels": [26, 26], "mobs": [["dg_dead_knight", 1]]},
 		{"id": "dg_sanctuary", "name": "Зал изумрудного алтаря", "center": [-45.5, -46.0], "radius": 14.0, "levels": [26, 28], "mobs": [["dg_bone_oracle", 2, 26, 27], ["dg_grave_oracle", 3, 26, 27], ["dg_plague_shaman", 2, 27, 28], ["dg_sect_wraith", 3, 28, 28]]},
 		{"id": "dg_elder_priest", "name": "Изумрудный алтарь", "center": [-45.5, -50.0], "radius": 4.0, "levels": [29, 29], "mobs": [["dg_elder_priest", 1]]},
-		{"id": "dg_treasury", "name": "Сокровищница", "center": [-64.0, 21.2], "radius": 9.0, "levels": [27, 29], "mobs": [["dg_rot_corsair", 3, 27, 28], ["dg_coral_corsair", 2, 28, 29], ["dg_reef_wraith", 2, 28, 29], ["octopus", 3, 26, 28]]}
+		{"id": "dg_treasury", "name": "Сокровищница", "center": [-64.0, 21.2], "radius": 9.0, "levels": [27, 29], "mobs": [["dg_rot_corsair", 3, 27, 28], ["dg_coral_corsair", 2, 28, 29], ["dg_reef_wraith", 2, 28, 29], ["octopus", 3, 26, 28]]},
+		{"id": "dg_captain", "name": "Палуба «Изумрудной клятвы»", "center": [32.0, 19.6], "radius": 1.0, "levels": [30, 30], "mobs": [["dg_captain", 1]], "fixed": true}
 	],
 	"transitions": [],
 	"props": [

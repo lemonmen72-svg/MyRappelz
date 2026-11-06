@@ -23,16 +23,11 @@ extends CharacterBody3D
 ## killed = true: зверя убили, false: его забрали из мира (consume)
 signal gone(mob: Mob, killed: bool)
 
-## Удар по площади каменного стража: перезарядка, замах, радиус, множитель атаки.
 ## Дальше этого расстояния от игрока зверь «спит»: не думает, не анимируется и не рисуется.
 const SLEEP_DIST := 55.0
 ## Дальность сна сейчас (Кардинал «Прохождение острова» на время прогона ставит меньше — дальние звери не бродят,
 ## шаг физики дешевле; обычная игра — SLEEP_DIST).
 static var sleep_dist := SLEEP_DIST
-const SLAM_CD := 8.0
-const SLAM_WINDUP := 0.9
-const SLAM_RADIUS := 4.5
-const SLAM_POWER := 1.3
 ## Агрессивный зверь замечает героя или питомца на дистанции своей атаки + столько метров.
 const AGGRO_MARGIN := 3.5
 
@@ -146,6 +141,11 @@ var _mark: Node3D = null
 var _mark_gem: Node3D = null
 var _slam_cd := 4.0
 var _slam_windup := 0.0
+## Удар по площади вида (MobData.slam_of: cd, windup, radius, power, text, color; пусто — нет).
+var _slam_cfg: Dictionary = {}
+## Ярость (MobData "enrage": hp — доля HP, aspd — удары чаще во столько раз, text): вторая фаза босса.
+var enraged := false
+var _attack_base := 1.3
 var _asleep := false
 var _sleep_check := 0.0
 
@@ -178,6 +178,8 @@ func setup(id: String, spawn_slot: int, pos: Vector3, lvl: int = -1) -> void:
 	eva = float(stats["eva"])
 	crit = float(stats["crit"])
 	attack_every = float(stats["attack_cd"])
+	_attack_base = attack_every
+	_slam_cfg = MobData.slam_of(type_id)
 	xp_reward = int(stats["xp"])
 	aggro_range = _reach() + AGGRO_MARGIN if aggressive else 0.0
 	home = pos
@@ -308,7 +310,7 @@ func _physics_process(delta: float) -> void:
 	attack_cd = maxf(0.0, attack_cd - delta)
 	taunt_time = maxf(0.0, taunt_time - delta)
 	_tick_debuffs(delta)
-	if type_id == "golem":
+	if not _slam_cfg.is_empty():
 		_slam_cd = maxf(0.0, _slam_cd - delta)
 	_tick_dots(delta)
 	if is_dead:
@@ -381,14 +383,8 @@ func _physics_process(delta: float) -> void:
 			_slam_windup -= delta
 			if _slam_windup <= 0.0:
 				_slam()
-		elif type_id == "golem" and _slam_cd <= 0.0 and to.length() < SLAM_RADIUS - 0.5:
-			_slam_windup = SLAM_WINDUP
-			_slam_cd = SLAM_CD
-			CreatureModels.spawn_ring(get_parent(), global_position, SLAM_RADIUS, Color(1.0, 0.45, 0.2), SLAM_WINDUP)
-			if _model != null:
-				var wt := create_tween()
-				wt.tween_property(_model, "scale", Vector3(0.92, 1.12, 0.92), SLAM_WINDUP * 0.8)
-				wt.tween_property(_model, "scale", Vector3.ONE, 0.1)
+		elif not _slam_cfg.is_empty() and _slam_cd <= 0.0 and to.length() < float(_slam_cfg["radius"]) - 0.5:
+			start_slam()
 		elif to.length() > _reach() - (CHASE_SLACK if _closing else 0.0):
 			# Цель за рекой — через мост (IslandWorld.Route)
 			_closing = true
@@ -478,21 +474,54 @@ func _reach() -> float:
 	return maxf(1.9, 1.0 + 0.7 * body_scale)
 
 
-## Удар по площади каменного стража: урон игроку и питомцам вокруг.
+## Замах удара по площади (_slam): круг на земле, стоит на месте windup с; у модели из файла — клип умения.
+func start_slam() -> void:
+	var wu := float(_slam_cfg["windup"])
+	_slam_windup = wu
+	_slam_cd = float(_slam_cfg["cd"])
+	CreatureModels.spawn_ring(get_parent(), global_position, float(_slam_cfg["radius"]), _slam_cfg["color"], wu)
+	if _asset != null:
+		_asset.play_cast(wu + 0.4)
+	elif _model != null:
+		var wt := create_tween()
+		wt.tween_property(_model, "scale", Vector3(0.92, 1.12, 0.92), wu * 0.8)
+		wt.tween_property(_model, "scale", Vector3.ONE, 0.1)
+
+
+## Удар по площади (каменный страж, капитан): урон игроку и питомцам вокруг.
 func _slam() -> void:
 	skill_uses += 1
 	var parent := get_parent()
-	CreatureModels.spawn_ring(parent, global_position, SLAM_RADIUS, Color(0.9, 0.75, 0.5), 0.35)
+	var r := float(_slam_cfg["radius"])
+	var c: Color = _slam_cfg["color"]
+	CreatureModels.spawn_ring(parent, global_position, r, c.lightened(0.2), 0.35)
 	Vfx.death_puff(parent, global_position + Vector3(0, 0.3, 0), 1.6)
-	Vfx.magic_burst(parent, global_position + Vector3(0, 0.4, 0), Color(1.0, 0.65, 0.3), SLAM_RADIUS * 0.6, 0.35)
-	Util.float_text(parent, global_position + Vector3(0, _height + 0.8, 0), "Сотрясение!", Color(1, 0.6, 0.3))
+	Vfx.magic_burst(parent, global_position + Vector3(0, 0.4, 0), c, r * 0.6, 0.35)
+	Util.float_text(parent, global_position + Vector3(0, _height + 0.8, 0), String(_slam_cfg["text"]), c)
 	for g in ["player", "pets"]:
 		for n in get_tree().get_nodes_in_group(g):
 			var node := n as Node3D
 			if node == null or not is_instance_valid(node) or node.get("is_down") == true:
 				continue
-			if node.global_position.distance_to(global_position) <= SLAM_RADIUS:
-				node.call("take_damage", _hit_damage(node, SLAM_POWER), self)
+			if node.global_position.distance_to(global_position) <= r:
+				node.call("take_damage", _hit_damage(node, float(_slam_cfg["power"])), self)
+
+
+## Ярость (вторая фаза босса, MobData "enrage"): HP ниже доли — удары чаще, перезарядка удара по площади короче.
+func _check_enrage() -> void:
+	var en := MobData.enrage_of(type_id)
+	if en.is_empty():
+		return
+	var want := float(hp) <= float(max_hp) * float(en["hp"])
+	if want == enraged:
+		return
+	enraged = want
+	attack_every = _attack_base / (float(en["aspd"]) if enraged else 1.0)
+	if enraged:
+		var parent := get_parent()
+		var c := Color(0.35, 1.0, 0.6)
+		Vfx.magic_burst(parent, global_position + Vector3(0, _height * 0.6, 0), c, 2.2, 0.5)
+		Util.float_text(parent, global_position + Vector3(0, _height + 1.1, 0), String(en["text"]), c, 1.3)
 
 
 ## Оглушить на sec секунд.
@@ -808,6 +837,8 @@ func _heal(delta: float, frac_per_sec: float) -> void:
 		hp = mini(max_hp, hp + h)
 		_regen_acc -= h
 		_update_label()
+		if enraged:
+			_check_enrage()
 
 
 ## amount — готовый урон (защиту зверя и уровни уже учёл атакующий: Combat.damage).
@@ -835,6 +866,8 @@ func take_damage(amount: int, attacker: Node3D, crit_hit: bool = false, periodic
 	_update_label()
 	if hp <= 0:
 		_die()
+	elif not enraged:
+		_check_enrage()
 
 
 ## Удар героя с «Тихой поступью» может не отвлечь зверя от питомца, которого тот уже бьёт.

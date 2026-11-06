@@ -876,7 +876,11 @@ func mob_slots(rng: RandomNumberGenerator) -> Array:
 			for n in int(entry[1]):
 				var pos := Vector3.ZERO
 				var found := false
-				for attempt in 160:
+				# Место задано точно (босс на палубе корабля): центр зоны, высота — палубы
+				if bool(zone.get("fixed", false)):
+					pos = Vector3(c.x, _ground_or_deck(c) + 0.1, c.y)
+					found = true
+				for attempt in (0 if found else 160):
 					var ang := rng.randf() * TAU
 					var rr := sqrt(rng.randf()) * r * (1.0 if attempt < 80 else 1.6)
 					var x := c.x + cos(ang) * rr
