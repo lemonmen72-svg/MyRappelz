@@ -2214,14 +2214,15 @@ func _note_stories() -> void:
 			_ev("story", String(sid))
 
 
-## Шаг в подземелье: отдых, бой по цели задания главы I; целей здесь нет (или сумка полна) — назад на остров.
+## Шаг в подземелье: отдых, бой по цели задания главы I; целей здесь нет (или сумка забита) — назад на остров.
 ## Выход и новый вход строят подземелье заново: мини-боссы и капитан, убитые раньше задания, — снова на месте.
 func _dungeon_step() -> bool:
 	var p := _p()
 	if p == null:
 		return false
+	# Сумка забита и есть что продать — сначала на остров к торговцу (добыча и знаки иначе останутся лежать)
 	var inv := Game.inventory
-	if inv.capacity - inv.used_cells() >= int(profile["bag_reserve"]):
+	if inv.used_cells() < inv.capacity or _junk_cells().is_empty():
 		if float(p.hp) < float(p.max_hp) * float(profile["rest_below"]):
 			return await _rest()
 		var task := _pick_goal(["kill"])
