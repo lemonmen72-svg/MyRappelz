@@ -1,0 +1,3501 @@
+{
+	"hero": {
+		"abyss_blood": {
+			"buff": {
+				"arch": "blood_burst",
+				"dur": 0.9,
+				"el": "blood",
+				"k": 1,
+				"scale": 1,
+				"seed": 309
+			},
+			"el": "blood"
+		},
+		"abyss_howl": {
+			"area": {
+				"arch": "roar",
+				"dur": 0.9,
+				"el": "dark",
+				"k": 1,
+				"scale": 1.4,
+				"seed": 31878
+			},
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 7873
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 45173
+			},
+			"el": "dark"
+		},
+		"acid_mist": {
+			"el": "poison",
+			"impact": {
+				"arch": "water_splash",
+				"dur": 0.7,
+				"el": "poison",
+				"k": 1,
+				"scale": 1,
+				"seed": 52735
+			},
+			"proj": {
+				"el": "poison"
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "poison",
+				"k": 1,
+				"scale": 1,
+				"seed": 19133
+			}
+		},
+		"alert_guard": {
+			"buff": {
+				"arch": "shield",
+				"dur": 1.2,
+				"el": "shield",
+				"k": 1,
+				"scale": 1,
+				"seed": 7568
+			},
+			"el": "shield"
+		},
+		"armor_breach": {
+			"el": "light",
+			"impact": {
+				"arch": "cleave",
+				"dur": 0.6,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 33772
+			}
+		},
+		"armor_split": {
+			"el": "steel",
+			"impact": {
+				"arch": "cleave",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 5845
+			}
+		},
+		"axe_storm": {
+			"el": "steel",
+			"impact": {
+				"arch": "spin_slash",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1.15,
+				"seed": 35233
+			}
+		},
+		"backstab": {
+			"el": "steel",
+			"impact": {
+				"arch": "stab",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 7370
+			}
+		},
+		"bad_dream": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 711
+			},
+			"el": "dark",
+			"impact": {
+				"arch": "cursed_sigil",
+				"dur": 0.8,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 41565
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 17533
+			}
+		},
+		"battle_fervor": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 1.2,
+				"el": "spirit",
+				"k": 1,
+				"scale": 1,
+				"seed": 57301
+			},
+			"el": "spirit"
+		},
+		"beacon_ray": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.6,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 1389
+			},
+			"el": "light",
+			"impact": {
+				"arch": "spirit_burst",
+				"dur": 0.7,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 38206
+			},
+			"proj": {
+				"el": "light"
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 28687
+			}
+		},
+		"beast_calm": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 2277
+			},
+			"el": "beast"
+		},
+		"beast_form": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 35956
+			},
+			"el": "beast"
+		},
+		"beast_hide": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 48586
+			},
+			"el": "beast"
+		},
+		"beast_might": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 28231
+			},
+			"el": "beast"
+		},
+		"beast_roar": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 29890
+			},
+			"el": "beast"
+		},
+		"beast_wit": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 33144
+			},
+			"el": "beast"
+		},
+		"binding_strike": {
+			"el": "steel",
+			"impact": {
+				"arch": "slash",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 20596
+			}
+		},
+		"blessed_blade": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 1.2,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 30425
+			},
+			"el": "light"
+		},
+		"blinding_flash": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.9,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 34230
+			},
+			"el": "light",
+			"impact": {
+				"arch": "holy_beam",
+				"dur": 0.8,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 64189
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 55696
+			}
+		},
+		"blood_gift": {
+			"buff": {
+				"arch": "blood_burst",
+				"dur": 0.9,
+				"el": "blood",
+				"k": 1,
+				"scale": 1,
+				"seed": 12815
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.9,
+				"el": "blood",
+				"k": 1,
+				"scale": 1,
+				"seed": 32477
+			},
+			"el": "blood"
+		},
+		"blood_rain": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.5,
+				"el": "blood",
+				"k": 1,
+				"scale": 1,
+				"seed": 60757
+			},
+			"el": "blood",
+			"impact": {
+				"arch": "blood_burst",
+				"dur": 0.9,
+				"el": "blood",
+				"k": 1,
+				"scale": 1,
+				"seed": 56423
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "blood",
+				"k": 1,
+				"scale": 1,
+				"seed": 59431
+			}
+		},
+		"bloody_blade": {
+			"el": "steel",
+			"impact": {
+				"arch": "slash",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 41802
+			}
+		},
+		"borrowed_life": {
+			"buff": {
+				"arch": "soul_drain",
+				"dur": 0.9,
+				"el": "blood",
+				"k": 1,
+				"scale": 1,
+				"seed": 38218
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.2,
+				"el": "blood",
+				"k": 1,
+				"scale": 1,
+				"seed": 61659
+			},
+			"el": "blood"
+		},
+		"brittle_hide": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 19643
+			},
+			"el": "dark",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.8,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 6105
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 25305
+			}
+		},
+		"bulwark": {
+			"buff": {
+				"arch": "shield",
+				"dur": 1.2,
+				"el": "shield",
+				"k": 1,
+				"scale": 1,
+				"seed": 15420
+			},
+			"el": "shield"
+		},
+		"burning_arrow": {
+			"el": "fire",
+			"impact": {
+				"arch": "flame_burst",
+				"dur": 0.6,
+				"el": "fire",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 13368
+			}
+		},
+		"burning_ground": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.8,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 27829
+			},
+			"el": "fire",
+			"impact": {
+				"arch": "flame_burst",
+				"dur": 0.8,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 35088
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 11975
+			}
+		},
+		"challenge": {
+			"area": {
+				"arch": "roar",
+				"dur": 0.9,
+				"el": "spirit",
+				"k": 1,
+				"scale": 2.4,
+				"seed": 54551
+			},
+			"el": "spirit",
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "spirit",
+				"k": 1,
+				"scale": 1,
+				"seed": 64399
+			}
+		},
+		"charge_stab": {
+			"el": "steel",
+			"impact": {
+				"arch": "stab",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 15154
+			}
+		},
+		"chord_mind": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "mind",
+				"k": 1,
+				"scale": 1,
+				"seed": 64677
+			},
+			"el": "mind"
+		},
+		"chord_strength": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 1.2,
+				"el": "spirit",
+				"k": 1,
+				"scale": 1,
+				"seed": 61516
+			},
+			"el": "spirit"
+		},
+		"chord_vitality": {
+			"buff": {
+				"arch": "shield",
+				"dur": 1.2,
+				"el": "shield",
+				"k": 1,
+				"scale": 1,
+				"seed": 48201
+			},
+			"el": "shield"
+		},
+		"chord_wisdom": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "mind",
+				"k": 1,
+				"scale": 1,
+				"seed": 46622
+			},
+			"el": "mind"
+		},
+		"cleanse_beast": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 0.9,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 42259
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.5,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 25493
+			},
+			"el": "heal"
+		},
+		"concentration": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "ice",
+				"k": 1,
+				"scale": 1,
+				"seed": 54145
+			},
+			"el": "ice"
+		},
+		"critical_shot": {
+			"el": "steel",
+			"impact": {
+				"arch": "arrow_impact",
+				"dur": 0.5,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 30191
+			}
+		},
+		"crushing_toll": {
+			"el": "steel",
+			"impact": {
+				"arch": "cleave",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 43224
+			}
+		},
+		"cursed_arrow": {
+			"el": "dark",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 18026
+			}
+		},
+		"dark_strike": {
+			"el": "dark",
+			"impact": {
+				"arch": "slash",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 41841
+			}
+		},
+		"dawn_cross": {
+			"el": "light",
+			"impact": {
+				"arch": "slash",
+				"dur": 0.9,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 22653
+			}
+		},
+		"decay": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.9,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 10662
+			},
+			"el": "dark",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.8,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 5474
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 41952
+			}
+		},
+		"deep_evasion": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 51316
+			},
+			"el": "dark"
+		},
+		"disarm_blow": {
+			"el": "shield",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 12201
+			}
+		},
+		"drain_arrow": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 37888
+			},
+			"el": "steel"
+		},
+		"dual_shot": {
+			"el": "steel",
+			"impact": {
+				"arch": "arrow_impact",
+				"dur": 0.5,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 57700
+			}
+		},
+		"dull_strike": {
+			"el": "light",
+			"impact": {
+				"arch": "slash",
+				"dur": 0.6,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 25972
+			}
+		},
+		"dusk_veil": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 16490
+			},
+			"el": "dark"
+		},
+		"earth_frenzy": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 18809
+			},
+			"el": "earth"
+		},
+		"earth_grip": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.9,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 63247
+			},
+			"el": "earth",
+			"impact": {
+				"arch": "ground_spike",
+				"dur": 0.8,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 35914
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 60597
+			}
+		},
+		"fire_edge": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 40764
+			},
+			"el": "fire"
+		},
+		"fire_feed": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 42517
+			},
+			"el": "fire"
+		},
+		"fire_frenzy": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 21483
+			},
+			"el": "fire"
+		},
+		"fire_heart": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 16257
+			},
+			"el": "fire"
+		},
+		"fire_skin": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 39752
+			},
+			"el": "fire"
+		},
+		"fire_spark": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.5,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 44884
+			},
+			"el": "fire",
+			"impact": {
+				"arch": "flame_burst",
+				"dur": 0.7,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 32429
+			},
+			"proj": {
+				"el": "fire"
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 50266
+			}
+		},
+		"fire_tornado": {
+			"area": {
+				"arch": "explosion",
+				"dur": 0.9,
+				"el": "fire",
+				"k": 1,
+				"scale": 1.4,
+				"seed": 34880
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.8,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 37760
+			},
+			"el": "fire",
+			"impact": {
+				"arch": "flame_burst",
+				"dur": 0.8,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 55929
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 23774
+			}
+		},
+		"first_aid": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 31171
+			},
+			"el": "light"
+		},
+		"flame_orb": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.2,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 24697
+			},
+			"el": "fire",
+			"impact": {
+				"arch": "flame_burst",
+				"dur": 0.7,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 30740
+			},
+			"proj": {
+				"el": "fire"
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 18963
+			}
+		},
+		"focus_moment": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "mind",
+				"k": 1,
+				"scale": 1,
+				"seed": 43883
+			},
+			"el": "mind"
+		},
+		"frost_arrow": {
+			"el": "ice",
+			"impact": {
+				"arch": "ice_shards",
+				"dur": 0.6,
+				"el": "ice",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 12192
+			}
+		},
+		"frost_thorn": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.9,
+				"el": "ice",
+				"k": 1,
+				"scale": 1,
+				"seed": 31904
+			},
+			"el": "ice",
+			"impact": {
+				"arch": "ice_shards",
+				"dur": 0.7,
+				"el": "ice",
+				"k": 1,
+				"scale": 1,
+				"seed": 42624
+			},
+			"proj": {
+				"el": "ice"
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "ice",
+				"k": 1,
+				"scale": 1,
+				"seed": 49854
+			}
+		},
+		"gift_intellect": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "mind",
+				"k": 1,
+				"scale": 1,
+				"seed": 34535
+			},
+			"el": "mind"
+		},
+		"gift_strength": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 1.2,
+				"el": "spirit",
+				"k": 1,
+				"scale": 1,
+				"seed": 13470
+			},
+			"el": "spirit"
+		},
+		"gift_vitality": {
+			"buff": {
+				"arch": "shield",
+				"dur": 1.2,
+				"el": "shield",
+				"k": 1,
+				"scale": 1,
+				"seed": 20999
+			},
+			"el": "shield"
+		},
+		"gift_wisdom": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "mind",
+				"k": 1,
+				"scale": 1,
+				"seed": 48348
+			},
+			"el": "mind"
+		},
+		"grace": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 1.2,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 17696
+			},
+			"el": "light"
+		},
+		"gust": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 53305
+			},
+			"el": "wind"
+		},
+		"haste": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 12907
+			},
+			"el": "steel"
+		},
+		"head_breaker": {
+			"el": "steel",
+			"impact": {
+				"arch": "slash",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 31357
+			}
+		},
+		"healing_dew": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 43605
+			},
+			"el": "heal"
+		},
+		"healing_touch": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 32116
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.5,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 41410
+			},
+			"el": "heal"
+		},
+		"heaven_smite": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.9,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 38742
+			},
+			"el": "light",
+			"impact": {
+				"arch": "holy_beam",
+				"dur": 0.9,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 63709
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 25328
+			}
+		},
+		"holy_strike": {
+			"el": "light",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 57379
+			}
+		},
+		"hunter_mark": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 44230
+			},
+			"el": "fire"
+		},
+		"ice_orbs": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.5,
+				"el": "ice",
+				"k": 1,
+				"scale": 1,
+				"seed": 28336
+			},
+			"el": "ice",
+			"impact": {
+				"arch": "ice_shards",
+				"dur": 0.7,
+				"el": "ice",
+				"k": 1,
+				"scale": 1,
+				"seed": 55312
+			},
+			"proj": {
+				"el": "ice"
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "ice",
+				"k": 1,
+				"scale": 1,
+				"seed": 22062
+			}
+		},
+		"ice_shackles": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.2,
+				"el": "ice",
+				"k": 1,
+				"scale": 1,
+				"seed": 33970
+			},
+			"el": "ice",
+			"impact": {
+				"arch": "ice_shards",
+				"dur": 0.7,
+				"el": "ice",
+				"k": 1,
+				"scale": 1,
+				"seed": 49462
+			},
+			"proj": {
+				"el": "ice"
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "ice",
+				"k": 1,
+				"scale": 1,
+				"seed": 28740
+			}
+		},
+		"kindle_spark": {
+			"buff": {
+				"arch": "spirit_burst",
+				"dur": 0.9,
+				"el": "spirit",
+				"k": 1,
+				"scale": 1,
+				"seed": 47322
+			},
+			"el": "spirit"
+		},
+		"last_breath": {
+			"buff": {
+				"arch": "soul_drain",
+				"dur": 0.9,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 14334
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.9,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 9679
+			},
+			"el": "dark"
+		},
+		"life_sip": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.2,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 26875
+			},
+			"el": "dark",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.7,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 57625
+			},
+			"proj": {
+				"el": "dark"
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 48409
+			}
+		},
+		"life_thread": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 1.2,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 34573
+			},
+			"el": "heal"
+		},
+		"light_barrage": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.5,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 50775
+			},
+			"el": "light",
+			"impact": {
+				"arch": "spirit_burst",
+				"dur": 0.9,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 48736
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 18797
+			}
+		},
+		"light_dome": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 1.2,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 27296
+			},
+			"el": "light"
+		},
+		"light_pulse": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.5,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 63098
+			},
+			"el": "light",
+			"impact": {
+				"arch": "spirit_burst",
+				"dur": 0.7,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 47411
+			},
+			"proj": {
+				"el": "light"
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 3644
+			}
+		},
+		"lullaby": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 5191
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.2,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 4379
+			},
+			"el": "heal"
+		},
+		"mend_beast": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 23316
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.9,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 52962
+			},
+			"el": "heal"
+		},
+		"mire": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.2,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 40097
+			},
+			"el": "earth",
+			"impact": {
+				"arch": "rock_impact",
+				"dur": 0.8,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 7358
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 64203
+			}
+		},
+		"oblivion": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 47340
+			},
+			"el": "steel"
+		},
+		"pack_wrath": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 1820
+			},
+			"el": "beast"
+		},
+		"piercing_arrow": {
+			"el": "blood",
+			"impact": {
+				"arch": "blood_burst",
+				"dur": 0.6,
+				"el": "blood",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 48517
+			}
+		},
+		"pin_down": {
+			"el": "steel",
+			"impact": {
+				"arch": "arrow_impact",
+				"dur": 0.5,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 34723
+			}
+		},
+		"power_breath": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 0.9,
+				"el": "spirit",
+				"k": 1,
+				"scale": 1,
+				"seed": 17160
+			},
+			"el": "spirit"
+		},
+		"predator_claws": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 23894
+			},
+			"el": "beast"
+		},
+		"pure_spring": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 32796
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.5,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 50282
+			},
+			"el": "heal"
+		},
+		"quick_heal": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 37446
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.7,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 41940
+			},
+			"el": "heal"
+		},
+		"quick_pace": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 15473
+			},
+			"el": "wind"
+		},
+		"radiant_circle": {
+			"area": {
+				"arch": "holy_nova",
+				"dur": 0.9,
+				"el": "light",
+				"k": 1,
+				"scale": 1.75,
+				"seed": 54348
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.5,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 17806
+			},
+			"el": "light",
+			"impact": {
+				"arch": "holy_beam",
+				"dur": 0.8,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 27381
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 4440
+			}
+		},
+		"radiant_claws": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 1.2,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 63036
+			},
+			"el": "light"
+		},
+		"radiant_edge": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 1.2,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 31637
+			},
+			"el": "light"
+		},
+		"radiant_veil": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 1.2,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 13298
+			},
+			"el": "light"
+		},
+		"renewal": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 0.9,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 31682
+			},
+			"el": "heal"
+		},
+		"ringing_blow": {
+			"el": "steel",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 23519
+			}
+		},
+		"rock_strength": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 9903
+			},
+			"el": "earth"
+		},
+		"rockslide": {
+			"area": {
+				"arch": "shockwave",
+				"dur": 0.9,
+				"el": "earth",
+				"k": 1,
+				"scale": 1.55,
+				"seed": 48830
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.5,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 25634
+			},
+			"el": "earth",
+			"impact": {
+				"arch": "rock_impact",
+				"dur": 0.8,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 32665
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 56468
+			}
+		},
+		"sacred_fire": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 14765
+			},
+			"el": "fire"
+		},
+		"savage_fury": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "blood",
+				"k": 1,
+				"scale": 1,
+				"seed": 32118
+			},
+			"el": "blood"
+		},
+		"scorching_heat": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.6,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 12017
+			},
+			"el": "fire",
+			"impact": {
+				"arch": "flame_burst",
+				"dur": 0.8,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 44924
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 18171
+			}
+		},
+		"second_wind": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 0.9,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 18713
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 2.4,
+				"el": "heal",
+				"k": 1,
+				"scale": 1,
+				"seed": 64231
+			},
+			"el": "heal"
+		},
+		"shadow_hail": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.8,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 20963
+			},
+			"el": "dark",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.9,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 37249
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 945
+			}
+		},
+		"shadow_seal": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "emerald",
+				"k": 1,
+				"scale": 1,
+				"seed": 26376
+			},
+			"el": "emerald"
+		},
+		"shadow_step": {
+			"el": "dark",
+			"impact": {
+				"arch": "slash",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 65109
+			},
+			"release": {
+				"arch": "shadow_burst",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 17649
+			}
+		},
+		"shared_pain": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "blood",
+				"k": 1,
+				"scale": 1,
+				"seed": 65266
+			},
+			"el": "blood"
+		},
+		"shield_hammer": {
+			"el": "shield",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 57990
+			}
+		},
+		"shield_rush": {
+			"area": {
+				"arch": "shockwave",
+				"dur": 0.9,
+				"el": "shield",
+				"k": 1,
+				"scale": 1.4,
+				"seed": 31672
+			},
+			"el": "shield",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.9,
+				"el": "shield",
+				"k": 1,
+				"scale": 1,
+				"seed": 23338
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "shield",
+				"k": 1,
+				"scale": 1,
+				"seed": 27262
+			}
+		},
+		"shield_thunder": {
+			"area": {
+				"arch": "shockwave",
+				"dur": 0.9,
+				"el": "shield",
+				"k": 1,
+				"scale": 1.9,
+				"seed": 25086
+			},
+			"el": "shield",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 13260
+			}
+		},
+		"sky_offering": {
+			"buff": {
+				"arch": "holy_nova",
+				"dur": 0.9,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 1496
+			},
+			"el": "light"
+		},
+		"sleeping_dust": {
+			"area": {
+				"arch": "cursed_sigil",
+				"dur": 0.9,
+				"el": "dark",
+				"k": 1,
+				"scale": 2.3,
+				"seed": 298
+			},
+			"el": "dark",
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 43920
+			}
+		},
+		"slumber_pool": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.2,
+				"el": "water",
+				"k": 1,
+				"scale": 1,
+				"seed": 12963
+			},
+			"el": "water",
+			"impact": {
+				"arch": "water_splash",
+				"dur": 0.8,
+				"el": "water",
+				"k": 1,
+				"scale": 1,
+				"seed": 12003
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "water",
+				"k": 1,
+				"scale": 1,
+				"seed": 4721
+			}
+		},
+		"soul_merge": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 1.2,
+				"el": "spirit",
+				"k": 1,
+				"scale": 1,
+				"seed": 9806
+			},
+			"el": "spirit"
+		},
+		"soul_remnant": {
+			"buff": {
+				"arch": "soul_drain",
+				"dur": 0.9,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 57588
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.9,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 43217
+			},
+			"el": "dark"
+		},
+		"soul_return": {
+			"buff": {
+				"arch": "blessing",
+				"dur": 0.9,
+				"el": "spirit",
+				"k": 1,
+				"scale": 1,
+				"seed": 56734
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 2.4,
+				"el": "spirit",
+				"k": 1,
+				"scale": 1,
+				"seed": 43786
+			},
+			"el": "spirit"
+		},
+		"spark_shot": {
+			"el": "spirit",
+			"impact": {
+				"arch": "spirit_burst",
+				"dur": 0.6,
+				"el": "spirit",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 40725
+			}
+		},
+		"spark_vigor": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 0.9,
+				"el": "spirit",
+				"k": 1,
+				"scale": 1,
+				"seed": 16029
+			},
+			"el": "spirit"
+		},
+		"spin_strike": {
+			"el": "steel",
+			"impact": {
+				"arch": "spin_slash",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 44382
+			}
+		},
+		"spirit_wrath": {
+			"area": {
+				"arch": "ritual_circle",
+				"dur": 0.9,
+				"el": "spirit",
+				"k": 1,
+				"scale": 1.4,
+				"seed": 41047
+			},
+			"buff": {
+				"arch": "blessing",
+				"dur": 1.2,
+				"el": "spirit",
+				"k": 1,
+				"scale": 1,
+				"seed": 62680
+			},
+			"el": "spirit"
+		},
+		"sticky_arrow": {
+			"el": "earth",
+			"impact": {
+				"arch": "rock_impact",
+				"dur": 0.6,
+				"el": "earth",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 22472
+			}
+		},
+		"stone_edge": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 14421
+			},
+			"el": "earth"
+		},
+		"stone_fang": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.9,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 64158
+			},
+			"el": "earth",
+			"impact": {
+				"arch": "rock_impact",
+				"dur": 0.7,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 42349
+			},
+			"proj": {
+				"el": "earth"
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 50760
+			}
+		},
+		"stonebreaker": {
+			"area": {
+				"arch": "shockwave",
+				"dur": 0.9,
+				"el": "earth",
+				"k": 1,
+				"scale": 1.15,
+				"seed": 6017
+			},
+			"el": "earth",
+			"impact": {
+				"arch": "cleave",
+				"dur": 0.6,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 18246
+			}
+		},
+		"storm_circle": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.8,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 32264
+			},
+			"el": "storm",
+			"impact": {
+				"arch": "lightning_strike",
+				"dur": 0.8,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 34668
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 25590
+			}
+		},
+		"storm_edge": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 31265
+			},
+			"el": "storm"
+		},
+		"thorn_shield": {
+			"buff": {
+				"arch": "shield",
+				"dur": 1.2,
+				"el": "shield",
+				"k": 1,
+				"scale": 1,
+				"seed": 1523
+			},
+			"el": "shield"
+		},
+		"thrust_arrow": {
+			"el": "steel",
+			"impact": {
+				"arch": "arrow_impact",
+				"dur": 0.5,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 9839
+			}
+		},
+		"thunder_frenzy": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 6003
+			},
+			"el": "storm"
+		},
+		"thunder_roll": {
+			"area": {
+				"arch": "lightning_strike",
+				"dur": 0.9,
+				"el": "storm",
+				"k": 1,
+				"scale": 1.75,
+				"seed": 63786
+			},
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.8,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 55614
+			},
+			"el": "storm",
+			"impact": {
+				"arch": "lightning_strike",
+				"dur": 0.9,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 63786
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 33064
+			}
+		},
+		"thunderclap": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.2,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 2204
+			},
+			"el": "storm",
+			"impact": {
+				"arch": "lightning_strike",
+				"dur": 0.9,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 57576
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 34642
+			}
+		},
+		"twin_fury": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 6531
+			},
+			"el": "wind"
+		},
+		"venom_tip": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "poison",
+				"k": 1,
+				"scale": 1,
+				"seed": 10195
+			},
+			"el": "poison"
+		},
+		"ward_charm": {
+			"buff": {
+				"arch": "shield",
+				"dur": 1.2,
+				"el": "shield",
+				"k": 1,
+				"scale": 1,
+				"seed": 50420
+			},
+			"el": "shield"
+		},
+		"water_edge": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "water",
+				"k": 1,
+				"scale": 1,
+				"seed": 30799
+			},
+			"el": "water"
+		},
+		"water_frenzy": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "water",
+				"k": 1,
+				"scale": 1,
+				"seed": 44368
+			},
+			"el": "water"
+		},
+		"wild_roar": {
+			"area": {
+				"arch": "roar",
+				"dur": 0.9,
+				"el": "beast",
+				"k": 1,
+				"scale": 2.4,
+				"seed": 35382
+			},
+			"el": "beast",
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 52247
+			}
+		},
+		"wildfire": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 1.2,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 26866
+			},
+			"el": "fire",
+			"impact": {
+				"arch": "flame_burst",
+				"dur": 0.7,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 55763
+			},
+			"proj": {
+				"el": "fire"
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "fire",
+				"k": 1,
+				"scale": 1,
+				"seed": 57476
+			}
+		},
+		"will_breaker": {
+			"el": "mind",
+			"impact": {
+				"arch": "slash",
+				"dur": 0.6,
+				"el": "mind",
+				"k": 1,
+				"scale": 1,
+				"seed": 3851
+			}
+		},
+		"wind_feed": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 9663
+			},
+			"el": "wind"
+		},
+		"wind_fetters": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.5,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 25820
+			},
+			"el": "wind",
+			"impact": {
+				"arch": "wind_slash",
+				"dur": 0.8,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 43861
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 25746
+			}
+		},
+		"wind_sickle": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.5,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 594
+			},
+			"el": "wind",
+			"impact": {
+				"arch": "wind_slash",
+				"dur": 0.7,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 54279
+			},
+			"proj": {
+				"el": "wind"
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 21668
+			}
+		},
+		"wind_slash": {
+			"el": "wind",
+			"impact": {
+				"arch": "spin_slash",
+				"dur": 0.6,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 4229
+			}
+		},
+		"wind_step": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 16261
+			},
+			"el": "wind"
+		},
+		"wind_wings": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 38619
+			},
+			"el": "wind"
+		},
+		"zap": {
+			"cast": {
+				"arch": "cast_gather",
+				"dur": 0.5,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 27719
+			},
+			"el": "storm",
+			"impact": {
+				"arch": "lightning_bolt",
+				"dur": 0.8,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 51328
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "storm",
+				"k": 1,
+				"scale": 1,
+				"seed": 5629
+			}
+		}
+	},
+	"mob": {
+		"dg_captain:curse:armor": {
+			"buff": {
+				"arch": "emerald_curse",
+				"dur": 5,
+				"el": "emerald",
+				"k": 1,
+				"scale": 1,
+				"seed": 35603
+			},
+			"el": "emerald"
+		},
+		"dg_captain:curse:aslow": {
+			"buff": {
+				"arch": "emerald_curse",
+				"dur": 5,
+				"el": "emerald",
+				"k": 1,
+				"scale": 1,
+				"seed": 12618
+			},
+			"el": "emerald"
+		},
+		"dg_captain:curse:poison": {
+			"buff": {
+				"arch": "toxic_pool",
+				"dur": 5,
+				"el": "poison",
+				"k": 1,
+				"scale": 0.6,
+				"seed": 3599
+			},
+			"el": "poison"
+		},
+		"dg_captain:curse:slow": {
+			"buff": {
+				"arch": "emerald_curse",
+				"dur": 5,
+				"el": "emerald",
+				"k": 1,
+				"scale": 1,
+				"seed": 29011
+			},
+			"el": "emerald"
+		},
+		"dg_captain:curse:stun": {
+			"buff": {
+				"arch": "emerald_curse",
+				"dur": 2,
+				"el": "emerald",
+				"k": 1,
+				"scale": 1,
+				"seed": 9762
+			},
+			"el": "emerald"
+		},
+		"dg_captain:slam": {
+			"area": {
+				"arch": "ritual_circle",
+				"dur": 0.9,
+				"el": "emerald",
+				"k": 1,
+				"scale": 1.9,
+				"seed": 39910
+			},
+			"el": "emerald"
+		},
+		"golem:slam": {
+			"area": {
+				"arch": "shockwave",
+				"dur": 0.9,
+				"el": "earth",
+				"k": 1,
+				"scale": 1.75,
+				"seed": 20865
+			},
+			"el": "earth"
+		}
+	},
+	"pet": {
+		"boar:fierce_rush": {
+			"el": "beast",
+			"impact": {
+				"arch": "claw",
+				"dur": 0.6,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 51141
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "beast",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 46759
+			}
+		},
+		"centaur:daze": {
+			"el": "dark",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 20488
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 41558
+			}
+		},
+		"centaur:hoof_quake": {
+			"el": "earth",
+			"impact": {
+				"arch": "stab",
+				"dur": 0.6,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 60961
+			}
+		},
+		"centaur:piercing_strike": {
+			"el": "steel",
+			"impact": {
+				"arch": "stab",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 26259
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "steel",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 35764
+			}
+		},
+		"centaur:ruin_storm": {
+			"area": {
+				"arch": "tornado",
+				"dur": 1,
+				"el": "wind",
+				"k": 1,
+				"scale": 1.9,
+				"seed": 44744
+			},
+			"el": "wind",
+			"impact": {
+				"arch": "stab",
+				"dur": 0.6,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 57219
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "wind",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 49092
+			}
+		},
+		"centaur:spear_flurry": {
+			"el": "steel",
+			"impact": {
+				"arch": "stab",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 14161
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "steel",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 55822
+			}
+		},
+		"centaur:spear_storm": {
+			"el": "steel",
+			"impact": {
+				"arch": "stab",
+				"dur": 0.6,
+				"el": "steel",
+				"k": 1,
+				"scale": 1.15,
+				"seed": 8632
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "steel",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 57989
+			}
+		},
+		"centaur:war_horn": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 59044
+			},
+			"el": "steel"
+		},
+		"centaur:wound_lick_centaur": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "steel",
+				"k": 1,
+				"scale": 1,
+				"seed": 59716
+			},
+			"el": "steel"
+		},
+		"golem:ground_roar": {
+			"area": {
+				"arch": "shockwave",
+				"dur": 1,
+				"el": "earth",
+				"k": 1,
+				"scale": 1.55,
+				"seed": 57900
+			},
+			"el": "earth",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 16702
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "earth",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 49250
+			}
+		},
+		"octopus:abyss_wail": {
+			"el": "water",
+			"release": {
+				"arch": "roar",
+				"dur": 0.8,
+				"el": "water",
+				"k": 1,
+				"scale": 1,
+				"seed": 13523
+			}
+		},
+		"octopus:blood_thirst": {
+			"buff": {
+				"arch": "blood_burst",
+				"dur": 1.2,
+				"el": "blood",
+				"k": 1,
+				"scale": 1,
+				"seed": 33085
+			},
+			"el": "blood"
+		},
+		"octopus:corruption_pool": {
+			"area": {
+				"arch": "toxic_pool",
+				"dur": 10,
+				"el": "water",
+				"k": 1,
+				"scale": 1.9,
+				"seed": 28531
+			},
+			"el": "water",
+			"impact": {
+				"arch": "water_splash",
+				"dur": 0.6,
+				"el": "water",
+				"k": 1,
+				"scale": 1,
+				"seed": 59434
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "water",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 44250
+			}
+		},
+		"octopus:deep_pulse": {
+			"area": {
+				"arch": "water_wave",
+				"dur": 1,
+				"el": "water",
+				"k": 1,
+				"scale": 1.15,
+				"seed": 14538
+			},
+			"el": "water",
+			"impact": {
+				"arch": "water_splash",
+				"dur": 0.6,
+				"el": "water",
+				"k": 1,
+				"scale": 1.15,
+				"seed": 40348
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "water",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 62588
+			}
+		},
+		"octopus:tentacle_whirl": {
+			"el": "wind",
+			"impact": {
+				"arch": "water_splash",
+				"dur": 0.6,
+				"el": "wind",
+				"k": 1,
+				"scale": 1,
+				"seed": 24819
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "wind",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 29825
+			}
+		},
+		"octopus:tide_call": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "water",
+				"k": 1,
+				"scale": 1,
+				"seed": 18137
+			},
+			"el": "water"
+		},
+		"octopus:venom_blood": {
+			"el": "poison",
+			"impact": {
+				"arch": "water_splash",
+				"dur": 0.6,
+				"el": "poison",
+				"k": 1,
+				"scale": 1,
+				"seed": 28156
+			}
+		},
+		"octopus:wound_lick_octopus": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "water",
+				"k": 1,
+				"scale": 1,
+				"seed": 5189
+			},
+			"el": "water"
+		},
+		"panther:daze": {
+			"el": "dark",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 20488
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 41558
+			}
+		},
+		"panther:dusk_rupture": {
+			"el": "dark",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 61419
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 4723
+			}
+		},
+		"panther:hunter_call": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 5759
+			},
+			"el": "dark"
+		},
+		"panther:midnight_vortex": {
+			"area": {
+				"arch": "cursed_sigil",
+				"dur": 1,
+				"el": "dark",
+				"k": 1,
+				"scale": 1.9,
+				"seed": 52527
+			},
+			"el": "dark",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 3419
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 4131
+			}
+		},
+		"panther:shadow_fang": {
+			"el": "dark",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 21649
+			}
+		},
+		"panther:shadow_rend": {
+			"el": "dark",
+			"impact": {
+				"arch": "claw",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 5832
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 54752
+			}
+		},
+		"panther:shadow_squall": {
+			"el": "dark",
+			"impact": {
+				"arch": "claw",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 1.15,
+				"seed": 38307
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 50593
+			}
+		},
+		"panther:wound_lick_panther": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 58922
+			},
+			"el": "dark"
+		},
+		"pheasant:dawn_curse": {
+			"area": {
+				"arch": "holy_nova",
+				"dur": 1,
+				"el": "light",
+				"k": 1,
+				"scale": 1.9,
+				"seed": 38139
+			},
+			"el": "light",
+			"impact": {
+				"arch": "spirit_burst",
+				"dur": 0.6,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 19114
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "light",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 45795
+			}
+		},
+		"pheasant:dawn_song": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 38524
+			},
+			"el": "light"
+		},
+		"pheasant:daze": {
+			"el": "dark",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 20488
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 41558
+			}
+		},
+		"pheasant:feather_storm": {
+			"el": "wind",
+			"impact": {
+				"arch": "stab",
+				"dur": 0.6,
+				"el": "wind",
+				"k": 1,
+				"scale": 1.15,
+				"seed": 25678
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "wind",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 13207
+			}
+		},
+		"pheasant:shrill_cry": {
+			"el": "beast",
+			"impact": {
+				"arch": "stab",
+				"dur": 0.6,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 28572
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "beast",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 65529
+			}
+		},
+		"pheasant:spark_peck": {
+			"el": "light",
+			"impact": {
+				"arch": "stab",
+				"dur": 0.6,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 63910
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "light",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 22191
+			}
+		},
+		"pheasant:spur_strike": {
+			"el": "light",
+			"impact": {
+				"arch": "stab",
+				"dur": 0.6,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 65340
+			}
+		},
+		"pheasant:wound_lick_pheasant": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "light",
+				"k": 1,
+				"scale": 1,
+				"seed": 1720
+			},
+			"el": "light"
+		},
+		"skeleton:bone_fury": {
+			"el": "emerald",
+			"impact": {
+				"arch": "slash",
+				"dur": 0.6,
+				"el": "emerald",
+				"k": 1,
+				"scale": 1,
+				"seed": 14753
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "emerald",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 61333
+			}
+		},
+		"skeleton:bone_shudder": {
+			"el": "emerald",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "emerald",
+				"k": 1,
+				"scale": 1,
+				"seed": 8592
+			}
+		},
+		"skeleton:daze": {
+			"el": "dark",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 20488
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 41558
+			}
+		},
+		"skeleton:decay_flurry": {
+			"el": "poison",
+			"impact": {
+				"arch": "slash",
+				"dur": 0.6,
+				"el": "poison",
+				"k": 1,
+				"scale": 1.15,
+				"seed": 29979
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "poison",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 12255
+			}
+		},
+		"skeleton:grave_thirst_skeleton": {
+			"buff": {
+				"arch": "blood_burst",
+				"dur": 1.2,
+				"el": "emerald",
+				"k": 1,
+				"scale": 1,
+				"seed": 53086
+			},
+			"el": "emerald"
+		},
+		"skeleton:grim_call": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 316
+			},
+			"el": "dark"
+		},
+		"skeleton:knight_blade": {
+			"area": {
+				"arch": "ritual_circle",
+				"dur": 1,
+				"el": "emerald",
+				"k": 1,
+				"scale": 1.9,
+				"seed": 39197
+			},
+			"el": "emerald",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.6,
+				"el": "emerald",
+				"k": 1,
+				"scale": 1,
+				"seed": 27370
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "emerald",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 35352
+			}
+		},
+		"skeleton:rot_cleave": {
+			"el": "poison",
+			"impact": {
+				"arch": "water_splash",
+				"dur": 0.6,
+				"el": "poison",
+				"k": 1,
+				"scale": 1,
+				"seed": 55690
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "poison",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 13306
+			}
+		},
+		"turtle:clan_wall": {
+			"buff": {
+				"arch": "shield",
+				"dur": 1.2,
+				"el": "shield",
+				"k": 1,
+				"scale": 1,
+				"seed": 60147
+			},
+			"el": "shield"
+		},
+		"turtle:daze": {
+			"el": "dark",
+			"impact": {
+				"arch": "shadow_burst",
+				"dur": 0.6,
+				"el": "dark",
+				"k": 1,
+				"scale": 1,
+				"seed": 20488
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "dark",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 41558
+			}
+		},
+		"turtle:earthquake": {
+			"area": {
+				"arch": "shockwave",
+				"dur": 1,
+				"el": "earth",
+				"k": 1,
+				"scale": 1.9,
+				"seed": 48343
+			},
+			"el": "earth",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 63485
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "earth",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 649
+			}
+		},
+		"turtle:ram": {
+			"el": "earth",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 18482
+			}
+		},
+		"turtle:rockfall": {
+			"el": "earth",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "earth",
+				"k": 1,
+				"scale": 1.15,
+				"seed": 24208
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "earth",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 24216
+			}
+		},
+		"turtle:shell_wrath": {
+			"el": "earth",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 39255
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "earth",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 18711
+			}
+		},
+		"turtle:stone_jaws": {
+			"el": "earth",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 26193
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "earth",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 4221
+			}
+		},
+		"turtle:wound_lick_turtle": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "earth",
+				"k": 1,
+				"scale": 1,
+				"seed": 51210
+			},
+			"el": "earth"
+		},
+		"wolf:alpha_call": {
+			"buff": {
+				"arch": "buff_up",
+				"dur": 1.2,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 25591
+			},
+			"el": "beast"
+		},
+		"wolf:chilling_howl": {
+			"el": "beast",
+			"release": {
+				"arch": "roar",
+				"dur": 0.8,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 62010
+			}
+		},
+		"wolf:fang_flurry": {
+			"el": "beast",
+			"impact": {
+				"arch": "claw",
+				"dur": 0.6,
+				"el": "beast",
+				"k": 1,
+				"scale": 1.15,
+				"seed": 37319
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "beast",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 53949
+			}
+		},
+		"wolf:fierce_rush": {
+			"el": "beast",
+			"impact": {
+				"arch": "claw",
+				"dur": 0.6,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 51141
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "beast",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 46759
+			}
+		},
+		"wolf:lunging_bite": {
+			"el": "beast",
+			"impact": {
+				"arch": "blunt_hit",
+				"dur": 0.6,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 64067
+			}
+		},
+		"wolf:moon_frenzy": {
+			"area": {
+				"arch": "roar",
+				"dur": 1,
+				"el": "beast",
+				"k": 1,
+				"scale": 1.55,
+				"seed": 30697
+			},
+			"el": "beast",
+			"impact": {
+				"arch": "claw",
+				"dur": 0.6,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 24822
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "beast",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 47930
+			}
+		},
+		"wolf:rending_bite": {
+			"el": "beast",
+			"impact": {
+				"arch": "claw",
+				"dur": 0.6,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 2932
+			},
+			"release": {
+				"arch": "release",
+				"dur": 0.5,
+				"el": "beast",
+				"k": 1,
+				"scale": 0.8,
+				"seed": 1012
+			}
+		},
+		"wolf:wound_lick_wolf": {
+			"buff": {
+				"arch": "heal_burst",
+				"dur": 1.2,
+				"el": "beast",
+				"k": 1,
+				"scale": 1,
+				"seed": 29088
+			},
+			"el": "beast"
+		}
+	},
+	"version": 1
+}

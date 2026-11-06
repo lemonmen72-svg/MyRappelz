@@ -505,8 +505,11 @@ func _slam() -> void:
 	var r := float(_slam_cfg["radius"])
 	var c: Color = _slam_cfg["color"]
 	CreatureModels.spawn_ring(parent, global_position, r, c.lightened(0.2), 0.35)
-	Vfx.death_puff(parent, global_position + Vector3(0, 0.3, 0), 1.6)
-	Vfx.magic_burst(parent, global_position + Vector3(0, 0.4, 0), c, r * 0.6, 0.35)
+	# Эффект удара из генератора VFX (SkillVfx «<вид>:slam»); нет записи — прежние облако и вспышка
+	if SkillVfx.play("mob", type_id + ":slam", "area", parent, global_position + Vector3(0, 0.5, 0),
+			{"ground": global_position, "height": _height}) == null and not SkillVfx.has_phase("mob", type_id + ":slam", "area"):
+		Vfx.death_puff(parent, global_position + Vector3(0, 0.3, 0), 1.6)
+		Vfx.magic_burst(parent, global_position + Vector3(0, 0.4, 0), c, r * 0.6, 0.35)
 	Util.float_text(parent, global_position + Vector3(0, _height + 0.8, 0), String(_slam_cfg["text"]), c)
 	for g in ["player", "pets"]:
 		for n in get_tree().get_nodes_in_group(g):
@@ -545,7 +548,7 @@ func curse_now(t: Node3D) -> void:
 	curse_uses += 1
 	last_curse = c
 	t.call("curse", String(c[0]), float(c[1]), float(c[2]), self)
-	if is_inside_tree():
+	if is_inside_tree() and not SkillVfx.buff("mob", "%s:curse:%s" % [type_id, String(c[0])], t):
 		Vfx.magic_burst(get_parent(), t.global_position + Vector3(0, 1.0, 0), Color(0.3, 1.0, 0.55), 1.4, 0.4)
 	if _asset != null:
 		_asset.play_cast(0.9)

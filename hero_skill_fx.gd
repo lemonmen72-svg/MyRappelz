@@ -79,6 +79,8 @@ func cast(sid: String, n: int, sk: Dictionary) -> bool:
 	if t != null:
 		p._engage(t)
 	anim(String(sk.get("anim", "attack")), sid, use)
+	# Эффект выпуска силы на герое (генератор VFX: SkillVfx, таблица vfx/skill_vfx.json)
+	SkillVfx.release("hero", sid, p, t)
 	var fx: Array = sk.get("fx", [])
 	var col: Color = sk.get("color", Color.WHITE)
 	if use == "ranged" or (use == "magic" and bool(sk.get("proj", false))):
@@ -87,11 +89,13 @@ func cast(sid: String, n: int, sk: Dictionary) -> bool:
 		var cb := func(hit: Mob, dealt: int) -> void:
 			if is_instance_valid(hit):
 				apply(sid, n, hit, fx, dealt)
-		p._shoot(t, dmg, 1.4, cb, not p.skill_hits(t))
+		p._shoot(t, dmg, 1.4, cb, not p.skill_hits(t), SkillVfx.proj_style("hero", sid))
 	else:
 		apply(sid, n, t, fx, -1)
 		if use == "self" or use == "pet":
-			Projectile.burst(p.get_parent(), p.global_position + Vector3(0, 1.0, 0), col, 1.8, 0.35)
+			var who: Node3D = p if use == "self" else p._active_pet()
+			if not SkillVfx.buff("hero", sid, who if who != null else p):
+				Projectile.burst(p.get_parent(), p.global_position + Vector3(0, 1.0, 0), col, 1.8, 0.35)
 	p._announce(String(sk.get("name", sid)), "")
 	return true
 
@@ -105,6 +109,9 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 	var parent := p.get_parent()
 	var dealt := 0
 	var used_proj := proj_dealt < 0
+	# Новые эффекты попадания (SkillVfx): один раз на применение; снаряд показал своё сам
+	var vfx_new := SkillVfx.has_phase("hero", sid, "impact") or SkillVfx.has_phase("hero", sid, "area")
+	var vfx_shown := proj_dealt >= 0
 	for item in fx:
 		var e: Dictionary = item
 		match String(e.get("do", "")):
@@ -124,13 +131,18 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 							continue
 						dealt += p._deal(t, roll(e, n, sid))
 					var dir := t.global_position - p.global_position
-					if String(sk.get("use", "")) == "melee":
+					if vfx_new:
+						if not vfx_shown:
+							vfx_shown = true
+							SkillVfx.impact("hero", sid, p, t)
+					elif String(sk.get("use", "")) == "melee":
 						Vfx.slash_arc(parent, t.aim_point(), dir, col, 1.2)
 					else:
 						Vfx.hit_spark(parent, t.aim_point(), col, 1.4)
 				if e.has("area"):
 					var r := HeroSkills.value_at(e["area"], n)
-					Projectile.burst(parent, t.global_position + Vector3(0, 0.6, 0), col, r, 0.4)
+					if not vfx_new:
+						Projectile.burst(parent, t.global_position + Vector3(0, 0.6, 0), col, r, 0.4)
 					for m in p._mobs_around(t.global_position, r):
 						if m != t and p.skill_hits(m):
 							p._deal(m, roll(e, n, sid))
@@ -187,6 +199,9 @@ func apply(sid: String, n: int, t: Mob, fx: Array, proj_dealt: int) -> void:
 					call(h, sid, n, t, e)
 				elif not job_special(String(e.get("handler", "")), sid, n, t, e):
 					p.message.emit("«%s»: особое действие появится в следующем обновлении" % String(sk.get("name", sid)))
+	# Умение без урона (ослабление, яд, сон) — эффект попадания всё равно на цели
+	if vfx_new and not vfx_shown and t != null and is_instance_valid(t) and not t.is_dead:
+		SkillVfx.impact("hero", sid, p, t)
 
 
 ## «Сырой» урон эффекта e на уровне n (до защиты зверя): доля атаки (power "atk") или маг. атаки ("matk") × mult + flat,

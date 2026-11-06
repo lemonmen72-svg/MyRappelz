@@ -52,7 +52,8 @@ extends RefCounted
 ##     "editor_start", "editor_share", "editor_reset", "editor_reset_yes", "editor_reset_no" (DungeonEditor), "tp_poi_<id>", "tp_zone_<id>" (teleports());
 ##   «Тест-бот»: "bot_mode_<id>" (BotScenario.MODES; «скоро» — недоступны), "bot_sec_<раздел>" (режим «По разделам»:
 ##     переключатели разделов BotSection.SECTIONS), "bot_start", "bot_stop", "bot_open", "bot_share",
-##     "anim_system", "anim_combat_idle" (система анимаций 1.0 и боевая стойка — выключатели отката).
+##     "anim_system", "anim_combat_idle" (система анимаций 1.0 и боевая стойка — выключатели отката),
+##     "vfx_new" (эффекты умений генератора VFX — SkillVfx.enabled).
 
 const ADMIN_TOOLS := true
 ## Размер окна для «Среднего» размера интерфейса.
@@ -338,6 +339,11 @@ static func set_anim(main: Node, on: bool, combat: bool) -> void:
 	AnimResolver.combat_idle = combat
 	_done(main, "Система анимаций %s, боевая стойка %s" % ["включена" if on else "выключена (прежний выбор клипов)",
 		"включена" if combat else "выключена"])
+
+
+static func set_vfx(main: Node, on: bool) -> void:
+	SkillVfx.enabled = on
+	_done(main, "Новые эффекты умений %s" % ("включены" if on else "выключены (прежние вспышки)"))
 
 
 static func set_god(main: Node, on: bool) -> void:
@@ -1064,6 +1070,11 @@ static func _build_bot(main: Node, body: VBoxContainer) -> void:
 		AnimResolver.enabled, func() -> void: AdminPanel.set_anim(main, not AnimResolver.enabled, AnimResolver.combat_idle))
 	_choice(r3, "anim_combat_idle", "Боевая стойка: вкл." if AnimResolver.combat_idle else "Боевая стойка: выкл.",
 		AnimResolver.combat_idle, func() -> void: AdminPanel.set_anim(main, AnimResolver.enabled, not AnimResolver.combat_idle))
+	# Эффекты умений из генератора VFX (SkillVfx): откат на прежние вспышки — до перезапуска
+	_head(body, "Эффекты")
+	var r4 := _row(body)
+	_choice(r4, "vfx_new", "Новые эффекты умений: вкл." if SkillVfx.enabled else "Новые эффекты умений: выкл.",
+		SkillVfx.enabled, func() -> void: AdminPanel.set_vfx(main, not SkillVfx.enabled))
 
 
 ## «По разделам»: разделы переключателями (выбор хранится — BotScenarioGame.chosen), оценка времени.

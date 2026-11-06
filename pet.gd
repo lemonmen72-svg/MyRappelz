@@ -941,12 +941,15 @@ func _apply_skill(id: String, t: Mob) -> void:
 		return
 	if not is_instance_valid(t) or t.is_dead:
 		return
+	# Эффекты умения из генератора VFX (SkillVfx, ключ «вид:умение»); нет записи — прежние вспышки
+	var vkey := "%s:%s" % [species, id]
+	SkillVfx.release("pet", vkey, self, t)
 	var victims: Array[Mob] = [t]
 	var fx := _skill_color(sk)
 	if sk.has("radius"):
 		var r := float(sk["radius"])
 		victims = _mobs_near(t.global_position, r)
-		_area_fx(t.global_position, r, fx)
+		_area_fx(t.global_position, r, fx, vkey)
 	var mult := PetSkills.value(sk["dmg"], n) if sk.has("dmg") else 0.0
 	var hits := int(sk.get("hits", 1))
 	var src := StatusEffects.source_pet_skill(species, id)
@@ -958,7 +961,7 @@ func _apply_skill(id: String, t: Mob) -> void:
 		_pool_id = id
 		_pool_left = float(sk["pool"])
 		_pool_tick = 0.0
-		_area_fx(global_position, float(sk.get("radius", 5.0)), fx)
+		_area_fx(global_position, float(sk.get("radius", 5.0)), fx, vkey)
 		return
 	_skill_crit = float(sk.get("crit", 0.0))
 	for m in victims:
@@ -966,12 +969,12 @@ func _apply_skill(id: String, t: Mob) -> void:
 		if sure < 1.0 and Combat.rand() >= sure:
 			_miss_text(m)
 			continue
-		_skill_fx(m, fx, mult > 1.5)
+		_skill_fx(m, fx, mult > 1.5, vkey)
 		if mult > 0.0:
 			m.take_damage(_mitigate(m, _roll(mult)), self, _last_crit)
 			for i in range(1, hits):
 				if is_inside_tree():
-					get_tree().create_timer(0.22 * float(i)).timeout.connect(_extra_hit.bind(m, mult, fx))
+					get_tree().create_timer(0.22 * float(i)).timeout.connect(_extra_hit.bind(m, mult, fx, vkey))
 		if m.is_dead:
 			continue
 		var parent := get_parent()
@@ -1026,7 +1029,7 @@ func _tick_pool(delta: float) -> void:
 		return
 	_pool_tick = float(sk.get("pool_every", 2.0))
 	var r := float(sk.get("radius", 5.0))
-	_area_fx(global_position, r, _skill_color(sk))
+	_area_fx(global_position, r, _skill_color(sk), "%s:%s" % [species, _pool_id])
 	var mult := PetSkills.value(sk["dmg"], n) if sk.has("dmg") else 0.0
 	for m in _mobs_near(global_position, r):
 		if mult > 0.0:
@@ -1040,13 +1043,13 @@ func _tick_pool(delta: float) -> void:
 
 
 ## Следующий удар серии (двойной, тройной). target_ref без типа: зверь мог уже исчезнуть.
-func _extra_hit(target_ref: Variant, mult: float, fx: Color) -> void:
+func _extra_hit(target_ref: Variant, mult: float, fx: Color, vkey: String = "") -> void:
 	if is_down or not is_instance_valid(target_ref):
 		return
 	var m := target_ref as Mob
 	if m == null or m.is_dead:
 		return
-	_skill_fx(m, fx, false)
+	_skill_fx(m, fx, false, vkey)
 	m.take_damage(_mitigate(m, _roll(mult)), self, _last_crit)
 
 
@@ -1104,7 +1107,8 @@ func _apply_buff(sk: Dictionary, n: int, id: String = "") -> void:
 			Util.float_text(parent, head, "Раны заживают", c)
 	if _asset != null:
 		_asset.play_cast()
-	Vfx.magic_burst(parent, owner_node.global_position + Vector3(0, 1.0, 0), c, 1.6, 0.4)
+	if not SkillVfx.buff("pet", "%s:%s" % [species, id], owner_node):
+		Vfx.magic_burst(parent, owner_node.global_position + Vector3(0, 1.0, 0), c, 1.6, 0.4)
 
 
 ## Цвет эффектов умения: у мага и лекаря — цвет вида (пантера — тёмная теневая магия), иначе — значка.
@@ -1116,8 +1120,12 @@ func _skill_color(sk: Dictionary) -> Color:
 
 
 ## Попадание умения по зверю m: у мага и лекаря — вспышка магии на цели, у бойцов и танков — дуга удара.
-func _skill_fx(m: Mob, c: Color, big: bool) -> void:
+func _skill_fx(m: Mob, c: Color, big: bool, vkey: String = "") -> void:
 	if not is_inside_tree() or not is_instance_valid(m):
+		return
+	if vkey != "" and SkillVfx.has_phase("pet", vkey, "impact"):
+		SkillVfx.play("pet", vkey, "impact", get_parent(), m.mid_point(), SkillVfx.opts_on(m, global_position))
+		_bump()
 		return
 	var pos := m.mid_point()
 	if PetStats.is_magic(species):
@@ -1130,8 +1138,12 @@ func _skill_fx(m: Mob, c: Color, big: bool) -> void:
 
 
 ## Умение по площади: кольцо и вспышка вокруг center.
-func _area_fx(center: Vector3, radius: float, c: Color) -> void:
+func _area_fx(center: Vector3, radius: float, c: Color, vkey: String = "") -> void:
 	if not is_inside_tree():
+		return
+	if vkey != "" and SkillVfx.has_phase("pet", vkey, "area"):
+		var o := {"ground": center, "dir": center - global_position, "from": global_position + Vector3(0, 1.0, 0)}
+		SkillVfx.play("pet", vkey, "area", get_parent(), center + Vector3(0, 0.6, 0), o)
 		return
 	CreatureModels.spawn_ring(get_parent(), center, radius, c, 0.4)
 	Vfx.magic_burst(get_parent(), center + Vector3(0, 0.5, 0), c, radius * 0.8, 0.45)

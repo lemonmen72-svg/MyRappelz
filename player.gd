@@ -128,6 +128,8 @@ var last_attacker: Variant = null
 ## Каст умения: id умения ("" — каста нет), уровень, цель (запомнена в начале; null — умение без цели), длительность
 ## (с учётом скорости каста) и сколько прошло, с.
 var casting := ""
+## Эффект каста на герое (SkillVfx.cast_start), гаснет в _end_cast.
+var _cast_fx: Node3D = null
 var cast_level := 0
 var cast_target: Mob = null
 var cast_total := 0.0
@@ -900,7 +902,7 @@ func set_toggle(id: String, on: bool) -> String:
 		tg[id] = true
 		_mp_delay = MP_COMBAT_TIME
 		_announce(String(sk["name"]), "включено")
-		if is_inside_tree():
+		if is_inside_tree() and not SkillVfx.buff("hero", id, self):
 			Projectile.burst(get_parent(), global_position + Vector3(0, 1.0, 0), sk["color"], 1.4, 0.3)
 	else:
 		tg.erase(id)
@@ -1107,8 +1109,10 @@ func _deal(t: Mob, dmg: int) -> int:
 
 ## Выпустить снаряд (стрела у лучника, болт у арбалета, шар у мага). on_hit: func(target: Mob, damage: int).
 ## miss — промах: снаряд долетает, но урона нет (обычный выстрел героя со статами).
-func _shoot(t: Mob, dmg: int, size: float, on_hit: Callable, miss: bool = false) -> void:
+func _shoot(t: Mob, dmg: int, size: float, on_hit: Callable, miss: bool = false, style: Dictionary = {}) -> void:
 	var p := Projectile.new()
+	# Вид снаряда и эффект попадания умения (генератор VFX: SkillVfx.proj_style)
+	p.style = style
 	var k := "orb"
 	if weapon_kind == "crossbow":
 		k = "bolt"
@@ -1302,6 +1306,7 @@ func _begin_cast(sid: String, n: int, sk: Dictionary, sec: float) -> bool:
 	_mp_delay = MP_COMBAT_TIME
 	if _has_model():
 		_model.play_cast_loop(_cast_loop_kind(sid, sk))
+	_cast_fx = SkillVfx.cast_start("hero", sid, self, sec, t)
 	stats_changed.emit()
 	return true
 
@@ -1382,6 +1387,9 @@ func _end_cast() -> void:
 	cast_total = 0.0
 	cast_elapsed = 0.0
 	_cast_reach = -1.0
+	if _cast_fx != null:
+		SkillVfx.cast_stop(_cast_fx)
+		_cast_fx = null
 	if _has_model():
 		_model.stop_cast_loop()
 	stats_changed.emit()
@@ -1437,12 +1445,14 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 				away = Vector3(0, 0, 1)
 			var dest := t.global_position + away.normalized() * 1.5
 			dest.y = global_position.y
-			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.3, 0.1, 0.4), 1.2, 0.3)
+			if not SkillVfx.release("hero", sid, self, t):
+				Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.3, 0.1, 0.4), 1.2, 0.3)
 			global_position = dest
 			velocity = Vector3.ZERO
 			_engage(t)
 			_anim_by_kind("dash", sid, "melee")
-			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.5, 0.2, 0.7), 1.2, 0.3)
+			if not SkillVfx.release("hero", sid, self, t):
+				Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), Color(0.5, 0.2, 0.7), 1.2, 0.3)
 			_announce(sname, "")
 		"self":
 			shade_time = float(sk.get("buff_time", 10.0))
@@ -1451,7 +1461,8 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			shade_crit = HeroSkills.field_buff(sid, "crit", n)
 			add_effect("shade", shade_time, StatusEffects.source_hero_skill(sid))
 			_anim_by_kind("buff", sid, "self")
-			Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), col, 2.0, 0.4)
+			if not SkillVfx.buff("hero", sid, self):
+				Projectile.burst(fx_parent, global_position + Vector3(0, 1.0, 0), col, 2.0, 0.4)
 			_announce(sname, "уклонение +%d%% на %d с" % [roundi(shade_eva * 100.0), roundi(shade_time)])
 		"near":
 			var t := _find_target(float(sk.get("radius", 6.0)))
@@ -1461,7 +1472,8 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			_anim_by_kind("cast", sid, "near")
 			var sec := HeroSkills.field(sid, "sleep", n)
 			t.sleep(sec, StatusEffects.source_hero_skill(sid))
-			Projectile.burst(fx_parent, t.aim_point(), col, 1.3, 0.4)
+			if not SkillVfx.impact("hero", sid, self, t):
+				Projectile.burst(fx_parent, t.aim_point(), col, 1.3, 0.4)
 			Util.float_text(fx_parent, t.global_position + Vector3(0, 2.4 * t.body_scale + 0.8, 0), "Сон", col.lightened(0.4))
 			_announce(sname, "сон %.1f с" % sec)
 		"melee":
@@ -1479,8 +1491,9 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			else:
 				dmg = 0
 				_miss_text(t)
-			Vfx.slash_arc(fx_parent, t.aim_point(),
-				t.global_position - global_position, col, 1.2)
+			if not SkillVfx.impact("hero", sid, self, t):
+				Vfx.slash_arc(fx_parent, t.aim_point(),
+					t.global_position - global_position, col, 1.2)
 			for i in range(1, int(sk.get("hits", 1))):
 				get_tree().create_timer(HIT_GAP * float(i)).timeout.connect(_late_hit.bind(t, mult, flat, force, false))
 			if sk.has("heal") and dmg > 0:
@@ -1501,7 +1514,7 @@ func _cast_hero(sid: String, n: int, sk: Dictionary) -> bool:
 			var force := bool(sk.get("crit", false))
 			var cb := func(hit: Mob, _dealt: int) -> void:
 				_bolt_effects(hit, sid, n)
-			_shoot(t, _roll(mult, force, flat), 1.3, cb, not skill_hits(t))
+			_shoot(t, _roll(mult, force, flat), 1.3, cb, not skill_hits(t), SkillVfx.proj_style("hero", sid))
 			for i in range(1, int(sk.get("hits", 1))):
 				get_tree().create_timer(HIT_GAP * float(i)).timeout.connect(
 					_late_shot.bind(t, mult, flat, force, Callable(), false))

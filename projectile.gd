@@ -18,6 +18,9 @@ var size := 1.0
 var on_hit: Callable = Callable()
 ## Промах: урона и on_hit нет.
 var miss := false
+## Умение (генератор VFX, SkillVfx.proj_style): {group, key[, el]} — у шара вид стихии el, при попадании — эффект
+## попадания умения вместо общей вспышки. {} — прежний снаряд.
+var style: Dictionary = {}
 
 var _life := 0.0
 var _spin: Node3D = null
@@ -39,6 +42,9 @@ func _ready() -> void:
 		_build_arrow()
 	elif kind == "bolt":
 		_build_bolt()
+	elif style.has("el"):
+		var q := SkillVfx.quality_override if SkillVfx.quality_override >= 0 else Quality.effective("effects")
+		VfxArchetypes.dress_projectile(self, String(style["el"]), size, q)
 	else:
 		_build_orb()
 
@@ -81,6 +87,9 @@ func _hit() -> void:
 			"Крит!", Color(1, 0.85, 0.2), 1.4)
 	if on_hit.is_valid():
 		on_hit.call(t, damage)
+	if style.has("key") and by != null and SkillVfx.impact(String(style["group"]), String(style["key"]), by, t):
+		queue_free()
+		return
 	if is_shaft():
 		Vfx.hit_spark(get_parent(), hit_pos, color.lightened(0.3), 0.9 * size)
 	else:

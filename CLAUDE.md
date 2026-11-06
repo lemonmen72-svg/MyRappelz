@@ -1441,6 +1441,29 @@ Corsair Revenant), сабля — Verdant Oathblade; значки добычи �
   подземелья — HP × `dungeon_hp` 0.1 и бессмертие на бою (помощь «подземелье»), подряд не больше `dungeon_idle_trips`
   ходок без победы; фича «chapter1» — окна свитков и признания капитана.
 
+## Генератор эффектов умений (VFX)
+ТЗ — `docs/vfx/DARK_PACT_UNIVERSAL_VFX_GENERATOR_CLAUDE.md`; задача Максима: генератор — инструмент, которым по названиям
+и описаниям умений собираются эффекты и встраиваются в игру; эффекты красивые и красочные. Устройство —
+`docs/vfx/VFX_ARCHITECTURE.md`, аудит — `VFX_AUDIT.md`, каталог (что у какого умения) — `VFX_PRESETS_CATALOG.md`,
+руководство — `VFX_USER_GUIDE_RU.md`, лицензии — `VFX_LICENSES.md` (сторонних ассетов нет), замеры — `VFX_ANDROID_BENCHMARK.md`.
+- `vfx/vfx_kit.gd` (`VfxKit`): слои — текстуры кодом, меши, `CPUParticles3D` (притяжение к центру, вращение, разброс
+  оттенка), вспышки, следы на земле, торы, столбы, дуги, молнии, лучи, шипы, постоянные частицы, краткий огонь (≤ 3).
+- `vfx/vfx_archetypes.gd` (`VfxArchetypes`): 39 архетипов (`LIST`, `_a_<имя>`), палитры 17 стихий `PALETTES`
+  (ядро, основной, второй, искры, дым; изумруд #39FF8A — только секта), вид снаряда `dress_projectile`, качество 0–2.
+- `vfx/vfx_rules.gd` (`VfxRules`): стихия по корням слов названия/описания (`KEYWORDS`: «=слово» — целиком, иначе начало
+  слова), полю `c`, виду питомца; архетипы фаз cast / release / proj / impact / area / buff по `use`, анимации, оружию,
+  площади, статусам, `HANDLERS`.
+- Генератор `vfx/vfx_generate.gd` (`VfxGenerate`), запуск `godot --headless --path . res://tools/vfx_generate.tscn` →
+  `vfx/skill_vfx.json` (hero 151, pet 58 «вид:id», mob 7) и каталог; правки руками — `vfx/skill_vfx_overrides.json`.
+  Новое или изменённое умение — запустить генератор (тест падает, если таблица устарела).
+- В игре `vfx/skill_vfx.gd` (`SkillVfx`): `cast_start`/`cast_stop` (Player._begin_cast / _end_cast), `release`, `impact`
+  (+ area), `buff`, `proj_style` (Player._shoot → `Projectile.style`: шар стихии и эффект попадания); встроено в
+  `HeroSkillFx.activate/apply`, `Player._cast_hero` (Наёмник), `set_toggle`, `Pet._apply_skill/_skill_fx/_area_fx/_apply_buff`,
+  `Mob._slam`, `Mob.curse_now`. Нет записи — прежний эффект `Vfx`. Лимиты: дальше 26 м — низкое качество, дальше 55 м
+  — не строится, больше 36 эффектов — низкое, больше 54 — нет. Откат — админ-панель «Тест-бот» → «Эффекты» (`vfx_new`,
+  `SkillVfx.enabled`). Тест `tests/test_vfx_gen.gd`. Рендеры эффектов не делаю (правило Максима) — проверка тестами
+  и на телефоне.
+
 ## Сюжет мира
 Решение Максима: **`docs/story/DUNGEON_CHAPTER1_STORY.md` — канон и начало истории всего мира Dark Pact** (глава I «Шёпот
 из глубин»: гоблины в пещере острова → нежить → Секта Мрака → проклятый капитан → Великий Пакт трёх рас, путь на

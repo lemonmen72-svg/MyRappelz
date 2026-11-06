@@ -60,6 +60,7 @@ test_ui_icons 3
 test_ui_scale 7
 test_vegetation 3
 test_vfx 4
+test_vfx_gen 15
 test_weapons 4
 perf 13
 test_cardinal 90
