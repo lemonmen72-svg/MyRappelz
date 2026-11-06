@@ -63,6 +63,35 @@ const DEFAULTS := {
 		"attack_hit_time": 0.23},
 	"anathema_chief": {"height": 2.2, "length": 0.72, "width": 1.31, "walk_speed": 1.16, "run_speed": 6.94,
 		"attack_hit_time": 0.27},
+	# Монстры подземелья (стиль «biped», модели Максима из «ДАНЖ»; оружие в руке — grips в creatures.json)
+	"dg_goblin": {"height": 1.35, "length": 0.38, "width": 1.39, "walk_speed": 0.67, "run_speed": 4.20,
+		"attack_hit_time": 0.23},
+	"dg_goblin_chief": {"height": 1.75, "length": 0.48, "width": 1.75, "walk_speed": 0.87, "run_speed": 5.09,
+		"attack_hit_time": 0.27},
+	"dg_sailor": {"height": 1.80, "length": 0.33, "width": 1.78, "walk_speed": 0.94, "run_speed": 5.95,
+		"attack_hit_time": 0.63},
+	"dg_graveguard": {"height": 1.95, "length": 0.38, "width": 1.91, "walk_speed": 1.04, "run_speed": 6.58,
+		"attack_hit_time": 0.27},
+	"dg_wight": {"height": 1.90, "length": 0.35, "width": 1.89, "walk_speed": 0.91, "run_speed": 5.78,
+		"attack_hit_time": 0.63},
+	"dg_dead_knight": {"height": 2.30, "length": 0.49, "width": 2.10, "walk_speed": 1.33, "run_speed": 8.34,
+		"attack_hit_time": 0.37},
+	"dg_bone_oracle": {"height": 1.90, "length": 0.41, "width": 1.73, "walk_speed": 0.95, "run_speed": 6.31,
+		"attack_hit_time": 0.23},
+	"dg_grave_oracle": {"height": 1.85, "length": 0.47, "width": 1.85, "walk_speed": 0.93, "run_speed": 6.06,
+		"attack_hit_time": 0.23},
+	"dg_plague_shaman": {"height": 1.85, "length": 0.37, "width": 1.82, "walk_speed": 0.96, "run_speed": 5.79,
+		"attack_hit_time": 0.23},
+	"dg_sect_wraith": {"height": 1.95, "length": 0.42, "width": 1.78, "walk_speed": 0.96, "run_speed": 6.08,
+		"attack_hit_time": 0.23},
+	"dg_elder_priest": {"height": 2.20, "length": 0.56, "width": 2.12, "walk_speed": 1.06, "run_speed": 7.17,
+		"attack_hit_time": 0.23},
+	"dg_coral_corsair": {"height": 1.90, "length": 0.56, "width": 1.96, "walk_speed": 1.02, "run_speed": 6.54,
+		"attack_hit_time": 0.27},
+	"dg_rot_corsair": {"height": 1.85, "length": 0.41, "width": 1.72, "walk_speed": 0.99, "run_speed": 6.03,
+		"attack_hit_time": 0.23},
+	"dg_reef_wraith": {"height": 1.90, "length": 0.42, "width": 1.90, "walk_speed": 1.01, "run_speed": 6.10,
+		"attack_hit_time": 0.57},
 }
 ## Окончания моделей стадий эволюции: стадия 1 (в коде 0..2) → "_2", стадия 2 → "_3".
 const STAGE_SUFFIX := ["", "_2", "_3"]
@@ -87,6 +116,8 @@ static var _outline: ShaderMaterial
 var species := ""
 ## Своя модель стадии эволюции (<вид>_2 / <вид>_3): процедурные украшения стадии ей не нужны.
 var stage_model := false
+## Оружие в руке (hold_weapon), null — нет.
+var weapon_node: MeshInstance3D = null
 ## Не останавливать анимацию за кадром (автотесты на телефоне без 3D-рендера — как headless в CI).
 static var always_animate := false
 ## Кто это для учёта системы анимаций (AnimResolver): "mob" — зверь мира, "pet" — питомец (ставит Pet).
@@ -180,6 +211,8 @@ static func info_for(id: String) -> Dictionary:
 			r["clips"] = jd["clips"]
 		if jd.get("bones") is Dictionary:
 			r["bones"] = jd["bones"]
+		if jd.get("grips") is Dictionary:
+			r["grips"] = jd["grips"]
 	for k in BASE_INFO:
 		r[k] = float(r[k])
 	_infos[id] = r
@@ -274,6 +307,36 @@ func setup(id: String, s: float, color: Color = Color.WHITE, tint: Color = Color
 		vis.screen_entered.connect(_on_screen_changed.bind(true))
 		vis.screen_exited.connect(_on_screen_changed.bind(false))
 		add_child(vis)
+	return true
+
+
+## Оружие в кисти двуногого монстра (MobData weapon): модель Handheld на кости bones.hands[hand], хват — grips[hand]
+## из creatures.json (точка и ось клинка в пространстве кисти, как grip_r героя: CharacterModel._grip_xf).
+## Нет кости, хвата или файла оружия — false (монстр без оружия).
+func hold_weapon(id: String, hand: String = "R") -> bool:
+	if id == "" or skeleton == null:
+		return false
+	var hands: Dictionary = (info.get("bones", {}) as Dictionary).get("hands", {})
+	var grips: Dictionary = info.get("grips", {})
+	if not hands.has(hand) or not grips.has(hand):
+		return false
+	var bi := skeleton.find_bone(String(hands[hand]))
+	if bi < 0:
+		return false
+	var w := Handheld.make(id)
+	if w == null:
+		return false
+	var g: Dictionary = grips[hand]
+	var gp: Array = g.get("pos", [0, 0, 0])
+	var gd: Array = g.get("dir", [0, 1, 0])
+	var att := BoneAttachment3D.new()
+	att.name = "Weapon" + hand
+	skeleton.add_child(att)
+	att.bone_idx = bi
+	var xf := CharacterModel._grip_xf(Vector3(gd[0], gd[1], gd[2]), Vector3(gp[0], gp[1], gp[2]))
+	w.transform = xf * Transform3D(Handheld.hold_basis(id), Vector3.ZERO)
+	att.add_child(w)
+	weapon_node = w
 	return true
 
 

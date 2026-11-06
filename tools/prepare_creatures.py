@@ -3623,6 +3623,40 @@ BIPED_CREATURES = {
 	"anathema_chief": {"style": "biped", "height": 2.2, "tris": 8000,
 		"clips": {"Attack": ("ual2", ["Sword_Regular_B", "Sword_Regular_B_Rec"])}},
 }
+# Монстры подземелья (0.36, папка Максима «ДАНЖ/МОНСТРЫ ПОДЗЕМЕЛЬЯ»; оружие в руке — MobData "weapon", модели
+# assets/handheld/mw_*): гоблины логова, мёртвые матросы и рыцари зала костей, жрецы Секты Мрака святилища (канон —
+# docs/story/DUNGEON_CHAPTER1_STORY.md). Матросы и призраки — клипы зомби UAL2, жрецы — стойка и удар заклинателя.
+_ZOMBIE = {"Idle": ("ual2", ["Zombie_Idle_Loop"]), "Walk": ("ual2", ["Zombie_Walk_Fwd_Loop"])}
+_CASTER = {"Idle": ("ual1", ["Spell_Simple_Idle_Loop"]), "Walk": ("ual1", ["Walk_Formal_Loop"]),
+	"Attack": ("ual1", ["Spell_Simple_Enter", "Spell_Simple_Shoot", "Spell_Simple_Exit"])}
+DUNGEON_MOBS = {
+	"dg_goblin": {"style": "biped", "height": 1.35, "tris": 20000,
+		"clips": {"Attack": ("ual2", ["Sword_Regular_A", "Sword_Regular_A_Rec"])}},
+	"dg_goblin_chief": {"style": "biped", "height": 1.75, "tris": 24000,
+		"clips": {"Attack": ("ual2", ["Sword_Regular_B", "Sword_Regular_B_Rec"])}},
+	"dg_sailor": {"style": "biped", "height": 1.8, "tris": 20000,
+		"clips": dict(_ZOMBIE, Attack=("ual2", ["Sword_Regular_C"]))},
+	"dg_coral_corsair": {"style": "biped", "height": 1.9, "tris": 20000,
+		"clips": dict(_ZOMBIE, Attack=("ual2", ["Sword_Regular_B", "Sword_Regular_B_Rec"]))},
+	"dg_rot_corsair": {"style": "biped", "height": 1.85, "tris": 20000,
+		"clips": dict(_ZOMBIE, Attack=("ual2", ["Sword_Regular_A", "Sword_Regular_A_Rec"]))},
+	"dg_reef_wraith": {"style": "biped", "height": 1.9, "tris": 20000,
+		"clips": dict(_ZOMBIE, Attack=("ual2", ["Zombie_Scratch"]))},
+	"dg_graveguard": {"style": "biped", "height": 1.95, "tris": 20000,
+		"clips": {"Attack": ("ual2", ["Sword_Regular_B", "Sword_Regular_B_Rec"])}},
+	"dg_wight": {"style": "biped", "height": 1.9, "tris": 20000,
+		"clips": {"Attack": ("ual2", ["Sword_Regular_C"])}},
+	"dg_dead_knight": {"style": "biped", "height": 2.3, "tris": 26000,
+		"clips": {"Attack": ("ual1", ["Sword_Attack"])}},
+	"dg_bone_oracle": {"style": "biped", "height": 1.9, "tris": 20000, "clips": dict(_CASTER)},
+	"dg_grave_oracle": {"style": "biped", "height": 1.85, "tris": 20000,
+		"clips": dict(_CASTER, Attack=("ual2", ["Sword_Regular_A", "Sword_Regular_A_Rec"]))},
+	"dg_plague_shaman": {"style": "biped", "height": 1.85, "tris": 20000, "clips": dict(_CASTER)},
+	"dg_sect_wraith": {"style": "biped", "height": 1.95, "tris": 20000,
+		"clips": dict(_ZOMBIE, Attack=("ual2", ["Sword_Regular_A", "Sword_Regular_A_Rec"]))},
+	"dg_elder_priest": {"style": "biped", "height": 2.2, "tris": 26000, "clips": dict(_CASTER)},
+}
+BIPED_CREATURES.update(DUNGEON_MOBS)
 CREATURES.update(BIPED_CREATURES)
 
 # Качество моделей (решение Максима: «текстуры на максимум от исходного, чтобы модель была максимально качественной и
@@ -3640,6 +3674,9 @@ QUALITY_TRIS = {
 }
 for _cid, _tris in QUALITY_TRIS.items():
 	CREATURES[_cid].update({"tris": _tris, "tex": 0, "tex_hq": True})
+# монстры подземелья: текстуры Meshy 4096 → 2048 (как у жителей), высокое качество сжатия
+for _cid in DUNGEON_MOBS:
+	CREATURES[_cid].update({"tex": 2048, "tex_hq": True})
 # Пути к UAL1_Standard.glb / UAL2_Standard.glb (задаёт main по --ual1/--ual2)
 BIPED_UAL = {"ual1": "", "ual2": ""}
 
@@ -4203,8 +4240,10 @@ def build_biped(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 		if "speed" in cl:
 			clip_meta[cl["name"]]["speed"] = round(cl["speed"], 3)
 	contact = rts["ual1"].contact
+	gr = biped_grips(rig, roles)
 	return {
 		"kind": "biped",
+		"grips": gr,
 		"height": round(float(hi[1] - lo[1]), 3),
 		"length": round(float(hi[2] - lo[2]), 3),
 		"width": round(float(hi[0] - lo[0]), 3),
@@ -4228,6 +4267,34 @@ def build_biped(cid: str, src_path: str, cfg: dict, out_dir: str) -> dict:
 		},
 		"source": os.path.basename(src_path),
 	}
+
+
+def biped_grips(rig, roles: dict) -> dict:
+	"""Хват оружия в пространстве кисти (как prepare_hero.grips без пальцев): центр кулака — на 0.8 длины от
+	запястья к концу кисти, чуть к ладони; клинок — поперёк кисти, вперёд (+Z модели) — для оружия монстров
+	(CreatureAsset, MobData "weapon")."""
+	out = {}
+	for s, c in roles["arms"].items():
+		hand = c[min(3, len(c) - 1)]
+		w = rig.gpos[hand]
+		knuck = rig.gpos[c[-1]] if len(c) > 4 else w + (w - rig.gpos[c[2]]) * 0.35
+		a = knuck - w
+		L = float(np.linalg.norm(a))
+		if L < 1e-6:
+			continue
+		a = a / L
+		across = np.array([0.0, 0.0, 1.0])
+		across = across - a * np.dot(across, a)
+		across /= np.linalg.norm(across)
+		n = np.cross(a, across)
+		if n[1] > 0.0:
+			n = -n
+		pos = w + a * (0.8 * L) + n * 0.022
+		d = across + 0.15 * a
+		d /= np.linalg.norm(d)
+		R = rig.grot[hand]
+		out[s] = {"pos": [round(float(x), 4) for x in R.T @ (pos - w)], "dir": [round(float(x), 4) for x in R.T @ d]}
+	return out
 
 
 def biped_check_rest(meta: dict, G0: dict, idx: dict) -> bool:

@@ -258,6 +258,19 @@ const BASE_ITEMS := {
 	"midnight_claw": {"name": "Коготь полуночи", "type": "trophy", "icon": "fang", "rarity": "rare", "buy": 0, "sell": 1150, "color": Color(0.62, 0.42, 0.95), "desc": "Чёрный коготь Владычицы полуночи с фиолетовым отливом. Трофей босса."},
 	"thunder_spear": {"name": "Громовой наконечник", "type": "trophy", "icon": "spike", "rarity": "rare", "buy": 0, "sell": 1300, "color": Color(1.0, 0.85, 0.45), "desc": "Наконечник копья Громового хана, звенит от прикосновения. Трофей босса."},
 	"bone_crown": {"name": "Костяной венец", "type": "trophy", "icon": "spike", "rarity": "unique", "buy": 0, "sell": 1600, "color": Color(0.95, 0.9, 0.72), "desc": "Венец из костяных шипов Костяного владыки. Трофей босса."},
+	# Трофеи монстров подземелья (MobData dg_*; значки — пока процедурные по icon, промт — tools/Промты_значки_добычи_подземелья.docx)
+	"goblin_token": {"name": "Племенной знак", "type": "trophy", "icon": "spike", "buy": 0, "sell": 260, "color": Color(0.55, 0.75, 0.35), "desc": "Костяной знак с зелёной спиралью — такие гоблины носят на шнурке. Доказательство победы над гоблином."},
+	"rusty_buckle": {"name": "Ржавая пряжка", "type": "trophy", "icon": "plate", "buy": 0, "sell": 240, "color": Color(0.62, 0.45, 0.3), "desc": "Пряжка с чужого ремня, рыжая от ржавчины: гоблины тащат всё, что блестит."},
+	"warlord_tusk": {"name": "Клык вождя", "type": "trophy", "icon": "fang", "rarity": "rare", "buy": 0, "sell": 900, "color": Color(0.85, 0.9, 0.6), "desc": "Огромный клык Вождя гоблинов в медной оправе. Ценный трофей."},
+	"brine_rag": {"name": "Просоленный лоскут", "type": "trophy", "icon": "pelt", "buy": 0, "sell": 280, "color": Color(0.55, 0.6, 0.55), "desc": "Обрывок паруса, задубевший от соли и времени."},
+	"sea_bone": {"name": "Морская кость", "type": "trophy", "icon": "fang", "buy": 0, "sell": 300, "color": Color(0.82, 0.85, 0.75), "desc": "Кость утонувшего моряка, обросшая крошечными ракушками."},
+	"coral_shard": {"name": "Осколок коралла", "type": "trophy", "icon": "crystal", "buy": 0, "sell": 320, "color": Color(0.35, 0.8, 0.6), "desc": "Зеленоватый коралл, тихо светящийся в темноте, — он пророс сквозь доспех корсара."},
+	"dead_plate": {"name": "Пластина мёртвого доспеха", "type": "trophy", "icon": "plate", "buy": 0, "sell": 300, "color": Color(0.4, 0.48, 0.45), "desc": "Почерневшая пластина доспеха со следом зелёного знака."},
+	"grave_chain": {"name": "Звено погребальной цепи", "type": "trophy", "icon": "shard", "buy": 0, "sell": 290, "color": Color(0.5, 0.55, 0.5), "desc": "Тяжёлое звено цепи, которой нежить сковывали в склепе."},
+	"black_seal": {"name": "Чёрная печать", "type": "trophy", "icon": "shard", "rarity": "rare", "buy": 0, "sell": 1100, "color": Color(0.25, 0.6, 0.4), "desc": "Печать с глазом и щупальцами с доспеха Мёртвого рыцаря. Ценный трофей."},
+	"sect_candle": {"name": "Зелёная свеча", "type": "trophy", "icon": "crystal", "buy": 0, "sell": 310, "color": Color(0.4, 0.95, 0.55), "desc": "Огарок ритуальной свечи: пламя давно погасло, а воск всё ещё светится."},
+	"ritual_ash": {"name": "Ритуальный пепел", "type": "trophy", "icon": "scale", "buy": 0, "sell": 330, "color": Color(0.6, 0.65, 0.6), "desc": "Серый пепел из жаровен святилища, холодный на ощупь."},
+	"sect_sigil": {"name": "Знак Секты Мрака", "type": "trophy", "icon": "spike", "rarity": "unique", "buy": 0, "sell": 1400, "color": Color(0.35, 0.9, 0.5), "desc": "Литой знак — глаз и щупальца — с посоха Старшего жреца. Трофей мини-босса."},
 }
 
 ## Предметы прокачки (type "upgrade") и существ — база оригинала (ItemResource, MarketResource; tools/

@@ -175,6 +175,94 @@ const TYPES := {
 		"defense": 0.8, "attack_cd": 1.1, "boss": true, "species": "anathema_chief", "stage": 0, "respawn": 600.0,
 		"loot": ["chief_spike", "bone_blade"], "special": ["bone_crown"],
 	},
+	# ---------- Подземелье (этап 2, 0.36; модели Максима из «ДАНЖ», клипы UAL): 20–30 ур. Решения Максима: обычные —
+	# сила босса острова (поле dungeon: множители MobStats.BOSS_* × power), мини-боссы — HP ×2 к ним (dungeon_hp),
+	# возрождение обычных как на острове, мини-боссов — 20 мин. Оружие в руке — weapon (assets/handheld/mw_*, кисть
+	# hand, хват — grips в creatures.json). Зоны — world/dungeon.json mob_zones (логово гоблинов, склеп, святилище, причал).
+	"dg_goblin": {
+		"name": "Гоблин-мародёр", "gen": "гоблина-мародёра", "level": 20, "speed": 4.4, "gold": [20, 40],
+		"color": Color(0.35, 0.5, 0.25), "scale": 1.0, "rarity": "uncommon", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": false, "attack_cd": 1.1, "weapon": "mw_rusty_dagger",
+		"loot": ["goblin_token", "rusty_buckle"],
+	},
+	"dg_goblin_chief": {
+		"name": "Вождь гоблинов", "gen": "вождя гоблинов", "level": 23, "speed": 4.2, "gold": [60, 120],
+		"color": Color(0.3, 0.45, 0.22), "scale": 1.0, "rarity": "rare", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": true, "dungeon_hp": 2.0, "respawn": 1200.0, "attack_cd": 1.3,
+		"weapon": "mw_broad_sword", "loot": ["goblin_token", "warlord_tusk"], "mirror": true,
+	},
+	"dg_sailor": {
+		"name": "Мёртвый матрос", "gen": "мёртвого матроса", "level": 22, "speed": 3.6, "gold": [24, 46],
+		"color": Color(0.3, 0.42, 0.36), "scale": 1.0, "rarity": "uncommon", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": false, "attack_cd": 1.3, "weapon": "mw_cleaver",
+		"loot": ["brine_rag", "sea_bone"], "undead": true,
+	},
+	"dg_graveguard": {
+		"name": "Мёртвый страж", "gen": "мёртвого стража", "level": 24, "speed": 3.6, "gold": [28, 52],
+		"color": Color(0.3, 0.4, 0.34), "scale": 1.0, "rarity": "uncommon", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": false, "defense": 1.15, "attack_cd": 1.4, "weapon": "mw_knight_sword",
+		"loot": ["dead_plate", "grave_chain"], "undead": true, "knight": true,
+	},
+	"dg_wight": {
+		"name": "Мёртвый мечник", "gen": "мёртвого мечника", "level": 24, "speed": 3.8, "gold": [28, 52],
+		"color": Color(0.28, 0.4, 0.34), "scale": 1.0, "rarity": "uncommon", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": false, "attack_cd": 1.3, "weapon": "mw_longsword",
+		"loot": ["dead_plate", "grave_chain"], "undead": true, "knight": true,
+	},
+	"dg_dead_knight": {
+		"name": "Мёртвый рыцарь", "gen": "Мёртвого рыцаря", "level": 26, "speed": 3.6, "gold": [80, 150],
+		"color": Color(0.22, 0.3, 0.26), "scale": 1.0, "rarity": "rare", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": true, "dungeon_hp": 2.0, "respawn": 1200.0, "defense": 1.15, "attack_cd": 1.6,
+		"weapon": "mw_bastard_sword", "loot": ["dead_plate", "black_seal"], "mirror": true, "undead": true, "knight": true,
+	},
+	"dg_bone_oracle": {
+		"name": "Костяной жрец", "gen": "костяного жреца", "level": 26, "speed": 3.4, "gold": [30, 56],
+		"color": Color(0.34, 0.46, 0.34), "scale": 1.0, "rarity": "uncommon", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": false, "magic": true, "defense": 0.85, "attack_cd": 1.5,
+		"loot": ["sect_candle", "ritual_ash"], "undead": true, "sect": true,
+	},
+	"dg_grave_oracle": {
+		"name": "Могильный жрец", "gen": "могильного жреца", "level": 26, "speed": 3.4, "gold": [30, 56],
+		"color": Color(0.32, 0.44, 0.32), "scale": 1.0, "rarity": "uncommon", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": false, "magic": true, "defense": 0.85, "attack_cd": 1.4, "weapon": "mw_ritual_dagger",
+		"loot": ["sect_candle", "ritual_ash"], "undead": true, "sect": true,
+	},
+	"dg_plague_shaman": {
+		"name": "Чумной шаман", "gen": "чумного шамана", "level": 27, "speed": 3.4, "gold": [32, 60],
+		"color": Color(0.36, 0.5, 0.28), "scale": 1.0, "rarity": "uncommon", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": false, "magic": true, "defense": 0.85, "attack_cd": 1.5,
+		"loot": ["sect_candle", "ritual_ash"], "sect": true,
+	},
+	"dg_sect_wraith": {
+		"name": "Призрак секты", "gen": "призрака секты", "level": 28, "speed": 3.8, "gold": [34, 62],
+		"color": Color(0.25, 0.45, 0.36), "scale": 1.0, "rarity": "uncommon", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": false, "attack_cd": 1.5, "weapon": "mw_scythe",
+		"loot": ["sect_candle", "ritual_ash"], "undead": true, "sect": true,
+	},
+	"dg_elder_priest": {
+		"name": "Старший жрец", "gen": "Старшего жреца", "level": 29, "speed": 3.4, "gold": [90, 170],
+		"color": Color(0.3, 0.5, 0.34), "scale": 1.0, "rarity": "rare", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": true, "dungeon_hp": 2.0, "respawn": 1200.0, "magic": true, "defense": 0.9,
+		"attack_cd": 1.6, "weapon": "mw_runic_sword", "loot": ["ritual_ash", "sect_sigil"], "mirror": true, "sect": true,
+	},
+	"dg_coral_corsair": {
+		"name": "Коралловый корсар", "gen": "кораллового корсара", "level": 28, "speed": 3.8, "gold": [34, 62],
+		"color": Color(0.38, 0.42, 0.36), "scale": 1.0, "rarity": "uncommon", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": false, "attack_cd": 1.5, "weapon": "mw_axe",
+		"loot": ["brine_rag", "coral_shard"], "undead": true,
+	},
+	"dg_rot_corsair": {
+		"name": "Гнилой корсар", "gen": "гнилого корсара", "level": 28, "speed": 3.8, "gold": [34, 62],
+		"color": Color(0.34, 0.44, 0.3), "scale": 1.0, "rarity": "uncommon", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": false, "attack_cd": 1.3, "weapon": "mw_cutlass",
+		"loot": ["brine_rag", "sea_bone"], "undead": true,
+	},
+	"dg_reef_wraith": {
+		"name": "Рифовый утопленник", "gen": "рифового утопленника", "level": 29, "speed": 3.6, "gold": [36, 66],
+		"color": Color(0.26, 0.45, 0.42), "scale": 1.0, "rarity": "uncommon", "tameable": false, "dungeon": true,
+		"power": 1.5, "mini_boss": false, "attack_cd": 1.4, "weapon": "mw_curved_dagger",
+		"loot": ["coral_shard", "sea_bone"], "undead": true,
+	},
 	# Кабан и каменный страж — модели из примитивов: в мире больше не появляются (на острове только существа
 	# Максима), данные — для совместимости (старые сохранения, тесты)
 	"golem": {
@@ -221,6 +309,16 @@ static func defense(id: String) -> float:
 ## Босс (по одному на каждое существо острова).
 static func is_boss(id: String) -> bool:
 	return TYPES.has(id) and bool(get_type(id).get("boss", false))
+
+
+## Монстр подземелья (поле dungeon): сила босса острова (MobStats.derived).
+static func is_dungeon(id: String) -> bool:
+	return TYPES.has(id) and bool(get_type(id).get("dungeon", false))
+
+
+## Оружие в руке модели монстра (id модели assets/handheld, "" — без оружия).
+static func weapon_of(id: String) -> String:
+	return String(get_type(id).get("weapon", ""))
 
 
 ## Минибосс: «Редкий» зверь мира, не босс (вожак анатем, змеекрыл, кентавр); поле "mini_boss" заменяет правило.

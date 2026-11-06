@@ -192,6 +192,8 @@ func _ready() -> void:
 	add_child(_model)
 	_mat = CreatureModels.build(_model, model_species, color, body_scale, Color.WHITE, model_stage)
 	_asset = CreatureModels.asset_of(_model)
+	if _asset != null:
+		_asset.hold_weapon(MobData.weapon_of(type_id))
 	CreatureModels.add_collision(self, model_id, body_scale)
 	_height = CreatureModels.height(model_id, body_scale)
 	if MobData.flying(type_id):

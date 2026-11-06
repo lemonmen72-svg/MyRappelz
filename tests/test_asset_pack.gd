@@ -649,10 +649,13 @@ func _check_files() -> void:
 		var want_part := "creatures" if stage else "creatures_base"
 		if String(f) == "sheep.glb":
 			want_part = "world"
+		if String(f).begins_with("dg_"):
+			# Монстры подземелья (0.36) — свои две части
+			want_part = Assets.part_of(p) if ["dungeon_mobs", "dungeon_mobs_b"].has(Assets.part_of(p)) else "dungeon_mobs"
 		check(Assets.part_of(p) == want_part and Assets.part_of(p.get_basename() + ".png") == want_part,
 			"%s — в части %s (%s)" % [f, want_part, Assets.part_of(p)])
 	var dirs := {"res://assets/props/": "world|world_b|dungeon", "res://assets/textures/": "world",
-		"res://assets/handheld/": "handheld|handheld_r2",
+		"res://assets/handheld/": "handheld|handheld_r2|dungeon_mobs_b",
 		"res://assets/icons/items/": "icons", "res://assets/icons/skills/": "icons", "res://assets/icons/ui/": "icons",
 		"res://assets/icons/pets/wolf/": "icons"}
 	for d in dirs:

@@ -1278,6 +1278,45 @@ Corsair Revenant), сабля — Verdant Oathblade; значки добычи �
   больше (`water_corals`: озеро 18, канал 5, озёра алтаря 2 + 2; не у мостов и корабля) — всего 33. Тест `test_dungeon` —
   каждый мост строго по оси с берега на берег в обе стороны (12 переходов), точки зигзага по палубе — с запасом 1 м.
 
+## 0.36: подземелье, этап 2 — монстры
+Решения Максима (05.11): монстры 20–30 ур., обычные — сила босса острова того же уровня, мини-боссы областей — HP ×2 к
+ней, возрождение обычных — как на острове, мини-боссов — 20 мин; рост, клипы и оружие — по моделям из «ДАНЖ».
+- **Модели** — `assets/creatures/dg_*.glb/.png` (14 моделей Meshy со скелетом; `tools/prepare_creatures.py`, стиль
+  «biped», `DUNGEON_MOBS`: рост, треугольники 20–26 тыс., клипы UAL — у нежити `_ZOMBIE`, у жрецов `_CASTER`; текстура
+  2048 ASTC HQ). `biped_grips` пишет в `creatures.json` хват оружия `grips` {L, R: pos, dir} в пространстве кисти — как
+  `grip_r` героя. Размеры — и в `CreatureAsset.DEFAULTS` (без пакета — двуногий из примитивов `CreatureModels._lizard`).
+- **Оружие монстров** — `assets/handheld/mw_*` (14 моделей Максима, `tools/prepare_handheld.py`, вид "npc", рамка
+  "blade"): `MobData` поле `weapon`, `CreatureAsset.hold_weapon(id)` — `BoneAttachment3D` на кости `bones.hands.R`,
+  `CharacterModel._grip_xf(dir, pos)` × `Handheld.hold_basis` (вызывает `Mob._ready`; нет файла — без оружия).
+- **Данные** (`MobData`, раздел «Подземелье»): гоблины — Гоблин-мародёр `dg_goblin` 20–22, мини-босс Вождь гоблинов
+  `dg_goblin_chief` 23; склеп — Мёртвый матрос `dg_sailor` 22–23, Мёртвый страж `dg_graveguard` и Мёртвый мечник
+  `dg_wight` 24–25 (`knight`), мини-босс Мёртвый рыцарь `dg_dead_knight` 26; святилище — жрецы секты (`sect`):
+  Костяной жрец `dg_bone_oracle`, Могильный жрец `dg_grave_oracle` 26–27, Чумной шаман `dg_plague_shaman` 27–28 (магия —
+  поле `magic`), Призрак секты `dg_sect_wraith` 28, мини-босс Старший жрец `dg_elder_priest` 29; сокровищница — Гнилой
+  корсар `dg_rot_corsair`, Коралловый корсар `dg_coral_corsair`, Рифовый утопленник `dg_reef_wraith` 27–29 (команда
+  капитана — к боссу этапа 4). Поля: `dungeon` (`MobData.is_dungeon` → `MobStats.derived` берёт множители
+  `BOSS_*` × `power` 1.5, как у боссов острова), `dungeon_hp` (мини-боссы ×2), `mini_boss` (3 предмета добычи,
+  нападают сами; обычные нейтральны), `respawn` 1200 у мини-боссов. Итог (тест печатает «ПОДЗЕМЕЛЬЕ …»): гоблин 20 ур.
+  — HP 21 948, атака 348; Вождь 23 — HP 52 193; Мёртвый рыцарь 26 — HP 61 924.
+- **Трофеи** (`ItemData`, тип "trophy", значки пока процедурные): `goblin_token` (Племенной знак — для задания главы I
+  «10 знаков»), `rusty_buckle`, `warlord_tusk`, `brine_rag`, `sea_bone`, `coral_shard`, `dead_plate`, `grave_chain`,
+  `black_seal`, `sect_candle`, `ritual_ash`, `sect_sigil`. Промт листа значков — `tools/Промты_значки_добычи_подземелья.docx`
+  (`tools/make_dungeon_loot_icons_doc.py`, нарезка `cut_icon_sheet.py … --cols 4`). Добыча — `LootTable` как у зверей
+  + `DUNGEON_BONUS` (в подземелье +1 предмет).
+- **Где стоят** — `world/dungeon.json` `mob_zones` (формат острова; 45 монстров: лагерь гоблинов 9 + вождь, шахта 4,
+  склеп 12 + рыцарь, святилище 10 + жрец, сокровищница 7). `DungeonWorld.mob_slots`: точка — на полу зала (`room_at`, не
+  палуба, не мост, не коридор), не ближе `MOB_PORTAL_GAP` 14 м к порталу, вне твёрдых объектов (`_solid_circles` по
+  `prop_shapes` + `MOB_PROP_GAP`). `plan.py` и `blender_scene.py` сохраняют `mob_zones` (пишут поверх конфига).
+- **Пакет ресурсов**: части `dungeon_mobs` (гоблины, склеп, костяной жрец — явные шаблоны) и `dungeon_mobs_b`
+  (святилище, сокровищница, оружие `assets/handheld/mw_*`): одна часть была бы ≈ 124 МБ исходников.
+- Тест `tests/test_dungeon_mobs.gd` (данные, сила против `boss_wolf` того же уровня, модели, хват у кисти и клинок
+  поперёк предплечья — печатает «ХВАТ …», без пакета, расстановка по залам в мире подземелья).
+- **Плагины Blender для локаций** (решение Максима 06.11, `tools/blender_addons/`, README там): BagaPie 11.0.10
+  (zip расширения; доски, перила и тросы вдоль кривой, лестницы, настил) и BlenderLevelArchitect (`levelArchitect_v2.py`:
+  комнаты, коридоры, пещеры, лестницы, экспорт GLB + JSON проходимости); оба GPL, проверены в Blender 4.2.3 без окна,
+  в игру не идут (`.gdignore`). Мосты и причалы — BagaPie, каркас залов — BlenderLevelArchitect; текстуры
+  BlenderLevelArchitect не берём (лицензия не указана).
+
 ## Сюжет мира
 Решение Максима: **`docs/story/DUNGEON_CHAPTER1_STORY.md` — канон и начало истории всего мира Dark Pact** (глава I «Шёпот
 из глубин»: гоблины в пещере острова → нежить → Секта Мрака → проклятый капитан → Великий Пакт трёх рас, путь на

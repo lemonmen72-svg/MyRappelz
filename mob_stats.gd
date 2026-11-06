@@ -109,6 +109,8 @@ static func _row(lvl: int) -> Array:
 
 ## Главная атака вида магическая (маг и лекарь среди видов питомцев).
 static func is_magic(species: String) -> bool:
+	if MobData.TYPES.has(species) and MobData.get_type(species).has("magic"):
+		return bool(MobData.get_type(species)["magic"])
 	return PetData.SPECIES.has(species) and PetStats.is_magic(species)
 
 
@@ -154,8 +156,7 @@ static func body_scale(type_id: String, lvl: int) -> float:
 ## Мини-босс — «Редкий» зверь мира, не босс (вожак анатем, змеекрыл, кентавр). То же правило, что у
 ## MobData.is_mini_boss (после слияния можно звать его).
 static func is_mini_boss(type_id: String) -> bool:
-	return MobData.TYPES.has(type_id) and not MobData.is_boss(type_id) \
-		and String(MobData.get_type(type_id).get("rarity", "common")) == "rare"
+	return MobData.is_mini_boss(type_id)
 
 
 ## Агрессивный зверь (решение Максима): боссы и мини-боссы нападают сами, когда герой или его питомец подходит на
@@ -188,9 +189,13 @@ static func derived(type_id: String, lvl: int) -> Dictionary:
 	var lf := float(lv)
 	var magic := is_magic(sp)
 	var pw := MobData.power(type_id)
-	var boss := MobData.is_boss(type_id)
+	# Монстры подземелья (решение Максима): сила босса острова, мини-боссы — HP ×dungeon_hp сверх неё
+	var dungeon := MobData.is_dungeon(type_id)
+	var boss := MobData.is_boss(type_id) or dungeon
 	var elite := not boss and is_mini_boss(type_id)
 	var hp_m := pw * (BOSS_HP if boss else (ELITE_HP if elite else 1.0))
+	if dungeon:
+		hp_m *= float(MobData.get_type(type_id).get("dungeon_hp", 1.0))
 	var atk_m := pw * (BOSS_ATK if boss else (ELITE_ATK if elite else 1.0))
 	var def_m := MobData.defense(type_id) * (BOSS_DEF if boss else (ELITE_DEF if elite else 1.0))
 	var xp_m := pw * (BOSS_XP if boss else (ELITE_XP if elite else 1.0))

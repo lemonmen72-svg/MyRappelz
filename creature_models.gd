@@ -197,7 +197,11 @@ static func build(root: Node3D, species: String, color: Color, s: float, tint: C
 		"anathema", "anathema_blade", "anathema_chief":
 			_lizard(root, rig, species, color, s)
 		_:
-			_beast(root, rig, species, color, s)
+			if species.begins_with("dg_"):
+				# Монстры подземелья без пакета ресурсов — двуногий из примитивов (как анатема)
+				_lizard(root, rig, species, color, s)
+			else:
+				_beast(root, rig, species, color, s)
 	var a: Dictionary = root.get_meta("anim", {})
 	_finish(root, rig, a)
 	root.set_meta("anim", a)

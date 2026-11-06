@@ -212,6 +212,42 @@ const PACKS := {
 		"assets/props/dg_*.glb",
 		"assets/props/props_dg_*.png",
 	],
+	# Монстры подземелья (0.36): двуногие dg_* (tools/prepare_creatures.py, стиль «biped») — логово гоблинов и склеп;
+	# вторая часть — святилище и сокровищница, оружие монстров mw_* (tools/prepare_handheld.py)
+	"dungeon_mobs": [
+		"assets/creatures/dg_goblin.glb",
+		"assets/creatures/dg_goblin.png",
+		"assets/creatures/dg_goblin_chief.glb",
+		"assets/creatures/dg_goblin_chief.png",
+		"assets/creatures/dg_sailor.glb",
+		"assets/creatures/dg_sailor.png",
+		"assets/creatures/dg_graveguard.glb",
+		"assets/creatures/dg_graveguard.png",
+		"assets/creatures/dg_wight.glb",
+		"assets/creatures/dg_wight.png",
+		"assets/creatures/dg_dead_knight.glb",
+		"assets/creatures/dg_dead_knight.png",
+		"assets/creatures/dg_bone_oracle.glb",
+		"assets/creatures/dg_bone_oracle.png",
+	],
+	"dungeon_mobs_b": [
+		"assets/creatures/dg_grave_oracle.glb",
+		"assets/creatures/dg_grave_oracle.png",
+		"assets/creatures/dg_plague_shaman.glb",
+		"assets/creatures/dg_plague_shaman.png",
+		"assets/creatures/dg_sect_wraith.glb",
+		"assets/creatures/dg_sect_wraith.png",
+		"assets/creatures/dg_elder_priest.glb",
+		"assets/creatures/dg_elder_priest.png",
+		"assets/creatures/dg_coral_corsair.glb",
+		"assets/creatures/dg_coral_corsair.png",
+		"assets/creatures/dg_rot_corsair.glb",
+		"assets/creatures/dg_rot_corsair.png",
+		"assets/creatures/dg_reef_wraith.glb",
+		"assets/creatures/dg_reef_wraith.png",
+		"assets/handheld/mw_*.glb",
+		"assets/handheld/mw_*.png",
+	],
 }
 ## Порядок загрузки частей: сначала мир (с ним игра выглядит нормально), затем значки, оружие, звери; части не из
 ## списка (герои, жители, стадии, новые) — после, в порядке манифеста. По нему идут HTTPRequest (по очереди) и

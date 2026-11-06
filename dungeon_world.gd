@@ -854,6 +854,86 @@ func forest_at(_x: float, _z: float) -> float:
 	return 0.0
 
 
+## Слоты монстров по зонам mob_zones (формат острова: [вид, сколько, мин. ур., макс. ур.]): точка — на полу зала
+## (room_at, не мост, не палуба, не коридор), вне безопасной зоны, не ближе MOB_PORTAL_GAP к порталу и не в твёрдом
+## объекте (круг по следу коллизии из prop_shapes + MOB_PROP_GAP).
+const MOB_PORTAL_GAP := 14.0
+const MOB_PROP_GAP := 0.7
+
+
+func mob_slots(rng: RandomNumberGenerator) -> Array:
+	var res := []
+	var solids := _solid_circles()
+	var por := v2((cfg.get("portal", {}) as Dictionary).get("center", [0, 0]))
+	for z in cfg.get("mob_zones", []):
+		var zone: Dictionary = z
+		var c := v2(zone["center"])
+		var r := float(zone.get("radius", 8.0))
+		var lv: Array = zone.get("levels", [20, 20])
+		for m in zone.get("mobs", []):
+			var entry: Array = m
+			var elv: Array = [entry[2], entry[3]] if entry.size() >= 4 else lv
+			for n in int(entry[1]):
+				var pos := Vector3.ZERO
+				var found := false
+				for attempt in 160:
+					var ang := rng.randf() * TAU
+					var rr := sqrt(rng.randf()) * r * (1.0 if attempt < 80 else 1.6)
+					var x := c.x + cos(ang) * rr
+					var zz := c.y + sin(ang) * rr
+					if _mob_spot_ok(x, zz, solids, por):
+						pos = ground(x, zz)
+						found = true
+						break
+				if not found:
+					pos = ground(c.x, c.y)
+				res.append({
+					"type": String(entry[0]), "pos": pos, "zone": String(zone.get("id", "")),
+					"level": rng.randi_range(int(elv[0]), int(elv[1])),
+				})
+	return res
+
+
+func _mob_spot_ok(x: float, z: float, solids: Array, por: Vector2) -> bool:
+	if not is_walkable(x, z) or room_at(x, z) == "" or Vector2(x, z).distance_to(por) < MOB_PORTAL_GAP:
+		return false
+	if in_safe_zone(Vector3(x, 0.0, z)):
+		return false
+	for d in cfg.get("decks", []):
+		if shape_sd(d, Vector2(x, z)) < 1.0:
+			return false
+	for sc in solids:
+		var a: Array = sc
+		if Vector2(x, z).distance_to(a[0]) < float(a[1]) + MOB_PROP_GAP:
+			return false
+	return true
+
+
+## Твёрдые объекты раскладки кругами [центр, радиус] по их форме коллизии (prop_shapes).
+func _solid_circles() -> Array:
+	var out: Array = []
+	var shapes: Dictionary = cfg.get("prop_shapes", {})
+	for e in cfg.get("props", []):
+		var a: Array = e
+		var id := String(a[0])
+		if not shapes.has(id):
+			continue
+		var sh: Dictionary = shapes[id]
+		var s := float(a[4]) if a.size() > 4 else 1.0
+		var yaw := deg_to_rad(float(a[3])) if a.size() > 3 else 0.0
+		var ctr := Vector2(float(a[1]), float(a[2]))
+		if sh.has("pole"):
+			var pl: Array = sh["pole"]
+			out.append([ctr + Vector2(float(pl[0]), float(pl[1])).rotated(-yaw) * s, float(pl[2]) * s])
+			continue
+		var rad := 0.0
+		for q in sh.get("hull", []):
+			var qa: Array = q
+			rad = maxf(rad, Vector2(float(qa[0]), float(qa[1])).length())
+		out.append([ctr, rad * s])
+	return out
+
+
 ## Зал, в котором точка (id из rooms; "" — коридор, вода, край).
 func room_at(x: float, z: float) -> String:
 	for r in cfg.get("rooms", []):
