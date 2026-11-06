@@ -79,6 +79,9 @@ var pets: Array[Dictionary] = []
 var active_pet := -1
 ## Ячейки карт существ в поясе (PetBelt; 1…6, «Расширитель пояса»). Питомец в ячейке — запись pets[i]["belt"].
 var belt_slots := 1
+## Быстрые слоты HUD (0.41): 3 предмета для кнопок quick1…quick3 ("" — пусто); у зелья — вид берётся лучший
+## из сумки (Economy.quick_item). Ключ сохранения "quick".
+var quick: Array = ["", "", ""]
 ## Локация героя (0.35): "island" — остров, "dungeon" — подземелье за пещерой (DungeonWorld). Сохраняется: вошёл в
 ## игру в подземелье — у его входа. arrive — откуда пришёл (не сохраняется): "portal" — через портал (герой встаёт у
 ## портала локации), "" — обычный старт (точка старта / вход подземелья).
@@ -167,6 +170,7 @@ func reset() -> void:
 	quests_time = {}
 	storage.from_dict({})
 	storage_gold = 0
+	quick = ["", "", ""]
 	xp_mult = 1
 
 
@@ -576,6 +580,7 @@ func to_dict() -> Dictionary:
 		"storage": {"items": storage.to_dict(), "cells": storage.layout_to_array()},
 		"storage_gold": storage_gold,
 		"belt_slots": belt_slots,
+		"quick": quick.duplicate(),
 		"location": location,
 		"pos": hero_pos(),
 		"xp_mult": xp_mult,
@@ -714,6 +719,11 @@ func from_dict(d: Dictionary) -> void:
 		storage.load_layout(sd.get("cells", []))
 	storage_gold = maxi(0, int(d.get("storage_gold", 0)))
 	belt_slots = clampi(int(d.get("belt_slots", 1)), 1, PetBelt.MAX_SLOTS)
+	quick = ["", "", ""]
+	var quick_src: Variant = d.get("quick", [])
+	if quick_src is Array:
+		for i in mini(3, (quick_src as Array).size()):
+			quick[i] = String((quick_src as Array)[i])
 	location = "dungeon" if String(d.get("location", "island")) == "dungeon" else "island"
 	var sp: Variant = d.get("pos", {})
 	saved_pos = (sp as Dictionary).duplicate() if sp is Dictionary else {}

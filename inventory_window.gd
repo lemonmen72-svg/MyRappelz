@@ -1253,6 +1253,8 @@ func _card_item(card: VBoxContainer) -> void:
 			acts.append(["Во 2-е кольцо", "act_equip_ring2", _on_equip_ring2, Game.gear_block(id, "ring2") != ""])
 	elif _usable(id):
 		acts.append(["Использовать", "act_use", _on_use])
+		for qi in 3:
+			acts.append(["В быстрый слот %d" % (qi + 1), "act_quick_%d" % (qi + 1), economy.set_quick.bind(qi, id)])
 	elif ItemData.is_soul_card(id):
 		acts.append(["Сформировать", "act_form", _on_form])
 	elif Story.has(id):

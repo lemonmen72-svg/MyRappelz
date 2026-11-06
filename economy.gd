@@ -79,6 +79,7 @@ func setup(m: Node) -> void:
 	Game.storage.changed.connect(_on_storage_changed)
 	main.hud.set_button_visible("shop", false)
 	_update_potion_button()
+	_update_quick_buttons()
 
 
 ## Обрабатывает действия: "potion", "bag_window", "shop". true, если действие своё.
@@ -86,6 +87,9 @@ func handle_action(id: String) -> bool:
 	match id:
 		"potion":
 			use_potion()
+			return true
+		"quick1", "quick2", "quick3":
+			use_quick(int(id.substr(5)) - 1)
 			return true
 		"bag_window":
 			if is_bag_open():
@@ -256,6 +260,95 @@ func mana_cooldown_frac() -> float:
 ## Доля оставшейся перезарядки зелья: 0 = готово, 1 = только что выпито.
 func potion_cooldown_frac() -> float:
 	return clampf(_potion_cd / POTION_CD, 0.0, 1.0)
+
+
+# ---------- Быстрые слоты (0.41) ----------
+
+## Что сейчас в быстром слоте i: у зелья — лучшее зелье того же вида в сумке (или само, если его нет), иначе id.
+static func quick_item(i: int) -> String:
+	if i < 0 or i >= Game.quick.size():
+		return ""
+	var id := String(Game.quick[i])
+	var kind := ItemData.potion_kind(id)
+	if kind != "":
+		var best := best_potion(kind)
+		return best if best != "" else id
+	return id
+
+
+## Сколько можно использовать из слота i.
+static func quick_count(i: int) -> int:
+	var id := String(Game.quick[i]) if i >= 0 and i < Game.quick.size() else ""
+	if id == "":
+		return 0
+	var kind := ItemData.potion_kind(id)
+	return potion_count(kind) if kind != "" else Game.inventory.count(id)
+
+
+## Положить предмет id в быстрый слот i (из того же слота в другом — переезжает); "" — очистить.
+func set_quick(i: int, id: String) -> void:
+	if i < 0 or i >= Game.quick.size():
+		return
+	for k in Game.quick.size():
+		if String(Game.quick[k]) == id:
+			Game.quick[k] = ""
+	Game.quick[i] = id
+	_update_quick_buttons()
+	if id != "":
+		_msg("«%s» — в быстром слоте %d" % [ItemData.item_name(id), i + 1])
+
+
+## Нажали быстрый слот i: использовать; пустой — открыть сумку на разделе «Зелья и усиления».
+func use_quick(i: int) -> bool:
+	var id := quick_item(i)
+	if id == "":
+		window.bag_tab = "potions"
+		if not window.is_open():
+			window.open("bag")
+		else:
+			window.refresh()
+		_msg("Выберите зелье и нажмите «В быстрый слот %d»" % (i + 1))
+		return false
+	if quick_count(i) <= 0:
+		_msg("Нет: %s" % ItemData.item_name(id))
+		return false
+	var ok := false
+	if ItemData.is_potion(id):
+		ok = drink(id)
+	elif String(ItemData.get_item(id).get("creature_potion", "")) != "":
+		ok = drink_creature_potion(id)
+	elif id == "revive_scroll":
+		ok = main.pets.revive_any()
+	_update_quick_buttons()
+	return ok
+
+
+func _update_quick_buttons() -> void:
+	if main == null or main.hud == null:
+		return
+	for i in 3:
+		var bid := "quick%d" % (i + 1)
+		if not main.hud.has_button(bid):
+			continue
+		var id := quick_item(i)
+		if id == "":
+			main.hud.set_button_text(bid, "Слот")
+			main.hud.set_button_icon(bid, UiIcons.icon_spec("quick_slot_empty", IconView.glyph("+", Color(0.5, 0.5, 0.65))))
+			main.hud.set_button_count(bid, 0)
+		else:
+			main.hud.set_button_text(bid, ItemData.item_name(id))
+			main.hud.set_button_icon(bid, IconView.item(id))
+			main.hud.set_button_count(bid, quick_count(i))
+
+
+## Перезарядка быстрого слота i (доля): зелья здоровья и маны — общие с кнопкой «Зелье».
+func quick_cooldown(i: int) -> float:
+	match ItemData.potion_kind(quick_item(i)):
+		"hp":
+			return potion_cooldown_frac()
+		"mp":
+			return mana_cooldown_frac()
+	return 0.0
 
 
 func _update_potion_button() -> void:
@@ -574,6 +667,7 @@ func _zone_mat(c: Color) -> StandardMaterial3D:
 
 func _on_inventory_changed() -> void:
 	_update_potion_button()
+	_update_quick_buttons()
 	if window != null:
 		window.dirty = true
 
@@ -603,6 +697,9 @@ func _process(delta: float) -> void:
 	if _mana_cd > 0.0:
 		_mana_cd = maxf(0.0, _mana_cd - delta)
 	main.hud.set_cooldown("potion", potion_cooldown_frac())
+	for qi in 3:
+		if main.hud.has_button("quick%d" % (qi + 1)):
+			main.hud.set_cooldown("quick%d" % (qi + 1), quick_cooldown(qi))
 
 	var near := is_near_merchant()
 	if near != _shop_near:

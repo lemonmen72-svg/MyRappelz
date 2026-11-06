@@ -74,3 +74,4 @@ test_vegetation
 test_vfx
 test_vfx_gen
 test_weapons
+test_skill_pages

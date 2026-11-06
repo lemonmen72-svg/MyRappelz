@@ -1143,17 +1143,21 @@ func skill_id(slot: String) -> String:
 	var i := SLOT_IDS.find(slot)
 	if i < 0:
 		return slot
+	i += HeroSkills.page * HeroSkills.SLOTS
 	var slots: Array = Game.hero.get("slots", [])
 	return String(slots[i]) if i < slots.size() else ""
 
 
-## Назначить умение id на кнопку i (0..3); id = "" — очистить. Умение с другой кнопки переезжает.
+## Назначить умение id в ячейку i (0..11: страница i / 4, кнопка i % 4); id = "" — очистить. Умение с другой
+## ячейки переезжает.
 func assign_slot(id: String, i: int) -> bool:
-	if i < 0 or i >= HeroSkills.SLOTS:
+	if i < 0 or i >= HeroSkills.TOTAL_SLOTS:
 		return false
 	if id != "" and (HeroSkills.skill_level(Game.hero, id) <= 0 or HeroSkills.kind(id) == "passive"):
 		return false
 	var slots: Array = Game.hero["slots"]
+	while slots.size() < HeroSkills.TOTAL_SLOTS:
+		slots.append("")
 	for k in slots.size():
 		if String(slots[k]) == id:
 			slots[k] = ""

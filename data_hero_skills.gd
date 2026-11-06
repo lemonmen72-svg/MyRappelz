@@ -33,8 +33,13 @@ const JP_START := 5
 const JP_PER_LEVEL := 10
 ## Поддержка переключаемых умений списывается раз в UPKEEP_PERIOD секунд.
 const UPKEEP_PERIOD := 10.0
-## Сколько кнопок умений в HUD (skill1…skill4).
+## Сколько кнопок умений в HUD (skill1…skill4) — на странице; страниц PAGES (свайп по кнопкам, 0.41), всего
+## ячеек TOTAL_SLOTS (Game.hero.slots: страница p, кнопка i — индекс p × SLOTS + i).
 const SLOTS := 4
+const PAGES := 3
+const TOTAL_SLOTS := 12
+## Открытая страница кнопок умений (на время игры).
+static var page := 0
 ## Воин: искра духа — за каждые SPARK_HITS попавших обычных атак (JobFxWarrior).
 const SPARK_HITS := 4
 ## Базовый урон умений вики (сотни единиц) → наш масштаб атаки.
@@ -678,7 +683,7 @@ static func ensure_record(rec: Dictionary, class_id: String) -> void:
 	var slots: Array = []
 	var ssrc: Variant = rec.get("slots", [])
 	var any := false
-	for i in SLOTS:
+	for i in TOTAL_SLOTS:
 		var id := ""
 		if ssrc is Array and i < (ssrc as Array).size():
 			id = String((ssrc as Array)[i])

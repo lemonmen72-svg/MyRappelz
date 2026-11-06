@@ -76,3 +76,4 @@ test_dungeon_pets 20
 test_dungeon_boss 15
 test_dungeon_story 15
 test_fixes_040 20
+test_skill_pages 10

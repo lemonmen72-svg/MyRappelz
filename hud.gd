@@ -28,6 +28,8 @@ extends CanvasLayer
 
 ## Нажатие кнопки действия (касание, клавиша или кнопка меню).
 signal action(id: String)
+## Свайп по кнопкам умений (0.41): dir +1 — следующая страница умений (палец влево), −1 — предыдущая.
+signal swipe(dir: int)
 ## Размер интерфейса изменился (apply_ui_scale): модули перестраивают свои элементы на HUD (трекер заданий).
 signal scale_changed
 
@@ -131,6 +133,13 @@ var claim_touch := Callable()
 ## "icon": IconView или null (значок вместо подписи — set_button_icon)}.
 ## offset и r — уже с масштабом UiScale.
 var _buttons := {}
+## Кнопки, по которым листают свайпом (кнопки умений): умение срабатывает, когда палец отпущен без свайпа.
+var swipe_ids: Array = []
+## Касание кнопки умения: index → {id, start, done}.
+var _swipe_touch := {}
+## Сдвиг пальца, после которого это свайп, а не нажатие («Средний»), и подпись страницы над кнопками.
+const SWIPE_MIN := 40.0
+var _page_label: Label = null
 var _joy_idx := -1
 ## Касания камеры (индекс → последняя позиция): один палец в правой половине экрана вне кнопок
 ## вращает камеру, два пальца щипком приближают и отдаляют. Накопленные сдвиг и множитель дальности.
@@ -499,6 +508,10 @@ static func _wrap_words(l: Label, text: String, max_w: float) -> String:
 				line = cand
 		out.append(line)
 	return "\n".join(out)
+
+
+func has_button(id: String) -> bool:
+	return _buttons.has(id)
 
 
 func set_button_visible(id: String, v: bool) -> void:
@@ -1203,6 +1216,50 @@ func _release_all() -> void:
 		_buttons[id]["touch"] = -1
 
 
+## Кнопка умения под точкой p, даже скрытая (пустая ячейка): с неё тоже можно листать.
+func _swipe_button_at(p: Vector2) -> String:
+	if edit_mode:
+		return ""
+	for id in swipe_ids:
+		if not _buttons.has(id):
+			continue
+		var b: Dictionary = _buttons[id]
+		var panel: Panel = b["panel"]
+		var c := panel.position + panel.size / 2.0
+		if p.distance_to(c) <= float(b["r"]) * TOUCH_K:
+			return String(id)
+	return ""
+
+
+## Подпись страницы умений над кнопками: «● ○ ○», pages ≤ 1 — скрыта.
+func set_skill_page(page: int, pages: int) -> void:
+	if _page_label == null:
+		_page_label = Label.new()
+		_page_label.name = "SkillPage"
+		_page_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_page_label.add_theme_color_override("font_outline_color", Color.BLACK)
+		_page_label.add_theme_constant_override("outline_size", 4)
+		_page_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
+		add_child(_page_label)
+	var dots := PackedStringArray()
+	for i in pages:
+		dots.append("●" if i == page else "○")
+	_page_label.text = " ".join(dots)
+	_page_label.visible = pages > 1 and not edit_mode
+	_page_label.add_theme_font_size_override("font_size", UiScale.fs(UiScale.FONT_SMALL))
+	if swipe_ids.size() > 0 and _buttons.has(swipe_ids[0]):
+		# Над самой верхней кнопкой умений
+		var top := INF
+		var cx := 0.0
+		for id in swipe_ids:
+			var pn: Panel = _buttons[id]["panel"]
+			if pn.position.y < top:
+				top = pn.position.y
+				cx = pn.position.x + pn.size.x * 0.5
+		_page_label.reset_size()
+		_page_label.position = Vector2(cx - _page_label.size.x * 0.5, top - _page_label.size.y - UiScale.px(2))
+
+
 func _button_at(p: Vector2) -> String:
 	if edit_mode:
 		return ""
@@ -1246,6 +1303,10 @@ func _input(event: InputEvent) -> void:
 				return
 			if claim_touch.is_valid() and bool(claim_touch.call(te.index, p)):
 				return
+			var sid := _swipe_button_at(p)
+			if sid != "":
+				_swipe_touch[te.index] = {"id": sid, "start": p, "done": false}
+				return
 			var id := _button_at(p)
 			if id != "":
 				if _buttons[id]["hold"]:
@@ -1260,6 +1321,13 @@ func _input(event: InputEvent) -> void:
 				# Второй палец (для щипка) может быть и в левой половине
 				_cam_touches[te.index] = p
 		else:
+			if _swipe_touch.has(te.index):
+				var st: Dictionary = _swipe_touch[te.index]
+				_swipe_touch.erase(te.index)
+				# Отпустил без свайпа — нажатие кнопки (видимой)
+				if not bool(st["done"]) and _button_at(te.position) == String(st["id"]):
+					action.emit(String(st["id"]))
+				return
 			if te.index == _joy_idx:
 				_reset_joy()
 			_cam_touches.erase(te.index)
@@ -1269,6 +1337,13 @@ func _input(event: InputEvent) -> void:
 		return
 
 	var de := event as InputEventScreenDrag
+	if de != null and _swipe_touch.has(de.index):
+		var sw: Dictionary = _swipe_touch[de.index]
+		var dx := de.position.x - (sw["start"] as Vector2).x
+		if not bool(sw["done"]) and absf(dx) >= UiScale.px(SWIPE_MIN):
+			sw["done"] = true
+			swipe.emit(1 if dx < 0.0 else -1)
+		return
 	if de != null and _cam_touches.has(de.index):
 		var prev: Vector2 = _cam_touches[de.index]
 		if _cam_touches.size() == 1:

@@ -33,7 +33,7 @@ const ICONS := {
 	"confirm": "act_confirm", "cancel": "act_cancel",
 	"accept": "act_quest_take", "complete": "act_quest_turnin", "create_*": "act_use", "gear_equip": "act_pet_gear",
 	"gear_off_*": "act_unequip", "toggle_*": "act_toggle", "unslot_*": "act_slot_clear", "unequip_shield": "act_unequip",
-	"offhand_*": "act_offhand",
+	"offhand_*": "act_offhand", "act_quick_*": "quick_edit",
 }
 ## Главные действия (золотые) и опасные (алые) — тоже по имени, «*» — начало.
 const PRIMARY := ["act_equip", "act_buy", "act_buy5", "act_craft", "act_craft_yes", "act_forge", "act_use", "act_form",

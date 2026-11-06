@@ -58,6 +58,10 @@ const OTHER_BUTTONS := [
 	["potion", "Зелье", Vector2(340, 62), 32.0, Color(0.85, 0.15, 0.3, 0.45)],
 	["shop", "Торговец", Vector2(330, 170), 34.0, Color(0.85, 0.7, 0.2, 0.45)],
 	["talk", "Говорить", Vector2(420, 110), 34.0, Color(0.95, 0.6, 0.25, 0.45)],
+	# Быстрые слоты зелий и усилителей (0.41): в нижнем ряду левее «Зелья»
+	["quick1", "Слот", Vector2(410, 36), 26.0, Color(0.45, 0.35, 0.75, 0.45)],
+	["quick2", "Слот", Vector2(480, 36), 26.0, Color(0.45, 0.35, 0.75, 0.45)],
+	["quick3", "Слот", Vector2(550, 36), 26.0, Color(0.45, 0.35, 0.75, 0.45)],
 ]
 ## Кнопки команд питомца (HUD.add_pet_button — в ряд под панелью питомца, видны при призванном питомце):
 ## [id, подпись, цвет]. «Авто» — сам нападает на зверей рядом, «Атака» — бьёт выделенную цель героя, «Защита» —
@@ -359,10 +363,12 @@ func _build_hud() -> void:
 	hud = HUD.new()
 	add_child(hud)
 	hud.action.connect(_on_action)
+	hud.swipe.connect(_on_skill_swipe)
 	# Центры кнопок отсчитываются от правого нижнего угла экрана
 	hud.add_button("attack", "Атака", ATTACK_BUTTON[0], float(ATTACK_BUTTON[1]), Color(0.9, 0.2, 0.2, 0.45), true)
 	for b in SKILL_BUTTONS:
 		hud.add_button(String(b[0]), "", b[1], float(b[2]), b[3])
+		hud.swipe_ids.append(String(b[0]))
 	for b in OTHER_BUTTONS:
 		hud.add_button(String(b[0]), String(b[1]), b[2], float(b[3]), b[4])
 	for b in PET_BUTTONS:
@@ -737,11 +743,23 @@ func refresh_skill_buttons() -> void:
 		hud.set_button_icon("attack", IconView.item(Game.weapon))
 	else:
 		hud.set_button_icon("attack", IconView.shape("sword", Color(0.85, 0.85, 0.95)))
+	# Страницы умений (свайп): пустые ячейки видны, если на других страницах что-то есть или открыта не первая
+	var slots: Array = Game.hero.get("slots", [])
+	var extra := HeroSkills.page != 0
+	for k in range(HeroSkills.SLOTS, mini(slots.size(), HeroSkills.TOTAL_SLOTS)):
+		if String(slots[k]) != "":
+			extra = true
+	hud.set_skill_page(HeroSkills.page, HeroSkills.PAGES if extra else 1)
 	for b in SKILL_BUTTONS:
 		var bid := String(b[0])
 		var sid := player.skill_id(bid)
-		hud.set_button_visible(bid, sid != "")
+		hud.set_button_visible(bid, sid != "" or extra)
 		if sid == "":
+			if extra:
+				hud.set_blocked(bid, false)
+				hud.set_button_color(bid, hud.button_color(bid))
+				hud.set_button_text(bid, "Пусто")
+				hud.set_button_icon(bid, UiIcons.icon_spec("skill_slot_empty", IconView.glyph("·", Color(0.4, 0.42, 0.55))))
 			continue
 		var sk := HeroSkills.get_skill(sid)
 		var text := String(sk.get("name", sid))
@@ -753,6 +771,13 @@ func refresh_skill_buttons() -> void:
 		hud.set_button_color(bid, TOGGLE_ON_COLOR if on else hud.button_color(bid))
 		hud.set_button_text(bid, text)
 		hud.set_button_icon(bid, IconView.hero_skill(sid))
+
+
+## Свайп по кнопкам умений: следующая / предыдущая страница (по кругу).
+func _on_skill_swipe(dir: int) -> void:
+	HeroSkills.page = posmod(HeroSkills.page + dir, HeroSkills.PAGES)
+	refresh_skill_buttons()
+	hud.show_message("Умения: страница %d из %d" % [HeroSkills.page + 1, HeroSkills.PAGES], 1.2)
 
 
 ## Значок «Приручить»: карта существа вида цели (если у вида есть карта), иначе базовая карта.

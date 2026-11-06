@@ -647,18 +647,22 @@ func _card(id: String, p: Player) -> Control:
 		btns.add_child(tb)
 		buttons["toggle_" + id] = tb
 	if kind != "passive" and cur > 0:
-		var srow := HBoxContainer.new()
-		srow.add_theme_constant_override("separation", int(UiScale.px(6)))
-		box.add_child(srow)
-		srow.add_child(_label("На кнопку:", UiScale.FONT_BODY, MUTED))
+		# На кнопку: страницы умений (свайп по кнопкам в бою) — по ряду на страницу
+		box.add_child(_label("На кнопку (страница — свайп по кнопкам умений):", UiScale.FONT_BODY, MUTED))
 		var slots: Array = Game.hero.get("slots", [])
-		for i in HeroSkills.SLOTS:
-			var sbn := _button(str(i + 1), 46)
-			sbn.toggle_mode = true
-			sbn.button_pressed = i < slots.size() and String(slots[i]) == id
-			sbn.pressed.connect(_on_slot.bind(id, i))
-			srow.add_child(sbn)
-			buttons["slot_%d" % (i + 1)] = sbn
+		for pg in HeroSkills.PAGES:
+			var srow := HBoxContainer.new()
+			srow.add_theme_constant_override("separation", int(UiScale.px(6)))
+			box.add_child(srow)
+			srow.add_child(_label("%d:" % (pg + 1), UiScale.FONT_BODY, MUTED))
+			for k in HeroSkills.SLOTS:
+				var i := pg * HeroSkills.SLOTS + k
+				var sbn := _button(str(k + 1), 46)
+				sbn.toggle_mode = true
+				sbn.button_pressed = i < slots.size() and String(slots[i]) == id
+				sbn.pressed.connect(_on_slot.bind(id, i))
+				srow.add_child(sbn)
+				buttons["slot_%d" % (i + 1)] = sbn
 	return panel
 
 
@@ -701,11 +705,14 @@ func _on_toggle(id: String) -> void:
 func _on_slot(id: String, i: int) -> void:
 	var slots: Array = Game.hero.get("slots", [])
 	var nm := String(HeroSkills.get_skill(id).get("name", id))
+	var where := "кнопка %d" % (i % HeroSkills.SLOTS + 1)
+	if i >= HeroSkills.SLOTS:
+		where += ", страница %d" % (i / HeroSkills.SLOTS + 1)
 	if i < slots.size() and String(slots[i]) == id:
 		_player().assign_slot("", i)
-		_msg("Кнопка %d пуста" % (i + 1))
+		_msg("Пусто: %s" % where)
 	elif _player().assign_slot(id, i):
-		_msg("«%s» — на кнопке %d" % [nm, i + 1])
+		_msg("«%s» — %s" % [nm, where])
 	refresh()
 
 
