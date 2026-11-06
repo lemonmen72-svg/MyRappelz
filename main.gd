@@ -283,6 +283,10 @@ func restart_scene() -> Node:
 	return fresh
 
 
+func _wait_vfx_prewarm() -> void:
+	VfxKit.finish_prewarm(true)
+
+
 ## Маски эффектов из фонового потока — в текстуры, когда готовы (VfxKit.prewarm).
 func _finish_vfx_prewarm() -> void:
 	if not VfxKit.finish_prewarm() and is_inside_tree():
@@ -312,6 +316,9 @@ func _start_world() -> void:
 	_on_location_entered()
 	# Маски, шум и меши эффектов умений — заранее, а не на первом умении (VFX 2.0)
 	VfxKit.prewarm.call_deferred()
+	# Выход или перезапуск сцены, пока поток масок работает, — дождаться его (иначе скрипт выгружается под потоком)
+	if not tree_exiting.is_connected(_wait_vfx_prewarm):
+		tree_exiting.connect(_wait_vfx_prewarm)
 	var pw := get_tree().create_timer(0.5)
 	pw.timeout.connect(_finish_vfx_prewarm)
 	# Vulkan проверяется: время в мире до подтверждения; сообщение о рендерере (откат после вылета, Vulkan со

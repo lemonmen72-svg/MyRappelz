@@ -587,7 +587,12 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 	used.name = "used_label"
 	used.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(used)
-	head.add_child(_button("Сортировать", "sort", _on_sort))
+	# Сортировка — кнопкой-значком (подпись — подсказкой): строка над сеткой не шире сетки
+	var sb := UiIcons.icon_button("act_sort", TAB_SIDE)
+	sb.name = "sort"
+	sb.pressed.connect(_on_sort)
+	buttons["sort"] = sb
+	head.add_child(sb)
 	if mode == "bag":
 		var cb := _button("Экипировка" if craft_open else "Крафт", "craft_toggle", _on_craft_toggle)
 		UiIcons.add_icon(cb, "menu_bag" if craft_open else "btn_craft")
@@ -1407,7 +1412,8 @@ func _weapon_stats(card: VBoxContainer, id: String, cmp: String) -> void:
 	if not ItemData.weapon_fits(id, Game.class_id):
 		card.add_child(_text("Не подходит вашей профессии", UiScale.FONT_BODY, BAD))
 	var g := GridContainer.new()
-	g.columns = 2
+	# На складе карточка узкая — кнопки со значками в один столбец
+	g.columns = 1 if mode == "storage" or craft_open else 2
 	g.add_theme_constant_override("h_separation", int(UiScale.px(12)))
 	g.add_theme_constant_override("v_separation", 0)
 	card.add_child(g)
