@@ -191,7 +191,7 @@ func summary(_bot: TestBot) -> String:
 
 const STATUS_NAMES := {"done": "сдано", "active": "взято, не сдано", "not_taken": "не взято", "stuck": "застряло"}
 const SPLIT_NAMES := {"walk": "путь", "fight": "бой", "loot": "добыча", "rest": "отдых", "npc": "жители", "ui": "окна",
-	"wait": "ожидание"}
+	"wait": "ожидание", "pause": "паузы"}
 const FEATURE_NAMES := {"job": "Выбор профессии", "dungeon": "Подземелье", "bag": "Торба", "storage": "Склад", "temper": "Закалка",
 	"craft": "Крафт кубом", "craft_powder": "Крафт с порошком", "tame": "Приручение", "form": "Формирование",
 	"pet_gear": "Снаряжение питомцу (оружие)", "pet_armor": "Снаряжение питомцу (доспех)", "evolve": "Эволюция у Кирка",

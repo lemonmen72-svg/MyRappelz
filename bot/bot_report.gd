@@ -879,6 +879,9 @@ static func log_by_section(mark: String) -> Dictionary:
 		var is_err := line.contains("ERROR")
 		if not is_err and not line.contains("WARNING"):
 			continue
+		# Фиктивный рендер (без экрана, автотесты в CI): пустые меши эффектов — не ошибка игры
+		if i + 1 < all.size() and all[i + 1].contains("servers/rendering/dummy"):
+			continue
 		if not res.has(cur):
 			res[cur] = {"errors": 0, "warnings": 0, "lines": PackedStringArray()}
 		var d: Dictionary = res[cur]

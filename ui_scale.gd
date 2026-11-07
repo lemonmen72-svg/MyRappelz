@@ -81,8 +81,9 @@ static func set_level(l: int, save: bool = true) -> void:
 	Util.refresh_theme()
 
 
-## Перечитать выбор из файла при следующем запросе.
-static func reload() -> void:
+## Перечитать выбор из файла при следующем запросе. Не «reload»: Класс.reload() — встроенный GDScript.reload()
+## (перекомпиляция, все статические поля — к начальным; в APK может не пройти).
+static func reread() -> void:
 	_level = -1
 
 

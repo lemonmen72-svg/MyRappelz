@@ -139,7 +139,7 @@ func run_step() -> void:
 		6:
 			check(is_equal_approx(float(hud._buttons["attack"]["r"]), UiScale.px(60.0)) and UiScale.level() == UiScale.LARGE,
 				"«Крупный» из настроек: кнопка атаки r %.0f" % float(hud._buttons["attack"]["r"]))
-			UiScale.reload()
+			UiScale.reread()
 			check(UiScale.level() == UiScale.LARGE, "размер интерфейса сохранён в settings.cfg и прочитан")
 			_check_window("настройки после смены размера")
 			hud.close_window()
@@ -639,8 +639,8 @@ func _restore_cfg() -> void:
 			f.close()
 	elif FileAccess.file_exists(UiScale.PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(UiScale.PATH))
-	UiScale.reload()
-	Quality.reload()
+	UiScale.reread()
+	Quality.reread()
 	UiScale.set_level(UiScale.MEDIUM, false)
 
 

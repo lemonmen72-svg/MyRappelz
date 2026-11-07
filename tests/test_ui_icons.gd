@@ -27,6 +27,7 @@ func run_step() -> void:
 			_check_textures()
 			_check_hud(hud)
 			_check_windows(hud)
+			_check_narrow(hud)
 			# Долгое касание по значку «Сумка»: подпись, без действия
 			hud.action.connect(func(id: String) -> void: _actions.append(id))
 			_menu_btn = hud.menu_buttons()["bag_window"] as Button
@@ -45,6 +46,40 @@ func run_step() -> void:
 			check(_actions.has("bag_window") and hud.is_window_open(), "короткое касание открывает сумку")
 			hud.close_window()
 			ok_done()
+
+
+## Узкие кнопки («+», «−», «+100», ячейки) — рисованная рамка BtnSmall: торцы рамки-картинки (2 × 32 px) в них
+## не помещаются (0.43: жалоба Максима на ячейки «На кнопку» в окне героя).
+func _check_narrow(hud: HUD) -> void:
+	var plus := Button.new()
+	plus.text = "+"
+	var wide := Button.new()
+	wide.text = "Купить ×5 и ещё"
+	var cell := Button.new()
+	cell.text = "Ячейка"
+	cell.custom_minimum_size = Vector2(46, 44)
+	check(UiButtons.narrow(plus) and UiButtons.narrow(cell) and not UiButtons.narrow(wide),
+		"узкие кнопки: «+» %.0f px, ячейка 46 px — узкие, «%s» %.0f px — нет" % [UiButtons.width_of(plus), wide.text,
+		UiButtons.width_of(wide)])
+	UiButtons.decorate(plus, "act_drop_plus")
+	UiButtons.decorate(wide, "act_buy5")
+	check(plus.theme_type_variation == "BtnSmall" and wide.theme_type_variation == "BtnPrimary",
+		"«+» — рисованная BtnSmall, «Купить ×5» — золотая BtnPrimary")
+	for b in [plus, wide, cell]:
+		b.free()
+	var eco: Node = main.economy
+	eco.open_bag()
+	var bad: Array[String] = []
+	var n := 0
+	for k in eco.window.buttons:
+		var b := eco.window.buttons[k] as Button
+		if b == null or not b.is_visible_in_tree() or not UiButtons.narrow(b) or b.has_theme_stylebox_override("normal"):
+			continue
+		n += 1
+		if b.get_theme_stylebox("normal") is StyleBoxTexture:
+			bad.append(String(k))
+	check(bad.is_empty(), "в сумке узкие кнопки (%d) — без рамки-картинки%s" % [n, ("" if bad.is_empty() else ": " + ", ".join(bad))])
+	hud.close_window()
 
 
 func _check_textures() -> void:

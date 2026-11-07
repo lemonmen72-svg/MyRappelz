@@ -46,6 +46,8 @@ const CI_ONLY := {
 	"test_texture_quality": "читает .import и заголовки PNG исходников — в APK их нет (только сжатые текстуры)",
 	"test_movement_smooth": "мерит дрожь движения при ровно 60 кадрах/с (CI: --fixed-fps 60 без экрана)",
 	"test_cardinal_story": "сам запускает тест-бота на долгое прохождение (режим «Кардинал: прохождение острова» есть на вкладке)",
+	"test_cardinal_profiles": "сам запускает тест-бота (режим «Кардинал: профили игроков» есть на вкладке), а второй бот не запускается",
+	"test_bridge_walk": "≈ 400 с игрового времени прогулок по мостам — дольше таймаута теста на телефоне (300 с); мосты проходит и режим «Кардинал: прохождение острова»",
 }
 ## Проверяют модели и текстуры из пакета ресурсов: без всех частей — пропуск.
 const NEED_PACK := ["test_hero_models", "test_npc_models", "test_props", "test_handheld", "test_pet_stages",
@@ -432,9 +434,9 @@ func reset_env() -> void:
 	Engine.time_scale = 1.0
 	if _settings_moved and FileAccess.file_exists(Quality.PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(Quality.PATH))
-	Quality.reload()
+	Quality.reread()
 	Quality.mob_range_override = -1
-	UiScale.reload()
+	UiScale.reread()
 	Util.refresh_theme()
 	Quality.set_throttle(0)
 	Quality._menu_open = false
@@ -496,7 +498,7 @@ func on_finish(b: TestBot) -> void:
 				f.store_string(was.substr(1))
 				f.close()
 		b.note("Файл %s изменился во время автотестов — возвращён, как был" % String(p))
-	UiScale.reload()
+	UiScale.reread()
 	Util.refresh_theme()
 
 

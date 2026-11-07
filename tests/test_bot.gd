@@ -513,6 +513,6 @@ func _restore_settings_file() -> void:
 		f.close()
 	elif FileAccess.file_exists(Quality.PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(Quality.PATH))
-	Quality.reload()
-	UiScale.reload()
+	Quality.reread()
+	UiScale.reread()
 	Util.refresh_theme()

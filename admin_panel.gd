@@ -52,6 +52,8 @@ extends RefCounted
 ##     "editor_start", "editor_share", "editor_reset", "editor_reset_yes", "editor_reset_no" (DungeonEditor), "tp_poi_<id>", "tp_zone_<id>" (teleports());
 ##   «Тест-бот»: "bot_mode_<id>" (BotScenario.MODES; «скоро» — недоступны), "bot_sec_<раздел>" (режим «По разделам»:
 ##     переключатели разделов BotSection.SECTIONS), "bot_start", "bot_stop", "bot_open", "bot_share",
+##     «Кардинал: профили игроков»: "bot_prof_<профиль>", "bot_seg_<elder|job|post>", "bot_seeds_<1|3|5>",
+##     "bot_race_<раса>", "bot_job_<профессия>", "bot_paccel_<8|16|32>" (BotScenarioCardinalProfiles),
 ##     "anim_system", "anim_combat_idle" (система анимаций 1.0 и боевая стойка — выключатели отката),
 ##     "vfx_new" (эффекты умений генератора VFX — SkillVfx.enabled).
 
@@ -62,6 +64,7 @@ const MAX_LEVEL := 40
 const NOTE := Color(1.0, 0.86, 0.55)
 const MUTED := Color(0.75, 0.78, 0.9)
 const INFO := Color(0.85, 0.88, 0.95)
+const BAD := Color(1.0, 0.5, 0.45)
 ## Задание на профессию (сбрасывается вместе с профессией, как и задания после неё — QuestData.JOB_RESET).
 const JOB_QUEST := QuestData.JOB_QUEST
 ## Вкладки: [id, подпись].
@@ -1041,12 +1044,15 @@ static func _build_bot(main: Node, body: VBoxContainer) -> void:
 		_build_bot_sections(main, body)
 	elif bot_mode == "cardinal_story":
 		_build_bot_accel(main, body)
+	elif bot_mode == "cardinal_profiles":
+		_build_bot_profiles(main, body)
 	var running := TestBot.is_running()
 	_head(body, "Состояние: " + TestBot.status_text())
 	var r := _row(body)
 	_btn(r, "bot_start", "Начать", func() -> void: AdminPanel.bot_start(main), 140.0)
 	_btn(r, "bot_stop", "Стоп", func() -> void: AdminPanel.bot_stop(main), 140.0)
-	(buttons["bot_start"] as Button).disabled = running or (bot_mode == "sections" and BotScenarioGame.chosen().is_empty())
+	(buttons["bot_start"] as Button).disabled = running or (bot_mode == "sections" and BotScenarioGame.chosen().is_empty()) \
+		or (bot_mode == "cardinal_profiles" and BotScenarioCardinalProfiles.validate() != "")
 	(buttons["bot_stop"] as Button).disabled = not running
 	var last := TestBot.last_result()
 	_head(body, "Последний отчёт")
@@ -1097,6 +1103,65 @@ static func _build_bot_accel(main: Node, body: VBoxContainer) -> void:
 		var kk := int(k)
 		_choice(r, "bot_accel_%d" % kk, "×%d" % kk, roundi(BotScenarioCardinalStory.accel) == kk,
 			func() -> void: AdminPanel.set_bot_accel(main, kk))
+
+
+## «Кардинал: профили игроков»: профили, отрезок, прогонов на профиль, раса и профессия, ускорение; оценка времени и
+## понятная причина, если начать нельзя.
+static func _build_bot_profiles(main: Node, body: VBoxContainer) -> void:
+	var S := BotScenarioCardinalProfiles
+	body.add_child(_text("Честное прохождение отрезка острова разными «игроками»: опыт ×1, без бессмертия. Итог — время "
+		+ "уровней и заданий, опыт и золото, смерти, застревания, гринд, нехватка зелий и золота, пробы окон и кнопок, "
+		+ "подозрения с доказательствами. Правки профилей — файл user://cardinal_profiles.json.", UiScale.FONT_SMALL, MUTED))
+	_head(body, "Профили")
+	var g := _grid(body, 3)
+	for pid in CardinalProfiles.IDS:
+		var p := String(pid)
+		_choice(g, "bot_prof_" + p, CardinalProfiles.profile_name(p), S.chosen.has(p), func() -> void:
+			S.toggle_profile(p)
+			_reopen(main))
+	_head(body, "Отрезок")
+	var g2 := _grid(body, 3)
+	for sid in S.SEGMENT_IDS:
+		var sg := String(sid)
+		_choice(g2, "bot_seg_" + sg, String(S.SEGMENTS[sg]["name"]), S.segment == sg, func() -> void:
+			S.segment = sg
+			_reopen(main))
+	_head(body, "Прогонов на профиль (разные seed)")
+	var r := _row(body)
+	for n in S.SEED_CHOICES:
+		var nn := int(n)
+		_choice(r, "bot_seeds_%d" % nn, "×%d" % nn, S.seeds == nn, func() -> void:
+			S.seeds = nn
+			_reopen(main))
+	_head(body, "Раса героя (профессия — для отрезка «10 → 15 ур.»)")
+	var r2 := _row(body)
+	for rc in ["human", "light_elf", "dark_elf"]:
+		var rr := String(rc)
+		_choice(r2, "bot_race_" + rr, String(ClassData.race(rr).get("name", rr)), S.race == rr, func() -> void:
+			S.race = rr
+			S.job = ""
+			_reopen(main))
+	var r3 := _row(body)
+	for jb in ClassData.jobs_of(S.race):
+		var jj := String(jb)
+		_choice(r3, "bot_job_" + jj, ClassData.job_name(jj), S.job_for_run() == jj, func() -> void:
+			S.job = jj
+			_reopen(main))
+	_head(body, "Ускорение (шаг физики тот же 1/60 с, без 3D)")
+	var r4 := _row(body)
+	for k in S.ACCEL_CHOICES:
+		var kk := int(k)
+		_choice(r4, "bot_paccel_%d" % kk, "×%d" % kk, roundi(S.accel) == kk, func() -> void:
+			S.accel = float(kk)
+			_reopen(main))
+	var why := S.validate()
+	body.add_child(_text("Прогонов %d · примерно %d мин" % [S.chosen.size() * S.seeds, roundi(S.estimate_min())]
+		+ ("" if why == "" else " — " + why), UiScale.FONT_SMALL, INFO if why == "" else BAD))
+
+
+static func _reopen(main: Node) -> void:
+	if is_open(main):
+		open(main)
 
 
 static func set_bot_accel(main: Node, k: int) -> void:

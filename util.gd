@@ -37,6 +37,13 @@ static func ui_theme() -> Theme:
 	_button_styles("BtnDanger", "btn_skin_danger", BTN_RED)
 	_theme.set_type_variation("BtnPrimary", "Button")
 	_theme.set_type_variation("BtnDanger", "Button")
+	# Узкие кнопки: у рамки-картинки торцы со звёздами по 32 px — в кнопку уже SKIN_MIN_W они не помещаются
+	# (сжимаются и закрывают надпись). Ячейки «На кнопку» в окне героя — прежний вид до 0.41 (просьба Максима):
+	# светлая кнопка с золотой рамкой, назначенная — золотая (BtnSlot); прочие узкие — рисованные (BtnSmall).
+	_slot_styles()
+	_button_styles("BtnSmall", "", BTN_NAVY)
+	_theme.set_type_variation("BtnSlot", "Button")
+	_theme.set_type_variation("BtnSmall", "Button")
 	for c in ["font_color", "font_hover_color", "font_focus_color", "font_hover_pressed_color"]:
 		_theme.set_color(c, "Button", Color(0.97, 0.94, 0.84))
 		_theme.set_color(c, "BtnDanger", Color(1.0, 0.95, 0.9))
@@ -44,12 +51,40 @@ static func ui_theme() -> Theme:
 	_theme.set_color("font_pressed_color", "Button", Color(1.0, 0.84, 0.42))
 	_theme.set_color("font_pressed_color", "BtnPrimary", Color(0.2, 0.1, 0.0))
 	_theme.set_color("font_pressed_color", "BtnDanger", Color(1.0, 0.9, 0.8))
-	for t in ["Button", "BtnPrimary", "BtnDanger"]:
+	_theme.set_color("font_pressed_color", "BtnSmall", Color(1.0, 0.84, 0.42))
+	for c in ["font_color", "font_hover_color", "font_focus_color", "font_hover_pressed_color"]:
+		_theme.set_color(c, "BtnSmall", Color(0.97, 0.94, 0.84))
+	for t in ["Button", "BtnPrimary", "BtnDanger", "BtnSmall"]:
 		_theme.set_color("font_disabled_color", t, Color(0.6, 0.62, 0.7))
 		_theme.set_color("icon_normal_color", t, Color.WHITE)
 		_theme.set_color("icon_disabled_color", t, Color(1, 1, 1, 0.45))
 	refresh_theme()
 	return _theme
+
+
+## Рамке-картинке нужна кнопка не уже этого (px «Среднего»): торцы 2 × 32 px + место под надпись.
+const SKIN_MIN_W := 84.0
+
+
+## Прежний вид кнопок (до 0.41) — ячейки «На кнопку» окна героя: светлая, золотая рамка, тёмный текст;
+## нажатая (назначенная) — золотая.
+static func _slot_styles() -> void:
+	var colors := {
+		"normal": Color(0.95, 0.93, 0.86), "hover": Color(1.0, 0.98, 0.92),
+		"pressed": Color(1.0, 0.82, 0.45), "disabled": Color(0.45, 0.46, 0.52),
+	}
+	for state in colors:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = colors[state]
+		sb.border_color = Color(0.85, 0.68, 0.32)
+		sb.set_border_width_all(2)
+		sb.anti_aliasing = true
+		_theme.set_stylebox(state, "BtnSlot", sb)
+	_theme.set_stylebox("focus", "BtnSlot", StyleBoxEmpty.new())
+	for c in ["font_color", "font_hover_color", "font_focus_color", "font_hover_pressed_color"]:
+		_theme.set_color(c, "BtnSlot", Color(0.18, 0.16, 0.28))
+	_theme.set_color("font_pressed_color", "BtnSlot", Color(0.3, 0.18, 0.05))
+	_theme.set_color("font_disabled_color", "BtnSlot", Color(0.8, 0.8, 0.85))
 
 
 ## Квадратная рамка кнопки-значка (вкладки, меню, «Закрыть»): картинка tab_skin_on / tab_skin_off или рисованная.
@@ -92,9 +127,12 @@ const SKIN_DIR := "res://assets/icons/ui_skin/"
 
 
 ## Стили кнопок типа t: из картинок skin_<состояние> (если есть файл) или рисованные по цветам pal.
+## skin "" — только рисованные (узкие кнопки BtnSmall).
 static func _button_styles(t: String, skin: String, pal: Dictionary) -> void:
 	var states := {"normal": skin if skin != "btn_skin" else "btn_skin_normal", "hover": "",
 		"pressed": "btn_skin_pressed" if t == "Button" else "", "disabled": "btn_skin_disabled", "focus": ""}
+	if skin == "":
+		states = {"normal": "", "hover": "", "pressed": "", "disabled": "", "focus": ""}
 	for st in states:
 		if st == "focus":
 			var f := StyleBoxEmpty.new()
@@ -151,7 +189,7 @@ static func refresh_theme() -> void:
 		panel.set_corner_radius_all(int(UiScale.px(UiScale.RADIUS)))
 		panel.set_content_margin_all(UiScale.px(UiScale.PAD))
 		panel.shadow_size = int(UiScale.px(6))
-	for t in ["Button", "BtnPrimary", "BtnDanger"]:
+	for t in ["Button", "BtnPrimary", "BtnDanger", "BtnSlot", "BtnSmall"]:
 		for state in ["normal", "hover", "pressed", "disabled"]:
 			var sb := _theme.get_stylebox(state, t)
 			if sb == null:

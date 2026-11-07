@@ -30,7 +30,7 @@ func before_start() -> void:
 	if _had_cfg:
 		_cfg_backup = FileAccess.get_file_as_string(Quality.PATH)
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(Quality.PATH))
-	Quality.reload()
+	Quality.reread()
 
 
 func run_step() -> void:
@@ -150,11 +150,11 @@ func _check_custom_and_save() -> void:
 	check(cf.load(Quality.PATH) == OK, "настройки записаны в settings.cfg")
 	check(int(cf.get_value("graphics", "aa", -1)) == 1 and int(cf.get_value("graphics", "view", -1)) == 3
 		and int(cf.get_value("graphics", "quality", -1)) == Quality.CUSTOM, "в файле — настройки и «Свои»")
-	Quality.reload()
+	Quality.reread()
 	check(Quality.option("aa") == 1 and Quality.option("view") == 3 and Quality.level() == Quality.CUSTOM,
 		"настройки прочитаны из файла")
 	Quality.set_fps_limit(45)
-	Quality.reload()
+	Quality.reread()
 	check(Quality.fps_limit() == 45 and Quality.option("aa") == 1, "предел кадров сохранён и не сбросил настройки")
 	Quality.set_option("render", 99, false)
 	check(Quality.option("render") == Quality.option_count("render") - 1, "значение вне вариантов — ближайшее")
@@ -169,7 +169,7 @@ func _check_legacy() -> void:
 	cf.set_value("graphics", "fps", 30)
 	cf.set_value("ui", "scale", 1)
 	check(cf.save(Quality.PATH) == OK, "старый файл настроек записан")
-	Quality.reload()
+	Quality.reread()
 	check(Quality.level() == Quality.HIGH, "старый файл: «Высокое»")
 	var p: Dictionary = Quality.PRESETS[Quality.HIGH]
 	check(Quality.option("shadows") == int(p["shadows"]) and Quality.option("aa") == int(p["aa"]), "старый файл: настройки по пресету")
@@ -729,8 +729,8 @@ func _restore() -> void:
 			f.close()
 	elif FileAccess.file_exists(Quality.PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(Quality.PATH))
-	Quality.reload()
-	UiScale.reload()
+	Quality.reread()
+	UiScale.reread()
 	Quality.apply(get_tree())
 
 

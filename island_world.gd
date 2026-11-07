@@ -1011,6 +1011,10 @@ class Route:
 				waypoint = w.bridge_waypoint(from, to)
 				if not waypoint.is_finite() and _blocked(w, from, to):
 					path = _detour(w, from, to)
+				elif waypoint.is_finite() and _blocked(w, from, waypoint):
+					# К подходу моста по прямой мешает ограда, дом, дерево — к подходу в обход по сетке (0.43: тест
+					# tests/test_bridge_walk.gd — зверь и питомец упирались у моста в дом на берегу)
+					path = _detour(w, from, waypoint)
 		# Обход препятствия: к первой точке пути, дошёл — к следующей
 		while not path.is_empty():
 			var pd := Vector3(path[0].x - from.x, 0.0, path[0].z - from.z)

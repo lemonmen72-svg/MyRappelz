@@ -150,7 +150,7 @@ func _next_spot() -> void:
 	if _li >= _levels.size():
 		print("PERF узлов в сцене: %d, зверей: %d, моделей под ModelLod: %d" % [
 			int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)), count_mobs(), ModelLod.count()])
-		Quality.reload()
+		Quality.reread()
 		ok_done()
 		return
 	step = 0

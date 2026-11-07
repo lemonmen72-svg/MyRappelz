@@ -7,7 +7,7 @@ extends Node
 ## хранилище аккаунтов переключается на отдельную папку STORAGE (Accounts.use_storage, стирается — как у автотестов),
 ## там создаётся аккаунт BOT_LOGIN (администратор — для админ-функций) и тестовый герой сценария в слоте 1
 ## (BotScenario.hero), главная сцена запускается заново (main.restart_scene) — мир тестового героя. Графика
-## меняется без записи в settings.cfg (Quality.set_level/set_option с save = false), в конце — Quality.reload().
+## меняется без записи в settings.cfg (Quality.set_level/set_option с save = false), в конце — Quality.reread().
 ## По окончании (готово, стоп, перегрев, лимит): отчёт (BotReport), тестовое хранилище стирается, хранилище и
 ## аккаунт игрока возвращаются, герой его слота загружается (Game.load_slot), сцена — заново: игрок снова в своём мире
 ## (героя нет — выбор персонажа). Бот — узел у корня дерева (переживает перезапуск сцены). Игру закрыли или она
@@ -397,11 +397,11 @@ func _return_home() -> void:
 		if sl >= 0 and not Game.load_slot(sl):
 			note("Не удалось загрузить героя игрока (слот %d) — откроется выбор персонажа" % (sl + 1))
 	ThermalGuard.suspended = false
-	Quality.reload()
-	UiScale.reload()
+	Quality.reread()
+	UiScale.reread()
 	Quality.set_throttle(0)
 	# Размер интерфейса — как у игрока (раздел «Интерфейс» меняет его без записи)
-	UiScale.reload()
+	UiScale.reread()
 	UiScale.set_level(UiScale.level(), false)
 	_remove_marker()
 	state = "home"
@@ -1130,8 +1130,8 @@ static func _restore_settings_from(backup: String) -> void:
 	elif FileAccess.file_exists(backup):
 		DirAccess.copy_absolute(ProjectSettings.globalize_path(backup), ProjectSettings.globalize_path(Quality.PATH))
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(backup))
-	Quality.reload()
-	UiScale.reload()
+	Quality.reread()
+	UiScale.reread()
 
 
 ## Запуск игры (main._ready): прошлый тест-бот не закончился (метка RUNNING) и убирал настройки игрока — вернуть их.

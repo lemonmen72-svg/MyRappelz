@@ -23,7 +23,7 @@ func run_step() -> void:
 		0:
 			if not bool(main.get("_started")):
 				return
-			SkillVfx.reload()
+			SkillVfx.reread()
 			_table()
 			_archetypes()
 			wait = 3

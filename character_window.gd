@@ -658,6 +658,8 @@ func _card(id: String, p: Player) -> Control:
 			for k in HeroSkills.SLOTS:
 				var i := pg * HeroSkills.SLOTS + k
 				var sbn := _button(str(k + 1), 46)
+				# Прежний вид ячеек (до 0.41): рамка-картинка с торцами в 46 px не помещалась
+				sbn.theme_type_variation = "BtnSlot"
 				sbn.toggle_mode = true
 				sbn.button_pressed = i < slots.size() and String(slots[i]) == id
 				sbn.pressed.connect(_on_slot.bind(id, i))

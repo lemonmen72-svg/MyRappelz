@@ -528,6 +528,13 @@ func _check_window(player: Player) -> void:
 	check(hw.is_open() and hw.tab == "blades" and hw.buttons.has("slot_4"), "окно перестроено, есть «На кнопку»")
 	hw.buttons["slot_4"].pressed.emit()
 	check(player.skill_id("skill4") == "head_breaker", "«Устрашающий удар» — на кнопке 4")
+	# Ячейки «На кнопку» — прежний вид (0.43, просьба Максима): светлые с золотой рамкой, без рамки-картинки
+	for sk in ["slot_1", "slot_4", "slot_12"]:
+		var sbtn := hw.buttons.get(sk) as Button
+		check(sbtn != null and sbtn.theme_type_variation == "BtnSlot" and sbtn.get_theme_stylebox("normal") is StyleBoxFlat
+			and sbtn.get_theme_stylebox("pressed") is StyleBoxFlat, "%s — прежний вид ячейки" % sk)
+	var s4 := hw.buttons.get("slot_4") as Button
+	check(s4 != null and s4.button_pressed, "назначенная ячейка 4 нажата (золотая)")
 	hw.buttons["tab_crossbow"].pressed.emit()
 	check(hw.tab == "crossbow" and hw.tree.icons.has("dual_shot") and hw.tree.icons.has("drain_arrow"), "вкладка «Арбалет»")
 	hw.buttons["tab_common"].pressed.emit()

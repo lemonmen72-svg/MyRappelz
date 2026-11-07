@@ -62,7 +62,7 @@ static func _read(path: String) -> Dictionary:
 	return d
 
 
-static func reload() -> void:
+static func reread() -> void:
 	_loaded = false
 	_table = {}
 

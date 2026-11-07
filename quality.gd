@@ -538,8 +538,9 @@ static func _save(vals: Dictionary) -> void:
 		push_warning("Не удалось сохранить настройки графики: %d" % err)
 
 
-## Перечитать выбор из файла при следующем запросе.
-static func reload() -> void:
+## Перечитать выбор из файла при следующем запросе. Не «reload»: Класс.reload() — встроенный GDScript.reload()
+## (перекомпиляция, все статические поля — к начальным; в APK может не пройти).
+static func reread() -> void:
 	_level = -1
 	_fps = -1
 	_guard = -1

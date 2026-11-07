@@ -101,10 +101,10 @@ func run_step() -> void:
 			var cf := ConfigFile.new()
 			check(cf.load(Quality.PATH) == OK and int(cf.get_value("graphics", "quality", -1)) == Quality.HIGH,
 				"качество сохранено в settings.cfg")
-			Quality.reload()
+			Quality.reread()
 			check(Quality.level() == Quality.HIGH, "качество прочитано из settings.cfg")
 			Quality.set_fps_limit(30)
-			Quality.reload()
+			Quality.reread()
 			check(Quality.fps_limit() == 30, "предел кадров сохранён и прочитан")
 			check(Quality.level() == Quality.HIGH, "предел кадров не сбросил качество")
 			Quality.set_fps_limit(999, false)

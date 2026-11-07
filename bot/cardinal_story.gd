@@ -50,6 +50,12 @@ const PROFILE_STORY := {
 	"dungeon_hp": 0.1,
 	# Ходок в подземелье подряд без единой победы — дальше цели подземелья «застряли» (защита от петли)
 	"dungeon_idle_trips": 3,
+	# Поведение профилей фазы 4 (CardinalProfiles; здесь — прежнее поведение «Прохождения»): паузы, неоптимальный
+	# выбор, ошибки маршрута, доля нажатий умений, умения раз в 3 уровня, запас зелий, питомец в бою, необязательное,
+	# покупка брони, пробы (fuzzing), фарм после отрезка, стартовые ресурсы
+	"pause_chance": 0.0, "pause_min": 0.0, "pause_max": 0.0, "noise": 0.0, "lost_chance": 0.0, "skill_use": 1.0,
+	"learn_lazy": false, "potions_keep": 0, "use_pet": true, "features": true, "gear_buy": false, "fuzz": 0.0,
+	"farm_sec": 0.0, "start_gold": 0, "start_potions": 0,
 }
 ## Перемотка отдыха (как у CardinalRun): ускорение игры × REST_BOOST, пока рядом нет опасности.
 const REST_BOOST := 8.0
@@ -72,6 +78,47 @@ var wall_limit := 3600.0
 var stop_after: Array = []
 ## Только до выбора профессии (вторая и третья раса в тесте).
 var until_job := false
+## Отрезок фазы 4: до этого уровня героя (0 — нет), старт с уровня start_level (> 1 — герой уже с профессией job:
+## задания до профессии сданы, как у игрока, который только что её выбрал).
+var until_level := 0
+var start_level := 1
+
+## Метрики фазы 4 (CARDINAL_MASTER_INSTRUCTION.md §7): уровни по времени, золото пришло / ушло, урон по герою, зелья,
+## бои, прокачка, паузы, ошибки маршрута, неоптимальный выбор, пробы и нарушения инвариантов, фарм, сохранение.
+var levels: Array = []
+var gold_in := 0
+var gold_out := 0
+var dmg_taken := 0
+var potions_used := 0
+var potions_bought := 0
+## Приручение: попыток и с душой; питомец: игровых с с призванным живым питомцем, убийств при нём.
+var tame_tries := 0
+var tame_ok := 0
+var pet_t := 0.0
+var pet_kills := 0
+var no_potion := 0
+var no_gold := 0
+var bag_full := 0
+var fights := 0
+var fight_time := 0.0
+var fights_dropped := 0
+var grind_t := 0.0
+var pause_t := 0.0
+var pauses := 0
+var lost := 0
+var noise_picks := 0
+var fuzz_log: Array = []
+var violations: PackedStringArray = PackedStringArray()
+var gear_bought: Array = []
+var farm := {}
+var save_bytes := 0
+## Случайность профиля (паузы, выбор, ошибки, пробы) — своя, от seed: у «Прохождения» (вероятности 0) не тянется,
+## и прежние решения не меняются.
+var _prng := RandomNumberGenerator.new()
+var _lvl_seen := 1
+var _gold_seen := 0
+var _hp_seen := 0
+var _seg_done_t := -1.0
 
 var done := false
 var stop_reason := ""
@@ -107,6 +154,8 @@ var _skip_mob: Dictionary = {}
 ## Где герой недавно погиб: [{pos: Vector3, until: игровое время}] — зверей рядом не выбирать (иначе цикл
 ## «возродился — пошёл к тем же волкам у агрессивных кентавров — погиб», 40 смертей подряд при ×32).
 var _danger: Array = []
+var _threat_list: Array = []
+var _threat_tick := -1
 const DANGER_RADIUS := 25.0
 const DANGER_SEC := 300.0
 var _goal_state: Dictionary = {}
@@ -155,6 +204,11 @@ func begin() -> void:
 	_wall0 = Time.get_ticks_usec()
 	_clock0 = Util.game_time()
 	start = _snapshot()
+	_prng.seed = seed_value * 7919 + 17
+	_lvl_seen = Game.level
+	_gold_seen = Game.gold + Game.storage_gold
+	_hp_seen = _p().hp if _p() != null else 0
+	levels = [{"level": Game.level, "t": 0.0}]
 	bot.note("Кардинал «%s»: %s, %s, seed %d, ускорение ×%.0f, опыт ×%d, звери спят дальше %.0f м" % [title,
 		String(ClassData.race(race).get("name", race)), ClassData.job_name(job), seed_value, accel, int(profile["xp_mult"]),
 		float(profile["sim_radius"])])
@@ -169,7 +223,22 @@ func _fresh_hero() -> void:
 	if job == "":
 		var js := ClassData.jobs_of(race)
 		job = String(js[0]) if not js.is_empty() else "warrior"
-	Game.new_character(TestBot.BOT_NICK, race, ClassData.WANDERER, gender)
+	if start_level > 1:
+		# Отрезок «после профессии»: герой выбрал профессию у мудреца — задания до профессии сданы, уровень и JP
+		# как у игрока, стартовое оружие профессии надето
+		Game.new_character(TestBot.BOT_NICK, race, job, gender)
+		Game.level = start_level
+		Game.xp = 0
+		Game.job_level_at_change = 10
+		Game.hero["jp"] = HeroSkills.default_jp(start_level)
+		for qid in QuestData.PRE_JOB + [QuestData.JOB_QUEST]:
+			Game.quests_done[String(qid)] = 1
+		Game.ensure_hero()
+	else:
+		Game.new_character(TestBot.BOT_NICK, race, ClassData.WANDERER, gender)
+	Game.gold += int(profile.get("start_gold", 0))
+	if int(profile.get("start_potions", 0)) > 0:
+		Game.inventory.add(ItemData.potion_id("hp", ItemData.potion_rank_for_level(Game.level)), int(profile["start_potions"]))
 	Game.xp_mult = int(profile["xp_mult"])
 	AdminPanel.god = false
 	AdminPanel.speed_mult = maxi(1, int(profile.get("run_speed", 1)))
@@ -283,6 +352,16 @@ func _end(reason: String) -> void:
 	AdminPanel.god = _god_saved
 	AdminPanel.speed_mult = 1
 	finish = _snapshot()
+	if farm.has("t0") and not farm.has("t1"):
+		farm["t1"] = game_t
+		farm["xp1"] = CardinalRun.cumulative_xp(Game.level, Game.xp)
+		farm["gold1"] = Game.gold
+		farm["kills1"] = kills
+	if Game.save_path != "" and Game.save_game():
+		var sf := FileAccess.open(Game.save_path, FileAccess.READ)
+		if sf != null:
+			save_bytes = sf.get_length()
+			sf.close()
 	for k in quests:
 		var r: Dictionary = quests[k]
 		if String(r["status"]) == "active" or String(r["status"]) == "ready":
@@ -327,6 +406,9 @@ func _tick() -> bool:
 	var gdt := maxf(0.0, now - game_t)
 	game_t = now
 	t_split[_split] = float(t_split.get(_split, 0.0)) + gdt
+	_track(pp)
+	if _pet_out():
+		pet_t += gdt
 	if _boosted:
 		boost_game += gdt
 	# Окно игры ставит предел кадров (MENU_FPS) — на ускорении его нет
@@ -358,6 +440,26 @@ func _tick() -> bool:
 	return true
 
 
+## Метрики тика: новые уровни (время), золото пришло / ушло (золото героя + на складе: склад — не трата), урон по
+## герою.
+func _track(pp: Player) -> void:
+	while Game.level > _lvl_seen:
+		_lvl_seen += 1
+		levels.append({"level": _lvl_seen, "t": snappedf(game_t, 0.1)})
+	if Game.level < _lvl_seen:
+		_lvl_seen = Game.level
+	var dg := Game.gold + Game.storage_gold - _gold_seen
+	if dg > 0:
+		gold_in += dg
+	elif dg < 0:
+		gold_out -= dg
+	_gold_seen = Game.gold + Game.storage_gold
+	if pp != null:
+		if pp.hp < _hp_seen and pp.hp > 0:
+			dmg_taken += _hp_seen - pp.hp
+		_hp_seen = pp.hp
+
+
 ## Подождать sec игровых секунд.
 func _wait(sec: float, split: String = "wait") -> bool:
 	_split = split
@@ -370,6 +472,10 @@ func _wait(sec: float, split: String = "wait") -> bool:
 
 func _on_message(text: String) -> void:
 	_msg_last = text
+	if text.contains("Сумка полна") or text.contains("сумка полна"):
+		bag_full += 1
+	if text.contains("Не хватает золота") or text.contains("не хватает золота"):
+		no_gold += 1
 	if text.contains("погибли"):
 		deaths += 1
 		var who := ""
@@ -416,6 +522,7 @@ func _eco() -> Economy:
 
 func _pm() -> PetManager:
 	return bot.main.get("pets") as PetManager
+
 
 
 func _win() -> InventoryWindow:
@@ -502,26 +609,31 @@ func _close() -> void:
 
 # ==================== Ходьба, бой, отдых ====================
 
-## Дойти до точки to (ближе near). Застрял (за stuck_teleport с не стал ближе на 0.5 м) — перенос к цели (помощь).
+## Дойти до точки to (ближе near) — ходьбой CardinalWalk (путь по сетке, обход, мосты). Застрял (за stuck_teleport с
+## своего времени ходьбы остаток пути не стал короче на 0.5 м) — перенос к цели (помощь). Прогресс — по остатку пути,
+## не по прямой (0.43: обход реки через мост по прямой цель не приближает — были ложные «застрял» у мостов).
 func _go(to: Vector3, near: float, what: String, defend: bool = true) -> bool:
 	_close()
 	_nav.reset()
 	# Сцена сменилась по пути (портал перенёс в другую локацию) — цель из прежнего мира, идти дальше некуда
 	var scene0: Node = bot.main
-	var best := INF
-	var best_t := game_t
-	var t0 := game_t
-	# Обход препятствия (стена, ограда, дерево): за DETOUR_CHECK с почти не сдвинулся — шаг вбок DETOUR_SEC с
-	var win_pos := _p().global_position if _p() != null else Vector3.ZERO
-	var win_t := game_t
-	var detour_until := -1.0
-	var detour_to := Vector3.ZERO
-	var side := 1.0
-	var fails := 0
-	# Путь по сетке (ограды, стены, деревья — CardinalNav); пусто — по прямой с маршрутом через мосты
-	var path := CardinalNav.path(_p().global_position, to) if _p() != null else PackedVector3Array()
-	var pi := 0
+	if _p() == null:
+		return false
+	# Профиль: сбился с пути (новичок) — сначала уходит не туда, потом к цели
+	if float(profile.get("lost_chance", 0.0)) > 0.0 and not _lost_now and CardinalWalk.flat(_p().global_position, to) > 30.0 \
+			and _prng.randf() < float(profile["lost_chance"]):
+		var wrong := _wrong_turn(_p().global_position, to)
+		if wrong.is_finite():
+			lost += 1
+			_lost_now = true
+			await _go(wrong, 2.0, what + " — сбился с пути", defend)
+			_lost_now = false
+			if not _alive() or _p() == null or bot.main != scene0:
+				return false
+	var wk := CardinalWalk.new()
+	wk.begin(_p().global_position, to, near, float(profile["stuck_teleport"]))
 	var fought := 0
+	var last_t := game_t
 	while _alive():
 		var p := _p()
 		var h := _h()
@@ -530,93 +642,50 @@ func _go(to: Vector3, near: float, what: String, defend: bool = true) -> bool:
 		if bot.main != scene0:
 			CardinalMove.stop(p, h)
 			return false
-		var d := _flat(p.global_position, to)
-		if d <= near:
+		var dt := game_t - last_t
+		last_t = game_t
+		var dir := wk.step(p.global_position, dt)
+		if wk.status == "arrived":
 			CardinalMove.stop(p, h)
+			walk_stats["arrived"] = int(walk_stats.get("arrived", 0)) + 1
 			return true
-		if d < best - 0.5:
-			best = d
-			best_t = game_t
-		elif game_t - best_t > float(profile["stuck_teleport"]) or game_t - t0 > float(profile["approach_limit"]) * 4.0:
+		if wk.status == "stuck" or wk.t > float(profile["approach_limit"]) * 4.0:
 			CardinalMove.stop(p, h)
-			_help("teleport", "застрял по пути к «%s» у (%.0f, %.0f), до цели %.0f м" % [what, p.global_position.x,
-				p.global_position.z, d])
+			_help("teleport", "застрял по пути к «%s» у (%.0f, %.0f), до цели %.0f м, остаток пути %.0f м%s" % [what,
+				p.global_position.x, p.global_position.z, CardinalWalk.flat(p.global_position, to), wk.remaining(p.global_position),
+				"" if wk.status == "stuck" else " (путь дольше %.0f с)" % (float(profile["approach_limit"]) * 4.0)])
 			bot.teleport(Vector2(to.x, to.z), "Кардинал: к «%s»" % what)
 			_nav.reset()
-			best = INF
-			best_t = game_t
-			t0 = game_t
-			path = CardinalNav.path(_p().global_position, to)
-			pi = 0
 			if not await _tick():
 				return false
+			wk.restart(_p().global_position)
+			last_t = game_t
 			continue
 		# Отбиться от напавшего — не больше THREAT_MAX раз за путь (у логова кентавров они возрождаются быстрее, чем
-		# герой проходит мимо: 7 игровых минут на месте); время боя в «застрял» не идёт
+		# герой проходит мимо: 7 игровых минут на месте); время боя в ходьбу (и в «застрял») не идёт
 		if defend and fought < THREAT_MAX:
 			var th := _threat()
 			if th != null:
 				CardinalMove.stop(p, h)
 				fought += 1
-				var tf := game_t
 				await _fight(th, "напал по пути")
 				_nav.reset()
-				best_t += game_t - tf
-				path = CardinalNav.path(_p().global_position, to)
-				pi = 0
+				if _p() == null:
+					return false
+				wk.repath(_p().global_position)
+				last_t = game_t
 				continue
 		_drink_if_low()
 		_split = "walk"
-		if game_t - win_t >= DETOUR_CHECK:
-			if _flat(p.global_position, win_pos) < 0.8 and game_t >= detour_until:
-				fails += 1
-				if fails % 2 == 0:
-					side = -side
-				detour_to = _detour_point(p.global_position, to, side, 2.0 + float(fails))
-				detour_until = game_t + DETOUR_SEC
-			elif _flat(p.global_position, win_pos) >= 0.8 and game_t >= detour_until:
-				fails = 0
-			win_pos = p.global_position
-			win_t = game_t
-		if game_t < detour_until:
-			var dd := Vector3(detour_to.x - p.global_position.x, 0.0, detour_to.z - p.global_position.z)
-			if dd.length() < 0.5:
-				detour_until = -1.0
-				path = CardinalNav.path(p.global_position, to)
-				pi = 0
-			else:
-				_walk_dir(p, h, dd.normalized())
-		elif not path.is_empty() and pi < path.size():
-			var pos := p.global_position
-			# Точки пути — точки поворота (AStarGrid2D с прыжками): между ними прямая по свободным клеткам
-			while pi < path.size() - 1 and _flat(pos, path[pi]) < 1.0:
-				pi += 1
-			if pi == path.size() - 1 and _flat(pos, path[pi]) < 1.0:
-				pi += 1
-			var aim: Vector3 = path[pi] if pi < path.size() else to
-			_walk_dir(p, h, Vector3(aim.x - pos.x, 0.0, aim.z - pos.z).normalized())
-		else:
-			_walk(p, h, to)
+		_walk_dir(p, h, dir)
 		if not await _tick():
 			return false
 	return false
 
 
-const DETOUR_CHECK := 1.2
 const THREAT_MAX := 3
-const DETOUR_SEC := 1.6
-
-
-## Точка обхода: вбок от направления на цель (side ±1), на проходимой земле, dist м.
-func _detour_point(pos: Vector3, to: Vector3, side: float, dist: float) -> Vector3:
-	var fwd := Vector3(to.x - pos.x, 0.0, to.z - pos.z).normalized()
-	var w := IslandWorld.current
-	for a in [90.0, 60.0, 120.0, 135.0, 45.0, 160.0]:
-		var d := fwd.rotated(Vector3.UP, deg_to_rad(a) * side)
-		var q := pos + d * dist
-		if w == null or w.is_walkable(q.x, q.z):
-			return q
-	return pos - fwd * dist
+## Ходьба за прогон: сколько раз дошёл (для отчёта).
+var walk_stats: Dictionary = {}
 
 
 ## Шаг к точке to по маршруту (мосты — IslandWorld.Route).
@@ -661,9 +730,15 @@ func _drink_if_low(force: bool = false) -> void:
 		return
 	if not force and float(p.hp) > float(p.max_hp) * float(profile["potion_below"]):
 		return
-	if eco.potion_cooldown_frac() > 0.0 or Economy.best_potion("hp") == "":
+	if eco.potion_cooldown_frac() > 0.0:
+		return
+	if Economy.best_potion("hp") == "":
+		if not _no_potion_noted:
+			_no_potion_noted = true
+			no_potion += 1
 		return
 	_action("potion")
+	potions_used += 1
 
 
 ## Бой со зверем m как игрок: подойти, цель касанием, удержание «Атаки», умения на кнопках, зелье. true — побеждён.
@@ -691,6 +766,8 @@ func _fight(m: Mob, why: String) -> bool:
 			god_on = true
 	_close()
 	_nav.reset()
+	fights += 1
+	_no_potion_noted = false
 	var hp_seen := m.hp
 	var hp_t := game_t
 	var sk_t := 0.0
@@ -739,12 +816,17 @@ func _fight(m: Mob, why: String) -> bool:
 			break
 	if god_on:
 		AdminPanel.god = false
+	fight_time += game_t - t0
 	var p2 := _p()
 	if p2 != null:
 		CardinalMove.stop(p2, _h())
 	var killed := m == null or not is_instance_valid(m) or m.is_dead
+	if not killed and deaths == deaths0:
+		fights_dropped += 1
 	if killed and deaths == deaths0:
 		kills += 1
+		if _pet_out():
+			pet_kills += 1
 		var sp := m.type_id if is_instance_valid(m) else "?"
 		kills_by[sp] = int(kills_by.get(sp, 0)) + 1
 		await _loot()
@@ -756,6 +838,10 @@ func _fight(m: Mob, why: String) -> bool:
 func _use_skills() -> bool:
 	var p := _p()
 	if p == null or ClassData.is_wanderer(Game.class_id):
+		return false
+	# Профиль: новичок жмёт умения редко
+	var su := float(profile.get("skill_use", 1.0))
+	if su < 1.0 and _prng.randf() > su:
 		return false
 	for slot in ["skill1", "skill2", "skill3", "skill4"]:
 		var sid := p.skill_id(slot)
@@ -880,6 +966,8 @@ func _find_mob(species: Array, lo: int, hi: int, allow_strong: bool = false) -> 
 			continue
 		if not m.is_boss and _in_danger(m.global_position):
 			continue
+		if not m.is_boss and _threat_near(m.global_position, m) != null:
+			continue
 		# Над водой дальше удара от берега (летучие рыбы над рекой) — не подойти; выберем ту, что ближе к берегу
 		if CardinalNav.gap_to_free(m.global_position) > REACH_GAP:
 			continue
@@ -888,6 +976,43 @@ func _find_mob(species: Array, lo: int, hi: int, allow_strong: bool = false) -> 
 			bd = d
 			best = m
 	return best
+
+
+## Запас к дальности нападения агрессивного зверя, м: подход к цели и бой рядом сдвигают героя.
+const THREAT_MARGIN := 8.0
+
+
+## Агрессивный зверь не по силам рядом с точкой pos (босс или «Редкий» вожак младше героя + 3 ур., обычный — старше
+## героя + level_gap): подойти к цели там — попасть под него (нападает сам; имя красное — игрок это видит). Звери того
+## же вида, что цель, не в счёт (их и надо бить). Профиль с avoid_aggro false (Новичок) не смотрит. null — угрозы нет.
+func _threat_near(pos: Vector3, target: Mob = null) -> Mob:
+	if not bool(profile.get("avoid_aggro", true)):
+		return null
+	for m in _threats():
+		if m == target or not is_instance_valid(m) or (target != null and m.type_id == target.type_id):
+			continue
+		if _flat(pos, m.global_position) < m.aggro_range + THREAT_MARGIN:
+			return m
+	return null
+
+
+## Агрессивные звери не по силам (список на тик: проверка зовётся для каждого зверя-кандидата).
+func _threats() -> Array:
+	if _threat_tick == ticks:
+		return _threat_list
+	_threat_tick = ticks
+	_threat_list = []
+	var gap := int(profile["level_gap"])
+	for n in _tree.get_nodes_in_group("mobs"):
+		var m := n as Mob
+		if m == null or not m.aggressive or not _mob_alive(m):
+			continue
+		var strong := m.level > Game.level + gap
+		if (m.is_boss or MobData.is_mini_boss(m.type_id)) and Game.level < m.level + 3:
+			strong = true
+		if strong:
+			_threat_list.append(m)
+	return _threat_list
 
 
 ## Рядом с местом недавней смерти героя (DANGER_RADIUS, DANGER_SEC).
@@ -1378,7 +1503,7 @@ func run() -> void:
 		return
 	while _alive():
 		if _finished():
-			_end("все задания пройдены" if stop_after.is_empty() and not until_job else "отрезок пройден")
+			_end("все задания пройдены" if stop_after.is_empty() and not until_job and until_level <= 0 else "отрезок пройден")
 			return
 		var acted: bool = await _step()
 		if not _alive():
@@ -1395,6 +1520,11 @@ func run() -> void:
 
 
 func _finished() -> bool:
+	return _segment_reached() and _farm_done()
+
+
+## Цель отрезка достигнута (без фарма Фармера после него).
+func _segment_reached() -> bool:
 	var q := _q()
 	if not stop_after.is_empty():
 		for id in stop_after:
@@ -1403,7 +1533,17 @@ func _finished() -> bool:
 		return true
 	if until_job:
 		return not ClassData.is_wanderer(Game.class_id)
+	if until_level > 0:
+		return Game.level >= until_level
 	return _quests_finished() and _features_done()
+
+
+## Фарм Фармера после отрезка (farm_sec) закончен (или его нет).
+func _farm_done() -> bool:
+	var fs := float(profile.get("farm_sec", 0.0))
+	if fs <= 0.0:
+		return true
+	return farm.has("t0") and game_t - float(farm["t0"]) >= fs
 
 
 func _quests_finished() -> bool:
@@ -1436,6 +1576,15 @@ func _step() -> bool:
 	# В подземелье — только бои заданий главы I; больше нечего делать — назад на остров (сдавать, брать, отдыхать)
 	if _in_dungeon():
 		return await _dungeon_step()
+	# Фармер: отрезок пройден — фарм зверей по силам и продажа добычи (сравнение дохода с заданиями)
+	if _segment_reached() and not _farm_done():
+		return await _farm_step()
+	# Профиль: отвлёкся (пауза), проба (Экспериментатор)
+	if float(profile["pause_chance"]) > 0.0 and _prng.randf() < float(profile["pause_chance"]):
+		return await _pause()
+	if float(profile["fuzz"]) > 0.0 and _prng.randf() < float(profile["fuzz"]):
+		await _fuzz()
+		return true
 	# 0. Сумка почти полна — продать лишнее
 	var inv := Game.inventory
 	if inv.capacity - inv.used_cells() < int(profile["bag_reserve"]):
@@ -1452,6 +1601,11 @@ func _step() -> bool:
 	if float(p.hp) < float(p.max_hp) * float(profile["rest_below"]):
 		return await _rest()
 	if await _care_pet():
+		return true
+	# Подготовка по профилю: запас зелий, броня в пустые ячейки
+	if await _stock_potions():
+		return true
+	if await _gear_shopping():
 		return true
 	# 2. Умения героя и питомца, фичи
 	if await _maybe_learn_skills():
@@ -1476,6 +1630,20 @@ func _step() -> bool:
 		bc = float(turn[1]) * TURN_IN_K
 	if String(take[0]) != "" and float(take[1]) * ACCEPT_K <= bc:
 		best = "take"
+	# Профиль: не самое выгодное дело (новичок, экспериментатор) — любое из доступных
+	if float(profile["noise"]) > 0.0 and _prng.randf() < float(profile["noise"]):
+		var opts: Array = []
+		if String(turn[0]) != "":
+			opts.append("turn")
+		if String(take[0]) != "":
+			opts.append("take")
+		if not task.is_empty():
+			opts.append("goal")
+		if opts.size() > 1:
+			var pick := String(opts[_prng.randi() % opts.size()])
+			if pick != best:
+				noise_picks += 1
+				best = pick
 	match best:
 		"turn":
 			_last_plan = "turn_in " + String(turn[0])
@@ -1579,6 +1747,8 @@ func _grind() -> bool:
 			continue
 		if m.level > Game.level + int(profile["level_gap"]) or float(_skip_mob.get(m.get_instance_id(), -1.0)) > game_t:
 			continue
+		if _in_danger(m.global_position) or _threat_near(m.global_position, m) != null:
+			continue
 		var d := _flat(m.global_position, p.global_position)
 		var s := float(Combat.xp_for(m.xp_reward, m.level, Game.level)) / (d + 25.0)
 		if s > bs:
@@ -1586,9 +1756,13 @@ func _grind() -> bool:
 			best = m
 	if best == null:
 		return false
+	var gt0 := game_t
 	if not await _go(best.global_position, maxf(3.0, _p().attack_range * 0.8), best.mob_name):
+		grind_t += game_t - gt0
 		return false
-	return await _fight(best, "прокачка")
+	var won: bool = await _fight(best, "прокачка")
+	grind_t += game_t - gt0
+	return won
 
 
 # ==================== Решатели целей ====================
@@ -2524,6 +2698,10 @@ func _maybe_learn_skills() -> bool:
 	var wk := _p().weapon_kind
 	if Game.level == _last_skill_level and wk == _slots_weapon:
 		return false
+	# Профиль: умения — раз в 3 уровня (новичок не заглядывает в окно героя)
+	if bool(profile.get("learn_lazy", false)) and _last_skill_level > 0 and Game.level < _last_skill_level + 3 \
+			and wk == _slots_weapon:
+		return false
 	if int(Game.hero.get("jp", 0)) <= 0 and wk == _slots_weapon:
 		_last_skill_level = Game.level
 		return false
@@ -2613,6 +2791,9 @@ static func _is_damage(sid: String) -> bool:
 ## Питомец: призвать (окно «Питомцы»), воскресить свитком, режим «Авто».
 func _care_pet() -> bool:
 	if Game.pets.is_empty():
+		return false
+	# Профиль: новичок питомца в бой не зовёт — только когда он нужен заданию
+	if not bool(profile.get("use_pet", true)) and not _pet_goal_open():
 		return false
 	var pm := _pm()
 	var i := _main_pet()
@@ -2739,6 +2920,9 @@ func _tame(species: String) -> bool:
 	_feature("tame", true, "%s: %s" % [MobData.get_type(species)["name"], "душа поймана" if soul else
 		("неудача — сломалась зеркальная карта" if mirror_broke else ("неудача — карта сломалась" if card_broke else "неясно"))])
 	_ev("tame", "%s — %s" % [species, "душа" if soul else "неудача"])
+	tame_tries += 1
+	if soul:
+		tame_ok += 1
 	return soul
 
 
@@ -2937,7 +3121,7 @@ func _pet_gear(i: int, item: String) -> bool:
 
 ## Фича, которую можно сделать сейчас (одна за шаг). true — сделано что-то.
 func _features() -> bool:
-	if until_job:
+	if until_job or not bool(profile.get("features", true)):
 		return false
 	_note_stories()
 	# Глава I пройдена: свитки и признание капитана открывались окном
@@ -3156,6 +3340,266 @@ func _feature_belt_expand() -> bool:
 
 # ==================== Итог ====================
 
+# ==================== Профили фазы 4 (CardinalProfiles) ====================
+
+var _no_potion_noted := false
+var _stock_t := -1000.0
+var _gear_tried: Dictionary = {}
+var _lost_now := false
+## Пробы Экспериментатора (виды, по кругу случайно).
+const FUZZ := ["windows", "skill_page", "auto_attack", "potion_full", "abandon", "sort", "attack_air", "stop_go"]
+
+
+## Пауза: игрок отвлёкся — стоит pause_min…pause_max с.
+func _pause() -> bool:
+	var lo := float(profile["pause_min"])
+	var sec := _prng.randf_range(lo, maxf(lo, float(profile["pause_max"])))
+	pauses += 1
+	CardinalMove.stop(_p(), _h())
+	var t0 := game_t
+	var ok: bool = await _wait(maxf(sec, 0.1), "pause")
+	pause_t += game_t - t0
+	return ok
+
+
+## Точка «не туда»: от направления на цель на 70–140° вбок, 15–25 м, на свободной земле (INF — нет такой).
+func _wrong_turn(pos: Vector3, to: Vector3) -> Vector3:
+	var fwd := Vector3(to.x - pos.x, 0.0, to.z - pos.z).normalized()
+	var w := IslandWorld.current
+	for _i in 6:
+		var ang := deg_to_rad(_prng.randf_range(70.0, 140.0)) * (1.0 if _prng.randf() < 0.5 else -1.0)
+		var q := pos + fwd.rotated(Vector3.UP, ang) * _prng.randf_range(15.0, 25.0)
+		if w != null and w.is_walkable(q.x, q.z) and CardinalNav.free_at(q):
+			return q
+	return Vector3.INF
+
+
+## Задание ждёт питомца (призвать, победить с ним, умение, снаряжение, сформировать).
+func _pet_goal_open() -> bool:
+	var q := _q()
+	if q == null:
+		return false
+	for k in q.active_ids():
+		var id := String(k)
+		var goals := QuestData.goals(id)
+		for gi in goals.size():
+			if not q.goal_done(id, gi) and ["summon", "pet_kill", "pet_skill", "pet_gear", "form"].has(
+					String((goals[gi] as Dictionary).get("type", ""))):
+				return true
+	return false
+
+
+## Зелье здоровья для покупки: ранг по уровню героя, но из товаров торговца (старшее, что у него есть).
+func _shop_potion() -> String:
+	var want := ItemData.potion_rank_for_level(Game.level)
+	var goods: Array = InventoryWindow.goods(Game.class_id, "merchant")
+	for r in range(want, 0, -1):
+		var id := ItemData.potion_id("hp", r)
+		if goods.has(id) and ItemData.level_block(id, Game.level) == "":
+			return id
+	return ""
+
+
+## Профиль: держать potions_keep зелий здоровья — докупить у торговца, когда осталось меньше половины (не чаще раза в
+## 5 игровых минут; 1000 золота остаются на задания).
+func _stock_potions() -> bool:
+	var keep := int(profile.get("potions_keep", 0))
+	if keep <= 0 or game_t - _stock_t < 300.0 or Economy.potion_count("hp") >= maxi(1, keep / 2):
+		return false
+	var id := _shop_potion()
+	var price := int(ItemData.get_item(id).get("buy", 0)) if id != "" else 0
+	if price <= 0:
+		return false
+	var n := mini(keep - Economy.potion_count("hp"), (Game.gold - 1000) / price)
+	_stock_t = game_t
+	if n <= 0:
+		return false
+	var before := Game.inventory.count(id)
+	await _buy("merchant", id, n)
+	potions_bought += maxi(0, Game.inventory.count(id) - before)
+	_ev("prep", "зелья: куплено %d «%s»" % [maxi(0, Game.inventory.count(id) - before), ItemData.item_name(id)])
+	return true
+
+
+## Профиль: броня 1-го ранга в пустые ячейки (доспех, шлем, перчатки, сапоги), когда хватает золота (2000 остаются).
+func _gear_shopping() -> bool:
+	if not bool(profile.get("gear_buy", false)) or ClassData.is_wanderer(Game.class_id):
+		return false
+	for slot in ["body", "head", "hands", "feet"]:
+		if String(Game.equip.get(slot, "")) != "" or _gear_tried.has(slot):
+			continue
+		var opt := _shop_item_for(slot)
+		if opt.is_empty():
+			_gear_tried[slot] = true
+			continue
+		var item := String(opt[1])
+		var price := int(ItemData.get_item(item).get("buy", 0))
+		if Game.gold < price + 2000:
+			continue
+		_gear_tried[slot] = true
+		if await _buy(String(opt[0]), item, 1) and await _equip(item, slot):
+			gear_bought.append({"t": snappedf(game_t, 0.1), "slot": slot, "item": item, "price": price})
+			_ev("prep", "броня: %s → %s за %d зол." % [ItemData.item_name(item), slot, price])
+		return true
+	return false
+
+
+## Фармер: отрезок пройден — фарм зверей по силам (как прокачка) и продажа добычи, farm_sec игровых секунд. Итог —
+## опыт, золото и убийства за фарм (в _end) против тех же за отрезок с заданиями.
+func _farm_step() -> bool:
+	if not farm.has("t0"):
+		farm = {"t0": game_t, "xp0": CardinalRun.cumulative_xp(Game.level, Game.xp), "gold0": Game.gold, "kills0": kills,
+			"sold": 0}
+		_ev("farm", "фарм %s: с %d ур., %d зол." % [TestBot.clock(float(profile["farm_sec"])), Game.level, Game.gold])
+	var inv := Game.inventory
+	if inv.capacity - inv.used_cells() < int(profile["bag_reserve"]) + 2 and not _junk_cells().is_empty():
+		farm["sold"] = int(farm["sold"]) + await _sell_junk(_nearest_trader())
+		return true
+	var p := _p()
+	if p != null and float(p.hp) < float(p.max_hp) * float(profile["rest_below"]):
+		return await _rest()
+	if not await _grind():
+		return await _wait(1.0)
+	return true
+
+
+## Проба Экспериментатора: окна, страницы умений, автоатака, зелье при полном HP, отказ от задания, сортировка сумки,
+## удар без цели, «пошёл — передумал». После — проверка инвариантов (_check_invariants).
+func _fuzz() -> void:
+	var kind := String(FUZZ[_prng.randi() % FUZZ.size()])
+	var text := ""
+	var p := _p()
+	var h := _h()
+	if p == null or h == null:
+		return
+	_split = "ui"
+	match kind:
+		"windows":
+			var ids := ["bag_window", "hero_window", "quest_window", "pets_window"]
+			var miss := PackedStringArray()
+			for id in ids:
+				_action(id)
+				if not h.is_window_open():
+					miss.append(id)
+				if not await _tick():
+					return
+				_close()
+				if h.is_window_open():
+					violations.append("%s [проба «окна»]: окно «%s» не закрылось" % [TestBot.clock(game_t), id])
+			text = "открыл и закрыл окна" + ("" if miss.is_empty() else "; не открылись: " + ", ".join(miss))
+		"skill_page":
+			var m := bot.main
+			if m.has_method("_on_skill_swipe"):
+				var p0 := HeroSkills.page
+				m.call("_on_skill_swipe", 1)
+				m.call("_on_skill_swipe", 1)
+				m.call("_on_skill_swipe", -1)
+				m.call("_on_skill_swipe", -1)
+				if HeroSkills.page != p0:
+					violations.append("%s [проба «страницы умений»]: после 2 вправо и 2 влево страница %d, была %d" % [
+						TestBot.clock(game_t), HeroSkills.page + 1, p0 + 1])
+			text = "листал страницы умений"
+		"auto_attack":
+			var m2 := bot.main
+			if m2.has_method("set_auto_attack"):
+				m2.call("set_auto_attack", true)
+				if not await _tick():
+					return
+				m2.call("set_auto_attack", false)
+				if bool(m2.get("auto_attack")):
+					violations.append("%s [проба «автоатака»]: не выключилась" % TestBot.clock(game_t))
+			text = "автоатака вкл/выкл"
+		"potion_full":
+			var id := Economy.best_potion("hp")
+			if id != "" and p.hp >= p.max_hp:
+				var n0 := Game.inventory.count(id)
+				_action("potion")
+				text = "зелье при полном HP: %s" % ("выпито (потрачено зря)" if Game.inventory.count(id) < n0 else "не выпито")
+			else:
+				text = "зелье при полном HP: нет случая"
+		"abandon":
+			var q := _q()
+			var cand: Array = []
+			for k in q.active_ids():
+				var qid := String(k)
+				if qid != QuestData.JOB_QUEST and not q.is_ready(qid):
+					cand.append(qid)
+			if cand.is_empty():
+				text = "отказ от задания: нечего"
+			else:
+				var qid := String(cand[_prng.randi() % cand.size()])
+				_action("quest_window")
+				var qw: QuestWindow = q.window
+				var ok := false
+				if qw != null and _press(qw.buttons, "q_" + qid) and _press(qw.buttons, "abandon"):
+					ok = _press(qw.buttons, "abandon_yes")
+				_close()
+				var still := q.is_active(qid)
+				text = "отказ от «%s»: %s" % [QuestData.quest_name(qid), "отказался" if ok and not still else "не вышло"]
+				if ok and still:
+					violations.append("%s [проба «отказ»]: «Отказаться» нажато, задание «%s» осталось взятым" % [
+						TestBot.clock(game_t), QuestData.quest_name(qid)])
+				if ok and not still:
+					_ev("fuzz", "отказ от «%s» — возьмёт снова" % QuestData.quest_name(qid))
+		"sort":
+			var before := Game.inventory.to_dict().duplicate(true)
+			_action("bag_window")
+			var w := _win()
+			if w != null:
+				_press(w.buttons, "sort")
+			_close()
+			var after := Game.inventory.to_dict()
+			if JSON.stringify((before as Dictionary).get("items", {})) != JSON.stringify((after as Dictionary).get("items", {})):
+				violations.append("%s [проба «сортировка»]: после сортировки изменилось число вещей" % TestBot.clock(game_t))
+			text = "сортировка сумки"
+		"attack_air":
+			p.select_target(null)
+			for _i in 3:
+				p.try_attack()
+				if not await _tick():
+					return
+			text = "удар без цели ×3"
+		"stop_go":
+			var dir := Vector3(_prng.randf_range(-1.0, 1.0), 0.0, _prng.randf_range(-1.0, 1.0)).normalized()
+			var t0 := game_t
+			while game_t - t0 < 0.8:
+				_walk_dir(p, h, dir)
+				if not await _tick():
+					return
+			CardinalMove.stop(p, h)
+			text = "пошёл и передумал"
+	fuzz_log.append({"t": snappedf(game_t, 0.1), "kind": kind, "text": text})
+	_check_invariants("проба «%s»" % kind)
+
+
+## Инварианты (после пробы): золото и вещи не отрицательны, сумка не за вместимостью (с запасом на карты с душой
+## сверх места), HP и MP в пределах, уровень и опыт, окна закрыты.
+func _check_invariants(where: String) -> void:
+	var bad := PackedStringArray()
+	if Game.gold < 0:
+		bad.append("золото %d" % Game.gold)
+	var inv := Game.inventory
+	if inv.used_cells() > inv.capacity + 12:
+		bad.append("занято ячеек %d при вместимости %d" % [inv.used_cells(), inv.capacity])
+	for id in inv.ids():
+		if inv.count(String(id)) <= 0:
+			bad.append("«%s»: %d шт." % [ItemData.item_name(String(id)), inv.count(String(id))])
+	var p := _p()
+	if p != null:
+		if p.hp > p.max_hp or p.hp < 0:
+			bad.append("HP %d из %d" % [p.hp, p.max_hp])
+		if p.mp > p.max_mp or p.mp < 0:
+			bad.append("MP %d из %d" % [p.mp, p.max_mp])
+	if Game.level < 1 or Game.xp < 0:
+		bad.append("уровень %d, опыт %d" % [Game.level, Game.xp])
+	var h := _h()
+	if h != null and h.is_window_open():
+		bad.append("окно осталось открытым")
+		_close()
+	for b in bad:
+		violations.append("%s [%s]: %s" % [TestBot.clock(game_t), where, b])
+
+
 func result() -> Dictionary:
 	var qs: Dictionary = {}
 	var q := _q() if bot != null and is_instance_valid(bot) and bot.main != null and is_instance_valid(bot.main) else null
@@ -3182,6 +3626,15 @@ func result() -> Dictionary:
 		"help": help, "help_total": help_count(), "features": features, "findings": findings,
 		"quests": qs, "events": events, "sim_radius": profile["sim_radius"], "xp_mult": profile["xp_mult"],
 		"nav": {"build_ms": nav_ms, "blocked_cells": CardinalNav.blocked_cells},
+		"segment": {"until_job": until_job, "until_level": until_level, "start_level": start_level, "stop_after": stop_after},
+		"metrics": {"levels": levels, "gold_in": gold_in, "gold_out": gold_out, "dmg_taken": dmg_taken,
+			"potions_used": potions_used, "potions_bought": potions_bought, "no_potion": no_potion, "no_gold": no_gold,
+			"bag_full": bag_full, "fights": fights, "fight_time": snappedf(fight_time, 0.1), "fights_dropped": fights_dropped,
+			"grind_t": snappedf(grind_t, 0.1), "pause_t": snappedf(pause_t, 0.1), "pauses": pauses, "lost": lost,
+			"noise_picks": noise_picks, "fuzz": fuzz_log, "violations": violations, "gear_bought": gear_bought,
+			"farm": farm, "save_bytes": save_bytes, "walk": walk_stats, "tame_tries": tame_tries, "tame_ok": tame_ok,
+			"pet_sec": snappedf(pet_t, 0.1), "pet_kills": pet_kills},
+		"profile_full": profile,
 		"cost": {"ticks": ticks, "ms_per_tick": snappedf(wall_sec() * 1000.0 / maxf(float(ticks), 1.0), 0.001),
 			"cardinal_ms_per_tick": snappedf(float(self_us) / 1000.0 / maxf(float(ticks), 1.0), 0.001)},
 	}

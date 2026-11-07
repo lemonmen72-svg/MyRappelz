@@ -59,9 +59,10 @@ static func _match(dict_or_list: Variant, name: String) -> Variant:
 	return null
 
 
-## Значок и вид кнопки b по её имени name (по умолчанию — имя узла). Уже есть значок — не меняется.
+## Значок и вид кнопки b по её имени name (по умолчанию — имя узла). Уже есть значок — не меняется. Узкая
+## кнопка (narrow) — рисованный вид BtnSmall: торцы рамки-картинки в неё не помещаются; BtnSlot не трогается.
 static func decorate(b: Button, name: String = "") -> void:
-	if b == null:
+	if b == null or b.theme_type_variation == "BtnSlot":
 		return
 	var n := name if name != "" else String(b.name)
 	var ic: Variant = _match(ICONS, n)
@@ -71,6 +72,34 @@ static func decorate(b: Button, name: String = "") -> void:
 		b.theme_type_variation = "BtnPrimary"
 	elif _match(DANGER, n) != null:
 		b.theme_type_variation = "BtnDanger"
+	if narrow(b):
+		b.theme_type_variation = "BtnSmall"
+
+
+## Кнопка уже рамки-картинки (Util.SKIN_MIN_W) или с надписью в 1–2 знака («+», «−», «1») — рисованный вид:
+## торцы рамки в ней не помещаются.
+static func narrow(b: Button) -> bool:
+	return width_of(b) < UiScale.px(Util.SKIN_MIN_W)
+
+
+## Ширина кнопки для выбора рамки: заданная (custom_minimum_size) или по надписи и значку. Кнопка без надписи
+## (только значок) — у неё своя квадратная рамка, не узкая.
+static func width_of(b: Button) -> float:
+	var w := b.custom_minimum_size.x
+	if w > 0.0:
+		return w
+	var t := b.text.strip_edges()
+	if t == "":
+		return 9999.0
+	var fs := UiScale.fs(UiScale.FONT)
+	if b.has_theme_font_size_override("font_size"):
+		fs = b.get_theme_font_size("font_size")
+	var font := b.get_theme_font("font")
+	w = (font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x if font != null else t.length() * fs * 0.55)
+	w += UiScale.px(UiScale.BTN_PAD_X) * 2.0
+	if b.icon != null:
+		w += UiScale.px(24)
+	return w
 
 
 ## Значок и вид кнопкам окна по словарю buttons {имя: кнопка}.

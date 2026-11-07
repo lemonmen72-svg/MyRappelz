@@ -37,6 +37,8 @@ const MODES := [
 		"minutes": 6},
 	{"id": "cardinal_story", "name": "Кардинал: прохождение острова", "ready": true,
 		"script": "res://bot/bot_scenario_cardinal_story.gd", "minutes": 40},
+	{"id": "cardinal_profiles", "name": "Кардинал: профили игроков", "ready": true,
+		"script": "res://bot/bot_scenario_cardinal_profiles.gd", "minutes": 60},
 ]
 
 
