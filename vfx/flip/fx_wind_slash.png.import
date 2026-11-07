@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://qn0kgq0v1qb4"
+path="res://.godot/imported/fx_wind_slash.png-08f9a7c2c1ab6e27f52073ff507f38f5.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_wind_slash.png"
+dest_files=["res://.godot/imported/fx_wind_slash.png-08f9a7c2c1ab6e27f52073ff507f38f5.image"]
+
+[params]
+

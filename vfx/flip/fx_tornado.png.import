@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bhdtkaq0mh6pv"
+path="res://.godot/imported/fx_tornado.png-48ae13be154dc8c5b875d5f2b30a2955.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_tornado.png"
+dest_files=["res://.godot/imported/fx_tornado.png-48ae13be154dc8c5b875d5f2b30a2955.image"]
+
+[params]
+

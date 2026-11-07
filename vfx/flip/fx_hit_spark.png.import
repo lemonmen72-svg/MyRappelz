@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bsgghvdu0o347"
+path="res://.godot/imported/fx_hit_spark.png-c644607edcee82b9e98310644fa00e4b.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_hit_spark.png"
+dest_files=["res://.godot/imported/fx_hit_spark.png-c644607edcee82b9e98310644fa00e4b.image"]
+
+[params]
+

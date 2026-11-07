@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://ckfgg36sj1w6w"
+path="res://.godot/imported/fx_aura_ring.png-627569c2fee03853c9729841e7433cb1.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_aura_ring.png"
+dest_files=["res://.godot/imported/fx_aura_ring.png-627569c2fee03853c9729841e7433cb1.image"]
+
+[params]
+

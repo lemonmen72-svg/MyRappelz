@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bcpn233gs87f7"
+path="res://.godot/imported/fx_poison_cloud.png-cd0fda3120c089eaf829dc51718807ef.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_poison_cloud.png"
+dest_files=["res://.godot/imported/fx_poison_cloud.png-cd0fda3120c089eaf829dc51718807ef.image"]
+
+[params]
+

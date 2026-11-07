@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://dvf8j4cq54adq"
+path="res://.godot/imported/fx_soul_drain.png-553083f9289dffce43960aa9fb81e24c.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_soul_drain.png"
+dest_files=["res://.godot/imported/fx_soul_drain.png-553083f9289dffce43960aa9fb81e24c.image"]
+
+[params]
+

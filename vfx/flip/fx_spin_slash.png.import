@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bl4nhjevask70"
+path="res://.godot/imported/fx_spin_slash.png-56dd78be7c8cba79804bf73ea77aff0e.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_spin_slash.png"
+dest_files=["res://.godot/imported/fx_spin_slash.png-56dd78be7c8cba79804bf73ea77aff0e.image"]
+
+[params]
+

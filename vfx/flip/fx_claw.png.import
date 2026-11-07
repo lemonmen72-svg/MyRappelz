@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://gpqxffdxpjrm"
+path="res://.godot/imported/fx_claw.png-f3409e4c84f7a60c4538f747dea1f67f.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_claw.png"
+dest_files=["res://.godot/imported/fx_claw.png-f3409e4c84f7a60c4538f747dea1f67f.image"]
+
+[params]
+

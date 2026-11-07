@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://ovmb16mwvn7v"
+path="res://.godot/imported/fx_holy_beam.png-55c57a95b76ce14721b1b9c30a68f1ef.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_holy_beam.png"
+dest_files=["res://.godot/imported/fx_holy_beam.png-55c57a95b76ce14721b1b9c30a68f1ef.image"]
+
+[params]
+

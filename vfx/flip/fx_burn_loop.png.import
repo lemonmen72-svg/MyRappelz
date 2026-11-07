@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bqeinhlfxbuxj"
+path="res://.godot/imported/fx_burn_loop.png-9b1967cb83af2c5d1c0531392b0d1521.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_burn_loop.png"
+dest_files=["res://.godot/imported/fx_burn_loop.png-9b1967cb83af2c5d1c0531392b0d1521.image"]
+
+[params]
+

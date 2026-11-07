@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://jg75k7x0pvcs"
+path="res://.godot/imported/fx_blood_burst.png-5fdae159d72cbb9f55a3a9954c9c70b2.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_blood_burst.png"
+dest_files=["res://.godot/imported/fx_blood_burst.png-5fdae159d72cbb9f55a3a9954c9c70b2.image"]
+
+[params]
+

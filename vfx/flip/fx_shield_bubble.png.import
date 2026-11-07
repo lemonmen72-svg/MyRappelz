@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://5rf1sq1fn7d8"
+path="res://.godot/imported/fx_shield_bubble.png-c61eded32f5975f4131cc4ffc06907b5.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_shield_bubble.png"
+dest_files=["res://.godot/imported/fx_shield_bubble.png-c61eded32f5975f4131cc4ffc06907b5.image"]
+
+[params]
+

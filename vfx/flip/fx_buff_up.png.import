@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://2742dr1faarl"
+path="res://.godot/imported/fx_buff_up.png-cc025b4364521095dc18b08449a4c633.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_buff_up.png"
+dest_files=["res://.godot/imported/fx_buff_up.png-cc025b4364521095dc18b08449a4c633.image"]
+
+[params]
+

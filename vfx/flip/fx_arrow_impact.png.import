@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://b6mmc1164n1xu"
+path="res://.godot/imported/fx_arrow_impact.png-38678f3cc75498d6a00b79b4f749c7d0.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_arrow_impact.png"
+dest_files=["res://.godot/imported/fx_arrow_impact.png-38678f3cc75498d6a00b79b4f749c7d0.image"]
+
+[params]
+

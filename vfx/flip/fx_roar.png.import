@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://70hxyon38x24"
+path="res://.godot/imported/fx_roar.png-c7a4ecde4a1ecdb94e29d8102be35f86.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_roar.png"
+dest_files=["res://.godot/imported/fx_roar.png-c7a4ecde4a1ecdb94e29d8102be35f86.image"]
+
+[params]
+

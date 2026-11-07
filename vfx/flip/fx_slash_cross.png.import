@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://cumfxheflg28"
+path="res://.godot/imported/fx_slash_cross.png-4773da0a22e5a4e3849634099759b857.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_slash_cross.png"
+dest_files=["res://.godot/imported/fx_slash_cross.png-4773da0a22e5a4e3849634099759b857.image"]
+
+[params]
+

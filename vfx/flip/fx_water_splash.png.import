@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bx12rbn4eiqj0"
+path="res://.godot/imported/fx_water_splash.png-0e8ebf4ea528a10589a9a7e2d9dc2734.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_water_splash.png"
+dest_files=["res://.godot/imported/fx_water_splash.png-0e8ebf4ea528a10589a9a7e2d9dc2734.image"]
+
+[params]
+

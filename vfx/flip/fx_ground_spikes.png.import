@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://cn3w5g4x8kldd"
+path="res://.godot/imported/fx_ground_spikes.png-a9ddca29c5708558653ba6ae5c46b5bd.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_ground_spikes.png"
+dest_files=["res://.godot/imported/fx_ground_spikes.png-a9ddca29c5708558653ba6ae5c46b5bd.image"]
+
+[params]
+

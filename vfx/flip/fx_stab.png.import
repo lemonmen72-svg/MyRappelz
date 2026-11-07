@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://rx555c883xx2"
+path="res://.godot/imported/fx_stab.png-8f6891c4b343f4a83e139c2aeb7d3945.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_stab.png"
+dest_files=["res://.godot/imported/fx_stab.png-8f6891c4b343f4a83e139c2aeb7d3945.image"]
+
+[params]
+

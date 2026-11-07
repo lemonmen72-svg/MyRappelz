@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://datovhix1xlku"
+path="res://.godot/imported/fx_heal_burst.png-13a4638d06e193b380f309a6117d569d.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_heal_burst.png"
+dest_files=["res://.godot/imported/fx_heal_burst.png-13a4638d06e193b380f309a6117d569d.image"]
+
+[params]
+

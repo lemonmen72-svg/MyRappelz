@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://b2dnohckjtwrt"
+path="res://.godot/imported/fx_explosion.png-83e21bd664171947b4dbd76c5d01dcbb.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_explosion.png"
+dest_files=["res://.godot/imported/fx_explosion.png-83e21bd664171947b4dbd76c5d01dcbb.image"]
+
+[params]
+

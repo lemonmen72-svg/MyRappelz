@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://do384gfw0wlw1"
+path="res://.godot/imported/fx_cast_release.png-82f29323056d86af712dc3a5ebc7ecb4.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_cast_release.png"
+dest_files=["res://.godot/imported/fx_cast_release.png-82f29323056d86af712dc3a5ebc7ecb4.image"]
+
+[params]
+

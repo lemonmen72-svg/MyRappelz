@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://63p5vgfikl8t"
+path="res://.godot/imported/fx_haste.png-5820864526ce9528e33ea27f93170f38.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_haste.png"
+dest_files=["res://.godot/imported/fx_haste.png-5820864526ce9528e33ea27f93170f38.image"]
+
+[params]
+

@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://dhb62mmbxhyav"
+path="res://.godot/imported/fx_frost_nova.png-1f400deab0a9b7b0bbe521346970c48c.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_frost_nova.png"
+dest_files=["res://.godot/imported/fx_frost_nova.png-1f400deab0a9b7b0bbe521346970c48c.image"]
+
+[params]
+

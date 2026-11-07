@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://cjwl166cy3w4u"
+path="res://.godot/imported/fx_blunt_impact.png-525f1fbda22dfe6b8ae8053bf28c7763.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_blunt_impact.png"
+dest_files=["res://.godot/imported/fx_blunt_impact.png-525f1fbda22dfe6b8ae8053bf28c7763.image"]
+
+[params]
+

@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://eqxiym27bmrx"
+path="res://.godot/imported/fx_slash_arc.png-73475ca29da89764f7ff4e596d30784c.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_slash_arc.png"
+dest_files=["res://.godot/imported/fx_slash_arc.png-73475ca29da89764f7ff4e596d30784c.image"]
+
+[params]
+

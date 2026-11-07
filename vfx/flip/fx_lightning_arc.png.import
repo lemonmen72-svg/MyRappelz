@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://dkahohr5pcyuj"
+path="res://.godot/imported/fx_lightning_arc.png-9cd362f1a1dd910903754fda168194d1.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_lightning_arc.png"
+dest_files=["res://.godot/imported/fx_lightning_arc.png-9cd362f1a1dd910903754fda168194d1.image"]
+
+[params]
+

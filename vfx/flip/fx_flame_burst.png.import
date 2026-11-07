@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://clk2l2ha3avjm"
+path="res://.godot/imported/fx_flame_burst.png-02eb1bcbccb375f2b3750c105429c562.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_flame_burst.png"
+dest_files=["res://.godot/imported/fx_flame_burst.png-02eb1bcbccb375f2b3750c105429c562.image"]
+
+[params]
+

@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bgjx1hg0wnaki"
+path="res://.godot/imported/fx_blessing.png-ded50dc026466708643d2c8fb2397c87.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_blessing.png"
+dest_files=["res://.godot/imported/fx_blessing.png-ded50dc026466708643d2c8fb2397c87.image"]
+
+[params]
+
