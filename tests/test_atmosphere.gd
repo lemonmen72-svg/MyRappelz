@@ -7,7 +7,8 @@ extends "res://tests/test_base.gd"
 ## по погоде), подземелье (вечная ночь для огней, изумрудная дымка над озёрами у алтаря, чёрная — над озером
 ## босса), админ-панель («Мир» → «Время и погода»).
 
-var _phase := 0
+var _first_main: Node = null
+var _tries := 0
 
 
 func run_step() -> void:
@@ -20,6 +21,17 @@ func run_step() -> void:
 			step = 1
 		1:
 			_island()
+			# В подземелье (как переход админ-панели: сцена строится заново)
+			_first_main = main
+			main.travel("dungeon")
+			step = 2
+		2:
+			if main == _first_main or not bool(main.get("_started")):
+				_tries += 1
+				if _tries > 900:
+					fail("подземелье не построилось")
+				return
+			_dungeon()
 			ok_done()
 
 
@@ -63,8 +75,11 @@ func _weather() -> void:
 			seen[Weather.scheduled(d, s)] = true
 	check(seen.size() == Weather.ORDER.size(), "за 40 суток бывает вся погода: %s" % [seen.keys()])
 	check(Weather.scheduled(7, 3) == Weather.scheduled(7, 3), "расписание детерминировано")
-	# Смена — плавная в конце отрезка
+	# Смена — плавная в конце отрезка (первые 3 смены «ясно → дождь»)
+	var smooth_n := 0
 	for d in 60:
+		if smooth_n >= 3:
+			break
 		for s in 8:
 			var a := Weather.scheduled(d, s)
 			var b := Weather.scheduled(d, s + 1)
@@ -75,7 +90,9 @@ func _weather() -> void:
 				var w2 := Weather.sample(h + Weather.SEG_HOURS * 0.999, d)
 				check(float(w0["rain"]) < 0.01 and float(w1["rain"]) > 0.05 and float(w1["rain"]) < float(w2["rain"]),
 					"ясно → дождь плавно: %.2f %.2f %.2f" % [w0["rain"], w1["rain"], w2["rain"]])
+				smooth_n += 1
 				break
+	check(smooth_n > 0, "в расписании есть смена «ясно → дождь» (%d)" % smooth_n)
 	# После дождя — туман и мокрая земля
 	var found := false
 	for d in 120:
@@ -190,3 +207,33 @@ func _island() -> void:
 		check(vis, "в туман слои над водой видны")
 	WorldClock.force_hour = -1.0
 	Weather.force = ""
+
+
+## Подземелье: всегда «ночь» для огней, пламя факелов, жаровен и свечей (изумрудное у секты), свет кристаллов и
+## огней — пул, изумрудная дымка над озёрами у алтаря и каналом, чёрная — над озером корабля.
+func _dungeon() -> void:
+	var at := Atmosphere.current
+	check(at != null and at.dungeon, "в подземелье — подземная атмосфера")
+	check(Atmosphere.night() > 0.99 and Atmosphere.rain() == 0.0, "в подземелье огни — как ночью, дождя нет")
+	var ff := FireFx.current
+	var emerald := 0
+	if ff != null:
+		for f in ff.fires:
+			var c: Color = f["color"]
+			if c.g > c.r * 2.0:
+				emerald += 1
+	check(ff != null and ff.fires.size() >= 20 and ff.mmi != null, "пламя подземелья: %d" % (ff.fires.size() if ff else 0))
+	check(emerald >= 3, "изумрудное пламя секты: %d" % emerald)
+	var nl := NightLights.current
+	check(nl != null and nl.sources.size() >= 40 and nl._pool.size() == NightLights.count(),
+		"свет огней и кристаллов подземелья: источников %d, ламп %d" % [nl.sources.size() if nl else 0, nl._pool.size() if nl else 0])
+	if nl != null:
+		nl.camera_override = main.player
+		nl._t = 0.0
+		nl.tick(0.1)
+		check(nl.lit() > 0, "у героя горят огни: %d" % nl.lit())
+	var hz := HazeFx.current
+	check(hz != null and hz.count_of("emerald") >= 3 and hz.count_of("abyss") == 1,
+		"дымки: изумрудных %d, чёрная над озером босса %d" % [hz.count_of("emerald") if hz else 0, hz.count_of("abyss") if hz else 0])
+	var props := main.find_child("DungeonProps", true, false)
+	check(props != null and int(props.get_meta("lights", -1)) == 0, "постоянных огней подземелья больше нет (свет — пул)")

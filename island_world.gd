@@ -139,7 +139,7 @@ func _build_atmo_fx() -> void:
 		Atmosphere.current.on_strike(_distant_strike)
 	var hz := HazeFx.new()
 	add_child(hz)
-	# Река: пятна тумана вдоль русел через ~16 м; пруд — одно пятно
+	# Река: пятна тумана вдоль русел через ~22 м; пруд — одно пятно
 	for branch in cfg.get("river", {}).get("branches", []):
 		var pts: Array = branch
 		var carry := 0.0
@@ -150,8 +150,8 @@ func _build_atmo_fx() -> void:
 			var t := carry
 			while t < seg:
 				var p := a.lerp(b, t / seg)
-				hz.add("mist", Vector3(p.x, river_level + 0.1, p.y), Vector2(20.0, 20.0))
-				t += 16.0
+				hz.add("mist", Vector3(p.x, river_level + 0.1, p.y), Vector2(24.0, 24.0))
+				t += 22.0
 			carry = t - seg
 	for pd in cfg.get("ponds", []):
 		var c := v2(pd["center"])

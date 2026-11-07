@@ -146,11 +146,12 @@ func _apply() -> void:
 	var sun_col := SUN_NOON.lerp(SUN_DUSK, dusk_k)
 	var energy := 0.0
 	var lcol := MOON_LIGHT
+	# Переключение на day = 0.12, когда оба почти не светят: луна гаснет к рассвету, солнце разгорается после
 	if sun_side:
 		energy = SUN_ENERGY * smoothstep(0.12, 0.45, day) * dim
 		lcol = sun_col
 	else:
-		energy = MOON_ENERGY * smoothstep(0.88, 0.6, day) * (1.0 - cloud * 0.6)
+		energy = MOON_ENERGY * (1.0 - smoothstep(0.0, 0.12, day)) * (1.0 - cloud * 0.6)
 	energy += flash_k * 1.4
 	if light != null:
 		light.light_color = lcol.lerp(Color(0.85, 0.9, 1.0), flash_k)

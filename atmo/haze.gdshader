@@ -8,6 +8,7 @@ render_mode blend_mix, depth_draw_never, cull_disabled, unshaded, shadows_disabl
 
 global uniform float atmo_fog;
 global uniform float atmo_night;
+global uniform vec4 atmo_sky_color;
 uniform vec4 haze_color : source_color = vec4(0.82, 0.88, 0.94, 1.0);
 uniform vec4 glow_color : source_color = vec4(0.3, 1.0, 0.55, 1.0);
 uniform float density : hint_range(0.0, 1.0) = 0.6;
@@ -18,6 +19,8 @@ uniform float swirl = 0.0;
 uniform float glow = 0.0;
 uniform float edge = 0.35;
 uniform float night_dim = 0.55;
+// Туман острова (use_fog) берёт часть цвета неба и тумана мира: днём белёсый, на заре тёплый, ночью серо-синий
+uniform float sky_tint = 0.35;
 
 varying vec3 v_world;
 
@@ -37,12 +40,12 @@ float hz_noise(vec2 p) {
 float hz_fbm(vec2 p) {
 	float v = 0.0;
 	float a = 0.5;
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < 3; i++) {
 		v += a * hz_noise(p);
 		p = p * 2.07 + vec2(3.1, 1.7);
 		a *= 0.5;
 	}
-	return v;
+	return v / 0.875;
 }
 
 void vertex() {
@@ -53,7 +56,8 @@ void fragment() {
 	vec2 c = UV - 0.5;
 	float r = length(c) * 2.0;
 	vec2 p = v_world.xz * scale;
-	if (swirl > 0.0) {
+	// Завихрение вокруг центра; у второго слоя swirl < 0 — крутится навстречу
+	if (swirl != 0.0) {
 		float ang = swirl * TIME * 0.15 + r * swirl * 2.5;
 		float cs = cos(ang);
 		float sn = sin(ang);
@@ -62,16 +66,16 @@ void fragment() {
 	float n1 = hz_fbm(p + drift * TIME);
 	float n2 = hz_fbm(p * 1.7 - drift.yx * TIME * 1.3 + 7.0);
 	float n = n1 * 0.6 + n2 * 0.4;
-	float d = smoothstep(0.35, 0.75, n);
-	// Края слоя — тают по кругу
-	d *= 1.0 - smoothstep(1.0 - edge, 1.0, r);
-	// У камеры — тает (камера внутри слоя)
+	// Края слоя тают по кругу, у камеры — тоже (камера внутри слоя): и дымка, и прожилки
+	float fade = 1.0 - smoothstep(1.0 - edge, 1.0, r);
 	float cam_d = distance(CAMERA_POSITION_WORLD, v_world);
-	d *= smoothstep(2.0, 9.0, cam_d);
+	fade *= smoothstep(2.0, 9.0, cam_d);
+	float d = smoothstep(0.35, 0.75, n) * fade;
 	float k = density * (use_fog ? atmo_fog : 1.0);
-	vec3 col = haze_color.rgb * mix(1.0, night_dim, atmo_night);
+	vec3 base = use_fog ? mix(haze_color.rgb, atmo_sky_color.rgb, sky_tint) : haze_color.rgb;
+	vec3 col = base * mix(1.0, night_dim, atmo_night);
 	// Светящиеся прожилки (магия, изумрудная плесень)
-	float veins = smoothstep(0.62, 0.7, n2) * (1.0 - smoothstep(0.7, 0.8, n2));
+	float veins = smoothstep(0.62, 0.7, n2) * (1.0 - smoothstep(0.7, 0.8, n2)) * fade;
 	col = mix(col, glow_color.rgb * 1.6, veins * glow);
 	ALBEDO = col;
 	ALPHA = clamp(d * k * haze_color.a + veins * glow * 0.35 * density, 0.0, 1.0);

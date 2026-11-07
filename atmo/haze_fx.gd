@@ -9,14 +9,14 @@ extends Node3D
 
 const PRESETS := {
 	"mist": {"color": Color(0.84, 0.89, 0.95, 0.9), "glow_color": Color(0.8, 0.9, 1.0), "density": 0.85, "use_fog": true,
-		"swirl": 0.0, "glow": 0.0, "scale": 0.06, "drift": Vector2(0.025, 0.01), "heights": [0.35, 1.1, 2.0],
-		"motes": ""},
+		"swirl": 0.0, "glow": 0.0, "scale": 0.06, "drift": Vector2(0.025, 0.01), "heights": [0.4, 1.4],
+		"motes": "", "range": 70.0, "night_dim": 0.4},
 	"emerald": {"color": Color(0.32, 0.78, 0.55, 0.55), "glow_color": Color(0.3, 1.0, 0.55), "density": 0.6,
 		"use_fog": false, "swirl": 0.0, "glow": 0.7, "scale": 0.11, "drift": Vector2(0.02, 0.015),
-		"heights": [0.25, 0.9], "motes": "emerald"},
+		"heights": [0.25, 0.9], "motes": "emerald", "range": 60.0},
 	"abyss": {"color": Color(0.04, 0.02, 0.07, 0.92), "glow_color": Color(0.55, 0.25, 1.0), "density": 0.85,
 		"use_fog": false, "swirl": 1.0, "glow": 0.55, "scale": 0.1, "drift": Vector2(0.01, 0.01),
-		"heights": [0.3, 1.0, 1.9], "motes": "abyss"},
+		"heights": [0.35, 1.3], "motes": "abyss", "range": 0.0},
 }
 const PARTICLE_DIST := 45.0
 
@@ -43,7 +43,9 @@ func add(kind: String, center: Vector3, size: Vector2) -> void:
 	var p: Dictionary = PRESETS.get(kind, PRESETS["mist"])
 	var nodes: Array = []
 	var hs: Array = p["heights"]
-	for i in hs.size():
+	# «Качество эффектов» низкое (и авто-снижение) — один слой
+	var n := hs.size() if Quality.effective("effects") > 0 else 1
+	for i in n:
 		var plane := PlaneMesh.new()
 		plane.size = size
 		var m := ShaderMaterial.new()
@@ -54,6 +56,7 @@ func add(kind: String, center: Vector3, size: Vector2) -> void:
 		m.set_shader_parameter("use_fog", bool(p["use_fog"]))
 		m.set_shader_parameter("swirl", float(p["swirl"]) * (1.0 if i % 2 == 0 else -0.7))
 		m.set_shader_parameter("glow", float(p["glow"]))
+		m.set_shader_parameter("night_dim", float(p.get("night_dim", 0.55)))
 		m.set_shader_parameter("scale", float(p["scale"]) * (1.0 + 0.3 * float(i)))
 		m.set_shader_parameter("drift", (p["drift"] as Vector2) * (1.0 + 0.4 * float(i)))
 		var mi := MeshInstance3D.new()
@@ -62,6 +65,9 @@ func add(kind: String, center: Vector3, size: Vector2) -> void:
 		mi.material_override = m
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.position = center + Vector3(0.0, float(hs[i]), 0.0)
+		if float(p.get("range", 0.0)) > 0.0:
+			mi.visibility_range_end = float(p["range"]) + maxf(size.x, size.y) * 0.5
+			mi.visibility_range_end_margin = 10.0
 		add_child(mi)
 		nodes.append(mi)
 	var motes: CPUParticles3D = null
