@@ -31,7 +31,9 @@ const EXITS := 6
 const TRACE_LINES := 200
 ## Причины завершения, которые считаются сбоем (ApplicationExitInfo).
 const EXIT_FAILURES := ["crash", "crash_native", "anr", "initialization_failure"]
-const EXIT_NAMES := {"exit_self": "игра вышла сама", "signaled": "сигнал системы", "low_memory": "не хватило памяти",
+## «signaled» со статусом 9 — обычно выход из игры: Godot 4.3 на Android закрывает себя сам — ProcessPhoenix.forceQuit
+## → Process.killProcess(свой pid), это SIGKILL (9); так же выглядит и «Остановить» в настройках телефона.
+const EXIT_NAMES := {"exit_self": "игра вышла сама", "signaled": "завершена сигналом (обычно выход из игры — Godot закрывается так сам)", "low_memory": "не хватило памяти",
 	"crash": "сбой Java", "crash_native": "сбой движка (native)", "anr": "зависание (ANR)",
 	"initialization_failure": "сбой запуска", "permission_change": "смена разрешений",
 	"excessive_resource_usage": "слишком много ресурсов", "user_requested": "закрыта игроком или системой",
