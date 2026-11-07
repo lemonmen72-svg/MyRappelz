@@ -1,8 +1,11 @@
+class_name BotScenarioAutotests
 extends BotScenario
 ## Режим «Автотесты на телефоне» тест-бота (этап 4, просьба Максима): наши автотесты tests/smoke_test.gd и
 ## tests/test_*.gd (папка tests/ лежит в APK — скрипты, ≈ 1.3 МБ текста) по одному в той же игре, итог — раздел
 ## «Автотесты» отчёта бота (.txt и .zip в «Загрузки/DarkPact_test», как у «Производительности»).
-## Режимы MODES: "autotests" — все, "autotests_quick" — быстрые (QUICK: логика боя, предметов, заданий, питомцев).
+## Режимы MODES: "autotests" — все, "autotests_quick" — быстрые (флаг quick каталога), "autotests_groups" — тесты
+## выбранных групп каталога (chosen_groups, файл GROUPS_FILE; лимит — по оценке, estimate). Что какой тест проверяет,
+## его группа, «только CI» и «нужен пакет» — каталог tests/catalog.gd (TestCatalog); в отчёте у теста — его название.
 ##
 ## Как идёт: мир тестового героя не грузится (needs_world false) — бот сохраняет героя игрока, переключается на своё
 ## хранилище и убирает главную сцену; настройки игрока (settings.cfg) убираются на время (TestBot.backup_settings —
@@ -35,28 +38,19 @@ const LOG_ERRORS := 12
 ## Ошибки GDScript (как в CI, .github/scripts/smoke_test.sh): тест не прошёл.
 const SCRIPT_ERRORS := ["SCRIPT ERROR", "Parse Error", "Compile Error", "Failed to load script", "Invalid call",
 	"Invalid access", "Invalid assignment"]
-## Только CI: причина.
-const CI_ONLY := {
-	"test_bot": "сам запускает тест-бота, а второй бот не запускается, пока идёт этот",
-	"test_bot_game": "сам запускает тест-бота (режим «Быстрый» — его и так можно запустить на вкладке), а второй бот не запускается",
-	"test_bot_lifecycle": "сам запускает тест-бота (сворачивание и контрольные точки — подставные), а второй бот не запускается",
-	"test_asset_pack": "читает export_presets.cfg (его нет в APK) и подменяет состояние пакета ресурсов — на телефоне это настоящий кэш загрузок",
-	"test_asset_fallback": "проверяет игру без пакета ресурсов (файлы частей не загружены) — на телефоне игра их уже загрузила",
-	"test_renderer": "подставляет Android и пишет файлы рендерера — на телефоне это настоящие файлы запуска (страховка Vulkan)",
-	"test_branding": "читает export_presets.cfg и папку данных проекта сборки — в APK их нет",
-	"test_texture_quality": "читает .import и заголовки PNG исходников — в APK их нет (только сжатые текстуры)",
-	"test_movement_smooth": "мерит дрожь движения при ровно 60 кадрах/с (CI: --fixed-fps 60 без экрана)",
-	"test_cardinal_story": "сам запускает тест-бота на долгое прохождение (режим «Кардинал: прохождение острова» есть на вкладке)",
-	"test_cardinal_profiles": "сам запускает тест-бота (режим «Кардинал: профили игроков» есть на вкладке), а второй бот не запускается",
-	"test_bridge_walk": "≈ 400 с игрового времени прогулок по мостам — дольше таймаута теста на телефоне (300 с); мосты проходит и режим «Кардинал: прохождение острова»",
-}
-## Проверяют модели и текстуры из пакета ресурсов: без всех частей — пропуск.
-const NEED_PACK := ["test_hero_models", "test_npc_models", "test_props", "test_handheld", "test_pet_stages",
-	"test_two_hand", "test_textures"]
-## Быстрые: логика без тяжёлых сцен (режим "autotests_quick").
-const QUICK := ["smoke_test", "test_accounts", "test_combat", "test_combat_melee", "test_combat_magic", "test_economy",
-	"test_inventory", "test_loot", "test_potions", "test_equipment", "test_enchant", "test_quests", "test_jobs",
-	"test_taming_cards", "test_pet_skills", "test_monster_stats", "test_balance_start", "test_mob_aggro"]
+## Только CI: тест → причина (каталог tests/catalog.gd, флаг "ci:<причина>").
+static var CI_ONLY: Dictionary = _catalog_ci_only()
+## Проверяют модели и текстуры из пакета ресурсов (флаг "pack"): без всех частей — пропуск.
+static var NEED_PACK: PackedStringArray = _catalog_flag("pack")
+## Быстрые (флаг "quick", режим "autotests_quick").
+static var QUICK: PackedStringArray = TestCatalog.quick()
+## Режим «Автотесты: по группам»: выбранные группы каталога (запоминаются в GROUPS_FILE).
+static var chosen_groups := PackedStringArray()
+static var _groups_loaded := false
+const GROUPS_FILE := "user://bot_test_groups.cfg"
+## Оценка времени теста на телефоне: секунды CI × PHONE_K + PHONE_EXTRA (загрузка мира теста).
+const PHONE_K := 1.5
+const PHONE_EXTRA := 8.0
 const STATUS_TEXT := {"ok": "прошёл", "fail": "НЕ ПРОШЁЛ", "timeout": "ТАЙМАУТ", "error": "ОШИБКА", "skip": "пропущен",
 	"stopped": "прерван"}
 
@@ -96,11 +90,18 @@ func id() -> String:
 
 
 func title() -> String:
+	if mode_key == "autotests_groups":
+		var names := PackedStringArray()
+		for g in groups():
+			names.append(TestCatalog.group_name(g))
+		return "Автотесты на телефоне (по группам: %s)" % ", ".join(names)
 	return "Автотесты на телефоне" + (" (быстрые)" if mode_key == "autotests_quick" else "")
 
 
 func limit() -> float:
 	var m := mode(mode_key if mode_key != "" else id())
+	if mode_key == "autotests_groups":
+		return clampf(estimate(test_names()) * 1.5 + 60.0, 180.0, float(m.get("minutes", 75)) * 60.0)
 	return float(m.get("minutes", 75)) * 60.0
 
 
@@ -141,6 +142,8 @@ func test_names() -> PackedStringArray:
 	if not only.is_empty():
 		return only
 	var all := list_tests()
+	if mode_key == "autotests_groups":
+		return group_tests(groups())
 	if mode_key != "autotests_quick":
 		return all
 	var out := PackedStringArray()
@@ -201,6 +204,71 @@ static func scan_tests() -> PackedStringArray:
 	return out
 
 
+static func _catalog_ci_only() -> Dictionary:
+	var d := {}
+	for k in TestCatalog.TESTS:
+		var why := TestCatalog.ci_only(String(k))
+		if why != "":
+			d[String(k)] = why
+	return d
+
+
+static func _catalog_flag(flag: String) -> PackedStringArray:
+	var res := PackedStringArray()
+	for k in TestCatalog.TESTS:
+		if TestCatalog.flags(String(k)).has(flag):
+			res.append(String(k))
+	return res
+
+
+## Выбранные группы режима «по группам» (первый раз — из GROUPS_FILE).
+static func groups() -> PackedStringArray:
+	if not _groups_loaded:
+		_groups_loaded = true
+		var cf := ConfigFile.new()
+		if cf.load(GROUPS_FILE) == OK:
+			for g in cf.get_value("autotests", "groups", PackedStringArray()):
+				if TestCatalog.group_ids().has(String(g)) and not chosen_groups.has(String(g)):
+					chosen_groups.append(String(g))
+	return chosen_groups
+
+
+## Включить или выключить группу g (и запомнить выбор).
+static func toggle_group(g: String) -> void:
+	groups()
+	var i := chosen_groups.find(g)
+	if i >= 0:
+		chosen_groups.remove_at(i)
+	elif TestCatalog.group_ids().has(g):
+		chosen_groups.append(g)
+	var cf := ConfigFile.new()
+	cf.set_value("autotests", "groups", chosen_groups)
+	cf.save(GROUPS_FILE)
+
+
+## Почему «по группам» не начать ("" — можно).
+static func groups_block() -> String:
+	return "выберите хотя бы одну группу тестов" if groups().is_empty() else ""
+
+
+## Тесты выбранных групп, которые пойдут на телефоне (без «только CI»), по порядку папки.
+static func group_tests(gs: PackedStringArray) -> PackedStringArray:
+	var res := PackedStringArray()
+	for n in list_tests():
+		if gs.has(TestCatalog.group_of(String(n))):
+			res.append(String(n))
+	return res
+
+
+## Оценка времени тестов names на телефоне, с (без «только CI»).
+static func estimate(names: PackedStringArray) -> float:
+	var t := 0.0
+	for n in names:
+		if TestCatalog.ci_only(String(n)) == "":
+			t += TestCatalog.secs(String(n)) * PHONE_K + PHONE_EXTRA
+	return t
+
+
 ## Почему тест не запускать на этом телефоне ("" — запускать).
 func skip_reason(n: String) -> String:
 	if CI_ONLY.has(n):
@@ -216,6 +284,9 @@ func skip_reason(n: String) -> String:
 func build(b: TestBot) -> void:
 	bot = b
 	var names := test_names()
+	# По группам: список — в контрольную точку (выбор групп мог смениться до «Продолжить»)
+	if mode_key == "autotests_groups" and only.is_empty():
+		only = names
 	planned = names.size()
 	var ib := b.interrupted_before
 	if String(ib.get("mode", "")).begins_with("autotests") and String(ib.get("step", "")) != "":
@@ -236,7 +307,12 @@ func build(b: TestBot) -> void:
 
 
 func _prepare(names: PackedStringArray) -> void:
-	bot.note("Автотесты: %d (%s)%s" % [names.size(), "быстрые" if mode_key == "autotests_quick" else "все",
+	var kind := "все"
+	if mode_key == "autotests_quick":
+		kind = "быстрые"
+	elif mode_key == "autotests_groups":
+		kind = title().trim_prefix("Автотесты на телефоне (").trim_suffix(")")
+	bot.note("Автотесты: %d (%s)%s" % [names.size(), kind,
 		"; в прошлый раз игра закрылась на «%s»" % _crashed_on if _crashed_on != "" else ""])
 	if names.is_empty():
 		bot.check(false, "список автотестов пуст (папки res://tests/ нет в сборке?)")
@@ -560,6 +636,17 @@ func summary(_b: TestBot) -> String:
 		", не успели %d" % left if left > 0 else "", planned]
 
 
+## Сводка для report.json: итог каждого теста (сравнение запусков, предложения).
+func report_data(_b: TestBot) -> Dictionary:
+	var list: Array = []
+	for r in results:
+		var errs: Array = Array(r.get("errors", PackedStringArray()))
+		list.append({"name": String(r["name"]), "status": String(r["status"]), "text": String(r.get("text", "")),
+			"sec": snappedf(float(r.get("sec", 0.0)), 0.1), "group": TestCatalog.group_of(String(r["name"])),
+			"errors": errs.slice(0, 4)})
+	return {"autotests": list, "planned": planned}
+
+
 static func _sec(v: float) -> String:
 	return "%.1f с" % v if v < 60.0 else TestBot.clock(v)
 
@@ -571,7 +658,7 @@ func report_lines(_b: TestBot) -> PackedStringArray:
 	L.append("  Условия: тесты писались для CI (без экрана, ровно 60 кадров/с — --fixed-fps 60); на телефоне кадр — "
 		+ "настоящее время и экран рисуется, поэтому тесты на точное время могут вести себя иначе. Настройки — по "
 		+ "умолчанию (настройки игрока убраны на время тестов и возвращены), аккаунты тестов — свои (стёрты в конце).")
-	L.append("  %3s  %-34s %-12s %8s %7s %6s  %s" % ["№", "Тест", "Итог", "Время", "Кадров", "к/с", "Ошибок Godot (GDScript / прочих), предупреждений"])
+	L.append("  %3s  %-34s %-12s %8s %7s %6s  %s" % ["№", "Тест", "Итог", "Время", "Кадров", "к/с", "Ошибок Godot (GDScript / прочих), предупреждений — что проверяет"])
 	var i := 0
 	var from_cp := 0
 	for r in results:
@@ -586,7 +673,7 @@ func report_lines(_b: TestBot) -> PackedStringArray:
 		L.append("  %3d  %-34s %-12s %8s %7s %6s  %s" % [i, (String(r["name"]) + (" *" if bool(r.get("from_cp", false))
 			else "")).left(34), String(STATUS_TEXT.get(st, st)),
 			"—" if st == "skip" else _sec(float(r["sec"])), "—" if st == "skip" else str(int(r["frames"])),
-			"—" if st == "skip" or float(r["fps"]) <= 0.0 else "%.0f" % float(r["fps"]), errs])
+			"—" if st == "skip" or float(r["fps"]) <= 0.0 else "%.0f" % float(r["fps"]), errs + " — " + TestCatalog.label(String(r["name"]))])
 	var left := planned - results.size()
 	if left > 0:
 		L.append("  … ещё %d тестов не запускались (бот остановлен раньше)" % left)
@@ -599,7 +686,11 @@ func report_lines(_b: TestBot) -> PackedStringArray:
 	if bad.is_empty():
 		L.append("  нет")
 	for r in bad:
-		L.append("  %s — %s: %s" % [String(r["name"]), String(STATUS_TEXT.get(String(r["status"]), "?")), String(r["text"])])
+		var rn := String(r["name"])
+		L.append("  %s%s — %s: %s" % [rn, " «%s»" % TestCatalog.title(rn) if TestCatalog.has(rn) else "",
+			String(STATUS_TEXT.get(String(r["status"]), "?")), String(r["text"])])
+		if TestCatalog.what(String(r["name"])) != "":
+			L.append("    что проверяет: " + TestCatalog.what(String(r["name"])))
 		var errs: PackedStringArray = r["errors"]
 		if not errs.is_empty():
 			L.append("    ошибки Godot за время теста (первые %d):" % errs.size())

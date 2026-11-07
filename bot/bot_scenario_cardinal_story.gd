@@ -199,6 +199,27 @@ const FEATURE_NAMES := {"job": "Выбор профессии", "dungeon": "По
 	"chapter1": "Глава I «Шёпот из глубин» (подземелье)"}
 
 
+## Сводка для report.json: пройдено заданий и где застряло (предложения, сравнение запусков).
+func report_data(_bot: TestBot) -> Dictionary:
+	if runs.is_empty():
+		return {}
+	var sus: Array = []
+	for r in runs:
+		var d := r.result()
+		var stuck := PackedStringArray()
+		var qs: Dictionary = d.get("quests", {})
+		for qid in qs:
+			var q: Dictionary = qs[qid]
+			if String(q.get("status", "")) == "stuck":
+				stuck.append("%s: %s" % [String(q.get("name", qid)), String(q.get("reason", ""))])
+		if not stuck.is_empty():
+			sus.append({"severity": "высокая", "title": "Застряли задания: %d (%s)" % [stuck.size(), String(d["title"])],
+				"who": String(d["title"]), "evidence": Array(stuck).slice(0, 6),
+				"advice": "Посмотреть задания в разделе «Кардинал» отчёта: причина застревания и место.", "repro": "",
+				"confidence": ""})
+	return {"suspicions": sus, "cardinal": summary(_bot)}
+
+
 func report_lines(_bot: TestBot) -> PackedStringArray:
 	var out := PackedStringArray()
 	out.append("Кардинал — прохождение острова")

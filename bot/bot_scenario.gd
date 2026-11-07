@@ -24,24 +24,58 @@ extends RefCounted
 ## BotSection (bot/bot_section.gd, bot/section_<id>.gd); minutes — лимит активного времени (у «По разделам» — по
 ## оценке выбранных разделов, BotScenarioGame.estimate).
 
-## Режимы вкладки «Тест-бот»: id, название, готов ли, сценарий, лимит активного времени (мин).
+## Группы режимов на вкладке «Тест-бот» (фаза 6 — порядок в тестах): [id, название, что это за режимы].
+const MODE_GROUPS := [
+	["game", "Бот играет и проверяет", "Бот сам играет тестовым героем по разделам игры и проверяет, что всё работает (бой, питомцы, торговля, задания, мир, интерфейс, подземелье)."],
+	["perf", "Производительность", "Кадры в секунду, нагрузка и нагрев телефона на сценах и пресетах графики."],
+	["autotests", "Автотесты на телефоне", "Те же проверки кода, что идут в CI на каждый пуш, — прямо на телефоне. Что какой тест проверяет — по группам ниже и в docs/TESTS.md."],
+	["cardinal", "Кардинал: как играют разные игроки", "Бот проходит игру как игрок и ищет тупики, застревания, долгий гринд и странности баланса."],
+]
+
+## Режимы вкладки «Тест-бот»: id, группа (MODE_GROUPS), название, готов ли, сценарий, лимит активного времени (мин),
+## что проверяет (about) и когда запускать (when) — показываются во вкладке и в docs/TESTS.md.
+## Литерал без выражений: tools/tests_catalog.py читает его для docs/TESTS.md.
 const MODES := [
-	{"id": "perf", "name": "Производительность", "ready": true, "script": "res://bot/bot_scenario_perf.gd", "minutes": 14},
-	{"id": "autotests", "name": "Автотесты на телефоне (все)", "ready": true,
-		"script": "res://bot/bot_scenario_autotests.gd", "minutes": 75},
-	{"id": "autotests_quick", "name": "Автотесты: быстрые", "ready": true,
-		"script": "res://bot/bot_scenario_autotests.gd", "minutes": 15},
-	{"id": "quick", "name": "Быстрый (5 мин)", "ready": true, "script": "res://bot/bot_scenario_quick.gd", "minutes": 6},
-	{"id": "full", "name": "Полный (10 мин)", "ready": true, "script": "res://bot/bot_scenario_full.gd", "minutes": 12},
-	{"id": "sections", "name": "По разделам", "ready": true, "script": "res://bot/bot_scenario_sections.gd", "minutes": 10},
-	{"id": "cardinal", "name": "Кардинал: первый срез", "ready": true, "script": "res://bot/bot_scenario_cardinal.gd",
-		"minutes": 12},
-	{"id": "cardinal_det", "name": "Кардинал: детерминизм", "ready": true, "script": "res://bot/bot_scenario_cardinal.gd",
-		"minutes": 6},
-	{"id": "cardinal_story", "name": "Кардинал: прохождение острова", "ready": true,
-		"script": "res://bot/bot_scenario_cardinal_story.gd", "minutes": 40},
-	{"id": "cardinal_profiles", "name": "Кардинал: профили игроков", "ready": true,
-		"script": "res://bot/bot_scenario_cardinal_profiles.gd", "minutes": 60},
+	{"id": "quick", "group": "game", "name": "Быстрый (5 мин)", "ready": true, "script": "res://bot/bot_scenario_quick.gd",
+		"minutes": 6, "about": "12 разделов коротко: бой 5 профессий, питомцы, приручение, торговля, склад, задания, задания жителей, экипировка, торба и пояс, мир, интерфейс, подземелье.",
+		"when": "После каждой новой сборки."},
+	{"id": "full", "group": "game", "name": "Полный (10 мин)", "ready": true, "script": "res://bot/bot_scenario_full.gd",
+		"minutes": 12, "about": "Те же 12 разделов подробно: все 9 профессий, все виды питомцев, все дороги острова, все залы подземелья.",
+		"when": "Перед выпуском или если быстрый нашёл ошибку."},
+	{"id": "sections", "group": "game", "name": "По разделам", "ready": true, "script": "res://bot/bot_scenario_sections.gd",
+		"minutes": 10, "about": "Только выбранные разделы, подробно.",
+		"when": "Проверить раздел после исправления."},
+	{"id": "perf", "group": "perf", "name": "Производительность", "ready": true, "script": "res://bot/bot_scenario_perf.gd",
+		"minutes": 14, "about": "Кадры в секунду, время кадра, вызовы, треугольники, нагрев: 6 сцен (город, поле, толпа, бой, даль, подземелье) × 4 пресета и тяжёлые настройки по одной.",
+		"when": "После изменений графики и на новом телефоне."},
+	{"id": "autotests_quick", "group": "autotests", "name": "Автотесты: быстрые", "ready": true,
+		"script": "res://bot/bot_scenario_autotests.gd", "minutes": 15,
+		"about": "Проверки логики: бой, предметы, торговля, задания, питомцы, звери (флаг «быстрые» в каталоге).",
+		"when": "Убедиться, что на телефоне игра считает так же, как в CI."},
+	{"id": "autotests_groups", "group": "autotests", "name": "Автотесты: по группам", "ready": true,
+		"script": "res://bot/bot_scenario_autotests.gd", "minutes": 75,
+		"about": "Проверки выбранных групп каталога (бой и умения, предметы, подземелье, модели …).",
+		"when": "Проверить одну область игры."},
+	{"id": "autotests", "group": "autotests", "name": "Автотесты на телефоне (все)", "ready": true,
+		"script": "res://bot/bot_scenario_autotests.gd", "minutes": 75,
+		"about": "Все проверки кода, которые можно запустить на телефоне (кроме «только CI»).",
+		"when": "Редко: долгий полный прогон кода на телефоне."},
+	{"id": "cardinal", "group": "cardinal", "name": "Кардинал: первый срез", "ready": true,
+		"script": "res://bot/bot_scenario_cardinal.gd", "minutes": 12,
+		"about": "Бродяга 1 ур. фармит у деревни как игрок; опыт за каждое убийство сверяется с формулой, добыча и золото — со статистикой.",
+		"when": "После изменений опыта, боя, добычи."},
+	{"id": "cardinal_det", "group": "cardinal", "name": "Кардинал: детерминизм", "ready": true,
+		"script": "res://bot/bot_scenario_cardinal.gd", "minutes": 6,
+		"about": "Два одинаковых ускоренных прогона должны совпасть убийство в убийство — ускорение ×8 честное.",
+		"when": "После изменений бота или ускорения."},
+	{"id": "cardinal_story", "group": "cardinal", "name": "Кардинал: прохождение острова", "ready": true,
+		"script": "res://bot/bot_scenario_cardinal_story.gd", "minutes": 40,
+		"about": "Свежий Бродяга проходит все задания острова с крафтом, питомцами и поясом ускоренно; по каждому заданию — взято, сдано, застряло, награды.",
+		"when": "После изменений заданий и наград."},
+	{"id": "cardinal_profiles", "group": "cardinal", "name": "Кардинал: профили игроков", "ready": true,
+		"script": "res://bot/bot_scenario_cardinal_profiles.gd", "minutes": 60,
+		"about": "Честное прохождение отрезка острова 5 типами игроков (новичок, обычный, ветеран, фармер, экспериментатор): время, смерти, застревания, гринд, золото, подозрения.",
+		"when": "Оценить баланс и удобство."},
 ]
 
 
@@ -85,6 +119,23 @@ static func mode(mode_id: String) -> Dictionary:
 static func mode_name(mode_id: String) -> String:
 	var m := mode(mode_id)
 	return String(m.get("name", mode_id)) if not m.is_empty() else mode_id
+
+
+## Название группы режимов.
+static func group_name(group_id: String) -> String:
+	for g in MODE_GROUPS:
+		if String(g[0]) == group_id:
+			return String(g[1])
+	return group_id
+
+
+## Режимы группы по порядку MODES.
+static func modes_in(group_id: String) -> Array:
+	var res: Array = []
+	for e in MODES:
+		if String((e as Dictionary).get("group", "")) == group_id:
+			res.append(e)
+	return res
 
 
 ## Режим из MODES, по которому создан сценарий ("" — создан напрямую, как в тестах).
@@ -139,6 +190,12 @@ func owns_scene() -> bool:
 ## Телефон не остывает в паузе — снизить нагрузку сценария (щадящий режим TestBot). Вернуть — что сделано, для журнала.
 func on_hot(_bot: TestBot) -> String:
 	return ""
+
+
+## Данные сценария для сводки запуска report.json (BotHistory.summary: сравнение запусков и предложения):
+## «Автотесты» — {"autotests": [...]}, «Кардинал: профили игроков» — {"suspicions": [...]} и т. п.
+func report_data(_bot: TestBot) -> Dictionary:
+	return {}
 
 
 func on_finish(_bot: TestBot) -> void:

@@ -355,6 +355,14 @@ func _begin() -> void:
 	started_text = "%04d-%02d-%02d %02d:%02d" % [int(now["year"]), int(now["month"]), int(now["day"]), int(now["hour"]),
 		int(now["minute"])]
 	base_name = BotReport.file_base(now)
+	# Два запуска в одну минуту: имя отчёта — с номером (иначе второй затирал отчёт и строку истории первого)
+	var nb := base_name
+	var k := 2
+	while FileAccess.file_exists(report_dir + nb + ".txt") or DirAccess.dir_exists_absolute(
+			ProjectSettings.globalize_path(report_dir + nb)):
+		nb = "%s_%d" % [base_name, k]
+		k += 1
+	base_name = nb
 	if origin == "":
 		origin = base_name
 	away_total_us = 0

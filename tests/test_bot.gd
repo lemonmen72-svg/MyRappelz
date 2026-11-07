@@ -15,7 +15,10 @@ extends "res://tests/test_base.gd"
 ## - запуск 3: режим «Автотесты на телефоне» (bot_scenario_autotests.gd) на своём списке — настоящий test_combat
 ##   (прошёл), test_bot (пропущен — только CI), подставные тесты: не прошёл (fail), завис (таймаут), не наследует
 ##   test_base (ошибка); главная сцена убрана на время тестов, настройки игрока убраны и возвращены, аккаунты тестов
-##   стёрты, игрок снова в своём мире; раздел «Автотесты» отчёта; список тестов и «быстрые»; recover_after_crash.
+##   стёрты, игрок снова в своём мире; раздел «Автотесты» отчёта; список тестов и «быстрые»; recover_after_crash;
+## - фаза 6: история запусков (BotHistory: report.json в папке запуска и в архиве, history.json), сравнение запуска
+##   с прошлым того же режима, экспорт всего, предложения (BotSuggest) — сбой прошлого запуска, перегрев, автотест не
+##   прошёл; вкладки «Отчёты» и «Предложения» админ-панели (кнопки, сравнение, экспорт — без кнопки «применить»).
 
 const BOT_REPORTS := "user://test_bot_reports/"
 const AutoScenario := preload("res://bot/bot_scenario_autotests.gd")
@@ -139,6 +142,9 @@ func run_step() -> void:
 			_home_slot = FileAccess.get_file_as_string(Accounts.slot_path(0))
 			check(_slot_key(_home_slot).begins_with("Тест|"), "слот 1 игрока — «Тест»")
 			Assets.plugin_override = _fake
+			# История запусков — только этого теста (user:// мог остаться от прошлого прогона)
+			if FileAccess.file_exists(BOT_REPORTS + BotHistory.FILE):
+				DirAccess.remove_absolute(ProjectSettings.globalize_path(BOT_REPORTS + BotHistory.FILE))
 			_start_run()
 			step = 1
 		1:
@@ -212,6 +218,7 @@ func run_step() -> void:
 				and not FileAccess.file_exists(AutoScenario.ACCOUNTS + "accounts.json"), "аккаунты автотестов стёрты")
 			check(not Handheld.force_missing and CreatureAsset.use_assets and not Assets.force_missing,
 				"подмены тестов сняты")
+			_check_history()
 			Assets.plugin_override = null
 			_restore_settings_file()
 			ok_done()
@@ -517,6 +524,85 @@ func _check_autotests_report() -> void:
 		check(text.contains(part), "отчёт автотестов содержит «%s»" % part.strip_edges())
 	check(not text.contains("Замеры (прогрев") and not text.contains("Рекомендации"), "без таблиц замеров")
 	check(UiScale.level() == UiScale.LARGE, "размер интерфейса игрока вернулся")
+
+
+## Фаза 6: история трёх запусков, сводки, сравнение, экспорт, предложения, вкладки «Отчёты» и «Предложения».
+func _check_history() -> void:
+	var list := BotHistory.runs(BOT_REPORTS)
+	var modes := PackedStringArray()
+	for r in list:
+		modes.append(String((r as Dictionary)["mode"]))
+	check(list.size() == 3 and Array(modes) == ["test", "test", "autotests"], "история запусков: %s" % [modes])
+	if list.size() < 3:
+		return
+	var n := list.size()
+	var r1: Dictionary = list[n - 3]
+	var r2: Dictionary = list[n - 2]
+	var r3: Dictionary = list[n - 1]
+	var d1 := BotHistory.load_summary(r1)
+	var d2 := BotHistory.load_summary(r2)
+	var d3 := BotHistory.load_summary(r3)
+	check(int(d1.get("schema", 0)) == BotHistory.SCHEMA and String(d1.get("id", "")) == String(r1["id"])
+		and String(d1.get("result", "")) == "done" and (d1.get("measures", []) as Array).size() >= 3,
+		"сводка запуска 1: итог %s, замеров %d" % [d1.get("result", "?"), (d1.get("measures", []) as Array).size()])
+	check(String(d2.get("result", "")) == "hot" and not (d2.get("crash", {}) as Dictionary).is_empty()
+		and bool((d2["crash"] as Dictionary).get("failure", false)), "сводка запуска 2: перегрев и сбой прошлого запуска")
+	var at: Array = d3.get("autotests", [])
+	check(at.size() == 5 and String((at[0] as Dictionary)["status"]) == "ok" and String((at[2] as Dictionary)["status"]) == "fail",
+		"сводка автотестов: %d тестов" % at.size())
+	# Архив запуска — со сводкой
+	var zr := ZIPReader.new()
+	var files := PackedStringArray()
+	if zr.open(String(r1.get("zip", ""))) == OK:
+		files = zr.get_files()
+		zr.close()
+	check(files.has(BotHistory.SUMMARY), "сводка report.json — в архиве отчёта (%s)" % [files])
+	# Сравнение: запуск 2 с запуском 1 (тот же режим); у первого — не с чем
+	check(BotHistory.previous_of(list, n - 2) == n - 3 and BotHistory.previous_of(list, n - 1) == -1
+		and BotHistory.previous_of(list, n - 3) == -1, "прошлый запуск того же режима")
+	check(BotHistory.compare_run(list, n - 2, BOT_REPORTS) == "", "сравнение запуска 2 с запуском 1")
+	var cmp := "\n".join(BotHistory.last_compare)
+	for part in ["Сравнение запусков", "Было:", "Стало:", "Итог:", "Замеры", "Лог Godot"]:
+		check(cmp.contains(part), "сравнение содержит «%s»" % part)
+	check(FileAccess.file_exists(BotHistory.compare_path(BOT_REPORTS)), "сравнение записано в файл")
+	# Предложения: сбой прошлого запуска (критично), перегрев, автотесты не прошли — только просмотр
+	var sug := BotSuggest.collect(list)
+	var titles := PackedStringArray()
+	for it in sug:
+		titles.append(String((it as Dictionary)["title"]))
+	var t := "\n".join(titles)
+	check(not sug.is_empty() and String((sug[0] as Dictionary)["severity"]) == "critical" and t.contains("Игра закрылась"),
+		"предложения: первым — сбой игры (%s)" % t.replace("\n", " | "))
+	check(t.contains("перегревом") and t.contains("Автотест") and t.contains("fake_fail"), "предложения: перегрев, автотесты")
+	var exp := BotHistory.export_all(BOT_REPORTS)
+	files = PackedStringArray()
+	if zr.open(String(exp.get("zip", ""))) == OK:
+		files = zr.get_files()
+		zr.close()
+	check(files.has("history.json") and files.has("suggestions.txt") and files.has("compare_last.txt")
+		and files.has(String(r1["id"]) + "/" + BotHistory.SUMMARY), "экспорт всего: %d файлов" % files.size())
+	# Вкладки админ-панели
+	var keep_dir := AdminPanel.reports_dir
+	AdminPanel.reports_dir = BOT_REPORTS
+	AdminPanel.report_sel = -1
+	AdminPanel.open(main, "reports")
+	var b := AdminPanel.buttons
+	check(b.has("tab_reports") and b.has("tab_suggest") and b.has("bot_hist_%d" % (n - 1)) and b.has("bot_hist_open")
+		and b.has("bot_hist_compare") and b.has("bot_export_all"), "вкладка «Отчёты»: запуски и кнопки")
+	check((b["bot_hist_compare"] as Button).disabled, "последний запуск (автотесты) сравнить не с чем")
+	(b["bot_hist_%d" % (n - 2)] as Button).pressed.emit()
+	check(AdminPanel.report_sel == n - 2 and not (AdminPanel.buttons["bot_hist_compare"] as Button).disabled,
+		"выбран запуск 2 — сравнить можно")
+	(AdminPanel.buttons["bot_hist_compare"] as Button).pressed.emit()
+	check(AdminPanel.buttons.has("bot_cmp_share"), "сравнение показано во вкладке")
+	AdminPanel.open(main, "suggest")
+	check(AdminPanel.buttons.has("bot_sug_export") and not (AdminPanel.buttons["bot_sug_export"] as Button).disabled,
+		"вкладка «Предложения»: экспорт")
+	for k in AdminPanel.buttons:
+		check(not String(k).contains("apply"), "у предложений нет кнопки «применить» (%s)" % k)
+	AdminPanel.reports_dir = keep_dir
+	AdminPanel.report_sel = -1
+	main.hud.close_window()
 
 
 ## settings.cfg — как до теста (user:// общий у тестов одной задачи CI).

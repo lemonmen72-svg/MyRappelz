@@ -541,6 +541,20 @@ func summary(_bot: TestBot) -> String:
 		(_analysis["suspicions"] as Array).size(), hi]
 
 
+## Сводка для report.json: подозрения (предложения, сравнение запусков) и итог по профилям.
+func report_data(_bot: TestBot) -> Dictionary:
+	if _analysis.is_empty():
+		return {}
+	var sus: Array = []
+	for s in _analysis.get("suspicions", []):
+		var sd: Dictionary = s
+		sus.append({"severity": String(sd.get("severity", "")), "title": String(sd.get("title", "")),
+			"who": String(sd.get("who", "")), "evidence": Array(sd.get("evidence", [])).slice(0, 6),
+			"advice": String(sd.get("advice", "")), "repro": String(sd.get("repro", "")),
+			"confidence": String(sd.get("confidence", ""))})
+	return {"suspicions": sus, "cardinal": summary(_bot)}
+
+
 func report_lines(_bot: TestBot) -> PackedStringArray:
 	var out := PackedStringArray()
 	out.append("Кардинал — профили игроков (фаза 4)")

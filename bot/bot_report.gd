@@ -300,7 +300,15 @@ static func export(bot: TestBot) -> Dictionary:
 		return res
 	f.store_string(text)
 	f.close()
+	# Сводка запуска (фаза 6: история, сравнение, предложения — BotHistory) — в папку запуска, до архива
+	var sd := BotHistory.summary(bot)
+	var sp := BotHistory.write_summary(bot, sd)
 	var entries: Array = [[bot.base_name + ".txt", txt_path]]
+	# Данные запуска в папке запуска (report.json, cardinal*.json) — в архив
+	if bot.run_dir != "":
+		for jf in DirAccess.get_files_at(bot.run_dir):
+			if String(jf).ends_with(".json"):
+				entries.append([String(jf), bot.run_dir + String(jf)])
 	for s in bot.shots:
 		entries.append(["shots/" + String(s), bot.run_dir + "shots/" + String(s)])
 	if not make_zip(zip_path, entries):
@@ -321,6 +329,8 @@ static func export(bot: TestBot) -> Dictionary:
 	else:
 		res["message"] = "Отчёт: %s" % ProjectSettings.globalize_path(String(res["zip"]) if String(res["zip"]) != ""
 			else txt_path)
+	res["summary"] = sp
+	BotHistory.add_run(sd, res, sp, bot.report_dir)
 	return res
 
 

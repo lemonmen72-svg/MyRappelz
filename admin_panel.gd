@@ -70,7 +70,7 @@ const BAD := Color(1.0, 0.5, 0.45)
 const JOB_QUEST := QuestData.JOB_QUEST
 ## Вкладки: [id, подпись].
 const TABS := [["hero", "Герой"], ["xp", "Опыт"], ["items", "Предметы"], ["pets", "Питомцы"], ["world", "Мир"],
-	["bot", "Тест-бот"]]
+	["bot", "Тест-бот"], ["reports", "Отчёты"], ["suggest", "Предложения"]]
 const XP_MULTS := [1, 2, 5, 10, 20, 50]
 const SPEED_MULTS := [1, 2, 3]
 const LEVEL_PRESETS := [1, 10, 15, 20, 30, 40]
@@ -145,6 +145,10 @@ static func open(main: Node, which: String = "") -> void:
 			_build_world(main, body)
 		"bot":
 			_build_bot(main, body)
+		"reports":
+			_build_reports(main, body)
+		"suggest":
+			_build_suggest(main, body)
 		_:
 			_build_hero(main, body)
 	if keep > 0 and _scroll != null:
@@ -192,7 +196,7 @@ static func _add_tabs(main: Node, body: VBoxContainer) -> void:
 		b.toggle_mode = true
 		b.button_pressed = id == tab
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.custom_minimum_size = Vector2(UiScale.px(110), UiScale.px(UiScale.TAB_H))
+		b.custom_minimum_size = Vector2(UiScale.px(96), UiScale.px(UiScale.TAB_H))
 		b.pressed.connect(func() -> void: AdminPanel.open(main, id))
 		bar.add_child(b)
 		buttons["tab_" + id] = b
@@ -1019,42 +1023,44 @@ static func _flat_dist(a: Vector3, b: Vector3) -> float:
 # ---------- Вкладка «Тест-бот» ----------
 
 static func _build_bot(main: Node, body: VBoxContainer) -> void:
-	body.add_child(_text("Бот сам играет отдельным тестовым героем в своём хранилище (ваш герой и сохранения не "
-		+ "меняются): «Производительность» меряет кадры, вызовы, треугольники и температуру, «Быстрый», «Полный» и "
-		+ "«По разделам» играют — бой и умения всех профессий, питомцы, приручение, торговля, склад, задания, "
-		+ "экипировка, мир, интерфейс — и проверяют; снимает экран и пишет отчёт: "
-		+ "Загрузки/DarkPact_test (архив .zip и .txt). По окончании вы вернётесь к своему герою. При нагреве бот "
-		+ "сам уходит на паузу «остывание», при сильном — останавливается. «Автотесты» — наши автотесты по одному "
-		+ "(какие прошли, ошибки, время).", UiScale.FONT_SMALL, MUTED))
-	_head(body, "Режим")
-	var g := _grid(body, 2)
-	for e in BotScenario.MODES:
-		var md: Dictionary = e
-		var mid := String(md["id"])
-		var avail := bool(md.get("ready", false))
-		var label := String(md["name"])
-		if avail and mid == "sections":
-			label += " — выбор ниже"
-		elif avail:
-			label += " — до %d мин" % int(md.get("minutes", 12))
-		else:
-			label += " — скоро"
-		_choice(g, "bot_mode_" + mid, label, mid == bot_mode, func() -> void: AdminPanel.set_bot_mode(main, mid))
-		(buttons["bot_mode_" + mid] as Button).disabled = not avail
+	body.add_child(_text("Бот играет отдельным тестовым героем в своём хранилище — ваш герой и сохранения не меняются, "
+		+ "по окончании вы вернётесь к своему герою. Отчёт — в Загрузки/DarkPact_test (.zip и .txt), история и сравнение "
+		+ "запусков — вкладка «Отчёты», что посмотреть по итогам — «Предложения». При нагреве бот сам уходит на паузу "
+		+ "«остывание», при сильном — останавливается. Что какой режим и тест проверяет — ниже и в docs/TESTS.md.",
+		UiScale.FONT_SMALL, MUTED))
+	for g in BotScenario.MODE_GROUPS:
+		var gid := String(g[0])
+		_head(body, String(g[1]))
+		body.add_child(_text(String(g[2]), UiScale.FONT_SMALL, MUTED))
+		var gg := _grid(body, 3)
+		for e in BotScenario.modes_in(gid):
+			var md: Dictionary = e
+			var mid := String(md["id"])
+			var avail := bool(md.get("ready", false))
+			var label := String(md["name"])
+			if not avail:
+				label += " — скоро"
+			_choice(gg, "bot_mode_" + mid, label, mid == bot_mode, func() -> void: AdminPanel.set_bot_mode(main, mid))
+			(buttons["bot_mode_" + mid] as Button).disabled = not avail
+	_build_bot_mode_info(main, body)
 	if bot_mode == "sections":
 		_build_bot_sections(main, body)
 	elif bot_mode == "cardinal_story":
 		_build_bot_accel(main, body)
 	elif bot_mode == "cardinal_profiles":
 		_build_bot_profiles(main, body)
+	elif bot_mode.begins_with("autotests"):
+		_build_bot_tests(main, body)
 	var running := TestBot.is_running()
 	_head(body, "Состояние: " + TestBot.status_text())
 	var r := _row(body)
 	_btn(r, "bot_start", "Начать", func() -> void: AdminPanel.bot_start(main), 140.0)
 	_btn(r, "bot_stop", "Стоп", func() -> void: AdminPanel.bot_stop(main), 140.0)
-	(buttons["bot_start"] as Button).disabled = running or (bot_mode == "sections" and BotScenarioGame.chosen().is_empty()) \
-		or (bot_mode == "cardinal_profiles" and BotScenarioCardinalProfiles.validate() != "")
+	var block := start_block()
+	(buttons["bot_start"] as Button).disabled = running or block != ""
 	(buttons["bot_stop"] as Button).disabled = not running
+	if block != "" and not running:
+		body.add_child(_text("Начать нельзя: " + block, UiScale.FONT_SMALL, BAD))
 	# Прерванный запуск долгого режима (контрольная точка): «Продолжить» — с того же места, «Забыть»
 	var cp := TestBot.read_checkpoint()
 	if bool(cp.get("exists", false)) and not running:
@@ -1085,19 +1091,238 @@ static func _build_bot(main: Node, body: VBoxContainer) -> void:
 	_btn(r2, "bot_share", "Поделиться", func() -> void: AdminPanel.bot_report(main, true), 160.0)
 	(buttons["bot_open"] as Button).disabled = last.is_empty()
 	(buttons["bot_share"] as Button).disabled = last.is_empty()
-	# Система анимаций 1.0 (AnimResolver): откат на прежний выбор клипов и боевой покой — до перезапуска
-	_head(body, "Анимации")
+	# Откат новых систем на прежние — только до перезапуска игры
+	_head(body, "Откат систем (до перезапуска)")
 	body.add_child(_text("Решения выбора клипов: " + AnimResolver.summary_line(), UiScale.FONT_SMALL, INFO))
 	var r3 := _row(body)
 	_choice(r3, "anim_system", "Система анимаций: вкл." if AnimResolver.enabled else "Система анимаций: выкл.",
 		AnimResolver.enabled, func() -> void: AdminPanel.set_anim(main, not AnimResolver.enabled, AnimResolver.combat_idle))
 	_choice(r3, "anim_combat_idle", "Боевая стойка: вкл." if AnimResolver.combat_idle else "Боевая стойка: выкл.",
 		AnimResolver.combat_idle, func() -> void: AdminPanel.set_anim(main, AnimResolver.enabled, not AnimResolver.combat_idle))
-	# Эффекты умений из генератора VFX (SkillVfx): откат на прежние вспышки — до перезапуска
-	_head(body, "Эффекты")
 	var r4 := _row(body)
 	_choice(r4, "vfx_new", "Новые эффекты умений: вкл." if SkillVfx.enabled else "Новые эффекты умений: выкл.",
 		SkillVfx.enabled, func() -> void: AdminPanel.set_vfx(main, not SkillVfx.enabled))
+
+
+## Почему выбранный режим не начать ("" — можно).
+static func start_block() -> String:
+	match bot_mode:
+		"sections":
+			return "выберите хотя бы один раздел" if BotScenarioGame.chosen().is_empty() else ""
+		"autotests_groups":
+			return BotScenarioAutotests.groups_block()
+		"cardinal_profiles":
+			return BotScenarioCardinalProfiles.validate()
+	return ""
+
+
+## Выбранный режим: что проверяет, когда запускать, сколько идёт.
+static func _build_bot_mode_info(_main: Node, body: VBoxContainer) -> void:
+	var m := BotScenario.mode(bot_mode)
+	if m.is_empty():
+		return
+	_head(body, "Выбрано: " + String(m["name"]))
+	body.add_child(_text("Что проверяет: " + String(m.get("about", "")), UiScale.FONT_SMALL, INFO))
+	body.add_child(_text("Когда запускать: " + String(m.get("when", "")), UiScale.FONT_SMALL, INFO))
+	var t := "до %d мин" % int(m.get("minutes", 12))
+	if bot_mode == "sections":
+		t = "примерно %s (по выбранным разделам)" % TestBot.clock(BotScenarioGame.estimate(BotScenarioGame.chosen()))
+	elif bot_mode == "autotests_groups":
+		t = "примерно %s (по выбранным группам)" % TestBot.clock(BotScenarioAutotests.estimate(
+			BotScenarioAutotests.group_tests(BotScenarioAutotests.groups())))
+	body.add_child(_text("Сколько идёт: " + t, UiScale.FONT_SMALL, INFO))
+
+
+## Автотесты: какие тесты пойдут (по группам каталога, с названиями); «по группам» — переключатели групп и что
+## проверяет каждый тест выбранных групп.
+static func _build_bot_tests(main: Node, body: VBoxContainer) -> void:
+	if bot_mode == "autotests_groups":
+		var cur := BotScenarioAutotests.groups()
+		_head(body, "Группы тестов (выбрано %d)" % cur.size())
+		var g := _grid(body, 3)
+		for gid in TestCatalog.group_ids():
+			var n := BotScenarioAutotests.group_tests(PackedStringArray([gid])).size()
+			var gg := String(gid)
+			_choice(g, "bot_tgrp_" + gg, "%s · %d" % [TestCatalog.group_name(gg), n], cur.has(gg),
+				func() -> void: AdminPanel.toggle_test_group(main, gg))
+		for gid in cur:
+			_head(body, TestCatalog.group_name(String(gid)))
+			for n in TestCatalog.in_group(String(gid)):
+				var why := TestCatalog.ci_only(String(n))
+				body.add_child(_text("• %s — %s%s" % [TestCatalog.title(String(n)), TestCatalog.what(String(n)),
+					" (только CI — на телефоне пропуск)" if why != "" else ""], UiScale.FONT_SMALL, MUTED if why != "" else INFO))
+		return
+	var names := (BotScenario.create(bot_mode) as BotScenarioAutotests).test_names()
+	_head(body, "Тесты (%d) по группам" % names.size())
+	for gid in TestCatalog.group_ids():
+		var titles := PackedStringArray()
+		for n in names:
+			if TestCatalog.group_of(String(n)) == String(gid):
+				titles.append(TestCatalog.title(String(n)))
+		if not titles.is_empty():
+			body.add_child(_text("%s: %s" % [TestCatalog.group_name(String(gid)), ", ".join(titles)], UiScale.FONT_SMALL,
+				INFO))
+	body.add_child(_text("Что проверяет каждый тест — режим «Автотесты: по группам» или docs/TESTS.md.", UiScale.FONT_SMALL,
+		MUTED))
+
+
+static func toggle_test_group(main: Node, g: String) -> void:
+	BotScenarioAutotests.toggle_group(g)
+	if is_open(main):
+		open(main)
+
+
+# ---------- Вкладка «Отчёты»: история запусков, сравнение, экспорт ----------
+
+## Выбранный запуск в истории (-1 — последний).
+static var report_sel := -1
+## Папка отчётов вкладок «Отчёты» и «Предложения» (тест — своя).
+static var reports_dir := TestBot.REPORT_DIR
+
+
+static func _build_reports(main: Node, body: VBoxContainer) -> void:
+	var list := BotHistory.runs(reports_dir)
+	body.add_child(_text("Запуски тест-бота на этом телефоне (последние %d, новые сверху). Выберите запуск: открыть, "
+		% BotHistory.MAX_RUNS + "поделиться, сравнить с прошлым запуском того же режима. «Экспорт всего» — архив сводок, "
+		+ "текстов отчётов, сравнения и предложений.", UiScale.FONT_SMALL, MUTED))
+	if list.is_empty():
+		_head(body, "Отчётов в истории ещё нет (история ведётся с версии 0.45)")
+		return
+	var sel := report_sel if report_sel >= 0 and report_sel < list.size() else list.size() - 1
+	_head(body, "Запуски")
+	for i in range(list.size() - 1, -1, -1):
+		var ii := i
+		_choice(body, "bot_hist_%d" % i, BotHistory.run_line(list[i]), i == sel,
+			func() -> void: AdminPanel.select_report(main, ii))
+	var run: Dictionary = list[sel]
+	_head(body, "Выбран: " + BotHistory.run_line(run))
+	var d := BotHistory.load_summary(run)
+	if not d.is_empty():
+		body.add_child(_text("Итог: %s%s · проверок %d, ошибок %d · длительность %s · лог: ошибок %d" % [
+			String(d.get("result_text", "")), " (%s)" % String(d["reason"]) if String(d.get("reason", "")) != "" else "",
+			int(d.get("checks", 0)), int(d.get("errors", 0)), TestBot.clock(float(d.get("duration", 0.0))),
+			int((d.get("log", {}) as Dictionary).get("errors", 0))], UiScale.FONT_SMALL, INFO))
+	var r := _row(body)
+	_btn(r, "bot_hist_open", "Открыть", func() -> void: AdminPanel.report_open(main, false), 120.0)
+	_btn(r, "bot_hist_share", "Поделиться", func() -> void: AdminPanel.report_open(main, true), 120.0)
+	_btn(r, "bot_hist_compare", "Сравнить с прошлым", func() -> void: AdminPanel.report_compare(main), 180.0)
+	var prev := BotHistory.previous_of(list, sel)
+	(buttons["bot_hist_compare"] as Button).disabled = prev < 0
+	if prev < 0:
+		body.add_child(_text("Сравнить не с чем: прошлого запуска режима «%s» в истории нет." % String(run.get("mode_name", "")),
+			UiScale.FONT_SMALL, MUTED))
+	var ids := BotHistory.last_compare_ids
+	if not BotHistory.last_compare.is_empty() and ids.size() == 2 and String(ids[1]) == String(run.get("id", "")):
+		_head(body, "Сравнение")
+		for line in BotHistory.last_compare:
+			var col := INFO
+			if line.contains("▼") or line.begins_with("  +") or line.contains("перестали"):
+				col = BAD
+			body.add_child(_text(line, UiScale.FONT_SMALL, col))
+		var rc := _row(body)
+		_btn(rc, "bot_cmp_share", "Поделиться сравнением", func() -> void: AdminPanel.compare_share(main), 200.0)
+	_head(body, "Экспорт")
+	var re := _row(body)
+	_btn(re, "bot_export_all", "Экспорт всего", func() -> void: AdminPanel.reports_export(main), 160.0)
+
+
+static func select_report(main: Node, i: int) -> void:
+	report_sel = i
+	if is_open(main):
+		open(main)
+
+
+static func _selected_run() -> Dictionary:
+	var list := BotHistory.runs(reports_dir)
+	if list.is_empty():
+		return {}
+	var sel := report_sel if report_sel >= 0 and report_sel < list.size() else list.size() - 1
+	return list[sel]
+
+
+## «Открыть» / «Поделиться» выбранным отчётом.
+static func report_open(main: Node, share: bool) -> String:
+	var run := _selected_run()
+	var msg := "Отчётов в истории нет"
+	if not run.is_empty():
+		msg = BotReport.share_report(run) if share else BotReport.open_report(run)
+	var hud := main.get("hud") as HUD
+	if hud != null:
+		hud.show_message(msg, 6.0)
+	return msg
+
+
+## «Сравнить с прошлым»: выбранный запуск с прошлым того же режима (строки — в окне, файл — compare_last.txt).
+static func report_compare(main: Node) -> String:
+	var list := BotHistory.runs(reports_dir)
+	var sel := report_sel if report_sel >= 0 and report_sel < list.size() else list.size() - 1
+	var err := BotHistory.compare_run(list, sel, reports_dir) if not list.is_empty() else "отчётов в истории нет"
+	var hud := main.get("hud") as HUD
+	if err != "" and hud != null:
+		hud.show_message("Сравнить нельзя: " + err, 6.0)
+	if is_open(main):
+		open(main)
+	return err
+
+
+static func compare_share(main: Node) -> String:
+	var msg := BotReport.share_report({"txt": BotHistory.compare_path(reports_dir)})
+	var hud := main.get("hud") as HUD
+	if hud != null:
+		hud.show_message(msg, 6.0)
+	return msg
+
+
+## «Экспорт всего»: архив в «Загрузки» и «Поделиться».
+static func reports_export(main: Node) -> Dictionary:
+	var res := BotHistory.export_all(reports_dir)
+	var msg := String(res.get("message", ""))
+	if String(res.get("zip", "")) != "":
+		msg += " · " + BotReport.share_report(res)
+	var hud := main.get("hud") as HUD
+	if hud != null:
+		hud.show_message(msg, 8.0)
+	return res
+
+
+# ---------- Вкладка «Предложения»: только просмотр ----------
+
+static func _build_suggest(main: Node, body: VBoxContainer) -> void:
+	var items := BotSuggest.collect(BotHistory.runs(reports_dir))
+	body.add_child(_text("Что стоит посмотреть по последнему запуску каждого режима тест-бота. Только просмотр и экспорт: "
+		+ "игра ничего не исправляет и не меняет сама — решение за вами.", UiScale.FONT_SMALL, MUTED))
+	var c := BotSuggest.counts(items)
+	_head(body, "Предложений: %d (критично %d, ошибок %d, внимание %d, заметок %d)" % [items.size(), int(c["critical"]),
+		int(c["error"]), int(c["warn"]), int(c["info"])])
+	if items.is_empty():
+		body.add_child(_text("Замечаний нет — или запусков с версии 0.45 ещё не было.", UiScale.FONT_SMALL, INFO))
+	for it in items:
+		var d: Dictionary = it
+		var sev := String(d["severity"])
+		body.add_child(_text("● %s · %s" % [String(BotSuggest.SEV_NAMES.get(sev, sev)), String(d["title"])],
+			UiScale.FONT_BODY, BotSuggest.SEV_COLORS.get(sev, INFO)))
+		body.add_child(_text("где: " + String(d["where"]), UiScale.FONT_SMALL, MUTED))
+		for e in d["evidence"]:
+			body.add_child(_text("· " + String(e), UiScale.FONT_SMALL, INFO))
+		if String(d["advice"]) != "":
+			body.add_child(_text("Что посмотреть: " + String(d["advice"]), UiScale.FONT_SMALL, NOTE))
+	var r := _row(body)
+	_btn(r, "bot_sug_export", "Экспорт предложений", func() -> void: AdminPanel.suggest_export(main), 200.0)
+	(buttons["bot_sug_export"] as Button).disabled = items.is_empty()
+
+
+## «Экспорт предложений»: текст в папку отчётов, «Загрузки» и «Поделиться».
+static func suggest_export(main: Node) -> String:
+	var path := reports_dir + "suggestions.txt"
+	var ok := TestBot.write_atomic(path, BotSuggest.text(BotSuggest.collect(BotHistory.runs(reports_dir))) + "\n")
+	var msg := "Не удалось записать предложения"
+	if ok:
+		BotReport.publish(path, BotReport.TXT_MIME)
+		msg = BotReport.share_report({"txt": path})
+	var hud := main.get("hud") as HUD
+	if hud != null:
+		hud.show_message(msg, 6.0)
+	return msg
 
 
 ## «По разделам»: разделы переключателями (выбор хранится — BotScenarioGame.chosen), оценка времени.
