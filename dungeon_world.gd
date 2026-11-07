@@ -98,11 +98,11 @@ func _build_atmo_fx() -> void:
 		var fd: Dictionary = f
 		ff.add(fd["pos"], float(fd["size"]), fd["color"], String(fd["kind"]))
 		nl.add((fd["pos"] as Vector3) + Vector3(0.0, float(fd["size"]) * 0.7, 0.0), fd["color"],
-			7.5 if String(fd["kind"]) == "brazier" else 6.0, 1.2 if String(fd["kind"]) == "brazier" else 0.9, "fire")
+			7.5 if String(fd["kind"]) == "brazier" else 6.0, 1.2 if String(fd["kind"]) == "brazier" else 0.9, "fire", 1.4)
 	ff.build()
 	for g in get_meta("dg_glows", []):
 		var gd: Dictionary = g
-		nl.add(gd["pos"], gd["color"], float(gd["range"]), float(gd["energy"]), String(gd["kind"]))
+		nl.add(gd["pos"], gd["color"], float(gd["range"]), float(gd["energy"]), String(gd["kind"]), 1.4)
 	var hz := HazeFx.new()
 	add_child(hz)
 	for wt in cfg.get("water", []):

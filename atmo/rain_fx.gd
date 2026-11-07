@@ -55,19 +55,19 @@ func _splashes() -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	p.name = "Splashes"
 	p.amount = Quality.particles(SPLASHES)
-	p.lifetime = 0.35
+	p.lifetime = 0.4
 	p.local_coords = false
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	p.emission_box_extents = Vector3(7.0, 0.05, 7.0)
+	p.emission_box_extents = Vector3(7.0, 0.02, 7.0)
 	p.direction = Vector3.UP
-	p.spread = 35.0
-	p.initial_velocity_min = 0.6
-	p.initial_velocity_max = 1.4
+	p.spread = 40.0
+	p.initial_velocity_min = 0.5
+	p.initial_velocity_max = 1.1
 	p.gravity = Vector3(0, -6.0, 0)
-	p.scale_amount_min = 0.04
-	p.scale_amount_max = 0.08
+	p.scale_amount_min = 0.05
+	p.scale_amount_max = 0.1
 	var g := Gradient.new()
-	g.set_color(0, Color(0.85, 0.92, 1.0, 0.7))
+	g.set_color(0, Color(0.85, 0.92, 1.0, 0.55))
 	g.set_color(1, Color(0.85, 0.92, 1.0, 0.0))
 	p.color_ramp = g
 	var q := QuadMesh.new()
@@ -76,8 +76,10 @@ func _splashes() -> CPUParticles3D:
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	# Без keep_scale Godot 4.3 теряет размер частицы (scale_amount) — квад 1 м: белые «шипы» по всей площади
+	m.billboard_keep_scale = true
 	m.vertex_color_use_as_albedo = true
-	m.albedo_texture = VfxKit.tex("drop")
+	m.albedo_texture = VfxKit.tex("soft")
 	q.material = m
 	p.mesh = q
 	return p

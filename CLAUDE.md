@@ -1740,6 +1740,31 @@ MIT (`assets/LICENSES.md`); рендеры не делаю — цвета неб
   (`dungeon_water.gdshader`): мелкие волны, свечение дышит, озеро босса (`abyss_area`) чернее с фиолетовым.
 - Админ-панель «Мир» → «Время и погода»: `time_<час>`, `time_speed_<1|10|60>`, `time_freeze`, `time_reset`,
   `weather_auto`, `weather_<погода>` (на эту игру).
+- **0.46.1 — по отчёту Максима** (S24 Ultra, Vulkan: «ночью засвеченный квадрат вокруг персонажа, отвратительно»):
+  - **Засвеченный квадрат**: `island_terrain.gdshader` light() от каждого огня (OmniLight3D пула `NightLights`)
+    добавлял «цвет тени» `shadow_tint × 0.6` без затухания — на весь участок рельефа 48 м (`IslandWorld.CHUNK`),
+    которого касается огонь; 6–8 огней у площади засвечивали участок целиком (у построек `toon`/`prop` и в
+    `dungeon_terrain` огни уже считались отдельно). Теперь у земли, травы и цветов (`wc_toon(…, LIGHT_IS_DIRECTIONAL)`
+    в `world_common.gdshaderinc`) огонь — только затухание по расстоянию, без «цвета тени» и порогов (порог у травы
+    давал резкий светлый диск). Правило: свой `light()` обязан различать `LIGHT_IS_DIRECTIONAL` (проверяет
+    `test_atmosphere._light_shaders`).
+  - **Огни**: затухание `NightLights.DECAY` 1.0 (было 1.4; в подземелье — 1.4, параметр `decay` источника), фонари —
+    дальность `size × 4 + 3` (6–12 м), сила `1 + a × 0.8`: под фонарём на 2.9 м пятно ≈ 0.5 в центре, на нет к 6–7 м
+    (до правки — 0.12, весь свет давала ошибка); ореолы у пламени (костры, факелы пещеры, жаровни) своего света не
+    дают (`_halo(…, "")` — свет у пламени `_flame`; было два огня в точке, у костра 2.3), кристаллы — `"crystal"`
+    явно. Костёр — свет на 0.85 высоты пламени, 9 м, 1.2; факелы и жаровни — 7 м, 1.2. Проверка — `_lamp_pools`:
+    пятно на земле у каждого фонаря и пламени 0.2…1.3.
+  - **Белые «шипы» в дождь**: у материалов частиц «к камере» (`BILLBOARD_PARTICLES`) Godot 4.3 без
+    `billboard_keep_scale` теряет `scale_amount` — каждая частица квадом 1 м (`scene/resources/material.cpp`). Брызги
+    дождя, искры и дым костров, пылинки и клубы дымок — с `billboard_keep_scale` (у `Vfx.fx_mat` было); брызги —
+    мягкие капли `soft` 5–10 см.
+  - `test_graphics_settings` на телефоне (Vulkan): FXAA в Mobile — встроенный `screen_space_aa`, своего прохода PostFx
+    нет; тест проверял только ветку Compatibility. Теперь `_check_aa` — по рендереру, CI проходит обе ветки
+    (вторая — с подставным Mobile `renderer_override`).
+  - **Шейдеры в Vulkan локально** (как Mobile на телефоне): программный Vulkan lavapipe — `apt-get download
+    mesa-vulkan-drivers`, `dpkg-deb -x` в свою папку, свой ICD json с `library_path` на `libvulkan_lvp.so`,
+    `VK_ICD_FILENAMES=<json> xvfb-run godot --rendering-method mobile --rendering-driver vulkan …` (без снимков —
+    только компиляция).
 - **Тест-бот и атмосфера**: на время любого режима — полдень и ясно (`TestBot.fix_atmo(ATMO_HOUR, ATMO_WEATHER)`:
   `WorldClock.force_hour`, `Weather.force`, свет и небо сразу — `snap_atmo`; замеры и снимки сравнимы между запусками),
   после теста — часы и погода игрока (`atmo_state` / `set_atmo_state`: сдвиг, скорость, остановка, своя погода

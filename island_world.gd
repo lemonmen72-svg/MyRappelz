@@ -128,8 +128,9 @@ func _build_atmo_fx() -> void:
 	for f in get_meta("poi_fires", []):
 		var fd: Dictionary = f
 		ff.add(fd["pos"], float(fd["size"]), fd["color"], String(fd.get("kind", "torch")))
-		nl.add((fd["pos"] as Vector3) + Vector3(0.0, float(fd["size"]) * 0.6, 0.0), fd["color"],
-			6.5 if String(fd.get("kind", "")) != "camp" else 9.0, 1.4 if String(fd.get("kind", "")) == "camp" else 1.0, "fire")
+		var camp := String(fd.get("kind", "")) == "camp"
+		nl.add((fd["pos"] as Vector3) + Vector3(0.0, float(fd["size"]) * (0.85 if camp else 0.6), 0.0), fd["color"],
+			9.0 if camp else 7.0, 1.2, "fire")
 	ff.build()
 	for l in get_meta("poi_lights", []):
 		var ld: Dictionary = l

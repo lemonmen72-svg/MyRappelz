@@ -191,6 +191,15 @@ func _island() -> void:
 	# Огни: пламя у построек
 	var ff := FireFx.current
 	check(ff != null and ff.fires.size() >= 5 and ff.mmi != null, "пламя огней: %d" % (ff.fires.size() if ff else 0))
+	# Отчёт 0.46.0 (S24 Ultra): ночью засвеченный квадрат вокруг героя, в дождь белые «шипы» по площади
+	_light_shaders()
+	if ff != null:
+		for e in ff._emitters:
+			check(_keeps_scale(e["sparks"]) and _keeps_scale(e["smoke"]), "искры и дым костра — своего размера")
+	if rain != null:
+		check(_keeps_scale(rain.splashes), "брызги дождя — своего размера (не квад 1 м)")
+	if nl != null:
+		_lamp_pools(nl)
 	# Туман у воды: слои есть, видны только в туман
 	var hz := HazeFx.current
 	check(hz != null and hz.count_of("mist") >= 5, "туман у воды: слоёв %d" % (hz.count_of("mist") if hz else 0))
@@ -233,7 +242,94 @@ func _dungeon() -> void:
 		nl.tick(0.1)
 		check(nl.lit() > 0, "у героя горят огни: %d" % nl.lit())
 	var hz := HazeFx.current
+	if hz != null:
+		for lay in hz.layers:
+			if lay["motes"] != null:
+				check(_keeps_scale(lay["motes"]), "пылинки и клубы дымки «%s» — своего размера" % String(lay["kind"]))
 	check(hz != null and hz.count_of("emerald") >= 3 and hz.count_of("abyss") == 1,
 		"дымки: изумрудных %d, чёрная над озером босса %d" % [hz.count_of("emerald") if hz else 0, hz.count_of("abyss") if hz else 0])
 	var props := main.find_child("DungeonProps", true, false)
 	check(props != null and int(props.get_meta("lights", -1)) == 0, "постоянных огней подземелья больше нет (свет — пул)")
+
+
+## Частица со своим размером: у материала «к камере» Godot 4.3 без billboard_keep_scale теряет scale_amount — квад 1 м.
+func _keeps_scale(p: CPUParticles3D) -> bool:
+	var q := p.mesh as QuadMesh if p != null else null
+	var m := q.material as StandardMaterial3D if q != null else null
+	return m != null and (m.billboard_mode == BaseMaterial3D.BILLBOARD_DISABLED or m.billboard_keep_scale)
+
+
+## У каждого шейдера со своим light() огни (не направленный свет) считаются отдельно: LIGHT_IS_DIRECTIONAL. Иначе
+## «цвет тени» или ступени от каждого огня ложились на весь меш, которого он касается (участок рельефа 48 м).
+func _light_shaders() -> void:
+	var files: Array[String] = []
+	_shader_files("res://", files)
+	var n := 0
+	var bad := PackedStringArray()
+	for path in files:
+		var sh := load(path) as Shader
+		if sh == null:
+			continue
+		var code := sh.code
+		var i := code.find("void light()")
+		if i < 0:
+			continue
+		n += 1
+		var j := code.find("\n}", i)
+		var body := code.substr(i, (j - i) if j > i else -1)
+		if not body.contains("LIGHT_IS_DIRECTIONAL"):
+			bad.append(path)
+	check(n >= 8 and bad.is_empty(), "свой light() у %d шейдеров, огни без «цвета тени» и ступеней: %s"
+		% [n, ", ".join(bad) if not bad.is_empty() else "все"])
+
+
+func _shader_files(dir: String, out: Array[String]) -> void:
+	var d := DirAccess.open(dir)
+	if d == null:
+		return
+	for f in d.get_files():
+		if f.ends_with(".gdshader"):
+			out.append(dir.path_join(f))
+	for sub in d.get_directories():
+		if sub.begins_with(".") or sub in ["assets", "android", "addons", "tools", "docs", "reference", "tests", "bot"]:
+			continue
+		_shader_files(dir.path_join(sub), out)
+
+
+## Затухание OmniLight3D Godot 4.3 (get_omni_attenuation): окно по дальности × расстояние^−decay.
+static func _omni_att(d: float, r: float, decay: float) -> float:
+	var nd := pow(d / r, 4.0)
+	var w := maxf(1.0 - nd, 0.0)
+	return w * w * pow(maxf(d, 0.0001), -decay)
+
+
+## Пятно ночного огня на земле прямо под ним: фонари и пламя заметны, но не засвечивают (≈ 0.2…1.2 силы).
+func _lamp_pools(nl: NightLights) -> void:
+	var w := IslandWorld.current
+	if w == null:
+		return
+	var lo := 99.0
+	var hi := 0.0
+	var lo_at := ""
+	var hi_at := ""
+	var n := 0
+	for s in nl.sources:
+		var kind := String(s["kind"])
+		if kind == "crystal":
+			continue
+		var p: Vector3 = s["pos"]
+		# Над водой (причал) свет ложится на воду, не на дно
+		var h := p.y - maxf(w.height_at(p.x, p.z), w.sea_level)
+		var r := float(s["range"])
+		if h <= 0.2 or h > r * 0.6:
+			continue
+		var g := float(s["energy"]) * _omni_att(h, r, float(s.get("decay", NightLights.DECAY)))
+		if g < lo:
+			lo = g
+			lo_at = "%s у (%.0f, %.0f) на %.1f м" % [kind, p.x, p.z, h]
+		if g > hi:
+			hi = g
+			hi_at = "%s у (%.0f, %.0f) на %.1f м" % [kind, p.x, p.z, h]
+		n += 1
+	check(n >= 6 and lo >= 0.2 and hi <= 1.3, "пятна огней на земле (%d): от %.2f (%s) до %.2f (%s) — видны и не засвечивают"
+		% [n, lo, lo_at, hi, hi_at])

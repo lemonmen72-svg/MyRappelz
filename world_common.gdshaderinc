@@ -52,7 +52,11 @@ float wc_path_dist(vec2 p) {
 }
 
 // Toon-свет: ступенька освещённости и чёткая граница тени. Использовать в light().
-vec3 wc_toon(vec3 n, vec3 l, float atten, vec3 light_color) {
+vec3 wc_toon(vec3 n, vec3 l, float atten, vec3 light_color, bool directional) {
+	if (!directional) {
+		// Огни (OmniLight3D): мягкое затухание по расстоянию, без порога — порог делал резкий светлый диск
+		return light_color * atten * smoothstep(-0.15, 0.45, dot(n, l)) / PI;
+	}
 	float lit = smoothstep(0.0, 0.1, dot(n, l)) * smoothstep(0.2, 0.75, atten);
 	return light_color * lit / PI;
 }

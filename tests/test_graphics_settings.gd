@@ -232,16 +232,15 @@ func _check_options() -> void:
 	# Сглаживание
 	var fx := _fx()
 	var expect_msaa := [Viewport.MSAA_DISABLED, Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X]
+	# На телефоне с Vulkan (Mobile; бот «Автотесты») FXAA — встроенный screen_space_aa окна, своего прохода PostFx
+	# нет; в CI и в Compatibility — проход PostFx. CI проходит обе ветки: вторая — с подставным Mobile
 	Quality.set_option("postfx", 0, false)
-	for v in Quality.option_count("aa"):
-		Quality.set_option("aa", v, false)
-		Quality.apply(tree)
-		check(win.msaa_3d == int(expect_msaa[v]), "сглаживание «%s»: MSAA %d" % [Quality.option_label("aa", v), win.msaa_3d])
-		var aa_sh: Shader = fx.current_shader() if fx != null else null
-		var has_fxaa := aa_sh != null and aa_sh.code.contains("#define USE_FXAA")
-		check(has_fxaa == (v == 1), "сглаживание «%s»: FXAA %s" % [Quality.option_label("aa", v), has_fxaa])
-		check(fx != null and fx.visible == (v == 1), "сглаживание «%s»: проход постобработки только у FXAA"
-			% Quality.option_label("aa", v))
+	var aa_runs: Array = [-1] if Quality.mobile_renderer() else [-1, 1]
+	for ro in aa_runs:
+		Quality.renderer_override = int(ro)
+		_check_aa(tree, win, fx, expect_msaa)
+	Quality.renderer_override = -1
+	Quality.apply(tree)
 
 	# Постобработка
 	Quality.set_option("aa", 2, false)
@@ -744,3 +743,24 @@ func _fx() -> PostFx:
 	for n in get_tree().get_nodes_in_group("postfx"):
 		return n as PostFx
 	return null
+
+
+## Сглаживание при каждом варианте: MSAA, FXAA — проходом PostFx (Compatibility) или встроенный (Mobile).
+func _check_aa(tree: SceneTree, win: Window, fx: PostFx, expect_msaa: Array) -> void:
+	var mobile := Quality.mobile_renderer()
+	for v in Quality.option_count("aa"):
+		Quality.set_option("aa", v, false)
+		Quality.apply(tree)
+		check(win.msaa_3d == int(expect_msaa[v]), "сглаживание «%s»: MSAA %d" % [Quality.option_label("aa", v), win.msaa_3d])
+		var aa_sh: Shader = fx.current_shader() if fx != null else null
+		var has_fxaa := aa_sh != null and aa_sh.code.contains("#define USE_FXAA")
+		if mobile:
+			var want_ssaa := Viewport.SCREEN_SPACE_AA_FXAA if v == 1 else Viewport.SCREEN_SPACE_AA_DISABLED
+			check(not has_fxaa and win.screen_space_aa == want_ssaa, "сглаживание «%s» (Mobile): FXAA встроенный %d, в PostFx %s"
+				% [Quality.option_label("aa", v), win.screen_space_aa, has_fxaa])
+			check(fx == null or not fx.visible, "сглаживание «%s» (Mobile): своего прохода постобработки нет"
+				% Quality.option_label("aa", v))
+		else:
+			check(has_fxaa == (v == 1), "сглаживание «%s»: FXAA %s" % [Quality.option_label("aa", v), has_fxaa])
+			check(fx != null and fx.visible == (v == 1), "сглаживание «%s»: проход постобработки только у FXAA"
+				% Quality.option_label("aa", v))

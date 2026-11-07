@@ -313,13 +313,20 @@ void fragment() {
 }
 
 void light() {
-	// Три тона: тень с сиреневым оттенком, полутон на склонах от солнца, полный свет
 	float ndl = dot(NORMAL, LIGHT);
-	// Тень от объектов — мягкий край (после фильтра PCF карты теней), не резкая ступенька по текселям
-	float sh = smoothstep(0.15, 0.75, ATTENUATION);
-	float lit = smoothstep(0.0, 0.06, ndl) * sh;
-	float full = smoothstep(0.40, 0.48, ndl) * sh;
-	vec3 tone = mix(shadow_tint * 0.6, vec3(0.8), lit);
-	tone = mix(tone, vec3(1.0), full);
-	DIFFUSE_LIGHT += LIGHT_COLOR * tone / PI;
+	if (LIGHT_IS_DIRECTIONAL) {
+		// Солнце или луна — три тона: тень с сиреневым оттенком, полутон на склонах, полный свет.
+		// Тень от объектов — мягкий край (после фильтра PCF карты теней), не резкая ступенька по текселям
+		float sh = smoothstep(0.15, 0.75, ATTENUATION);
+		float lit = smoothstep(0.0, 0.06, ndl) * sh;
+		float full = smoothstep(0.40, 0.48, ndl) * sh;
+		vec3 tone = mix(shadow_tint * 0.6, vec3(0.8), lit);
+		tone = mix(tone, vec3(1.0), full);
+		DIFFUSE_LIGHT += LIGHT_COLOR * tone / PI;
+	} else {
+		// Огни ночью (OmniLight3D пула NightLights) — мягкое пятно по затуханию с расстоянием. Без «цвета тени»:
+		// он добавлялся от каждого огня на весь участок рельефа 48 м, которого касается огонь, — засвеченный
+		// квадрат вокруг героя (0.46.0); без ступеней — иначе резкий светлый диск
+		DIFFUSE_LIGHT += LIGHT_COLOR * ATTENUATION * smoothstep(-0.15, 0.45, ndl) / PI;
+	}
 }

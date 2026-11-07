@@ -7,6 +7,9 @@ extends Node3D
 ## переставляются к ближайшим к камере источникам (не дальше MAX_DIST), яркость — по ночи (Atmosphere.night():
 ## днём огонь светит слабо, ночью — в полную силу; в подземелье всегда ночь). Тени у огней выключены.
 ## Свечение вдали (ореолы, пламя) — у FireFx и ореолов построек, не здесь.
+## Затухание огня — decay источника (omni_attenuation, по умолчанию DECAY 1.0 — как у Godot): под фонарём на высоте
+## 2.9 м с дальностью 8 м пятно на земле ≈ 0.5 силы в центре и сходит на нет к 6–7 м (шейдеры земли, травы и
+## построек берут у огней только затухание — без «цвета тени» и ступеней, иначе засвеченный квадрат участка).
 
 const REASSIGN := 0.4
 const MAX_DIST := 45.0
@@ -14,8 +17,10 @@ const MAX_DIST := 45.0
 const DAY_SHARE := 0.15
 ## Источников света по настройке «Эффекты» («Низкое», «Среднее», «Высокое»).
 const COUNTS := [3, 6, 8]
+## Затухание с расстоянием по умолчанию (OmniLight3D.omni_attenuation).
+const DECAY := 1.0
 
-## Источники: {pos, color, range, energy, kind, phase}.
+## Источники: {pos, color, range, energy, kind, phase, decay}.
 var sources: Array[Dictionary] = []
 var _pool: Array[OmniLight3D] = []
 var _assigned: Array[int] = []
@@ -51,15 +56,16 @@ static func count() -> int:
 	return int(COUNTS[lv])
 
 
-## Источник света в точке pos (координаты мира): kind "fire" / "lamp" / "crystal".
-func add(pos: Vector3, color: Color, range_m: float, energy: float, kind: String) -> void:
+## Источник света в точке pos (координаты мира): kind "fire" / "lamp" / "crystal"; decay — затухание с расстоянием.
+func add(pos: Vector3, color: Color, range_m: float, energy: float, kind: String, decay: float = DECAY) -> void:
 	sources.append({"pos": pos, "color": color, "range": range_m, "energy": energy, "kind": kind,
-		"phase": fposmod(pos.x * 0.73 + pos.z * 1.31, TAU)})
+		"phase": fposmod(pos.x * 0.73 + pos.z * 1.31, TAU), "decay": decay})
 
 
-static func add_source(pos: Vector3, color: Color, range_m: float, energy: float, kind: String) -> void:
+static func add_source(pos: Vector3, color: Color, range_m: float, energy: float, kind: String,
+		decay: float = DECAY) -> void:
 	if current != null and is_instance_valid(current):
-		current.add(pos, color, range_m, energy, kind)
+		current.add(pos, color, range_m, energy, kind, decay)
 
 
 func _build_pool(n: int) -> void:
@@ -73,7 +79,7 @@ func _build_pool(n: int) -> void:
 		om.shadow_enabled = false
 		om.light_energy = 0.0
 		om.visible = false
-		om.omni_attenuation = 1.4
+		om.omni_attenuation = DECAY
 		add_child(om)
 		_pool.append(om)
 		_assigned.append(-1)
@@ -141,6 +147,7 @@ func _reassign() -> void:
 		om.global_position = s["pos"]
 		om.light_color = s["color"]
 		om.omni_range = float(s["range"])
+		om.omni_attenuation = float(s.get("decay", DECAY))
 
 
 ## Сколько источников света сейчас горит (тесты).
