@@ -574,7 +574,9 @@ static func _exits_block(bot: TestBot, L: PackedStringArray) -> void:
 		L.append("  %d. %s%s" % [i + 1, "СБОЙ · " if bad else "", exit_line(e)])
 		var tr: Array = e.get("trace", []) if e.get("trace", []) is Array else []
 		if bad and not tr.is_empty():
-			L.append("     след (первые %d строк):" % tr.size())
+			# Разобранный tombstone (плагин 0.45+) начинается с «Сигнал:», прежний — читаемые куски файла
+			var parsed := String(tr[0]).begins_with("Сигнал:")
+			L.append("     след (разбор записи о сбое, строк %d):" % tr.size() if parsed else "     след (первые %d строк):" % tr.size())
 			for line in tr:
 				L.append("       " + String(line))
 		elif bad:

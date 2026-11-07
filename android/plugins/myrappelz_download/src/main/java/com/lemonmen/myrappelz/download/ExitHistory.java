@@ -20,8 +20,9 @@ import java.util.Locale;
  * Прошлые завершения игры для отчёта тест-бота (раздел «Прошлые завершения игры», DownloadPlugin.exitHistory):
  * ActivityManager.getHistoricalProcessExitReasons (Android 11+) — причина, статус, описание, время, важность процесса,
  * память; у сбоев (crash, crash_native, anr, initialization_failure) — след ApplicationExitInfo.getTraceInputStream:
- * у ANR — текст (стеки потоков, Android 11+), у crash_native — tombstone (Android 12+, двоичный protobuf: из него
- * берутся читаемые строки — сообщение abort, имена функций и библиотек стека), у crash (Java) следа нет.
+ * у ANR — текст (стеки потоков, Android 11+), у crash_native — tombstone (Android 12+, двоичный protobuf — разбор
+ * Tombstone: сигнал, причина, поток сбоя первым с кадрами и повторами, build-id, журнал; не разобрался — читаемые
+ * куски файла, как раньше), у crash (Java) следа нет.
  * <p>
  * Результат — JSON-строкой (JNI Godot 4.3: только String/bool/int/Dictionary, long не передаётся; вложенные списки
  * в строке надёжнее): {"sdk": int, "exits": [{reason, code, status, description, time, importance, process, pid,
@@ -30,8 +31,8 @@ import java.util.Locale;
  */
 final class ExitHistory {
 	private static final String TAG = "MyRappelzDownload";
-	/** Сколько байт следа читать, не больше. */
-	static final int TRACE_BYTES = 512 * 1024;
+	/** Сколько байт следа читать, не больше (tombstone с картой памяти и потоками — до нескольких МБ). */
+	static final int TRACE_BYTES = 4 * 1024 * 1024;
 	/** Строки следа crash_native: читаемые куски tombstone не короче стольких символов. */
 	static final int MIN_RUN = 5;
 	/** Строка следа — не длиннее. */
@@ -133,7 +134,13 @@ final class ExitHistory {
 			return out;
 		}
 		if (e.getReason() == ApplicationExitInfo.REASON_CRASH_NATIVE) {
-			return printableRuns(data, traceLines);
+			List<String> parsed = null;
+			try {
+				parsed = Tombstone.lines(data, traceLines);
+			} catch (Throwable t) {
+				Log.w(TAG, "tombstone parse failed", t);
+			}
+			return parsed != null && !parsed.isEmpty() ? parsed : printableRuns(data, traceLines);
 		}
 		String text = new String(data, StandardCharsets.UTF_8);
 		for (String line : text.split("\n")) {
