@@ -4,6 +4,8 @@ extends BotSection
 ## ходьба джойстиком (как палец: HUD.move_vec, относительно камеры) по дорогам острова — через мосты, мимо построек
 ## и деревьев: застрял (за STUCK_TIME с сдвинулся меньше STUCK_MOVE м) или провалился под землю — ошибка с местом
 ## и снимок, героя переносит к следующей точке, ходьба продолжается.
+## Атмосфера (0.46): ночью в городе горят огни (пул NightLights) и светит луна, в грозу идёт дождь у камеры, в туман
+## над рекой видны слои тумана (HazeFx); время и погода — свои на шаг (TestBot.fix_atmo), потом снова полдень.
 
 ## Дороги острова (world/training_island.json roads.paths): быстрый и полный проход.
 const QUICK_ROADS := ["town_human", "town_port"]
@@ -20,6 +22,8 @@ const UNDER := 1.2
 ## Звери у деревень: не старше этого уровня ближе VILLAGE_R м от центра деревни.
 const VILLAGE_MAX := 5
 const VILLAGE_R := 30.0
+## Город для проверки ночных огней (фонари у площади).
+const TOWN := Vector2(0, 5)
 
 var _route: Array[Vector3] = []
 var _road := ""
@@ -41,6 +45,16 @@ func id() -> String:
 func _build() -> void:
 	do("Мир: герой", _setup)
 	do("Звери у деревень — до %d ур." % VILLAGE_MAX, _village_mobs)
+	do("Атмосфера: ночь в городе", _atmo_night)
+	wait(0.6)
+	do("Атмосфера: ночь — огни", _atmo_night_check)
+	do("Атмосфера: гроза", func() -> void: TestBot.fix_atmo(TestBot.ATMO_HOUR, "storm"))
+	wait(0.8)
+	do("Атмосфера: гроза — дождь", _atmo_storm_check)
+	do("Атмосфера: туман у реки", _atmo_mist)
+	wait(0.8)
+	do("Атмосфера: туман — проверка", _atmo_mist_check)
+	do("Атмосфера: снова день", func() -> void: TestBot.fix_atmo(TestBot.ATMO_HOUR, TestBot.ATMO_WEATHER))
 	var tps := AdminPanel.teleports()
 	var n := 0
 	for i in tps.size():
@@ -63,6 +77,56 @@ func _build() -> void:
 func _setup() -> void:
 	hero(Game.class_id, maxi(Game.level, 10))
 	no_pets()
+
+
+func _atmo_night() -> void:
+	bot.teleport(TOWN, "Город")
+	TestBot.fix_atmo(0.0, "clear")
+
+
+func _atmo_night_check() -> void:
+	check(Atmosphere.night() > 0.9, "ночь: темно (%.2f)" % Atmosphere.night())
+	var at := Atmosphere.current
+	check(at != null and at.light != null and at.light.light_energy < 0.4, "ночь: свет луны слабый (%.2f)"
+		% (at.light.light_energy if at != null and at.light != null else -1.0))
+	var nl := NightLights.current
+	check(nl != null and nl.sources.size() > 0, "ночь: источников света на острове %d"
+		% (nl.sources.size() if nl != null else 0))
+	check(nl != null and nl.lit() > 0, "ночь: в городе горят огни (%d)" % (nl.lit() if nl != null else 0))
+	shot("night_town")
+
+
+func _atmo_storm_check() -> void:
+	check(Atmosphere.rain() > 0.9, "гроза: дождь (%.2f)" % Atmosphere.rain())
+	var at := Atmosphere.current
+	var rf := at.rain_fx as RainFx if at != null else null
+	check(rf != null and rf.near_mi != null and rf.near_mi.visible, "гроза: струи дождя у камеры")
+	shot("storm_town")
+
+
+## Туман погоды у реки: к первому слою тумана (река), погода «туман».
+func _atmo_mist() -> void:
+	TestBot.fix_atmo(TestBot.ATMO_HOUR, "mist")
+	var hz := HazeFx.current
+	if hz == null or hz.layers.is_empty():
+		return
+	var c: Vector3 = hz.layers[0]["center"]
+	bot.teleport(Vector2(c.x, c.z), "Река")
+
+
+func _atmo_mist_check() -> void:
+	var hz := HazeFx.current
+	if not check(hz != null and hz.count_of("mist") > 0, "туман: слои над рекой и прудом (%d)"
+			% (hz.count_of("mist") if hz != null else 0)):
+		return
+	check(Atmosphere.fog() > 0.5, "туман погоды (%.2f)" % Atmosphere.fog())
+	var vis := 0
+	for l in hz.layers:
+		for n in l["nodes"]:
+			if (n as Node3D).visible:
+				vis += 1
+	check(vis > 0, "туман: слоёв видно %d" % vis)
+	shot("mist_river")
 
 
 ## Живые звери острова (не бота) ближе VILLAGE_R м от центра деревни расы — не старше VILLAGE_MAX ур.

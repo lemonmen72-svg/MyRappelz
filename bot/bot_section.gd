@@ -20,7 +20,7 @@ const SECTIONS := [
 	{"id": "npc_quests", "name": "Задания жителей", "script": "res://bot/section_npc_quests.gd", "quick": 10, "full": 12},
 	{"id": "equipment", "name": "Экипировка", "script": "res://bot/section_equipment.gd", "quick": 8, "full": 12},
 	{"id": "bags", "name": "Торба и пояс", "script": "res://bot/section_bags.gd", "quick": 5, "full": 6},
-	{"id": "world", "name": "Мир", "script": "res://bot/section_world.gd", "quick": 40, "full": 200},
+	{"id": "world", "name": "Мир", "script": "res://bot/section_world.gd", "quick": 45, "full": 205},
 	{"id": "ui", "name": "Интерфейс", "script": "res://bot/section_ui.gd", "quick": 15, "full": 40},
 	# Последним: переходит через портал в подземелье и обратно (разделы выше — на острове)
 	{"id": "dungeon", "name": "Подземелье", "script": "res://bot/section_dungeon.gd", "quick": 70, "full": 180},

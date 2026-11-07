@@ -350,6 +350,11 @@ static func clock(sec: float) -> String:
 
 func _begin() -> void:
 	current = self
+	# Время и погода мира (атмосфера 0.46): на тест — полдень и ясно (замеры и снимки сравнимы между запусками),
+	# после теста — как было у игрока (_return_home)
+	if _atmo_saved.is_empty():
+		_atmo_saved = atmo_state()
+	fix_atmo(ATMO_HOUR, ATMO_WEATHER)
 	AnimResolver.reset_stats()
 	var now := Time.get_datetime_dict_from_system()
 	started_text = "%04d-%02d-%02d %02d:%02d" % [int(now["year"]), int(now["month"]), int(now["day"]), int(now["hour"]),
@@ -464,6 +469,45 @@ func _world_ready() -> bool:
 	return main != null and is_instance_valid(main) and main.is_inside_tree() and bool(main.get("_started"))
 
 
+## Время и погода мира на время теста (атмосфера 0.46): полдень, ясно.
+const ATMO_HOUR := 12.0
+const ATMO_WEATHER := "clear"
+## Часы и погода игрока до теста (atmo_state).
+var _atmo_saved: Dictionary = {}
+
+
+## Часы и погода мира: что поставил игрок (админ-панель «Мир» → «Время и погода») — до теста и после.
+static func atmo_state() -> Dictionary:
+	return {"offset": WorldClock.offset, "speed": WorldClock.speed, "frozen": WorldClock.frozen,
+		"frozen_hour": WorldClock.frozen_hour, "force_hour": WorldClock.force_hour, "weather": Weather.force}
+
+
+static func set_atmo_state(d: Dictionary) -> void:
+	if d.is_empty():
+		return
+	WorldClock.offset = float(d.get("offset", 0.0))
+	WorldClock.speed = float(d.get("speed", 1.0))
+	WorldClock.frozen = bool(d.get("frozen", false))
+	WorldClock.frozen_hour = float(d.get("frozen_hour", 12.0))
+	WorldClock.force_hour = float(d.get("force_hour", -1.0))
+	Weather.force = String(d.get("weather", ""))
+	snap_atmo()
+
+
+## Свои час h и погода w ("clear", "rain", "storm", "mist" …); свет, небо и туман — сразу, без плавной смены.
+static func fix_atmo(h: float, w: String) -> void:
+	WorldClock.force_hour = h
+	Weather.force = w
+	snap_atmo()
+
+
+static func snap_atmo() -> void:
+	var at := Atmosphere.current
+	if at != null and is_instance_valid(at):
+		at._first = true
+		at.tick(0.0)
+
+
 ## Вернуть игрока: стереть тестовое хранилище, войти в аккаунт игрока, загрузить героя его слота, сцену заново.
 func _return_home() -> void:
 	clear_spawned()
@@ -486,6 +530,8 @@ func _return_home() -> void:
 	UiScale.reread()
 	UiScale.set_level(UiScale.level(), false)
 	_remove_marker()
+	set_atmo_state(_atmo_saved)
+	_atmo_saved = {}
 	state = "home"
 	_wait_t = 0.0
 	_swap_scene()

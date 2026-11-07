@@ -313,7 +313,7 @@ func _check_admin_only() -> void:
 	Accounts.current = "Dedok_max"
 	check(BotScenario.create("perf") != null and BotScenario.create("quick") != null and BotScenario.create("full") != null
 		and BotScenario.create("sections") != null and BotScenario.create("nope") == null, "сценарии: perf, quick, full, sections")
-	check(BotScenario.create("perf").limit() == 840.0, "лимит «Производительности» — 14 мин")
+	check(BotScenario.create("perf").limit() == 900.0, "лимит «Производительности» — 15 мин")
 	# Шаги «Производительности»: сцены острова, настройки по одной, в конце — подземелье через портал (4 пресета)
 	var ptb := TestBot.new()
 	ptb.main = main

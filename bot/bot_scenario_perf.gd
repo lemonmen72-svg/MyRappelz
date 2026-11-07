@@ -9,8 +9,10 @@ extends BotScenario
 ## В конце (0.44) — сцена «Подземелье»: переход через портал (сцена заново, мир подземелья), у причала с видом на
 ## затонувший корабль, мостки и кораллы в воде — пресеты «Низкое…Максимальное» (в среднем по сценам и в
 ## рекомендациях — вместе с островом).
-## На каждую комбинацию — строка отчёта (метрики, температура до/после) и снимок. Итого ≈ 35 замеров × 18 с ≈ 11 мин
-## (лимит режима — 14 мин активного времени, BotScenario.MODES).
+## Время и погода (0.46): весь режим — полдень и ясно (TestBot.fix_atmo; замеры сравнимы между запусками), в городе
+## поверх «Среднего» — ещё «Ночь» (огни NightLights, луна) и «Ночь в грозу» (дождь, молнии) в сравнении с базой.
+## На каждую комбинацию — строка отчёта (метрики, температура до/после) и снимок. Итого ≈ 38 замеров × 18 с ≈ 12 мин
+## (лимит режима — 15 мин активного времени, BotScenario.MODES).
 
 const MEASURE := 15.0
 const CROWD := 14
@@ -78,6 +80,13 @@ func build(b: TestBot) -> void:
 		var v := int(op[1])
 		b.measure(String(town["name"]), "%s: %s" % [Quality.option_title(key), Quality.option_label(key, v)], MEASURE,
 			{"preset": Quality.MEDIUM, "option": [key, v], "kind": "setting"})
+	# Атмосфера: ночь (огни, луна) и гроза ночью (дождь, молнии) — поверх «Среднего», в сравнении с базой
+	b.do("Город: ночь", _atmo.bind(0.0, "clear"))
+	b.measure(String(town["name"]), "Ночь: огни и луна", MEASURE, {"preset": Quality.MEDIUM, "kind": "setting"})
+	b.do("Город: гроза ночью", _atmo.bind(0.0, "storm"))
+	b.measure(String(town["name"]), "Ночь в грозу: дождь, молнии", MEASURE, {"preset": Quality.MEDIUM,
+		"kind": "setting"})
+	b.do("Город: снова день", _atmo.bind(TestBot.ATMO_HOUR, TestBot.ATMO_WEATHER))
 	# Подземелье: через портал (без проверок задания — как админ-панель), пресеты у причала
 	b.do("Подземелье: переход", _to_dungeon)
 	b.wait_until("мир подземелья построен", _dungeon_ready, DUNGEON_WAIT)
@@ -140,6 +149,15 @@ func _enter(sc: Dictionary) -> void:
 		_cast_cd = 0.0
 		_skill_i = 0
 		_battle_mobs()
+
+
+## Время суток и погода замера (TestBot.fix_atmo): свет, небо, дождь — сразу.
+func _atmo(h: float, w: String) -> void:
+	TestBot.fix_atmo(h, w)
+	if h < 3.0:
+		bot.check(Atmosphere.night() > 0.9, "замер ночью: ночь %.2f" % Atmosphere.night())
+	if w == "storm":
+		bot.check(Atmosphere.rain() > 0.9, "замер в грозу: дождь %.2f" % Atmosphere.rain())
 
 
 func _to_dungeon() -> void:

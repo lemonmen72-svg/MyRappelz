@@ -563,6 +563,11 @@ func reset_env() -> void:
 	# Тесты ждут вкладку по умолчанию («Герой»); у игрока запомнена своя (бота запускают с «Тест-бота») — вернётся в конце
 	AdminPanel.tab = "hero"
 	JobFxNeophyte.corpses.clear()
+	# Часы и погода мира — по умолчанию, как в CI (свои у игрока вернёт TestBot в конце)
+	WorldClock.reset()
+	WorldClock.unix_override = -1.0
+	Weather.force = ""
+	NightLights.count_override = -1
 	CreatureAsset.use_assets = true
 	CharacterModel.use_assets = true
 	Handheld.force_missing = false
