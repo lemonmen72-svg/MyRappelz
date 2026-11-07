@@ -45,10 +45,11 @@ extends Node
 ## любом конце. Настройки игрока (settings.cfg) такой сценарий может убрать на время (backup_settings — копия в папке
 ## отчётов, путь — в метке RUNNING); игра упала посреди — recover_after_crash при следующем запуске (main._ready).
 ##
-## Фон Android (фаза 5 Кардинала): свёрнутой игра на Android не работает — главный цикл Godot стоит, пока активность
-## на паузе; фоновой службы нет (честно, без обхода правил Android). Свернули (NOTIFICATION_APPLICATION_PAUSED) — тест
-## стоит; вернулись — время в фоне (away_time; за весь запуск — away_total_us, его вычитают часы Кардинала) в лимиты
-## не входит, кадр после возвращения (его delta — всё время в фоне) не считается, замер идёт заново; запись в журнал
+## Фон Android (фаза 5 Кардинала): свёрнутой игра на Android не работает — Godot 4.3 в onStop активности ставит поток
+## отрисовки (и главный цикл) на паузу; фоновой службы нет (честно, без обхода правил Android). Свернули
+## (NOTIFICATION_APPLICATION_PAUSED) — тест стоит; вернулись — сколько стояли, говорит разрыв первого кадра (delta ≥
+## RESUME_GAP; короче — «на паузе», игра работала под диалогом), время в фоне (away_time; за весь запуск —
+## away_total_us, его вычитают часы Кардинала) в лимиты не входит, этот кадр не считается, замер идёт заново; запись в журнал
 ## сворачиваний (interruptions: когда, сколько, на каком шаге) и раздел отчёта «Сворачивания и фон» (питание,
 ## экономия энергии, оптимизация батареи, ограничение фона, группа ожидания — плагин powerInfo). Кадр длиннее
 ## SUSPEND_GAP без уведомлений — тоже простой. Пока игра свёрнута, плагин показывает уведомление «тест на паузе» с
@@ -105,6 +106,9 @@ const CHECKPOINT_SCHEMA := 1
 const SUSPEND_GAP := 20.0
 ## Без фокуса дольше (с) — строка журнала (шторка уведомлений, системный диалог; игра при этом работала).
 const FOCUS_NOTE := 2.0
+## Разрыв кадров после возвращения длиннее (с) — игра стояла (свернули, экран заблокирован: Godot 4.3 ставит поток
+## отрисовки на паузу в onStop); короче — активность была на паузе, но игра работала (диалог поверх, несколько окон).
+const RESUME_GAP := 0.5
 ## Как часто сообщать плагину, что делает бот (текст уведомления «на паузе»), с.
 const STATE_EVERY := 3.0
 ## Заголовок уведомления «на паузе».
@@ -178,7 +182,8 @@ var log_mark := ""
 ## "не начат"}; cur_section — индекс открытого (−1 — нет).
 var sections: Array[Dictionary] = []
 var cur_section := -1
-## Фон Android: сворачивания и потери фокуса {kind "свёрнута" / "без фокуса" / "стояла", sec, at, step, state, power},
+## Фон Android: сворачивания и потери фокуса {kind "свёрнута" / "на паузе" / "без фокуса" / "стояла", sec, at, step,
+## state, power},
 ## всего в фоне, с (в лимиты не входит); питание в начале и в конце (плагин powerInfo; {} — нет плагина); остановлен
 ## кнопкой «Остановить тест» уведомления.
 var interruptions: Array[Dictionary] = []
@@ -219,7 +224,9 @@ var _headless := false
 var _app_away := false
 var _away_start_us := 0
 var _away_paused := false
-var _skip_dt := false
+## После RESUMED: следующий кадр — разрыв кадров (delta) говорит, стояла ли игра.
+var _resume_check := false
+var _resume_sec := 0.0
 var _state_t := 0.0
 ## Доп. поля метки RUNNING (mark): шаг сценария, копия настроек.
 var _marker_extra: Dictionary = {}
@@ -484,11 +491,18 @@ func _process(delta: float) -> void:
 	if _last_us > 0:
 		fdt = float(now - _last_us) / 1000000.0
 	_last_us = now
-	# Кадр после возвращения свёрнутой игры: его delta — всё время в фоне (в лимиты и шаги не идёт)
-	if _skip_dt:
-		_skip_dt = false
-		delta = 0.0
-		fdt = 0.0
+	# Первый кадр после возвращения: его delta — сколько игра стояла (свёрнута, экран заблокирован) — в фоне, в лимиты
+	# и шаги не идёт; короткий — активность была на паузе, а игра работала (диалог поверх, несколько окон)
+	if _resume_check:
+		_resume_check = false
+		if delta >= RESUME_GAP:
+			away_time += delta
+			away_total_us += int(delta * 1.0e6)
+			_add_interruption("свёрнута", delta)
+			delta = 0.0
+			fdt = 0.0
+		else:
+			_add_interruption("на паузе", _resume_sec)
 	elif delta > SUSPEND_GAP and (state == "running" or state == "cooling" or state == "prepare"):
 		# Игра стояла без уведомлений о паузе (экран погас, система заморозила процесс)
 		away_time += delta
@@ -595,8 +609,9 @@ func _notification(what: int) -> void:
 			_back_from_away()
 
 
-## Вернулись (RESUMED, затем FOCUS_IN — второй вызов ничего не делает): сколько не было, журнал; свёрнутая —
-## следующий кадр не считается (_skip_dt); нажали «Остановить тест» в уведомлении — остановка.
+## Вернулись (RESUMED, затем FOCUS_IN — второй вызов ничего не делает). Была пауза активности — сколько игра
+## стояла, скажет разрыв следующего кадра (_resume_check, _process); только фокус (шторка) — запись «без фокуса»;
+## нажали «Остановить тест» в уведомлении — остановка.
 func _back_from_away() -> void:
 	if _away_start_us == 0:
 		return
@@ -605,11 +620,10 @@ func _back_from_away() -> void:
 	_away_start_us = 0
 	_away_paused = false
 	if paused:
-		_skip_dt = true
-		away_time += sec
-		away_total_us += int(sec * 1.0e6)
-	if paused or sec >= FOCUS_NOTE:
-		_add_interruption("свёрнута" if paused else "без фокуса", sec)
+		_resume_check = true
+		_resume_sec = sec
+	elif sec >= FOCUS_NOTE:
+		_add_interruption("без фокуса", sec)
 	# Остановка (отчёт, сцена заново) — не посреди уведомления движка, а в конце кадра
 	_check_stop_request.call_deferred()
 
@@ -629,6 +643,9 @@ func _add_interruption(kind: String, sec: float) -> void:
 				String(e["step"])])
 		"стояла":
 			note("Игра стояла %s без уведомления о паузе (шаг «%s») — в лимиты не вошло" % [clock(sec), String(e["step"])])
+		"на паузе":
+			note("Игра на паузе %s, но работала (диалог поверх, несколько окон; шаг «%s») — тест шёл" % [clock(sec),
+				String(e["step"])])
 		_:
 			note("Игра без фокуса %s (шторка, диалог; шаг «%s») — тест шёл" % [clock(sec), String(e["step"])])
 

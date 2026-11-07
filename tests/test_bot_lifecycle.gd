@@ -1,9 +1,9 @@
 extends "res://tests/test_base.gd"
 ## Тест-бот, фаза 5 Кардинала — фон Android и контрольные точки (без устройства: события Android и плагин подставные):
 ## - запуск 1 (сценарий LifeScenario из 4 частей, режим «life» через BotScenario.test_modes): свернули (FOCUS_OUT →
-##   PAUSED) на 90 с и вернулись (RESUMED → FOCUS_IN) — тест стоял: журнал сворачиваний, away_time и away_total_us,
-##   кадр после возвращения (delta 90 с) не идёт в активное время; кадр 25 с без уведомлений — «стояла»; шторка 3 с
-##   (только FOCUS_OUT) — «без фокуса», тест шёл; часы Кардинала (CardinalStory.wall_sec) вычитают время в фоне;
+##   PAUSED) на 90 с и вернулись (RESUMED → FOCUS_IN) — первый кадр (delta 90 с) говорит, что игра стояла: журнал
+##   сворачиваний, away_time и away_total_us, 90 с не идут в активное время; пауза под диалогом с обычным кадром —
+##   «на паузе», время не вычтено; кадр 25 с без уведомлений — «стояла»; шторка 3 с (только FOCUS_OUT) — «без фокуса»; часы Кардинала (CardinalStory.wall_sec) вычитают время в фоне;
 ##   плагин botState — бот идёт (режим и шаг в тексте), разрешение на уведомления спрошено (долгий режим, запрещены);
 ##   перегрев на 2-й части — точка «частей 2 из 4» остаётся (без .tmp), отчёт: «Сворачивания и фон», питание;
 ## - вкладка «Тест-бот»: «Прерванный запуск», «Продолжить» (настоящий путь AdminPanel.bot_resume) — готовые 2 части не
@@ -232,25 +232,33 @@ func _check_away() -> void:
 	_bot._away_start_us -= 90 * 1000000
 	_bot.notification(NOTIFICATION_APPLICATION_RESUMED)
 	_bot.notification(NOTIFICATION_APPLICATION_FOCUS_IN)
+	check(_bot._resume_check and _bot.interruptions.is_empty(), "вернулись — сколько игра стояла, скажет первый кадр")
+	# Первый кадр после возвращения: движок отдаёт в delta всё время в фоне
+	_bot._process(90.0)
 	check(_bot.interruptions.size() == 1 and String(_bot.interruptions[0]["kind"]) == "свёрнута"
 		and float(_bot.interruptions[0]["sec"]) >= 89.0, "свернули — запись «свёрнута» %.1f с" % (float(
 		_bot.interruptions[0]["sec"]) if not _bot.interruptions.is_empty() else -1.0))
 	check(_bot.away_time >= 89.0 and TestBot.away_total_us >= 89 * 1000000, "время в фоне: %.1f с (всего %d мкс)" % [
 		_bot.away_time, TestBot.away_total_us])
-	check(_bot._skip_dt, "кадр после возвращения не считается")
-	# Кадр, в котором движок отдал всё время в фоне
-	_bot._process(90.0)
-	check(_bot.active_time - act0 < 0.5 and not _bot._skip_dt, "90 с в фоне не вошли в активное время (+%.2f с)" % (
+	check(_bot.active_time - act0 < 0.5 and not _bot._resume_check, "90 с в фоне не вошли в активное время (+%.2f с)" % (
 		_bot.active_time - act0))
-	_bot._process(25.0)
-	check(_bot.interruptions.size() == 2 and String(_bot.interruptions[1]["kind"]) == "стояла" and _bot.active_time - act0 < 0.5,
-		"кадр 25 с без уведомлений — «стояла», в лимиты не вошло")
+	# Пауза активности, а игра работала (диалог поверх): первый кадр после возвращения — обычный
 	var away0 := _bot.away_time
+	_bot.notification(NOTIFICATION_APPLICATION_PAUSED)
+	_bot._away_start_us -= 4 * 1000000
+	_bot.notification(NOTIFICATION_APPLICATION_RESUMED)
+	_bot._process(1.0 / 60.0)
+	check(_bot.interruptions.size() == 2 and String(_bot.interruptions[1]["kind"]) == "на паузе"
+		and absf(_bot.away_time - away0) < 0.01, "пауза под диалогом, игра работала — «на паузе», время не вычтено")
+	_bot._process(25.0)
+	check(_bot.interruptions.size() == 3 and String(_bot.interruptions[2]["kind"]) == "стояла" and _bot.active_time - act0 < 1.0,
+		"кадр 25 с без уведомлений — «стояла», в лимиты не вошло")
+	away0 = _bot.away_time
 	_bot.notification(NOTIFICATION_APPLICATION_FOCUS_OUT)
 	_bot._away_start_us -= 3 * 1000000
 	_bot.notification(NOTIFICATION_APPLICATION_FOCUS_IN)
-	check(_bot.interruptions.size() == 3 and String(_bot.interruptions[2]["kind"]) == "без фокуса"
-		and absf(_bot.away_time - away0) < 0.01 and not _bot._skip_dt, "шторка 3 с — «без фокуса», тест шёл")
+	check(_bot.interruptions.size() == 4 and String(_bot.interruptions[3]["kind"]) == "без фокуса"
+		and absf(_bot.away_time - away0) < 0.01 and not _bot._resume_check, "шторка 3 с — «без фокуса», тест шёл")
 	# Часы Кардинала: 10 с прошло, из них 8 с игра была свёрнута — 2 с
 	var cs := CardinalStory.new()
 	cs._wall0 = Time.get_ticks_usec() - 10 * 1000000
@@ -269,7 +277,8 @@ func _check_hot_report() -> void:
 	check(not _fake.last_running(), "плагин знает: бот закончил (уведомление убрано)")
 	var text := FileAccess.get_file_as_string(String(_result["txt"]))
 	for s in ["Сворачивания и фон", "Свёрнута: 1, всего 1:30", "в лимиты не вошло", "Стояла без уведомления о паузе: 1",
-			"Без фокуса (шторка, диалог — игра работала): 1", "Фоновой работы нет", "Контрольных точек записано: 2",
+			"Без фокуса (шторка, диалог — игра работала): 1", "На паузе, но игра работала (диалог поверх, несколько окон): 1",
+			"Фоновой работы нет", "Контрольных точек записано: 2",
 			"Питание в начале: зарядка: да (77 %)", "экономия энергии: выкл", "оптимизация батареи для игры: вкл",
 			"группа ожидания: активная (10)", "уведомления: ЗАПРЕЩЕНЫ", "игра свёрнута 1:55 — не в счёт",
 			"Контрольная точка сохранена (частей 2 из 4)"]:

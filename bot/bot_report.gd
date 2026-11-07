@@ -528,6 +528,9 @@ static func _away_block(bot: TestBot, L: PackedStringArray) -> void:
 		if cnt.has("стояла"):
 			L.append("  Стояла без уведомления о паузе: %d, всего %s — в лимиты не вошло" % [int(cnt["стояла"]),
 				TestBot.clock(float(sec["стояла"]))])
+		if cnt.has("на паузе"):
+			L.append("  На паузе, но игра работала (диалог поверх, несколько окон): %d, всего %s" % [int(cnt["на паузе"]),
+				TestBot.clock(float(sec["на паузе"]))])
 		if cnt.has("без фокуса"):
 			L.append("  Без фокуса (шторка, диалог — игра работала): %d, всего %s" % [int(cnt["без фокуса"]),
 				TestBot.clock(float(sec["без фокуса"]))])
