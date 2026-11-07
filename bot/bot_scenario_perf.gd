@@ -6,8 +6,11 @@ extends BotScenario
 ## с умениями (BATTLE зверей перед героем, умения по кругу, обычная атака, MP и HP полные), даль (камера низко
 ## и далеко — весь остров). В каждой сцене — каждый пресет «Низкое…Максимальное» по MEASURE с (до замера прогрев
 ## TestBot.warmup), затем в городе — база «Среднее» и тяжёлые настройки по одной (SETTINGS) поверх «Среднего».
-## На каждую комбинацию — строка отчёта (метрики, температура до/после) и снимок. Итого ≈ 31 замер × 18 с ≈ 9.5 мин
-## (лимит режима — 12 мин активного времени, BotScenario.MODES).
+## В конце (0.44) — сцена «Подземелье»: переход через портал (сцена заново, мир подземелья), у причала с видом на
+## затонувший корабль, мостки и кораллы в воде — пресеты «Низкое…Максимальное» (в среднем по сценам и в
+## рекомендациях — вместе с островом).
+## На каждую комбинацию — строка отчёта (метрики, температура до/после) и снимок. Итого ≈ 35 замеров × 18 с ≈ 11 мин
+## (лимит режима — 14 мин активного времени, BotScenario.MODES).
 
 const MEASURE := 15.0
 const CROWD := 14
@@ -24,6 +27,12 @@ const SCENES := [
 	{"id": "battle", "name": "Бой с умениями", "pos": Vector2(34, 24), "cam": [0.4, 0.6, 11.0], "battle": true},
 	{"id": "far", "name": "Даль", "pos": Vector2(0, 5), "cam": [0.6, 0.32, 22.0]},
 ]
+## Сцена подземелья: точка (причал), камера — на корабль (на восток), наклон, расстояние.
+const DUNGEON_SCENE := "Подземелье"
+const DUNGEON_POS := Vector2(-34.0, 21.4)
+const DUNGEON_CAM := [-1.45, 0.62, 16.0]
+## Ждать мир подземелья после портала, с.
+const DUNGEON_WAIT := 120.0
 ## Настройки по одной поверх «Среднего» (город): [ключ Quality, значение].
 const SETTINGS := [
 	["shadows", 0], ["shadows", 3], ["aa", 0], ["aa", 1], ["aa", 3], ["render", 0], ["render", 3], ["outlines", 0],
@@ -31,6 +40,7 @@ const SETTINGS := [
 ]
 
 var bot: TestBot
+var _main0: Node = null
 var _cast_cd := 0.0
 var _skill_i := 0
 var _refill := 0.0
@@ -68,6 +78,13 @@ func build(b: TestBot) -> void:
 		var v := int(op[1])
 		b.measure(String(town["name"]), "%s: %s" % [Quality.option_title(key), Quality.option_label(key, v)], MEASURE,
 			{"preset": Quality.MEDIUM, "option": [key, v], "kind": "setting"})
+	# Подземелье: через портал (без проверок задания — как админ-панель), пресеты у причала
+	b.do("Подземелье: переход", _to_dungeon)
+	b.wait_until("мир подземелья построен", _dungeon_ready, DUNGEON_WAIT)
+	b.do("Сцена «%s»" % DUNGEON_SCENE, _enter_dungeon)
+	for l in range(Quality.LOW, Quality.ULTRA + 1):
+		b.measure(DUNGEON_SCENE, Quality.level_name(l), MEASURE, {"preset": l, "kind": "preset"})
+	b.do("Конец сцены «%s»" % DUNGEON_SCENE, _leave)
 	b.do("Конец: графика «Среднее»", func() -> void: b.set_preset(Quality.MEDIUM))
 
 
@@ -123,6 +140,29 @@ func _enter(sc: Dictionary) -> void:
 		_cast_cd = 0.0
 		_skill_i = 0
 		_battle_mobs()
+
+
+func _to_dungeon() -> void:
+	_leave()
+	_main0 = bot.main
+	AdminPanel.go_location(bot.main, "dungeon")
+
+
+func _dungeon_ready() -> bool:
+	var m := bot.main
+	if m == null or not is_instance_valid(m) or m == _main0 or not m.is_inside_tree() or not bool(m.get("_started")):
+		return false
+	var w: Variant = m.get("world")
+	return w != null and is_instance_valid(w) and w is DungeonWorld
+
+
+func _enter_dungeon() -> void:
+	var w: Variant = bot.main.get("world") if bot.main != null else null
+	if not bot.check(w is DungeonWorld, "мир подземелья для замера"):
+		return
+	bot.reset_camera()
+	bot.teleport(DUNGEON_POS, DUNGEON_SCENE)
+	bot.set_camera(float(DUNGEON_CAM[0]), float(DUNGEON_CAM[1]), float(DUNGEON_CAM[2]))
 
 
 func _leave() -> void:

@@ -306,7 +306,21 @@ func _check_admin_only() -> void:
 	Accounts.current = "Dedok_max"
 	check(BotScenario.create("perf") != null and BotScenario.create("quick") != null and BotScenario.create("full") != null
 		and BotScenario.create("sections") != null and BotScenario.create("nope") == null, "сценарии: perf, quick, full, sections")
-	check(BotScenario.create("perf").limit() == 720.0, "лимит «Производительности» — 12 мин")
+	check(BotScenario.create("perf").limit() == 840.0, "лимит «Производительности» — 14 мин")
+	# Шаги «Производительности»: сцены острова, настройки по одной, в конце — подземелье через портал (4 пресета)
+	var ptb := TestBot.new()
+	ptb.main = main
+	BotScenario.create("perf").build(ptb)
+	var dg := 0
+	var travel := false
+	for st in ptb._steps:
+		var sd: Dictionary = st
+		if String(sd["kind"]) == "measure" and String((sd["opts"] as Dictionary).get("scene", "")) == "Подземелье":
+			dg += 1
+		if String(sd["kind"]) == "until" and String(sd["name"]).contains("подземелья"):
+			travel = true
+	check(dg == 4 and travel, "«Производительность»: сцена «Подземелье» — %d замера, переход через портал: %s" % [dg, travel])
+	ptb.free()
 
 
 func _check_units() -> void:

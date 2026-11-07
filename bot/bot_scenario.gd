@@ -23,7 +23,7 @@ extends RefCounted
 
 ## Режимы вкладки «Тест-бот»: id, название, готов ли, сценарий, лимит активного времени (мин).
 const MODES := [
-	{"id": "perf", "name": "Производительность", "ready": true, "script": "res://bot/bot_scenario_perf.gd", "minutes": 12},
+	{"id": "perf", "name": "Производительность", "ready": true, "script": "res://bot/bot_scenario_perf.gd", "minutes": 14},
 	{"id": "autotests", "name": "Автотесты на телефоне (все)", "ready": true,
 		"script": "res://bot/bot_scenario_autotests.gd", "minutes": 75},
 	{"id": "autotests_quick", "name": "Автотесты: быстрые", "ready": true,

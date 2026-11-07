@@ -8,7 +8,7 @@ test_asset_fallback 8
 test_asset_pack 3
 test_balance_start 5
 test_bot 30
-test_bot_game 120
+test_bot_game 150
 test_branding 6
 test_bridge 4
 test_centaur 3

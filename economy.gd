@@ -128,16 +128,32 @@ static func roll_loot(type_id: String, lvl: int = -1, in_dungeon: bool = false) 
 	return LootTable.roll(type_id, l, in_dungeon)
 
 
-## Кладёт мешочек с добычей на землю в точке pos: предметы items и золото gold.
+## Кладёт мешочек с добычей на землю в точке pos: предметы items и золото gold (высота — drop_height).
 func spawn_drop(pos: Vector3, items: Dictionary, gold: int = 0) -> LootDrop:
 	var drop := LootDrop.new()
 	drop.items = items.duplicate()
 	drop.gold = maxi(0, gold)
-	drop.position = Vector3(pos.x, 0.0, pos.z)
+	drop.position = Vector3(pos.x, drop_height(pos), pos.z)
 	drop.picked_up.connect(_on_drop_picked)
 	drop.bag_full.connect(_on_bag_full)
 	main.add_child(drop)
 	return drop
+
+
+## Высота мешочка в точке pos: земля мира (в подземелье — пол зала или палуба корабля, DungeonWorld._ground_or_deck);
+## точка выше земли не больше чем на DROP_ABOVE м (зверь погиб на мосту, на настиле) — её высота. Нет мира — pos.y.
+## До 0.44 мешочек всегда ложился на y = 0: в подземелье — под пол поднятых залов (вход +1.5, шахта +3) и в корпус
+## корабля под палубой, в опущенных (склеп −2) висел в воздухе, на холмах острова — уходил в землю (тест бота
+## «Подземелье»; подобрать можно было — подбор по расстоянию на плоскости).
+const DROP_ABOVE := 6.0
+static func drop_height(pos: Vector3) -> float:
+	var w := IslandWorld.current
+	if w == null or not is_instance_valid(w):
+		return pos.y
+	var g := (w as DungeonWorld)._ground_or_deck(Vector2(pos.x, pos.z)) if w is DungeonWorld else w.height_at(pos.x, pos.z)
+	if pos.y > g and pos.y - g <= DROP_ABOVE:
+		return pos.y
+	return g
 
 
 # ---------- Зелья ----------
