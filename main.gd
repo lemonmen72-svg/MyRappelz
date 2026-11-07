@@ -289,6 +289,7 @@ func restart_scene() -> Node:
 
 func _wait_vfx_prewarm() -> void:
 	VfxKit.finish_prewarm(true)
+	VfxFlip.finish()
 
 
 ## Маски эффектов из фонового потока — в текстуры, когда готовы (VfxKit.prewarm).
@@ -320,6 +321,8 @@ func _start_world() -> void:
 	_on_location_entered()
 	# Маски, шум и меши эффектов умений — заранее, а не на первом умении (VFX 2.0)
 	VfxKit.prewarm.call_deferred()
+	# Раскадровки эффектов (листы части «vfx»): умения героя, питомцев, зверей и обычные удары — в фоне
+	VfxFlip.prewarm_world.call_deferred()
 	# Выход или перезапуск сцены, пока поток масок работает, — дождаться его (иначе скрипт выгружается под потоком)
 	if not tree_exiting.is_connected(_wait_vfx_prewarm):
 		tree_exiting.connect(_wait_vfx_prewarm)

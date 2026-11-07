@@ -42,6 +42,9 @@ const LABEL_PX := 0.62
 const STUCK_TIME := 1.8
 const STUCK_MOVE := 0.6
 const FOLLOW_DIST := 3.0
+## Удар питомца — лист раскадровки (VfxFlip, Vfx.slash_arc): по умолчанию когти зверя, у скелета — клинок, у
+## кентавра — укол копьём.
+const SLASH_SHEET := {"skeleton": "slash_arc", "centaur": "stab"}
 ## Лекарь лечит хозяина не дальше этого.
 const HEAL_RANGE := 15.0
 ## Рывок умения-тарана: цель дальше MIN и ближе MAX, м.
@@ -1459,7 +1462,8 @@ func _slash(t: Mob, size: float) -> void:
 		return
 	var dir := t.global_position - global_position
 	Vfx.slash_arc(get_parent(), t.mid_point(), dir,
-		CreatureModels.role_color(role).lightened(0.3), size * clampf(t.body_scale, 0.8, 1.6))
+		CreatureModels.role_color(role).lightened(0.3), size * clampf(t.body_scale, 0.8, 1.6),
+		String(SLASH_SHEET.get(species, "claw")))
 
 
 func _bump() -> void:

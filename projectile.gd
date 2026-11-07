@@ -144,6 +144,10 @@ func _build_orb() -> void:
 	cm.radial_segments = 14
 	cm.rings = 7
 	_part(cm, glow_mat(color.lightened(0.55), 1.0), Vector3.ZERO, true, false)
+	# Нарисованный сгусток (раскадровка «Снаряд-сгусток», VfxFlip) вместо ореола и звёздочки
+	if VfxKit.flipbook(self, "magic_orb", 1.3 * size, MAX_LIFE, {"color": color, "push": 0.0, "speed": 20.0,
+			"mirror": false}) != null:
+		return
 	var hm := SphereMesh.new()
 	hm.radius = 0.27 * size
 	hm.height = 0.54 * size

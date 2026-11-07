@@ -254,11 +254,15 @@ const PACKS := {
 		"assets/handheld/mw_*.glb",
 		"assets/handheld/mw_*.png",
 	],
+	# Раскадровки эффектов умений (листы VfxFlip, 0.46.1; без части — эффекты из прежних слоёв)
+	"vfx": [
+		"vfx/flip/fx_*.png",
+	],
 }
-## Порядок загрузки частей: сначала мир (с ним игра выглядит нормально), затем значки, оружие, звери; части не из
+## Порядок загрузки частей: сначала мир (с ним игра выглядит нормально), затем значки, эффекты, оружие, звери; части не из
 ## списка (герои, жители, стадии, новые) — после, в порядке манифеста. По нему идут HTTPRequest (по очереди) и
 ## DownloadManager (все сразу, но в этом порядке).
-const LOAD_ORDER := ["world", "world_b", "icons", "handheld", "creatures_base"]
+const LOAD_ORDER := ["world", "world_b", "icons", "vfx", "handheld", "creatures_base"]
 ## Часть старого манифеста (один пакет на все файлы, до разбиения на части): подключена — готовы все части.
 const ALL := "all"
 ## Файл пакета, по которому видно, что ресурсы уже лежат в res:// (редактор, автотесты, полная сборка).
@@ -372,6 +376,7 @@ static func reset_caches() -> void:
 	UiIcons.reset_cache()
 	ItemIcon.reset_cache()
 	SkillTree.reset_cache()
+	VfxFlip.reset()
 	Util.refresh_skins()
 
 

@@ -57,6 +57,7 @@ MUST_PACK = [
 	"assets/handheld/*.glb",
 	"assets/handheld/*.png",
 	"assets/icons/*.png",
+	"vfx/flip/*.png",
 ]
 # Данные моделей (роли костей, размеры, точки) — всегда в APK: код читает их до подключения частей.
 NEVER_PACK = [

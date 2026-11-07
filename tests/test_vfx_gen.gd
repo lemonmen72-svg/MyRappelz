@@ -93,6 +93,9 @@ func _table() -> void:
 
 
 func _archetypes() -> void:
+	# Слои прежних эффектов (раскадровки — tests/test_vfx_flip.gd): лист, догрузившийся в фоне посреди цикла,
+	# сменил бы число частиц между качествами
+	VfxFlip.enabled = false
 	var p: Player = main.player
 	var at := p.global_position + Vector3(0, 1.0, 6.0)
 	var o := {"ground": p.global_position + Vector3(0, 0, 6.0), "from": p.global_position + Vector3(0, 1.2, 0),
@@ -122,6 +125,7 @@ func _archetypes() -> void:
 		VfxArchetypes.dress_projectile(n3, String(el), 1.0, 1)
 		check(n3.get_child_count() >= 2, "снаряд стихии %s собран" % el)
 		n3.queue_free()
+	VfxFlip.enabled = true
 
 
 func _combat() -> void:

@@ -15,6 +15,8 @@
 | `vfx/skill_vfx.json` | — | Таблица (генерируется): `hero` {id}, `pet` {"вид:id"}, `mob` {"вид:slam", "вид:curse:<вид>"} → фазы. |
 | `vfx/skill_vfx_overrides.json` | — | Ручные правки поверх таблицы (поля фазы дополняются, `null` — убрать фазу). |
 | `vfx/skill_vfx.gd` | `SkillVfx` | В игре: таблица + правки, `play` фазы, удобные `impact`, `area_at`, `release`, `buff`, `cast_start` / `cast_stop`, `proj_style`; лимиты; выключатель `enabled`. |
+| `vfx/vfx_flip.gd` | `VfxFlip` | Раскадровки (0.46.1): листы Максима `vfx/flip/fx_<id>[_N].png` (4×4 кадра по 256 px, оттенки серого, импорт «Image») и `flipbooks.json`; фоновая загрузка, заранее — при входе в мир (`prewarm_world`), не больше 30 листов в видеопамяти, выключатель `enabled`. Слой — `VfxKit.flipbook` (виды: к камере, стоит на земле, лежит на земле, вдоль удара, между героем и целью), в архетипах — `VfxArchetypes._flip` (лист есть — свои слои той же формы не рисуются). |
+| `tools/prepare_flipbook.py` | — | Нарезка листов ChatGPT: сетка, яркость, край кадра, опора, петли; `tools/flipbook_sources.txt` — какой файл каким эффектом стал. |
 
 ## Пресет фазы
 

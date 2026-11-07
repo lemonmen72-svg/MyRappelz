@@ -568,6 +568,9 @@ func reset_env() -> void:
 	WorldClock.unix_override = -1.0
 	Weather.force = ""
 	NightLights.count_override = -1
+	# Раскадровки эффектов: тесты включают сразу-загрузку и выключатель
+	VfxFlip.enabled = true
+	VfxFlip.sync_load = false
 	CreatureAsset.use_assets = true
 	CharacterModel.use_assets = true
 	Handheld.force_missing = false

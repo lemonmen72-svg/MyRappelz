@@ -78,5 +78,6 @@ test_ui_icons
 test_ui_scale
 test_vegetation
 test_vfx
+test_vfx_flip
 test_vfx_gen
 test_weapons

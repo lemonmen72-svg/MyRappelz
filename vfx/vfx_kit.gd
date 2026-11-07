@@ -994,6 +994,143 @@ static func orb(root: Node3D, c: Color, size: float, time: float, offset: Vector
 	return mi
 
 
+## Нарисованный слой — раскадровка листа VfxFlip id (0.46.1): квад с кадрами одной анимации, цвет — палитра (тёмное —
+## второй цвет, середина — основной, самое яркое — ядро). size — сторона кадра, м (с полями ~10 %); time — сколько
+## идёт: разовый лист проигрывается целиком за time, петля крутится до конца time (появление и угасание —
+## прозрачностью). o: pal (палитра VfxArchetypes) или color; view — по листу (front — к камере, side — стоит на
+## земле, top — лежит на земле, right/left — вдоль dir); ground (мировая точка земли — у side и top), at (мировая
+## точка) или offset (от root), dir (+X кадра — к цели), span (мировой отрезок от at: кадр растянут между концами —
+## молния, поток душ), height (top — над землёй), side_k (размер, если выпал вариант «сбоку»), pivot ([x, y] —
+## своя опора) или anchor "hot" (опора — самое яркое место: вспышка укола), push (сдвиг к камере, м), add (false —
+## обычная прозрачность), under (Color — ещё слой обычной прозрачности под ним: тьма, дым), alpha, gain, hdr, core,
+## mirror (по умолчанию у front и side — случайно), rot (поворот кадра, рад), spin (top — оборотов за time), grow
+## (начальный масштаб — растёт до 1 за треть time), variant, delay, speed (кадров в секунду у петли), loop (крутить и
+## разовый лист), rng.
+## null — листа нет (части пакета «vfx») или он ещё грузится: эффект рисует прежние слои.
+static func flipbook(root: Node3D, id: String, size: float, time: float, o: Dictionary = {}) -> MeshInstance3D:
+	if root == null or not is_instance_valid(root) or not root.is_inside_tree():
+		return null
+	var got := VfxFlip.pick(id, int(o.get("variant", -1)), o.get("rng", null))
+	if got.is_empty():
+		return null
+	var rec: Dictionary = got["rec"]
+	var view := String(o.get("view", rec.get("view", "front")))
+	var cyc := bool(o.get("loop", String(VfxFlip.info(id).get("kind", "once")) == "loop"))
+	var pal: Dictionary = o.get("pal", {})
+	var base: Color = o.get("color", Color.WHITE)
+	var a_col: Color = pal.get("a", base)
+	var lo: Color = pal.get("b", a_col.darkened(0.35))
+	var hot: Color = pal.get("core", a_col.lightened(0.7))
+	if hot.get_luminance() < 0.35:
+		# Тьма: ядро палитры почти чёрное — самое яркое берёт светлый акцент
+		hot = pal.get("c", a_col.lightened(0.5))
+	var add := bool(o.get("add", true))
+	var bb := 2
+	match view:
+		"side":
+			bb = 4
+		"right", "left":
+			bb = 5
+		"top":
+			bb = 0
+	if o.has("span"):
+		# Отрезок (молния между героем и целью): кадр вдоль него при любом виде листа
+		bb = 5
+	var push := float(o.get("push", 0.0 if view == "top" else 0.5))
+	var mirror := bool(o.get("mirror", view in ["front", "side"] and randf() < 0.5))
+	var mats: Array[VfxMat] = []
+	var nodes: Array[MeshInstance3D] = []
+	var layers := [false, true] if o.has("under") else [true]
+	for main_layer in layers:
+		var m: VfxMat
+		if main_layer:
+			m = VfxMat.make(Color(a_col, float(o.get("alpha", 1.0))), got["tex"], add,
+				{"core_amt": float(o.get("core", 0.7)), "hdr": float(o.get("hdr", 1.45 if add else 1.0)), "soft": 0.2},
+				bb, Color(hot, 1.0))
+			m.set_shader_parameter("ramp_lo", Color(lo, 1.0))
+			m.set_shader_parameter("ramp_amt", 0.85 if add else 0.0)
+		else:
+			var uc: Color = o["under"]
+			m = VfxMat.make(uc, got["tex"], false, {"core_amt": 0.0, "hdr": 1.0, "soft": 0.2}, bb, uc)
+			m.render_priority = -1
+		m.set_shader_parameter("flip", Vector2(float(rec.get("grid", 4)), float(rec.get("grid", 4))))
+		m.set_shader_parameter("flip_n", float(rec.get("frames", 16)))
+		m.set_shader_parameter("flip_cycle", cyc)
+		m.set_shader_parameter("flip_gain", float(o.get("gain", 1.0)) * (1.0 if main_layer else 1.25))
+		var pv: Array = o.get("pivot", rec.get("hot" if String(o.get("anchor", "")) == "hot" else "pivot", [0.5, 0.5]))
+		m.set_shader_parameter("pivot", Vector2(float(pv[0]), float(pv[1])))
+		m.set_shader_parameter("flip_mirror", mirror)
+		m.set_shader_parameter("cam_push", push if main_layer else push * 0.9)
+		if o.has("rot"):
+			m.set_shader_parameter("rot", float(o["rot"]))
+		var mi := _mi(root, Vfx._plane() if view == "top" else Vfx._quad(), m)
+		mats.append(m)
+		nodes.append(mi)
+	var at: Vector3
+	var local := false
+	if view in ["side", "top"] and o.has("ground"):
+		at = o["ground"]
+	elif o.has("at"):
+		at = o["at"]
+	else:
+		at = o.get("offset", Vector3.ZERO)
+		local = true
+	if view == "side":
+		size *= float(o.get("side_k", 1.0))
+	var sc := Vector3(size, size, 1.0)
+	if view == "top":
+		sc = Vector3(size * 0.5, 1.0, size * 0.5)
+		at += Vector3(0, float(o.get("height", 0.0)) + 0.06, 0)
+	var fd := Vector3.ZERO
+	var span := false
+	if o.has("span"):
+		fd = o["span"]
+		span = true
+		at += fd * 0.5
+	elif bb == 5:
+		# «вправо» — движение к цели, «влево» — к герою (поток душ): у обоих +X кадра — к цели
+		fd = o.get("dir", Vector3.RIGHT)
+	for i in nodes.size():
+		var mi := nodes[i]
+		if local:
+			mi.position = at
+		else:
+			mi.global_position = at
+		mi.scale = sc * (1.06 if nodes.size() == 2 and i == 0 else 1.0)
+		if bb == 5:
+			mats[i].set_shader_parameter("face_dir", fd)
+			mats[i].set_shader_parameter("face_span", span)
+	var dl := float(o.get("delay", 0.0))
+	var n := float(rec.get("frames", 16))
+	var speed := float(o.get("speed", 14.0))
+	var grow := float(o.get("grow", 1.0))
+	for i in nodes.size():
+		var mi := nodes[i]
+		var m := mats[i]
+		var t := mi.create_tween().set_parallel(true)
+		if dl > 0.0:
+			mi.visible = false
+			t.tween_callback(mi.show).set_delay(dl)
+		if cyc:
+			_param(t, m, "flip_f", 0.0, speed * time, time, dl)
+			var a0 := m.albedo_color.a
+			m.albedo_color = Color(m.albedo_color, 0.0)
+			var fin := minf(0.25, time * 0.2)
+			t.tween_property(m, "albedo_color:a", a0, fin).set_delay(dl)
+			t.tween_property(m, "albedo_color:a", 0.0, minf(0.35, time * 0.25)).set_delay(dl + time - minf(0.35, time * 0.25))
+		else:
+			_param(t, m, "flip_f", 0.0, n - 1.0, time, dl)
+			t.tween_property(m, "albedo_color:a", 0.0, time * 0.15).set_delay(dl + time * 0.85)
+		if grow < 0.999:
+			var full := mi.scale
+			mi.scale = full * grow
+			t.tween_property(mi, "scale", full, time * 0.33).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT) \
+				.set_delay(dl)
+		if view == "top" and o.has("spin"):
+			t.tween_property(mi, "rotation:y", TAU * float(o["spin"]), time).set_delay(dl)
+	return nodes[nodes.size() - 1]
+
+
 ## Постоянная аура вокруг узла (каст, усиление): непрерывные частицы. Не удаляется сама — stop_loop.
 static func loop(parent: Node3D, o: Dictionary) -> CPUParticles3D:
 	var d := o.duplicate()

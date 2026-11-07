@@ -1,0 +1,49 @@
+# Раскадровки эффектов (flipbook): листы Максима из ChatGPT → эффект. Промты — tools/Промты_раскадровки_эффектов.docx.
+# Строка: <имя файла> <id эффекта>[_<вариант>] [вид] [земля] — вид, если лист нарисован не тем видом, что в промте
+# (front, side, top, right, left, head); земля — высота основания у вида «сбоку» (доля кадра сверху), если скрипт
+# угадал её неверно. Вариант — второй лист того же промта (fx_<id>_2.png).
+# Подготовка: python3 -I tools/prepare_flipbook.py --src <папка с листами>
+
+# Партия 1 (07.11, Яндекс Диск «1 партия.zip»): промты 1–39 по порядку документа, в архиве — в обратном порядке.
+file_00000000fb1c81f58cd901bebfc22b32.png cast_gather
+file_000000004a6c81f5b2903f478a656823.png cast_release
+file_0000000014ec81f582168482c73db955.png magic_orb
+file_00000000151881f583ffd864c92739b7.png slash_arc
+file_00000000947881f5bcd798055736b82b.png slash_cross
+file_00000000a1d081f59bfa56725faf82ce.png cleave side
+file_00000000219c81f5832895e897e7fb2d.png stab
+file_00000000e47481f5b1e60aaab7a644ed.png blunt_impact
+file_000000009e7081f590793c96d57d83af.png hit_spark
+file_00000000e71081f5b922f5200ee16c1c.png crit_flash
+file_00000000260081f5bc46943ac6aa5dd8.png claw
+file_00000000a96481f5ac1e48c2e93f094a.png spin_slash
+file_00000000a0f481f5acc8b4735602ac27.png arrow_impact
+file_0000000031e481f5b88417f384401e25.png arrow_impact_2
+file_00000000d0e481f598490b2b54908a22.png explosion side
+file_00000000502c81f5bd6b5eb456de8ed6.png flame_burst
+file_00000000856081f5ae052f43d6391ce8.png burn_loop
+file_0000000000c481f5b793ccfc71b8fbbc.png frost_nova
+file_00000000ea7c81f5b175c36d68b86a3e.png ice_shards
+file_000000003bb081f5943dbcac8c8f79d2.png lightning_strike
+file_000000006b6881f59bd112181dd75284.png lightning_arc
+file_0000000098cc81f59d3835b5cb3f9043.png water_splash
+file_00000000868881f58ca9075e475dfeb9.png rock_impact
+file_0000000052d081f596958d795a0d3f76.png ground_spikes
+file_00000000a7e081f593e65a08a5ec5760.png wind_slash
+file_000000005f7481f588beb9de91e8a701.png tornado
+file_00000000af9481f5848879e9d0880c82.png holy_beam
+file_0000000087b081f5a70211bb10dd5773.png shadow_burst side
+file_0000000059e881f5b76db6f0d93348ab.png soul_drain
+file_00000000d2e081f58ebe81c3e9ad2788.png poison_cloud
+file_00000000bff881f59e1908c8f71dffba.png blood_burst side 0.78
+file_00000000ecc881f58ae57085c51386f5.png spirit_burst
+file_000000005a8081f59d400ebb22850d48.png roar
+file_0000000077b881f590f615bd9e3dee38.png heal_burst side
+file_00000000e0e081f5b5f62ef97a9feb8f.png heal_rise
+file_00000000a31481f58cd2cc86e0b031cd.png buff_up
+file_00000000dff481f5ad7d288c598d1c1b.png aura_ring
+file_00000000aa8481f5a9be6343a8320849.png shield_bubble
+file_000000008d6481f59f294968fe71bafd.png shield_bubble_2 side 0.8
+file_0000000040a081f5a8543f478d3399f6.png blessing
+file_000000006a0081f592e9229ffc4b6192.png blessing_2
+file_00000000618881f5a95deeb16c00eb10.png haste

@@ -58,7 +58,7 @@ extends RefCounted
 ##     «Кардинал: профили игроков»: "bot_prof_<профиль>", "bot_seg_<elder|job|post>", "bot_seeds_<1|3|5>",
 ##     "bot_race_<раса>", "bot_job_<профессия>", "bot_paccel_<8|16|32>" (BotScenarioCardinalProfiles),
 ##     "anim_system", "anim_combat_idle" (система анимаций 1.0 и боевая стойка — выключатели отката),
-##     "vfx_new" (эффекты умений генератора VFX — SkillVfx.enabled).
+##     "vfx_new" (эффекты умений генератора VFX — SkillVfx.enabled), "vfx_flip" (раскадровки — VfxFlip.enabled).
 
 const ADMIN_TOOLS := true
 ## Размер окна для «Среднего» размера интерфейса.
@@ -354,6 +354,12 @@ static func set_anim(main: Node, on: bool, combat: bool) -> void:
 static func set_vfx(main: Node, on: bool) -> void:
 	SkillVfx.enabled = on
 	_done(main, "Новые эффекты умений %s" % ("включены" if on else "выключены (прежние вспышки)"))
+
+
+## Нарисованные раскадровки эффектов (VfxFlip.enabled): выкл. — эффекты из прежних слоёв.
+static func set_flip(main: Node, on: bool) -> void:
+	VfxFlip.enabled = on
+	_done(main, "Раскадровки эффектов %s" % ("включены" if on else "выключены (эффекты из прежних слоёв)"))
 
 
 static func set_god(main: Node, on: bool) -> void:
@@ -1124,6 +1130,8 @@ static func _build_bot(main: Node, body: VBoxContainer) -> void:
 	var r4 := _row(body)
 	_choice(r4, "vfx_new", "Новые эффекты умений: вкл." if SkillVfx.enabled else "Новые эффекты умений: выкл.",
 		SkillVfx.enabled, func() -> void: AdminPanel.set_vfx(main, not SkillVfx.enabled))
+	_choice(r4, "vfx_flip", "Раскадровки: вкл." if VfxFlip.enabled else "Раскадровки: выкл.",
+		VfxFlip.enabled, func() -> void: AdminPanel.set_flip(main, not VfxFlip.enabled))
 
 
 ## Почему выбранный режим не начать ("" — можно).

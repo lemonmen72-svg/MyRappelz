@@ -17,21 +17,26 @@ static var _curves := {}
 
 # ---------- Эффекты ----------
 
-## Искра попадания: звёздочка-вспышка, кольцо и разлетающиеся искры.
+## Искра попадания: звёздочка-вспышка, кольцо и разлетающиеся искры (есть лист «Искры попадания» — нарисованная
+## вспышка вместо второй звёздочки и кольца).
 static func hit_spark(parent: Node, pos: Vector3, color: Color = Color(1.0, 0.9, 0.5), size: float = 1.0) -> Node3D:
 	var root := _root(parent, pos, 0.7)
 	if root == null:
 		return null
+	var drawn := VfxKit.flipbook(root, "hit_spark", 1.7 * size, 0.42, {"color": color, "push": 0.5}) != null
 	_sprite(root, "star", Color(1, 1, 1, 0.95), 1.1 * size, 0.22)
-	_sprite(root, "star", Color(color, 0.85), 1.7 * size, 0.3)
-	_sprite(root, "ring", Color(color, 0.8), 1.3 * size, 0.28)
+	if not drawn:
+		_sprite(root, "star", Color(color, 0.85), 1.7 * size, 0.3)
+		_sprite(root, "ring", Color(color, 0.8), 1.3 * size, 0.28)
 	_particles(root, 8, 0.38, color, 0.22 * size, 5.5 * size,
 		{"damping": 7.0, "gravity": Vector3(0, -5, 0)})
 	return root
 
 
-## Дуга удара (аниме-«взмах»): яркий серп проносится через pos по направлению dir.
-static func slash_arc(parent: Node, pos: Vector3, dir: Vector3, color: Color = Color.WHITE, size: float = 1.0) -> Node3D:
+## Дуга удара (аниме-«взмах»): яркий серп проносится через pos по направлению dir. sheet — лист раскадровки
+## (VfxFlip: "slash_arc" — клинок, "claw" — когти зверя, "stab" — укол): есть лист — нарисованный удар вместо серпа.
+static func slash_arc(parent: Node, pos: Vector3, dir: Vector3, color: Color = Color.WHITE, size: float = 1.0,
+		sheet: String = "slash_arc") -> Node3D:
 	var root := _root(parent, pos, 0.6)
 	if root == null:
 		return null
@@ -39,6 +44,12 @@ static func slash_arc(parent: Node, pos: Vector3, dir: Vector3, color: Color = C
 	if d.length() < 0.01:
 		d = Vector3.FORWARD
 	d = d.normalized()
+	var stab := sheet == "stab"
+	if VfxKit.flipbook(root, sheet, (2.2 if stab else 1.9) * size, 0.42, {"color": color, "dir": d, "push": 0.6,
+			"anchor": "hot" if stab else "", "rot": 0.0 if stab else randf_range(-0.5, 0.5)}) != null:
+		_sprite(root, "star", Color(1, 1, 1, 0.9), 0.9 * size, 0.2)
+		_particles(root, 6, 0.3, color, 0.18 * size, 4.0 * size, {"dir": d, "spread": 50.0, "damping": 6.0})
+		return root
 	var r := 0.95 * size
 	var yaw := atan2(-d.x, -d.z)
 	var pivot := Node3D.new()
