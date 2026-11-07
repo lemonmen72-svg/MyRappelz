@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://cqq6rwmqd3u1y"
+path="res://.godot/imported/fx_summon.png-a121cb6a3326475c17d2162efc0be930.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_summon.png"
+dest_files=["res://.godot/imported/fx_summon.png-a121cb6a3326475c17d2162efc0be930.image"]
+
+[params]
+

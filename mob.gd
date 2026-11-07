@@ -194,6 +194,8 @@ func setup(id: String, spawn_slot: int, pos: Vector3, lvl: int = -1) -> void:
 
 func _ready() -> void:
 	add_to_group("mobs")
+	# Ослабления на звере — раскадровки над головой и у тела (StatusFx)
+	effects.host = self
 	collision_layer = 2
 	collision_mask = 1
 	_model = Node3D.new()

@@ -413,9 +413,12 @@ func _build_player() -> void:
 		var g := world.ground(float(sp["x"]), float(sp["z"]), 0.2)
 		var y := float(sp["y"]) + 0.2
 		player.position = Vector3(g.x, y if y > g.y and y < g.y + RESUME_ABOVE else g.y, g.z)
+	var through_portal := Game.arrive == "portal"
 	Game.arrive = ""
 	add_child(player)
 	Game.hero_ref = weakref(player)
+	if through_portal:
+		Vfx.teleport(self, player.global_position - Vector3(0, 0.2, 0), Color(0.35, 1.0, 0.7))
 	if Game.carry_buffs.has("hero"):
 		player.import_timed(Game.carry_buffs["hero"])
 		Game.carry_buffs.erase("hero")

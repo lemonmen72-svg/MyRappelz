@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://0a5yyi6vlod6"
+path="res://.godot/imported/fx_circle_sect.png-b514a50ee65f0722a3fce2bec6a5ba33.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_circle_sect.png"
+dest_files=["res://.godot/imported/fx_circle_sect.png-b514a50ee65f0722a3fce2bec6a5ba33.image"]
+
+[params]
+

@@ -1388,8 +1388,8 @@ func _teleport_to_owner() -> void:
 	_stuck_t = 0.0
 	_stuck_from = spot
 	if is_inside_tree() and get_parent() != null:
-		Vfx.magic_burst(get_parent(), old + Vector3(0, 0.5, 0), Color(0.45, 0.85, 1.0), 0.8, 0.35)
-		Vfx.magic_burst(get_parent(), spot + Vector3(0, 0.5, 0), Color(0.45, 0.85, 1.0), 0.8, 0.35)
+		Vfx.teleport(get_parent(), old, Color(0.45, 0.85, 1.0), 0.8)
+		Vfx.teleport(get_parent(), spot, Color(0.45, 0.85, 1.0), 0.8)
 	target = null
 	_pending = null
 	_dash_time = 0.0

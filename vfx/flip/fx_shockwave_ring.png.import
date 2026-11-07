@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://36isgkhmfg1w"
+path="res://.godot/imported/fx_shockwave_ring.png-ca472de7e83b8a08c888012dec6b5ead.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_shockwave_ring.png"
+dest_files=["res://.godot/imported/fx_shockwave_ring.png-ca472de7e83b8a08c888012dec6b5ead.image"]
+
+[params]
+

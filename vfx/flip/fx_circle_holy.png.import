@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bnxj5a3vs2yjs"
+path="res://.godot/imported/fx_circle_holy.png-8a5497cf064d99005dc1883860872443.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_circle_holy.png"
+dest_files=["res://.godot/imported/fx_circle_holy.png-8a5497cf064d99005dc1883860872443.image"]
+
+[params]
+

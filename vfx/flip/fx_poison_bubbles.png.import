@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://dewe5fvne0335"
+path="res://.godot/imported/fx_poison_bubbles.png-5ca7f655b92644048b5c627e4cd9adac.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_poison_bubbles.png"
+dest_files=["res://.godot/imported/fx_poison_bubbles.png-5ca7f655b92644048b5c627e4cd9adac.image"]
+
+[params]
+

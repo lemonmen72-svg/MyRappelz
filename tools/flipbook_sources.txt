@@ -47,3 +47,29 @@ file_000000008d6481f59f294968fe71bafd.png shield_bubble_2 side 0.8
 file_0000000040a081f5a8543f478d3399f6.png blessing
 file_000000006a0081f592e9229ffc4b6192.png blessing_2
 file_00000000618881f5a95deeb16c00eb10.png haste
+
+# Партия 2 (07.11, Яндекс Диск «2 партия.zip»): промты 40–61 по порядку документа, в архиве — в обратном порядке.
+# №52 «Тёмный круг» (circle_dark) ChatGPT рисовать отказался — замена в игре: «Проклятие» на земле и тёмные трещины
+# (VfxArchetypes._circle); «Круг природы» — в двух вариантах.
+file_00000000b92881f5b6480f62cd534b31.png stun_stars
+file_00000000b2d081f5a3980d16f7ca0248.png sleep_mist
+file_00000000bf1481f58af9ed5b693216bc.png fear_wisps
+file_000000004b9081f5877bb2dbb0f24da5.png slow_shackles
+file_00000000d7dc81f5ab67ee9cfbdb45a0.png root_vines
+file_00000000bb6081f5a3c5db0b60442f77.png poison_bubbles
+file_0000000087b881f58f71ca163ce0e47a.png curse_mark
+file_000000006df881f5a6c72ef7fcba37c0.png weaken_down
+file_00000000ab1881f5aff074482cd9a422.png blind_veil
+file_000000002aac81f5852eadf12b1b51cc.png bleed_drops
+file_00000000f62481f59fb0eaa81a5ae1d6.png circle_arcane
+file_00000000ccd881f5ad9c2c2d4c6e2cd2.png circle_holy
+file_00000000307481f594f7105417660364.png circle_nature
+file_00000000522081f5a287439cb37660a9.png circle_nature_2
+file_00000000019081f5b49cc2610d749686.png circle_sect
+file_000000002a7081f5ab8f7b5a24c59192.png circle_summon
+file_0000000034c881f5b40cbefeed45aed8.png shockwave_ring
+file_00000000d90081f5aed48f8d1f0b6b94.png ground_cracks
+file_0000000027d081f59fef49f1a2d15960.png ripple
+file_00000000a87481f5af467a3bc3d9d286.png level_up
+file_00000000187081f59a883854c6301477.png summon
+file_000000005e4c81f593c00f0b428c0343.png teleport

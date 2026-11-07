@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://xuykkgyb4n1k"
+path="res://.godot/imported/fx_fear_wisps.png-6a5fea7cc710e44d4787cb616c5cc37d.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_fear_wisps.png"
+dest_files=["res://.godot/imported/fx_fear_wisps.png-6a5fea7cc710e44d4787cb616c5cc37d.image"]
+
+[params]
+

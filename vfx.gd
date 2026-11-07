@@ -95,26 +95,31 @@ static func heal_sparkles(parent: Node, pos: Vector3, size: float = 1.0) -> Node
 	return root
 
 
-## Новый уровень: золотой столб света, два кольца, спираль звёздочек, большая звезда над головой.
+## Новый уровень: золотой столб света, два кольца, спираль звёздочек, большая звезда над головой (есть лист «Новый
+## уровень» — нарисованный столб с кольцами вместо столба, колец и спирали).
 static func level_up(parent: Node, pos: Vector3, size: float = 1.0) -> Node3D:
 	var root := _root(parent, pos, 2.1)
 	if root == null:
 		return null
-	_pillar(root, Color(GOLD, 0.45), 0.6 * size, 3.2 * size, 1.0)
-	_ground_ring(root, Color(GOLD, 0.9), 2.0 * size, 0.7)
-	_ground_ring(root, Color(1, 1, 1, 0.8), 1.4 * size, 0.6, 0.2)
-	_spiral(root, 22, GOLD, 0.7 * size, 3.0 * size, 1.3)
+	if VfxKit.flipbook(root, "level_up", 3.6 * size, 1.7, {"pal": VfxArchetypes.palette("light"), "ground": pos,
+			"push": 0.5}) == null:
+		_pillar(root, Color(GOLD, 0.45), 0.6 * size, 3.2 * size, 1.0)
+		_ground_ring(root, Color(GOLD, 0.9), 2.0 * size, 0.7)
+		_ground_ring(root, Color(1, 1, 1, 0.8), 1.4 * size, 0.6, 0.2)
+		_spiral(root, 22, GOLD, 0.7 * size, 3.0 * size, 1.3)
 	_sprite(root, "star", Color(1.0, 0.95, 0.7, 1.0), 2.0 * size, 0.6, true, Vector3(0, 2.3 * size, 0), 0.25, 0.25)
 	return root
 
 
-## Успешное приручение: сердечки, бирюзовая спираль, кольцо и вспышка.
+## Успешное приручение: сердечки, бирюзовая спираль, кольцо и вспышка (есть листы — круг призыва на земле и вихрь
+## призыва вместо кольца и спирали).
 static func tame_success(parent: Node, pos: Vector3, size: float = 1.0) -> Node3D:
 	var root := _root(parent, pos, 2.1)
 	if root == null:
 		return null
-	_ground_ring(root, Color(TAME, 0.9), 2.2 * size, 0.8)
-	_spiral(root, 16, TAME, 0.8 * size, 2.6 * size, 1.2)
+	if not _summon_flips(root, pos, TAME, size, 1.8):
+		_ground_ring(root, Color(TAME, 0.9), 2.2 * size, 0.8)
+		_spiral(root, 16, TAME, 0.8 * size, 2.6 * size, 1.2)
 	_sprite(root, "star", Color(1, 1, 1, 1), 2.2 * size, 0.45, true, Vector3(0, 1.2 * size, 0))
 	_particles(root, 9, 1.3, PINK, 0.38 * size, 2.6 * size,
 		{"tex": "heart", "add": false, "dir": Vector3.UP, "spread": 55.0, "gravity": Vector3(0, 0.6, 0),
@@ -123,14 +128,16 @@ static func tame_success(parent: Node, pos: Vector3, size: float = 1.0) -> Node3
 	return root
 
 
-## Эволюция питомца: столб света, вспышка-сфера, радужные кольца и взрыв звёздочек.
+## Эволюция питомца: столб света, вспышка-сфера, радужные кольца и взрыв звёздочек (есть листы — круг призыва и
+## вихрь призыва вместо столба, кольца и спирали).
 static func evolution(parent: Node, pos: Vector3, size: float = 1.0) -> Node3D:
 	var root := _root(parent, pos, 2.4)
 	if root == null:
 		return null
-	_pillar(root, Color(1.0, 0.95, 0.75, 0.5), 0.9 * size, 4.0 * size, 1.2)
-	_ground_ring(root, Color(GOLD, 0.9), 2.6 * size, 0.8)
-	_spiral(root, 26, Color(1.0, 0.9, 0.6), 1.0 * size, 3.5 * size, 1.5)
+	if not _summon_flips(root, pos, GOLD, size * 1.25, 2.1):
+		_pillar(root, Color(1.0, 0.95, 0.75, 0.5), 0.9 * size, 4.0 * size, 1.2)
+		_ground_ring(root, Color(GOLD, 0.9), 2.6 * size, 0.8)
+		_spiral(root, 26, Color(1.0, 0.9, 0.6), 1.0 * size, 3.5 * size, 1.5)
 	_glow_sphere(root, Color(1, 1, 1, 0.55), 1.5 * size, 0.5, Vector3(0, 0.8 * size, 0))
 	_ground_ring(root, Color(0.75, 0.55, 1.0, 0.85), 1.9 * size, 0.7, 0.25)
 	# Второй такт через 0.45 с: кольцо, большая звезда и разноцветные искры
@@ -141,6 +148,39 @@ static func evolution(parent: Node, pos: Vector3, size: float = 1.0) -> Node3D:
 	for c in colors:
 		_particles(root, 7, 0.8, c, 0.3 * size, 5.0 * size, opts, Vector3(0, 1.0 * size, 0), 0.45)
 	return root
+
+
+## Призыв питомца в точке pos (у ног): круг призыва на земле и вихрь, что сжимается во вспышку (листы «Круг
+## призыва» и «Призыв питомца»); без листов — прежняя вспышка цвета c.
+static func summon_pet(parent: Node, pos: Vector3, c: Color, size: float = 1.0) -> Node3D:
+	var root := _root(parent, pos, 2.2)
+	if root == null:
+		return null
+	if not _summon_flips(root, pos, c, size, 1.6):
+		magic_burst(parent, pos + Vector3(0, 0.6, 0), c, 1.4 * size, 0.4)
+	return root
+
+
+## Перенос (портал, возрождение, питомец догнал хозяина): столб света взлетает и схлопывается (лист «Перенос»);
+## без листа — прежняя вспышка цвета c.
+static func teleport(parent: Node, pos: Vector3, c: Color = Color(0.45, 0.85, 1.0), size: float = 1.0) -> Node3D:
+	var root := _root(parent, pos, 1.8)
+	if root == null:
+		return null
+	var pal := {"a": c, "b": c.darkened(0.35), "core": c.lightened(0.7), "c": c.lightened(0.4)}
+	if VfxKit.flipbook(root, "teleport", 3.2 * size, 1.1, {"pal": pal, "ground": pos, "push": 0.5}) == null:
+		magic_burst(parent, pos + Vector3(0, 0.5, 0), c, 0.9 * size, 0.35)
+	return root
+
+
+## Круг призыва на земле и вихрь призыва в точке pos (листы): true — построены.
+static func _summon_flips(root: Node3D, pos: Vector3, c: Color, size: float, time: float) -> bool:
+	var pal := {"a": c, "b": c.darkened(0.35), "core": c.lightened(0.75), "c": c.lightened(0.45)}
+	if VfxKit.flipbook(root, "summon", 3.0 * size, time, {"pal": pal, "ground": pos, "push": 0.5}) == null:
+		return false
+	VfxKit.flipbook(root, "circle_summon", 2.8 * size, time * 1.1, {"pal": pal, "ground": pos, "spin": 0.1,
+		"speed": 12.0})
+	return true
 
 
 ## Подбор добычи: золотые звёздочки фонтаном и маленькое кольцо.

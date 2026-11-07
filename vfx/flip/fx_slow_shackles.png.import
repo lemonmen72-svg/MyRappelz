@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://b6pel5xn4ytmj"
+path="res://.godot/imported/fx_slow_shackles.png-da83922a58af20a09bdcaf5d7abebe30.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_slow_shackles.png"
+dest_files=["res://.godot/imported/fx_slow_shackles.png-da83922a58af20a09bdcaf5d7abebe30.image"]
+
+[params]
+

@@ -1017,6 +1017,7 @@ static func teleport(main: Node, c: Vector2, label: String = "") -> Vector3:
 		pos = free_spot(w, c)
 	p.global_position = pos
 	p.velocity = Vector3.ZERO
+	Vfx.teleport(p.get_parent(), pos)
 	var pet := _pet(main)
 	if pet != null and w != null:
 		pet.global_position = w.ground(pos.x + 1.5, pos.z + 1.5, 0.2)

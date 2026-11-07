@@ -5,11 +5,14 @@ extends "res://tests/test_base.gd"
 ## (к камере — квад с поворотом к камере, «сбоку» — стоит на земле, опора у земли, «сверху» — лежит на земле,
 ## «вправо» — вдоль удара, отрезок — от героя до цели), кадры идут до конца, петля крутится дальше; тьма — с тёмным
 ## слоем под ней; удар, искра и снаряд обычных атак — с листами; выключатель и часть пакета «vfx» — откат на прежние
-## слои; листов в видеопамяти не больше VfxFlip.MAX_LOADED.
+## слои; листов в видеопамяти не больше VfxFlip.MAX_LOADED. Партия 2: ослабления на звере — петли над головой и у
+## тела (StatusFx) появляются и уходят сами; круги на земле по стихии, у тьмы — замена «Тёмного круга» («Проклятие»
+## на земле и трещины); ударная волна и трещины; новый уровень, призыв, приручение, эволюция, перенос.
 
 var once_mat: VfxMat = null
 var loop_mat: VfxMat = null
 var waited := 0
+var mob: Mob = null
 
 
 func race_class() -> Array:
@@ -47,12 +50,24 @@ func run_step() -> void:
 			var f_loop := float(loop_mat.get_shader_parameter("flip_f"))
 			check(f_loop > 16.0, "петля крутится дальше 16 кадров (%.1f)" % f_loop)
 			_basic()
+			_circles()
+			_special()
+			_status_start()
+			wait = 30
+			step = 3
+		3:
+			_status_check()
+			wait = 60 * 3
+			step = 4
+		4:
+			check(mob.get_node_or_null("StatusFx") == null, "ослабления кончились — слои ушли, узел StatusFx удалён")
 			_fallback()
 			_evict()
 			VfxFlip.sync_load = false
+			mob.queue_free()
 			wait = 60 * 4
-			step = 3
-		3:
+			step = 5
+		5:
 			var left := main.get_tree().get_nodes_in_group("vfx").size()
 			check(left == 0, "эффекты с листами удалились сами (осталось %d)" % left)
 			ok_done()
@@ -61,12 +76,22 @@ func run_step() -> void:
 ## Метаданные и файлы: всё, что берут архетипы, есть; каждый лист кем-то берётся.
 func _meta() -> void:
 	var m := VfxFlip.meta()
-	check(m.size() >= 39, "раскадровок в flipbooks.json: %d (первая партия — 39 эффектов)" % m.size())
+	check(m.size() >= 60, "раскадровок в flipbooks.json: %d (61 промт без «Тёмного круга»)" % m.size())
+	check(not m.has("circle_dark") and VfxFlip.circle_sheets("dark") == ["curse_mark", "ground_cracks"]
+		and VfxFlip.circle_sheets("blood") == ["curse_mark", "ground_cracks"],
+		"«Тёмного круга» нет — замена: «Проклятие» на земле и трещины")
 	var used := {}
 	for a in VfxFlip.ARCH_SHEETS:
 		for id in VfxFlip.ARCH_SHEETS[a]:
 			used[String(id)] = true
 			check(m.has(String(id)), "лист «%s» (архетип %s) есть в flipbooks.json" % [id, a])
+	for el in VfxArchetypes.PALETTES:
+		for id in VfxFlip.circle_sheets(String(el)):
+			used[String(id)] = true
+			check(m.has(String(id)), "круг стихии %s — лист «%s»" % [el, id])
+	for id in StatusFx.sheets():
+		used[String(id)] = true
+		check(m.has(String(id)), "ослабление — лист «%s»" % id)
 	var files := 0
 	for id in m:
 		check(used.has(String(id)), "лист «%s» берёт какой-то эффект (VfxFlip.ARCH_SHEETS)" % id)
@@ -100,7 +125,8 @@ func _meta() -> void:
 				check(float(en[en.size() - 1]) <= 0.2, "%s: разовый лист гаснет к концу (%.2f)" % [f, float(en[-1])])
 	check(files >= 42, "листов (с вариантами): %d" % files)
 	check(VfxFlip.files_of("blessing").size() == 2 and VfxFlip.files_of("shield_bubble").size() == 2
-		and VfxFlip.files_of("arrow_impact").size() == 2, "вторые варианты: благословение, щит, попадание стрелы")
+		and VfxFlip.files_of("arrow_impact").size() == 2 and VfxFlip.files_of("circle_nature").size() == 2,
+		"вторые варианты: благословение, щит, попадание стрелы, круг природы")
 
 
 ## Слои раскадровки в эффекте r: [MeshInstance3D].
@@ -217,6 +243,92 @@ func _basic() -> void:
 	# Питомцы бьют когтями, скелет — клинком, кентавр — копьём
 	check(String(Pet.SLASH_SHEET.get("wolf", "claw")) == "claw" and String(Pet.SLASH_SHEET["centaur"]) == "stab",
 		"удар питомца: волк — когти, кентавр — укол")
+
+
+## Лист слоя mi (по текстуре маски): id эффекта или "".
+func _sheet_of(mi: MeshInstance3D) -> String:
+	var m := mi.material_override as ShaderMaterial
+	var t: Variant = m.get_shader_parameter("mask")
+	for id in VfxFlip.meta():
+		for r in VfxFlip.files_of(String(id)):
+			if VfxFlip._tex.get(String((r as Dictionary)["file"])) == t:
+				return String(id)
+	return ""
+
+
+func _sheets_in(r: Node) -> Array:
+	var out: Array = []
+	for mi in _flips(r):
+		var id := _sheet_of(mi)
+		if not id in out:
+			out.append(id)
+	return out
+
+
+## Круги на земле по стихии: огонь — магический круг, свет — святой, лечение — природы, секта — свой знак, тьма —
+## замена «Тёмного круга»; волна и трещины у ударной волны.
+func _circles() -> void:
+	var p: Player = main.player
+	var at := p.global_position + Vector3(0, 1.0, 6.0)
+	var o := {"ground": p.global_position + Vector3(0, 0, 6.0), "from": p.global_position + Vector3(0, 1.2, 0),
+		"dir": Vector3.FORWARD, "height": 1.7, "q": 2}
+	var want := {"fire": ["circle_arcane"], "light": ["circle_holy"], "heal": ["circle_nature"],
+		"emerald": ["circle_sect"], "dark": ["curse_mark", "ground_cracks"]}
+	for el in want:
+		var r := VfxArchetypes.build({"arch": "cast_gather", "el": el, "dur": 1.0, "seed": 5}, main, at, o)
+		var got := _sheets_in(r)
+		for id in want[el]:
+			check(id in got, "каст, стихия %s: на земле — «%s» (%s)" % [el, id, got])
+		if el == "dark":
+			for mi in _flips(r):
+				if _sheet_of(mi) == "curse_mark":
+					check((mi as MeshInstance3D).mesh is PlaneMesh, "тьма: «Проклятие» лежит на земле (плоскость)")
+		r.remove_from_group("vfx")
+		r.queue_free()
+	var w := VfxArchetypes.build({"arch": "shockwave", "el": "earth", "dur": 0.8, "seed": 5}, main, at, o)
+	var ws := _sheets_in(w)
+	check("shockwave_ring" in ws and "ground_cracks" in ws and "ripple" in ws,
+		"ударная волна: кольцо, трещины, рябь — нарисованные (%s)" % [ws])
+	w.remove_from_group("vfx")
+	w.queue_free()
+
+
+## Особые: новый уровень, перенос, призыв питомца, приручение, эволюция.
+func _special() -> void:
+	var p: Player = main.player
+	var pos := p.global_position + Vector3(2, 0, 2)
+	var cases := {"level_up": Vfx.level_up(main, pos), "teleport": Vfx.teleport(main, pos),
+		"summon": Vfx.summon_pet(main, pos, Color(1, 0.7, 0.3)), "tame": Vfx.tame_success(main, pos),
+		"evolution": Vfx.evolution(main, pos)}
+	var want := {"level_up": ["level_up"], "teleport": ["teleport"], "summon": ["summon", "circle_summon"],
+		"tame": ["summon", "circle_summon"], "evolution": ["summon", "circle_summon"]}
+	for k in cases:
+		var got := _sheets_in(cases[k])
+		for id in want[k]:
+			check(id in got, "%s — нарисованный «%s» (%s)" % [k, id, got])
+
+
+## Ослабления на звере: оглушение и замедление, яд — петли над головой и у тела.
+func _status_start() -> void:
+	var p: Player = main.player
+	mob = main.spawn_mob("pheasant", 5, p.global_position + Vector3(0, 0.3, 5.0))
+	mob.stun(0.9)
+	mob.slow(0.3, 0.9)
+	check(mob.get_node_or_null("StatusFx") != null, "ослабление наложено — у зверя узел слоёв StatusFx")
+
+
+func _status_check() -> void:
+	var sf := mob.get_node_or_null("StatusFx")
+	check(sf != null, "слои ослаблений на месте, пока действуют")
+	var got := _sheets_in(sf)
+	check("stun_stars" in got and "slow_shackles" in got, "оглушение — звёзды над головой, замедление — оковы (%s)" % [got])
+	for mi in _flips(sf):
+		if _sheet_of(mi) == "stun_stars":
+			check((mi as MeshInstance3D).global_position.y > mob.global_position.y + float(mob.get("_height")),
+				"звёзды оглушения — над головой зверя")
+		if _sheet_of(mi) == "slow_shackles":
+			check((mi as MeshInstance3D).mesh is PlaneMesh, "оковы замедления — на земле у ног")
+	check(StatusFx.dot_element("venom_tip") == "poison", "яд Воина — пузыри яда")
 
 
 ## Откат: выключатель и без части пакета «vfx» — прежние слои.

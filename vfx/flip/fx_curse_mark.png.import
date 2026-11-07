@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bxrgrdghvoxbr"
+path="res://.godot/imported/fx_curse_mark.png-ad0ddafc1bf35963fd6c18c4200eb946.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_curse_mark.png"
+dest_files=["res://.godot/imported/fx_curse_mark.png-ad0ddafc1bf35963fd6c18c4200eb946.image"]
+
+[params]
+

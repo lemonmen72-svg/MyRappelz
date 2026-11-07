@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://ciixxi2aj2iv8"
+path="res://.godot/imported/fx_level_up.png-8d23e93ae839d5d8d4e3151c1ba84282.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_level_up.png"
+dest_files=["res://.godot/imported/fx_level_up.png-8d23e93ae839d5d8d4e3151c1ba84282.image"]
+
+[params]
+

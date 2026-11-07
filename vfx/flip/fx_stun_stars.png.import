@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://d33ltr7b6csbo"
+path="res://.godot/imported/fx_stun_stars.png-dc66570eac66c051b4fd9c02c40581c3.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_stun_stars.png"
+dest_files=["res://.godot/imported/fx_stun_stars.png-dc66570eac66c051b4fd9c02c40581c3.image"]
+
+[params]
+

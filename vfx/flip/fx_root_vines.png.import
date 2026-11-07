@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://5qyxkiw6t3om"
+path="res://.godot/imported/fx_root_vines.png-bec91323d7aa599590591f8d73c3134a.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_root_vines.png"
+dest_files=["res://.godot/imported/fx_root_vines.png-bec91323d7aa599590591f8d73c3134a.image"]
+
+[params]
+

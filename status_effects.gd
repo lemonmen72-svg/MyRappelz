@@ -36,6 +36,8 @@ const KINDS := {
 
 ## Растёт при добавлении, снятии эффекта и смене значка.
 var version := 0
+## Сущность-владелец (Mob, Player): её ослабления рисует StatusFx — раскадровки над головой и у тела.
+var host: Node3D = null
 var _list: Array[Dictionary] = []
 
 
@@ -78,6 +80,8 @@ func add(id: String, sec: float, info: Dictionary) -> void:
 	if sec <= 0.0:
 		return
 	var e := get_entry(id)
+	if host != null and bool(info.get("debuff", false)):
+		StatusFx.watch(host)
 	if e.is_empty():
 		e = {"id": id, "toggle": false, "dur": sec, "left": sec}
 		_set_info(e, info)

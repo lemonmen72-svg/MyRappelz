@@ -211,6 +211,8 @@ var ground_speed := 0.0
 
 func _ready() -> void:
 	add_to_group("player")
+	# Ослабления на герое (проклятия босса) — раскадровки над головой и у тела (StatusFx)
+	effects.host = self
 	_fx = HeroSkillFx.new(self)
 	collision_layer = 2
 	collision_mask = 1
@@ -1670,6 +1672,7 @@ func take_damage(amount: int, attacker: Node3D, pure: bool = false) -> void:
 		Game.gold = int(Game.gold * 0.8)
 		global_position = respawn_point()
 		Vfx.heal_sparkles(get_parent(), global_position, 1.3)
+		Vfx.teleport(get_parent(), global_position, Color(1.0, 0.92, 0.6))
 		if _has_model():
 			_model.play_rise()
 		last_target = null

@@ -16,21 +16,30 @@ const MAX_LOADED := 30
 ## Архетип VfxArchetypes → листы, которые он может взять (загрузить заранее). "orb" — снаряд, "basic" — удары и
 ## искры обычных атак (Vfx.slash_arc, Vfx.hit_spark).
 const ARCH_SHEETS := {
-	"explosion": ["explosion"], "flame_burst": ["flame_burst", "burn_loop"], "frost_nova": ["frost_nova"],
-	"ice_shards": ["ice_shards"], "water_splash": ["water_splash"], "water_wave": ["water_splash"],
-	"rock_impact": ["rock_impact"], "ground_spike": ["ground_spikes"], "shockwave": ["rock_impact"],
-	"lightning_strike": ["lightning_strike"], "lightning_bolt": ["lightning_arc", "hit_spark"],
-	"spark_hit": ["hit_spark"], "heal_burst": ["heal_burst", "heal_rise"], "holy_beam": ["holy_beam"],
-	"shield": ["shield_bubble"], "blessing": ["blessing"],
+	"explosion": ["explosion", "shockwave_ring", "ground_cracks", "ripple"], "flame_burst": ["flame_burst", "burn_loop"],
+	"frost_nova": ["frost_nova", "shockwave_ring", "ripple"], "ice_shards": ["ice_shards"],
+	"water_splash": ["water_splash", "shockwave_ring"], "water_wave": ["water_splash", "shockwave_ring"],
+	"rock_impact": ["rock_impact", "ground_cracks"], "ground_spike": ["ground_spikes", "ground_cracks"],
+	"shockwave": ["rock_impact", "shockwave_ring", "ground_cracks", "ripple"],
+	"lightning_strike": ["lightning_strike", "shockwave_ring", "ground_cracks", "ripple"],
+	"lightning_bolt": ["lightning_arc", "hit_spark"], "spark_hit": ["hit_spark"],
+	"heal_burst": ["heal_burst", "heal_rise"], "holy_beam": ["holy_beam"],
+	"holy_nova": ["shockwave_ring", "ripple"], "shield": ["shield_bubble"], "blessing": ["blessing"],
 	"buff_up": ["buff_up", "haste", "aura_ring"], "shadow_burst": ["shadow_burst"], "cursed_sigil": ["shadow_burst"],
-	"soul_drain": ["soul_drain"], "toxic_pool": ["poison_cloud"],
-	"blood_burst": ["blood_burst"], "ritual_circle": ["aura_ring"], "ghost": ["spirit_burst"],
+	"emerald_curse": ["ripple"], "soul_drain": ["soul_drain"], "toxic_pool": ["poison_cloud", "ripple"],
+	"blood_burst": ["blood_burst"], "ritual_circle": ["aura_ring", "ripple"], "ghost": ["spirit_burst"],
 	"wind_slash": ["wind_slash"], "tornado": ["tornado"], "slash": ["slash_arc", "slash_cross", "crit_flash"],
-	"cleave": ["cleave", "crit_flash"], "stab": ["stab"], "blunt_hit": ["blunt_impact"], "spin_slash": ["spin_slash"],
-	"arrow_impact": ["arrow_impact"], "claw": ["claw"], "roar": ["roar"], "spirit_burst": ["spirit_burst"],
-	"cast_gather": ["cast_gather"], "release": ["cast_release"], "orb": ["magic_orb"],
+	"cleave": ["cleave", "crit_flash", "ground_cracks"], "stab": ["stab"], "blunt_hit": ["blunt_impact", "shockwave_ring"],
+	"spin_slash": ["spin_slash", "shockwave_ring"], "arrow_impact": ["arrow_impact"], "claw": ["claw"],
+	"roar": ["roar", "shockwave_ring"], "spirit_burst": ["spirit_burst"], "cast_gather": ["cast_gather"],
+	"release": ["cast_release", "ripple"], "orb": ["magic_orb"],
 	"basic": ["slash_arc", "hit_spark", "claw"],
+	# Особые (Vfx: новый уровень, призыв, приручение, эволюция, перенос)
+	"special": ["level_up", "summon", "circle_summon", "teleport"],
 }
+## Архетипы с кругом на земле (VfxArchetypes._circle "circle"): круг своей стихии (VfxArchetypes.CIRCLE_SHEETS).
+const CIRCLE_ARCHES := ["frost_nova", "lightning_strike", "heal_burst", "holy_nova", "shield", "blessing", "buff_up",
+	"cursed_sigil", "ritual_circle", "cast_gather"]
 
 ## Листы включены (false — везде прежние слои; админ-панель «Тест-бот» → «Эффекты»).
 static var enabled := true
@@ -185,7 +194,8 @@ static func prewarm(ids: Array) -> void:
 static func prewarm_world() -> void:
 	if not enabled:
 		return
-	var arches := {"release": true, "cast_gather": true, "orb": true, "basic": true, "spark_hit": true}
+	var arches := {"release": true, "cast_gather": true, "orb": true, "basic": true, "spark_hit": true,
+		"special": true}
 	var tab := SkillVfx.table()
 	var hero: Dictionary = tab.get("hero", {})
 	for sid in HeroSkills.list_for(Game.class_id):
@@ -200,9 +210,15 @@ static func prewarm_world() -> void:
 	var mobs: Dictionary = tab.get("mob", {})
 	for k in mobs:
 		_arches_of(mobs[k], arches)
-	prewarm(sheets_for(arches.keys()))
+	# Ослабления на целях (StatusFx) — у героя, который их накладывает, и у боссов
+	var ids := sheets_for(arches.keys())
+	for id in StatusFx.sheets():
+		if not id in ids:
+			ids.append(id)
+	prewarm(ids)
 
 
+## Архетипы фаз записи таблицы ("arch" и "arch|стихия" — для кругов на земле).
 static func _arches_of(entry: Variant, out: Dictionary) -> void:
 	if not (entry is Dictionary):
 		return
@@ -210,18 +226,29 @@ static func _arches_of(entry: Variant, out: Dictionary) -> void:
 		var e: Variant = entry[ph]
 		if e is Dictionary and (e as Dictionary).has("arch"):
 			out[String(e["arch"])] = true
+			if String(e["arch"]) in CIRCLE_ARCHES:
+				out["%s|%s" % [e["arch"], e.get("el", "")]] = true
 		elif ph == "proj":
 			out["orb"] = true
 
 
-## Листы архетипов arches (ARCH_SHEETS), без повторов.
+## Листы архетипов arches (ARCH_SHEETS; "arch|стихия" — круг стихии на земле), без повторов.
 static func sheets_for(arches: Array) -> Array:
 	var out: Array = []
 	for a in arches:
-		for id in ARCH_SHEETS.get(String(a), []):
+		var list: Array = ARCH_SHEETS.get(String(a), [])
+		if String(a).contains("|"):
+			list = circle_sheets(String(a).get_slice("|", 1))
+		for id in list:
 			if not String(id) in out:
 				out.append(String(id))
 	return out
+
+
+## Лист круга на земле стихии el (замена «Тёмного круга» — «Проклятие» и трещины).
+static func circle_sheets(el: String) -> Array:
+	var id := String(VfxArchetypes.CIRCLE_SHEETS.get(el, "circle_arcane"))
+	return ["curse_mark", "ground_cracks"] if id == "dark" else [id]
 
 
 ## Фоновый поток: закончил — освободить задачу; есть ещё запрошенные — следующий поток.

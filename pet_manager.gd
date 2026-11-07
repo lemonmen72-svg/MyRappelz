@@ -184,6 +184,8 @@ func _spawn(rec: Dictionary) -> void:
 	p.setup(main.player, rec)
 	p.position = pl.global_position + Vector3(1.5, 0.2, 1.5)
 	main.add_child(p)
+	Vfx.summon_pet(main, p.global_position - Vector3(0, 0.2, 0), PetData.fx_color(p.species, Color(1.0, 0.72, 0.28)),
+		clampf(p._scale, 0.8, 1.6))
 	p.stats_changed.connect(_on_pet_stats)
 	p.died.connect(_on_pet_died.bind(p))
 	active_pet = p

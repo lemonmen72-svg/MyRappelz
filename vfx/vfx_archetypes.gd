@@ -48,6 +48,12 @@ const PALETTES := {
 		"c": Color(1.0, 0.9, 0.5), "smoke": Color(0.55, 0.5, 0.35, 0.6)},
 }
 
+## Круг на земле по стихии (раскадровки, 0.46.1): остальные стихии — магический круг "circle_arcane"; "dark" — замена
+## «Тёмного круга» (_flip_circle).
+const CIRCLE_SHEETS := {"light": "circle_holy", "shield": "circle_holy", "spirit": "circle_holy",
+	"heal": "circle_nature", "beast": "circle_nature", "wind": "circle_nature", "poison": "circle_nature",
+	"emerald": "circle_sect", "dark": "dark", "blood": "dark"}
+
 ## Архетипы: фаза, категория ТЗ, название (каталог).
 const LIST := {
 	"explosion": {"phase": "area", "cat": "fire", "title": "Огненный взрыв"},
@@ -246,12 +252,48 @@ static func _goff(P: Dictionary) -> Vector3:
 
 # ---------- Общие слои VFX 2.0 ----------
 
-## Магический круг (MagicArea, VfxKit.magic_circle) на земле под эффектом или в точке at: радиус в метрах,
-## kind "circle" / "ripple". false — сторонние блоки выключены (тогда архетип рисует свой знак).
+## Ударная волна по земле (раскадровка «Ударная волна», 0.46.1) или прежнее рваное кольцо; d — поперечник, м.
+static func _wave(P: Dictionary, g: Vector3, d: float, time: float, c: Color, delay: float = 0.0) -> void:
+	if _flip(P, "shockwave_ring", d * 1.1, {"ground": g, "time": maxf(time, 0.45), "delay": delay}):
+		return
+	if delay > 0.0:
+		VfxKit.decal(P["root"], "wave", c, g, d, time, true, 0.1, 1.0, 0.0, delay)
+	else:
+		VfxKit.decal(P["root"], "wave", c, g, d, time, true)
+
+
+## Светящиеся трещины в земле (раскадровка «Трещины в земле») или прежние; d — поперечник, м.
+static func _cracks(P: Dictionary, g: Vector3, d: float, time: float, c: Color, start: float = 0.7,
+		grow: float = 0.12) -> void:
+	if _flip(P, "ground_cracks", d * 1.15, {"ground": g, "time": maxf(time, 0.6), "core": 0.85}):
+		return
+	VfxKit.decal(P["root"], "crack", c, g, d, time, true, start, grow, 0.0, 0.0, 0.0, "lava")
+
+
+## Круг на земле — раскадровка (0.46.1): "circle" — по стихии (CIRCLE_SHEETS), "ripple" — рябь. Тьма и кровь —
+## замена «Тёмного круга» (ChatGPT его рисовать отказался): «Проклятие» лежит на земле с тёмным слоем под ним,
+## под ним расходятся тёмные трещины — кольцо с шипами, острая звезда и расколы, как в промте. false — листа нет.
+static func _flip_circle(P: Dictionary, g: Vector3, radius: float, life: float, kind: String, delay: float) -> bool:
+	if kind == "ripple":
+		return _flip(P, "ripple", radius * 2.4, {"ground": g, "time": maxf(life, 0.6), "delay": delay})
+	var id := String(CIRCLE_SHEETS.get(String(P["el"]), "circle_arcane"))
+	if id != "dark":
+		return _flip(P, id, radius * 2.3, {"ground": g, "time": life, "delay": delay, "spin": 0.08, "speed": 12.0})
+	if not _flip(P, "curse_mark", radius * 2.3, {"ground": g, "time": life, "delay": delay, "view": "top",
+			"loop": true, "spin": -0.08, "speed": 12.0, "under": Color(_c(P, "smoke"), 0.85)}):
+		return false
+	_flip(P, "ground_cracks", radius * 2.7, {"ground": g, "time": minf(maxf(life, 0.8), 2.4), "delay": delay})
+	return true
+
+
+## Магический круг на земле под эффектом или в точке at: радиус в метрах, kind "circle" / "ripple" — раскадровка
+## (_flip_circle), без листа — MagicArea (VfxKit.magic_circle). false — ни того ни другого (архетип рисует свой знак).
 static func _circle(P: Dictionary, radius: float, time: float, kind: String = "circle", delay: float = 0.0,
 		appear: float = 0.35, at: Variant = null) -> bool:
 	var g: Vector3 = P["ground"] if at == null else at
 	var life := minf(time, float(P["dur"]) + 1.5 - delay)
+	if _flip_circle(P, g, radius, life, kind, delay):
+		return true
 	return VfxKit.magic_circle(P["root"], P["pal"], String(P["el"]), g, radius, life, kind, int(P["q"]), delay,
 		minf(appear, life * 0.4)) != null
 
@@ -353,10 +395,10 @@ static func _a_explosion(P: Dictionary) -> void:
 		"size": 1.3 * s, "speed": 3.0 * s, "tex": "flame", "dir": Vector3.UP, "spread": 22.0, "damping": 2.0,
 		"gravity": Vector3(0, 5.0, 0), "curve": "grow"})
 	_streaks(P, 24, 0.35 * s, 9.0 * s, t * 0.9)
-	VfxKit.decal(r, "wave", Color(_c(P, "a"), 0.95), g, 5.0 * s, t * 0.7, true)
+	_wave(P, g, 5.0 * s, t * 0.7, Color(_c(P, "a"), 0.95))
 	VfxKit.wall(r, Color(_c(P, "a"), 0.85), g, 4.2 * s, 1.4 * s, t * 0.7)
 	if _rich(P):
-		VfxKit.decal(r, "crack", Color(_c(P, "b"), 0.95), g, 3.4 * s, t * 2.6, true, 0.7, 0.12, 0.0, 0.0, 0.0, "lava")
+		_cracks(P, g, 3.4 * s, t * 2.6, Color(_c(P, "b"), 0.95), 0.7, 0.12)
 		VfxKit.decal(r, "smoke", Color(0.08, 0.04, 0.03, 0.75), g, 3.2 * s, t * 3.0, false, 0.8, 0.1)
 		VfxKit.decal(r, "k:scorch_0%d" % (1 + (P["rng"] as RandomNumberGenerator).randi() % 3),
 			Color(0.05, 0.03, 0.02, 0.85), g, 3.6 * s, t * 3.0, false, 0.6, 0.12, 0.0, 0.0, 0.0, "plain")
@@ -407,7 +449,7 @@ static func _a_frost_nova(P: Dictionary) -> void:
 	if not _flip(P, "frost_nova", 5.6 * s, {"time": t * 1.2, "spin": 0.12}):
 		VfxKit.flash(r, "snow", _c(P, "core"), 2.8 * s, t * 0.5, true, Vector3.ZERO, 0.2)
 	VfxKit.flash(r, "glow", Color(_c(P, "a"), 0.8), 4.0 * s, t * 0.6)
-	VfxKit.decal(r, "wave", Color(_c(P, "a"), 0.95), g, 5.6 * s, t * 0.8, true)
+	_wave(P, g, 5.6 * s, t * 0.8, Color(_c(P, "a"), 0.95))
 	if not _circle(P, 2.0 * s, t * 1.7, "circle", 0.0, 0.2):
 		VfxKit.decal(r, "rune", Color(_c(P, "c"), 0.85), g, 3.8 * s, t * 1.6, true, 0.8, 0.2, 0.2)
 	if _rich(P):
@@ -465,7 +507,7 @@ static func _a_water_splash(P: Dictionary) -> void:
 	VfxKit.particles(r, {"amount": _n(P, 10), "life": t * 0.8, "color": _c(P, "core"), "size": 0.6 * s,
 		"speed": 2.4 * s, "tex": "soft", "damping": 3.0, "curve": "grow"})
 	if _rich(P):
-		VfxKit.decal(r, "wave", Color(_c(P, "a"), 0.85), _local_ground(P), 2.8 * s, t * 0.8, true)
+		_wave(P, _local_ground(P), 2.8 * s, t * 0.8, Color(_c(P, "a"), 0.85))
 		_dust(P, 6, 0.9 * s, 1.5 * s, t * 1.2, 0.4 * s)
 	VfxKit.shake(r, 0.08)
 
@@ -476,8 +518,8 @@ static func _a_water_wave(P: Dictionary) -> void:
 	var t := float(P["dur"])
 	var g := _local_ground(P)
 	_flip(P, "water_splash", 3.4 * s, {"time": t})
-	VfxKit.decal(r, "wave", Color(_c(P, "a"), 0.95), g, 6.0 * s, t * 0.9, true)
-	VfxKit.decal(r, "wave", Color(_c(P, "c"), 0.85), g, 4.0 * s, t * 0.9, true, 0.1, 1.0, 0.0, t * 0.18)
+	_wave(P, g, 6.0 * s, t * 0.9, Color(_c(P, "a"), 0.95))
+	_wave(P, g, 4.0 * s, t * 0.9, Color(_c(P, "c"), 0.85), t * 0.18)
 	VfxKit.wall(r, Color(_c(P, "a"), 0.85), g, 5.2 * s, 1.8 * s, t * 0.9, true, 0.15, "water")
 	VfxKit.wall(r, Color(_c(P, "c"), 0.6), g, 3.6 * s, 1.0 * s, t * 0.8, true, 0.1, "water")
 	var drops := VfxKit.particles(r, {"amount": _n(P, 32), "life": t, "color": _c(P, "c"),
@@ -506,7 +548,7 @@ static func _a_rock_impact(P: Dictionary) -> void:
 		"damping": 3.0, "gravity": Vector3(0, 0.6, 0), "curve": "grow"})
 	_streaks(P, 10, 0.22 * s, 6.0 * s, t * 0.6)
 	if _rich(P):
-		VfxKit.decal(r, "crack", Color(_c(P, "c"), 0.85), g, 2.6 * s, t * 2.2, true, 0.7, 0.12, 0.0, 0.0, 0.0, "lava")
+		_cracks(P, g, 2.6 * s, t * 2.2, Color(_c(P, "c"), 0.85), 0.7, 0.12)
 		VfxKit.wall(r, Color(_c(P, "smoke"), 0.7), g, 2.0 * s, 0.7 * s, t * 0.6, false, 0.2, "smoke")
 		_dirt(P, 8, 0.9 * s, 4.5 * s, t * 1.1, g + Vector3(0, 0.3, 0), Color(_c(P, "b"), 0.95))
 	VfxKit.shake(r, 0.3)
@@ -519,7 +561,7 @@ static func _a_ground_spike(P: Dictionary) -> void:
 	var g := _local_ground(P)
 	var rng: RandomNumberGenerator = P["rng"]
 	_flip(P, "ground_spikes", 3.2 * s, {"time": t * 1.3})
-	VfxKit.decal(r, "crack", Color(_c(P, "c"), 0.95), g, 4.0 * s, t * 2.2, true, 0.5, 0.12, 0.0, 0.0, 0.0, "lava")
+	_cracks(P, g, 4.0 * s, t * 2.2, Color(_c(P, "c"), 0.95), 0.5, 0.12)
 	VfxKit.spikes(r, _c(P, "a"), g, maxi(3, _n(P, 10)), 1.4 * s, 1.9 * s, t * 1.6, rng)
 	VfxKit.flash(r, "glow", Color(_c(P, "c"), 0.8), 3.0 * s, t * 0.4, true, g - r.global_position + Vector3(0, 0.3, 0))
 	VfxKit.wall(r, Color(_c(P, "smoke"), 0.8), g, 3.2 * s, 1.0 * s, t * 0.8, false, 0.2, "smoke")
@@ -540,11 +582,11 @@ static func _a_shockwave(P: Dictionary) -> void:
 	var off := g - r.global_position
 	_flip(P, "rock_impact", 3.2 * s, {"time": t * 1.2})
 	VfxKit.flash(r, "glow", Color(_c(P, "c"), 0.85), 3.4 * s, t * 0.4, true, off + Vector3(0, 0.4, 0))
-	VfxKit.decal(r, "wave", Color(_c(P, "c"), 0.95), g, 5.8 * s, t * 0.75, true)
+	_wave(P, g, 5.8 * s, t * 0.75, Color(_c(P, "c"), 0.95))
 	VfxKit.wall(r, Color(_c(P, "a"), 0.9), g, 5.0 * s, 1.5 * s, t * 0.75)
 	VfxKit.wall(r, Color(_c(P, "smoke"), 0.75), g, 4.2 * s, 1.1 * s, t * 0.9, false, 0.15, "smoke")
 	VfxKit.torus(r, Color(_c(P, "a"), 0.7), 3.0 * s, t * 0.7, off + Vector3(0, 0.3, 0), true, Vector3.ZERO, 0.8)
-	VfxKit.decal(r, "crack", Color(_c(P, "b"), 0.9), g, 3.6 * s, t * 2.2, true, 0.6, 0.12, 0.0, 0.0, 0.0, "lava")
+	_cracks(P, g, 3.6 * s, t * 2.2, Color(_c(P, "b"), 0.9), 0.6, 0.12)
 	_dust(P, 20, 1.1 * s, 5.0 * s, t * 1.3, 0.6 * s)
 	_circle(P, 3.0 * s, t * 1.2, "ripple", 0.0, 0.12)
 	if _rich(P):
@@ -591,9 +633,9 @@ static func _a_lightning_strike(P: Dictionary) -> void:
 		"color2": Color(1.0, 0.45, 0.12, 0.0), "size": 0.3 * s, "speed": 9.0 * s, "tex": "streak", "align": true,
 		"gravity": Vector3(0, -10.0, 0), "damping": 1.0, "offset": off + Vector3(0, 0.3, 0), "dir": Vector3.UP,
 		"spread": 80.0})
-	VfxKit.decal(r, "wave", Color(_c(P, "a"), 0.9), g, 3.6 * s, t * 0.6, true)
+	_wave(P, g, 3.6 * s, t * 0.6, Color(_c(P, "a"), 0.9))
 	if _rich(P):
-		VfxKit.decal(r, "crack", Color(_c(P, "b"), 0.85), g, 2.6 * s, t * 1.4, true, 0.8, 0.1, 0.0, 0.0, 0.0, "lava")
+		_cracks(P, g, 2.6 * s, t * 1.4, Color(_c(P, "b"), 0.85), 0.8, 0.1)
 		_debris(P, 12, 0.2 * s, 7.0 * s, t * 1.2, g + Vector3(0, 0.3, 0), Color(0.32, 0.3, 0.34))
 		_dirt(P, 6, 0.9 * s, 4.0 * s, t, g + Vector3(0, 0.3, 0), Color(0.35, 0.33, 0.4, 0.9))
 		# Голубой дым от удара
@@ -703,7 +745,7 @@ static func _a_holy_nova(P: Dictionary) -> void:
 	var g := _local_ground(P)
 	var off := g - r.global_position
 	_hot_core(P, 1.6 * s, t, off + Vector3(0, 0.6, 0))
-	VfxKit.decal(r, "wave", Color(_c(P, "a"), 0.95), g, 6.2 * s, t * 0.8, true)
+	_wave(P, g, 6.2 * s, t * 0.8, Color(_c(P, "a"), 0.95))
 	if not _circle(P, 2.3 * s, t * 1.5, "circle", 0.0, 0.2):
 		VfxKit.decal(r, "rune", Color(_c(P, "c"), 0.9), g, 4.4 * s, t * 1.4, true, 0.7, 0.2, 0.2)
 	_circle(P, 3.1 * s, t * 1.1, "ripple", 0.0, 0.15)
@@ -1091,7 +1133,7 @@ static func _a_cleave(P: Dictionary) -> void:
 		VfxKit.arc(r, Color(_c(P, "b"), 0.45), d, 2.0 * s, t, 1.25, Vector3(0, 0.3, 0), 1.9, 2.2)
 	if not _flip(P, "crit_flash", 2.4 * s, {"time": t * 0.75, "push": 0.8}):
 		_hot_core(P, 1.1 * s, t)
-	VfxKit.decal(r, "crack", Color(_c(P, "c"), 0.85), g, 2.8 * s, t * 2.0, true, 0.7, 0.12, 0.0, 0.0, 0.0, "lava")
+	_cracks(P, g, 2.8 * s, t * 2.0, Color(_c(P, "c"), 0.85), 0.7, 0.12)
 	VfxKit.wall(r, Color(_c(P, "smoke"), 0.7), g, 2.4 * s, 0.8 * s, t * 0.7, false, 0.2, "smoke")
 	_streaks(P, 16, 0.3 * s, 8.0 * s, t * 0.55, Vector3.ZERO, Vector3.UP, 180.0, -7.0)
 	if _rich(P):
@@ -1136,7 +1178,7 @@ static func _a_blunt_hit(P: Dictionary) -> void:
 	VfxKit.particles(r, {"amount": _n(P, 14), "life": t * 0.6, "color": _c(P, "c"), "color2": Color(_c(P, "a"), 0.0),
 		"size": 0.22 * s, "speed": 6.5 * s, "tex": "star", "gravity": Vector3(0, -7.0, 0), "curve": "twinkle"})
 	if _rich(P):
-		VfxKit.decal(r, "wave", Color(_c(P, "a"), 0.8), _local_ground(P), 2.4 * s, t * 0.6, true)
+		_wave(P, _local_ground(P), 2.4 * s, t * 0.6, Color(_c(P, "a"), 0.8))
 		VfxKit.wall(r, Color(_c(P, "smoke"), 0.6), _local_ground(P), 1.8 * s, 0.6 * s, t * 0.6, false, 0.2, "smoke")
 	VfxKit.shake(r, 0.3)
 
@@ -1152,7 +1194,7 @@ static func _a_spin_slash(P: Dictionary) -> void:
 	if not drawn:
 		VfxKit.arc(r, Color(_c(P, "core"), 0.95), Vector3.BACK, 1.9 * s, t * 0.9, 0.15, off + Vector3(0, 0.25, 0),
 			TAU * 0.9, 0.5)
-	VfxKit.decal(r, "wave", Color(_c(P, "a"), 0.85), g, 5.0 * s, t * 0.7, true)
+	_wave(P, g, 5.0 * s, t * 0.7, Color(_c(P, "a"), 0.85))
 	VfxKit.wall(r, Color(_c(P, "a"), 0.7), g, 3.6 * s, 0.9 * s, t * 0.7)
 	var sp := VfxKit.particles(r, {"amount": _n(P, 20), "life": t * 0.6, "color": _c(P, "c"),
 		"color2": Color(_c(P, "a"), 0.0), "size": 0.32 * s, "speed": 6.5 * s, "tex": "streak", "align": true,
@@ -1219,7 +1261,7 @@ static func _a_roar(P: Dictionary) -> void:
 		for i in 3:
 			VfxKit.flash(r, "ring", Color(_c(P, "a" if i % 2 == 0 else "b"), 0.9), (2.4 + float(i)) * s, t * 0.6, true,
 				off, 0.2, float(i) * t * 0.15, "wave")
-	VfxKit.decal(r, "wave", Color(_c(P, "a"), 0.85), g, 5.0 * s, t * 0.8, true)
+	_wave(P, g, 5.0 * s, t * 0.8, Color(_c(P, "a"), 0.85))
 	VfxKit.wall(r, Color(_c(P, "a"), 0.65), g, 4.2 * s, 1.3 * s, t * 0.8)
 	VfxKit.torus(r, Color(_c(P, "c"), 0.7), 2.6 * s, t * 0.7, off, true, Vector3.ZERO, 0.6)
 	if _rich(P):

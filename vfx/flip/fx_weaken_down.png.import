@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://b5km1jxrojwyj"
+path="res://.godot/imported/fx_weaken_down.png-244e5b815f5b161d423a5128e8360bee.image"
+
+[deps]
+
+source_file="res://vfx/flip/fx_weaken_down.png"
+dest_files=["res://.godot/imported/fx_weaken_down.png-244e5b815f5b161d423a5128e8360bee.image"]
+
+[params]
+
