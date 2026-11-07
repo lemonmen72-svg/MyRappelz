@@ -44,6 +44,20 @@ extends Node
 ## сценарий сам ставит сцены (owns_scene), в конце бот создаёт главную сцену заново. on_finish сценария — уборка при
 ## любом конце. Настройки игрока (settings.cfg) такой сценарий может убрать на время (backup_settings — копия в папке
 ## отчётов, путь — в метке RUNNING); игра упала посреди — recover_after_crash при следующем запуске (main._ready).
+##
+## Фон Android (фаза 5 Кардинала): свёрнутой игра на Android не работает — главный цикл Godot стоит, пока активность
+## на паузе; фоновой службы нет (честно, без обхода правил Android). Свернули (NOTIFICATION_APPLICATION_PAUSED) — тест
+## стоит; вернулись — время в фоне (away_time; за весь запуск — away_total_us, его вычитают часы Кардинала) в лимиты
+## не входит, кадр после возвращения (его delta — всё время в фоне) не считается, замер идёт заново; запись в журнал
+## сворачиваний (interruptions: когда, сколько, на каком шаге) и раздел отчёта «Сворачивания и фон» (питание,
+## экономия энергии, оптимизация батареи, ограничение фона, группа ожидания — плагин powerInfo). Кадр длиннее
+## SUSPEND_GAP без уведомлений — тоже простой. Пока игра свёрнута, плагин показывает уведомление «тест на паузе» с
+## кнопкой «Остановить тест» (botState — идёт ли бот и что делает; botStopRequested — нажали ли «Остановить»: тест
+## останавливается при возвращении, с отчётом и возвратом героя игрока). Долгие режимы (BotScenario.resumable:
+## «Кардинал: профили игроков», «Автотесты») пишут контрольную точку после каждого прогона или теста (save_checkpoint:
+## CHECKPOINT в папке отчётов — атомарно, версия схемы, sha256 данных); систему выгрузили или бот остановлен перегревом
+## или лимитом — во вкладке «Тест-бот» «Продолжить» (start с opts.resume: BotScenario.resume — готовое не повторяется)
+## или «Забыть». Закончен, остановлен вручную или из уведомления, ошибка — точка удаляется.
 
 signal main_changed(new_main: Node)
 signal finished(result: Dictionary)
@@ -84,11 +98,26 @@ const SETTLE := 1.0
 ## Снимок: ширина, качество JPG.
 const SHOT_W := 960
 const SHOT_QUALITY := 0.7
+## Контрольная точка долгого режима (save_checkpoint): файл в папке отчётов и версия его схемы.
+const CHECKPOINT := "checkpoint.json"
+const CHECKPOINT_SCHEMA := 1
+## Кадр длиннее (с) без уведомления о паузе — игра стояла (экран погас и т. п.): в лимиты не входит, в журнал.
+const SUSPEND_GAP := 20.0
+## Без фокуса дольше (с) — строка журнала (шторка уведомлений, системный диалог; игра при этом работала).
+const FOCUS_NOTE := 2.0
+## Как часто сообщать плагину, что делает бот (текст уведомления «на паузе»), с.
+const STATE_EVERY := 3.0
+## Заголовок уведомления «на паузе».
+const NOTICE_TITLE := "Dark Pact — тест-бот"
 
 ## Идущий бот (null — нет).
 static var current: TestBot = null
 ## Итог последнего запуска: {kind, text, time, txt, zip, public, uri, message}; {} — не читали (last_result()).
 static var last: Dictionary = {}
+## Сколько бот стоял свёрнутым за этот запуск, мкс (часы Кардинала вычитают: CardinalStory.wall_sec, CardinalRun).
+static var away_total_us := 0
+## Разрешение на уведомления спрошено (раз за запуск игры).
+static var _asked_notify := false
 
 var mode := ""
 var scenario: BotScenario
@@ -149,6 +178,20 @@ var log_mark := ""
 ## "не начат"}; cur_section — индекс открытого (−1 — нет).
 var sections: Array[Dictionary] = []
 var cur_section := -1
+## Фон Android: сворачивания и потери фокуса {kind "свёрнута" / "без фокуса" / "стояла", sec, at, step, state, power},
+## всего в фоне, с (в лимиты не входит); питание в начале и в конце (плагин powerInfo; {} — нет плагина); остановлен
+## кнопкой «Остановить тест» уведомления.
+var interruptions: Array[Dictionary] = []
+var away_time := 0.0
+var power_start: Dictionary = {}
+var power_end: Dictionary = {}
+var stop_from_notice := false
+## Контрольные точки: продолжение запуска origin (base_name первого; у нового — свой), с какой точки (resume_cp —
+## TestBot.read_checkpoint), сколько записано за этот запуск и последняя (прогресс).
+var resume_cp: Dictionary = {}
+var origin := ""
+var checkpoints := 0
+var checkpoint_last := ""
 
 var overlay: BotOverlay
 var _home: Dictionary = {}
@@ -174,6 +217,10 @@ var _retries: Dictionary = {}
 var _no_plugin: Dictionary = {}
 var _headless := false
 var _app_away := false
+var _away_start_us := 0
+var _away_paused := false
+var _skip_dt := false
+var _state_t := 0.0
 ## Доп. поля метки RUNNING (mark): шаг сценария, копия настроек.
 var _marker_extra: Dictionary = {}
 ## Главная сцена была текущей (до того, как сценарий без мира её убрал).
@@ -208,6 +255,14 @@ static func start(main_node: Node, mode_id: String, opts: Dictionary = {}) -> St
 		sc = BotScenario.create(mode_id)
 	if sc == null:
 		return "Режим «%s» пока недоступен" % BotScenario.mode_name(mode_id)
+	# Продолжение с контрольной точки (read_checkpoint): сценарий узнаёт, что готово, до limit() и build
+	var cp: Dictionary = opts.get("resume", {})
+	if not cp.is_empty():
+		if not sc.resumable():
+			return "режим «%s» не продолжается с контрольной точки" % BotScenario.mode_name(mode_id)
+		var rerr := sc.resume(cp.get("data", {}) as Dictionary)
+		if rerr != "":
+			return "Продолжить нельзя: " + rerr
 	var st := String(opts.get("storage", STORAGE))
 	if not st.ends_with("/"):
 		st += "/"
@@ -232,6 +287,9 @@ static func start(main_node: Node, mode_id: String, opts: Dictionary = {}) -> St
 	if opts.has("frame_guard"):
 		bot.frame_guard = bool(opts["frame_guard"])
 	bot.time_scale = float(opts.get("time_scale", 1.0))
+	if not cp.is_empty():
+		bot.resume_cp = cp
+		bot.origin = String(cp.get("origin", ""))
 	bot.main = main_node
 	main_node.get_tree().root.add_child(bot)
 	bot._begin()
@@ -290,6 +348,9 @@ func _begin() -> void:
 	started_text = "%04d-%02d-%02d %02d:%02d" % [int(now["year"]), int(now["month"]), int(now["day"]), int(now["hour"]),
 		int(now["minute"])]
 	base_name = BotReport.file_base(now)
+	if origin == "":
+		origin = base_name
+	away_total_us = 0
 	run_dir = report_dir + base_name + "/"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(run_dir + "shots"))
 	_read_marker()
@@ -299,12 +360,18 @@ func _begin() -> void:
 	if not interrupted_before.is_empty():
 		note("Прошлый запуск бота (%s) не завершился — игру закрыли или она упала; сохранения игрока не тронуты"
 			% String(interrupted_before.get("time", "?")))
+	if not resume_cp.is_empty():
+		note("Продолжение запуска %s с контрольной точки: %s (записана %s) — готовое не повторяется" % [origin,
+			String(resume_cp.get("progress", "")), String(resume_cp.get("saved", ""))])
 	device = BotReport.device_info()
+	power_start = BotReport.power_info()
+	_ask_notifications()
 	temp_start = read_temps(true)
 	player_quality = "%s, %d к/с" % [Quality.level_name(), Quality.fps_limit()]
 	# Дом игрока: хранилище, аккаунт, слот
 	_home = {"dir": Accounts.dir, "login": Accounts.current, "slot": Game.slot, "nick": Game.char_name}
 	_write_marker()
+	_plugin_state(true)
 	var hud := main.get("hud") as HUD
 	if hud != null:
 		hud.close_window()
@@ -417,6 +484,22 @@ func _process(delta: float) -> void:
 	if _last_us > 0:
 		fdt = float(now - _last_us) / 1000000.0
 	_last_us = now
+	# Кадр после возвращения свёрнутой игры: его delta — всё время в фоне (в лимиты и шаги не идёт)
+	if _skip_dt:
+		_skip_dt = false
+		delta = 0.0
+		fdt = 0.0
+	elif delta > SUSPEND_GAP and (state == "running" or state == "cooling" or state == "prepare"):
+		# Игра стояла без уведомлений о паузе (экран погас, система заморозила процесс)
+		away_time += delta
+		away_total_us += int(delta * 1.0e6)
+		_add_interruption("стояла", delta)
+		delta = 0.0
+		fdt = 0.0
+	_state_t += delta / maxf(Engine.time_scale, 0.001)
+	if _state_t >= STATE_EVERY:
+		_state_t = 0.0
+		_plugin_state(state != "home" and state != "done")
 	match state:
 		"prepare":
 			_tick_prepare(delta)
@@ -446,6 +529,7 @@ func _tick_prepare(dt: float) -> void:
 		note("Мир тестового героя готов (%s)" % clock(total_time))
 	scenario.build(self)
 	steps_total = _steps.size()
+	_plugin_state(true)
 	for s in _steps:
 		if String(s["kind"]) == "measure":
 			measures_total += 1
@@ -494,12 +578,108 @@ func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED:
 			_app_away = true
+			# Android: свернули — сначала FOCUS_OUT, затем PAUSED (главный цикл встаёт); шторка, диалог — только FOCUS_OUT
+			if _away_start_us == 0:
+				_away_start_us = Time.get_ticks_usec()
+				# Текст уведомления «на паузе» — свежий шаг (плагин обновит уже показанное)
+				if state != "home" and state != "done" and state != "idle":
+					_plugin_state(true)
+			if what == NOTIFICATION_APPLICATION_PAUSED:
+				_away_paused = true
 		NOTIFICATION_APPLICATION_FOCUS_IN, NOTIFICATION_APPLICATION_RESUMED:
 			if _app_away and state == "running" and _measuring():
 				note("Игра была свёрнута — замер «%s» заново" % step_name())
 				_restart_step()
 			_app_away = false
 			_last_us = 0
+			_back_from_away()
+
+
+## Вернулись (RESUMED, затем FOCUS_IN — второй вызов ничего не делает): сколько не было, журнал; свёрнутая —
+## следующий кадр не считается (_skip_dt); нажали «Остановить тест» в уведомлении — остановка.
+func _back_from_away() -> void:
+	if _away_start_us == 0:
+		return
+	var sec := float(Time.get_ticks_usec() - _away_start_us) / 1.0e6
+	var paused := _away_paused
+	_away_start_us = 0
+	_away_paused = false
+	if paused:
+		_skip_dt = true
+		away_time += sec
+		away_total_us += int(sec * 1.0e6)
+	if paused or sec >= FOCUS_NOTE:
+		_add_interruption("свёрнута" if paused else "без фокуса", sec)
+	# Остановка (отчёт, сцена заново) — не посреди уведомления движка, а в конце кадра
+	_check_stop_request.call_deferred()
+
+
+## Запись журнала сворачиваний: когда, сколько, на каком шаге, питание в этот момент.
+func _add_interruption(kind: String, sec: float) -> void:
+	if state == "done" or state == "idle":
+		return
+	var now := Time.get_datetime_dict_from_system()
+	var e := {"kind": kind, "sec": sec, "at": "%02d:%02d:%02d" % [int(now["hour"]), int(now["minute"]), int(now["second"])],
+		"step": step_name() if state == "running" or state == "cooling" else state, "state": state,
+		"power": BotReport.power_info()}
+	interruptions.append(e)
+	match kind:
+		"свёрнута":
+			note("Игра была свёрнута %s (шаг «%s») — тест стоял, время в фоне в лимиты не вошло" % [clock(sec),
+				String(e["step"])])
+		"стояла":
+			note("Игра стояла %s без уведомления о паузе (шаг «%s») — в лимиты не вошло" % [clock(sec), String(e["step"])])
+		_:
+			note("Игра без фокуса %s (шторка, диалог; шаг «%s») — тест шёл" % [clock(sec), String(e["step"])])
+
+
+## Нажали «Остановить тест» в уведомлении (флаг плагина) — остановка с отчётом. Нет плагина или старый — ничего.
+func _check_stop_request() -> void:
+	if result_kind != "" or state == "home" or state == "done" or _no_plugin.has("botStopRequested"):
+		return
+	var v: Variant = BotReport.plugin_call("botStopRequested", [])
+	if typeof(v) != TYPE_BOOL:
+		_no_plugin["botStopRequested"] = true
+		return
+	if bool(v):
+		BotReport.plugin_call("botClearStop", [])
+		stop_from_notice = true
+		stop("Остановлен кнопкой «Остановить тест» в уведомлении", "stopped")
+
+
+## Сообщить плагину, идёт ли бот и что делает (текст уведомления «на паузе», пока игра свёрнута).
+func _plugin_state(running: bool) -> void:
+	if _no_plugin.has("botState"):
+		return
+	var text := ""
+	if running and scenario != null:
+		text = "Режим «%s» — %s" % [scenario.title(), _notice_text()]
+	var v: Variant = BotReport.plugin_call("botState", [running, NOTICE_TITLE, text])
+	if typeof(v) != TYPE_BOOL:
+		_no_plugin["botState"] = true
+
+
+## Что делает бот — строка уведомления «на паузе».
+func _notice_text() -> String:
+	match state:
+		"idle", "prepare":
+			return "загрузка мира тестового героя"
+		"cooling":
+			return "пауза на остывание телефона"
+		"home":
+			return "возвращаю вашего героя"
+	return "шаг %d из %d: %s (%s)" % [mini(_si + 1, _steps.size()), _steps.size(), step_name(), clock(active_time)]
+
+
+## Android 13+: долгий режим — спросить разрешение на уведомления (иначе «на паузе» не покажется), раз за запуск игры.
+func _ask_notifications() -> void:
+	if _asked_notify or limit < 900.0:
+		return
+	var v: Variant = BotReport.plugin_call("notificationsAllowed", [])
+	if typeof(v) == TYPE_BOOL and not bool(v):
+		_asked_notify = true
+		BotReport.plugin_call("requestNotifications", [])
+		note("Спрошено разрешение на уведомления (Android 13+): без него уведомление «тест на паузе» не покажется")
 
 
 ## Сейчас идёт шаг замера.
@@ -671,6 +851,9 @@ func _watch(dt: float, fdt: float) -> void:
 	if _poll_t <= 0.0:
 		_poll_t = poll
 		read_temps(true)
+		_check_stop_request()
+		if result_kind != "":
+			return
 	if _status >= STATUS_STOP:
 		stop("Тест остановлен: телефон перегрелся (статус температуры %d — %s)" % [_status, status_name(_status)], "hot")
 		return
@@ -780,6 +963,16 @@ func _finish(kind: String, text: String) -> void:
 	clear_spawned()
 	scenario.on_finish(self)
 	temp_end = read_temps(true)
+	power_end = BotReport.power_info()
+	# Контрольная точка этого запуска: перегрев и лимит — остаётся («Продолжить» во вкладке), иначе удаляется
+	var cp := read_checkpoint(report_dir, false)
+	if bool(cp.get("exists", false)) and String(cp.get("origin", "")) == origin:
+		if kind == "hot" or kind == "limit":
+			note("Контрольная точка сохранена (%s) — продолжить: вкладка «Тест-бот» → «Продолжить»" % String(
+				cp.get("progress", "")))
+		else:
+			drop_checkpoint(report_dir)
+	_plugin_state(false)
 	var errors := 0
 	for c in checks:
 		if not bool(c["ok"]):
@@ -1082,14 +1275,11 @@ func _read_marker() -> void:
 
 
 func _write_marker() -> void:
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(report_dir))
-	var f := FileAccess.open(report_dir + RUNNING, FileAccess.WRITE)
-	if f == null:
-		return
-	var d := {"time": started_text, "mode": mode, "login": String(_home.get("login", "")), "slot": int(_home.get("slot", -1))}
+	var d := {"time": started_text, "mode": mode, "login": String(_home.get("login", "")), "slot": int(_home.get("slot", -1)),
+		"origin": origin}
 	d.merge(_marker_extra, true)
-	f.store_string(JSON.stringify(d))
-	f.close()
+	# Атомарно: игру выгрузили посреди записи — прежняя метка цела
+	write_atomic(report_dir + RUNNING, JSON.stringify(d))
 
 
 ## Дописать в метку RUNNING (шаг сценария: игра упала — следующий отчёт скажет, на чём).
@@ -1134,24 +1324,136 @@ static func _restore_settings_from(backup: String) -> void:
 	UiScale.reread()
 
 
-## Запуск игры (main._ready): прошлый тест-бот не закончился (метка RUNNING) и убирал настройки игрока — вернуть их.
-## Пока бот идёт — ничего. true — вернули.
+## Запуск игры (main._ready): прошлый тест-бот не закончился (метка RUNNING — игру закрыли, она упала или система
+## выгрузила свёрнутую): уведомление «тест на паузе» прежнего процесса убирается; нажали в нём «Остановить тест» —
+## контрольная точка удаляется (продолжать не просили), в метке — stopped_by_notice; убирал настройки игрока —
+## вернуть их. Пока бот идёт — ничего. true — настройки вернули.
 static func recover_after_crash(dir: String = REPORT_DIR) -> bool:
 	if is_running() or not FileAccess.file_exists(dir + RUNNING):
 		return false
 	var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(dir + RUNNING))
-	if not (v is Dictionary) or not (v as Dictionary).has("settings_backup"):
+	if not (v is Dictionary):
 		return false
 	var d: Dictionary = v
-	_restore_settings_from(String(d["settings_backup"]))
-	d.erase("settings_backup")
-	d["settings_recovered"] = true
-	var f := FileAccess.open(dir + RUNNING, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify(d))
-		f.close()
-	print("TestBot: прошлый запуск бота не закончился — настройки игрока возвращены из копии")
-	return true
+	BotReport.plugin_call("botState", [false, "", ""])
+	var changed := false
+	var sv: Variant = BotReport.plugin_call("botStopRequested", [])
+	if typeof(sv) == TYPE_BOOL and bool(sv):
+		BotReport.plugin_call("botClearStop", [])
+		d["stopped_by_notice"] = true
+		changed = true
+		var cp := read_checkpoint(dir, false)
+		if bool(cp.get("exists", false)) and String(cp.get("origin", "")) == String(d.get("origin", "")):
+			drop_checkpoint(dir)
+			print("TestBot: прошлый запуск остановлен из уведомления — контрольная точка удалена")
+	var restored := false
+	if d.has("settings_backup"):
+		_restore_settings_from(String(d["settings_backup"]))
+		d.erase("settings_backup")
+		d["settings_recovered"] = true
+		changed = true
+		restored = true
+		print("TestBot: прошлый запуск бота не закончился — настройки игрока возвращены из копии")
+	if changed:
+		write_atomic(dir + RUNNING, JSON.stringify(d))
+	return restored
+
+
+# ---------- Контрольные точки (долгие режимы: продолжение после выгрузки игры, перегрева, лимита) ----------
+
+## Записать контрольную точку (сценарий — после каждого законченного прогона или теста): data — только JSON-типы
+## (числа после чтения — float), progress — «прогонов 3 из 10». Файл CHECKPOINT в папке отчётов, атомарно; данные —
+## строкой JSON с sha256 (сверка байт в байт: число 1 после чтения и записи стало бы «1.0»).
+func save_checkpoint(data: Dictionary, progress: String) -> bool:
+	var body := JSON.stringify(data)
+	var now := Time.get_datetime_dict_from_system()
+	var cp := {"schema": CHECKPOINT_SCHEMA, "game_version": BotReport.version(), "mode": mode,
+		"title": scenario.title() if scenario != null else mode, "origin": origin, "run": base_name,
+		"saved": "%04d-%02d-%02d %02d:%02d:%02d" % [int(now["year"]), int(now["month"]), int(now["day"]), int(now["hour"]),
+			int(now["minute"]), int(now["second"])],
+		"progress": progress, "data_json": body, "sha256": body.sha256_text()}
+	var ok := write_atomic(report_dir + CHECKPOINT, JSON.stringify(cp, "\t"))
+	if ok:
+		checkpoints += 1
+		checkpoint_last = progress
+		mark({"checkpoint": progress})
+	else:
+		note("Контрольная точка не записана (%s)" % progress)
+	return ok
+
+
+## Контрольная точка в папке dir: {exists, ok, error, mode, title, origin, run, saved, progress, data}. ok — можно
+## продолжить: файл цел (JSON, версия схемы, sha256 данных), та же версия игры, а при check_mode — режим есть в MODES
+## и продолжается (BotScenario.resumable).
+static func read_checkpoint(dir: String = REPORT_DIR, check_mode: bool = true) -> Dictionary:
+	var path := dir + CHECKPOINT
+	if not FileAccess.file_exists(path):
+		return {"exists": false, "ok": false, "error": "контрольной точки нет"}
+	var res := {"exists": true, "ok": false, "error": ""}
+	# JSON.new().parse — без ошибки движка в логе (JSON.parse_string печатает её на испорченном файле)
+	var jp := JSON.new()
+	if jp.parse(FileAccess.get_file_as_string(path)) != OK or not (jp.data is Dictionary):
+		res["error"] = "файл повреждён (не читается)"
+		return res
+	var cp: Dictionary = jp.data
+	for k in ["mode", "title", "origin", "run", "saved", "progress", "game_version"]:
+		res[k] = str(cp.get(k, ""))
+	if int(cp.get("schema", 0)) != CHECKPOINT_SCHEMA:
+		res["error"] = "другая версия схемы файла (%s, нужна %d)" % [str(cp.get("schema", "?")), CHECKPOINT_SCHEMA]
+		return res
+	var body := str(cp.get("data_json", ""))
+	if body == "" or body.sha256_text() != str(cp.get("sha256", "")):
+		res["error"] = "контрольная сумма не сошлась — файл повреждён"
+		return res
+	var jd := JSON.new()
+	if jd.parse(body) != OK or not (jd.data is Dictionary):
+		res["error"] = "данные повреждены"
+		return res
+	var dv: Dictionary = jd.data
+	if str(res["game_version"]) != BotReport.version():
+		res["error"] = "записана версией игры %s, сейчас %s — такой запуск начнётся заново" % [str(res["game_version"]),
+			BotReport.version()]
+		return res
+	if check_mode:
+		var sc := BotScenario.create(str(res["mode"]))
+		if sc == null:
+			res["error"] = "режима «%s» нет" % str(res["mode"])
+			return res
+		if not sc.resumable():
+			res["error"] = "режим «%s» не продолжается с контрольной точки" % BotScenario.mode_name(str(res["mode"]))
+			return res
+	res["data"] = dv
+	res["ok"] = true
+	return res
+
+
+static func drop_checkpoint(dir: String = REPORT_DIR) -> void:
+	for f in [CHECKPOINT, CHECKPOINT + ".tmp"]:
+		if FileAccess.file_exists(dir + String(f)):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(dir + String(f)))
+
+
+## Записать файл атомарно: во временный рядом, затем переименование (Android, Linux — замена одним шагом: игру
+## выгрузили посреди записи — прежний файл цел), проверка чтением. false — не вышло.
+static func write_atomic(path: String, text: String) -> bool:
+	var base := path.get_base_dir()
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(base))
+	var tmp := path + ".tmp"
+	var f := FileAccess.open(tmp, FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_string(text)
+	f.flush()
+	f.close()
+	var d := DirAccess.open(base)
+	if d == null:
+		return false
+	if d.rename(tmp.get_file(), path.get_file()) != OK:
+		# Где переименование не заменяет файл — прежний удалить и снова
+		d.remove(path.get_file())
+		if d.rename(tmp.get_file(), path.get_file()) != OK:
+			return false
+	return FileAccess.get_file_as_string(path) == text
 
 
 func _remove_marker() -> void:

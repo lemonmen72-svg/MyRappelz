@@ -39,6 +39,7 @@ const SCRIPT_ERRORS := ["SCRIPT ERROR", "Parse Error", "Compile Error", "Failed 
 const CI_ONLY := {
 	"test_bot": "сам запускает тест-бота, а второй бот не запускается, пока идёт этот",
 	"test_bot_game": "сам запускает тест-бота (режим «Быстрый» — его и так можно запустить на вкладке), а второй бот не запускается",
+	"test_bot_lifecycle": "сам запускает тест-бота (сворачивание и контрольные точки — подставные), а второй бот не запускается",
 	"test_asset_pack": "читает export_presets.cfg (его нет в APK) и подменяет состояние пакета ресурсов — на телефоне это настоящий кэш загрузок",
 	"test_asset_fallback": "проверяет игру без пакета ресурсов (файлы частей не загружены) — на телефоне игра их уже загрузила",
 	"test_renderer": "подставляет Android и пишет файлы рендерера — на телефоне это настоящие файлы запуска (страховка Vulkan)",
@@ -105,6 +106,34 @@ func limit() -> float:
 
 func needs_world() -> bool:
 	return false
+
+
+func resumable() -> bool:
+	return true
+
+
+## Продолжение (контрольная точка): результаты готовых тестов (не повторяются) и свой список, если был.
+func resume(data: Dictionary) -> String:
+	var res: Variant = data.get("results", null)
+	if not (res is Array):
+		return "в контрольной точке нет результатов тестов"
+	if data.get("only", null) is Array and not (data["only"] as Array).is_empty():
+		only = PackedStringArray(data["only"])
+	results.clear()
+	for r in res:
+		if not (r is Dictionary) or String((r as Dictionary).get("name", "")) == "":
+			continue
+		var d: Dictionary = (r as Dictionary).duplicate()
+		d["errors"] = PackedStringArray(d.get("errors", []))
+		d["from_cp"] = true
+		results.append(d)
+	return ""
+
+
+## Контрольная точка после каждого теста: результаты готовых и свой список.
+func _checkpoint() -> void:
+	if bot != null:
+		bot.save_checkpoint({"results": results, "only": only}, "тестов %d из %d" % [results.size(), planned])
 
 
 ## Тесты по порядку: свой список, быстрые или все (smoke_test первым).
@@ -191,9 +220,16 @@ func build(b: TestBot) -> void:
 	var ib := b.interrupted_before
 	if String(ib.get("mode", "")).begins_with("autotests") and String(ib.get("step", "")) != "":
 		_crashed_on = String(ib["step"])
+	var done := {}
+	for r in results:
+		done[String(r["name"])] = true
+	if not done.is_empty():
+		b.note("Автотесты: из контрольной точки — готово %d из %d, они не повторяются" % [done.size(), names.size()])
 	b.do("Подготовка автотестов", _prepare.bind(names))
 	for i in names.size():
 		var n := String(names[i])
+		if done.has(n):
+			continue
 		# Свой таймаут теста — TIMEOUT; у шага бота — с запасом (если сценарий не справился)
 		b.wait_until("Автотест %s (%d/%d)" % [n, i + 1, names.size()], _run_one.bind(n), timeout + 60.0)
 	b.do("Конец автотестов", func() -> void: bot.note(summary(bot)))
@@ -252,6 +288,7 @@ func _start(n: String) -> void:
 		_phase = "next"
 		results.append(_cur)
 		bot.note("Автотест %s — пропущен: %s" % [n, why])
+		_checkpoint()
 		return
 	reset_env()
 	var tree := bot.get_tree()
@@ -366,6 +403,7 @@ func _record() -> void:
 	results.append(_cur)
 	reset_env()
 	_phase = "next"
+	_checkpoint()
 	var line := "Автотест %s — %s за %s" % [String(_cur["name"]), String(STATUS_TEXT.get(String(_cur["status"]), "?")),
 		_sec(float(_cur["sec"]))]
 	if String(_cur["text"]) != "":
@@ -535,11 +573,18 @@ func report_lines(_b: TestBot) -> PackedStringArray:
 		+ "умолчанию (настройки игрока убраны на время тестов и возвращены), аккаунты тестов — свои (стёрты в конце).")
 	L.append("  %3s  %-34s %-12s %8s %7s %6s  %s" % ["№", "Тест", "Итог", "Время", "Кадров", "к/с", "Ошибок Godot (GDScript / прочих), предупреждений"])
 	var i := 0
+	var from_cp := 0
+	for r in results:
+		if bool(r.get("from_cp", false)):
+			from_cp += 1
+	if from_cp > 0:
+		L.append("  (* — тест до перерыва, из контрольной точки: %d)" % from_cp)
 	for r in results:
 		i += 1
 		var st := String(r["status"])
 		var errs := "—" if st == "skip" else "%d / %d, %d" % [int(r["script_errors"]), int(r["other_errors"]), int(r["warnings"])]
-		L.append("  %3d  %-34s %-12s %8s %7s %6s  %s" % [i, String(r["name"]).left(34), String(STATUS_TEXT.get(st, st)),
+		L.append("  %3d  %-34s %-12s %8s %7s %6s  %s" % [i, (String(r["name"]) + (" *" if bool(r.get("from_cp", false))
+			else "")).left(34), String(STATUS_TEXT.get(st, st)),
 			"—" if st == "skip" else _sec(float(r["sec"])), "—" if st == "skip" else str(int(r["frames"])),
 			"—" if st == "skip" or float(r["fps"]) <= 0.0 else "%.0f" % float(r["fps"]), errs])
 	var left := planned - results.size()

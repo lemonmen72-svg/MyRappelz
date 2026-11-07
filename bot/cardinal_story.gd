@@ -146,6 +146,9 @@ var _saved := {}
 var _clock0 := 0.0
 var _wall0 := 0
 var _wall_end := -1.0
+## TestBot.away_total_us в начале прогона и на прошлой строке хода: время свёрнутой игры не идёт в часы прогона.
+var _away0 := 0
+var _beat_away := 0
 var _stopping := false
 var _nav := IslandWorld.Route.new()
 var _split := "wait"
@@ -202,6 +205,8 @@ func begin() -> void:
 	nav_ms = (Time.get_ticks_usec() - nav_t) / 1000
 	_fresh_hero()
 	_wall0 = Time.get_ticks_usec()
+	_away0 = TestBot.away_total_us
+	_beat_away = _away0
 	_clock0 = Util.game_time()
 	start = _snapshot()
 	_prng.seed = seed_value * 7919 + 17
@@ -320,7 +325,8 @@ func _snapshot() -> Dictionary:
 func wall_sec() -> float:
 	if _wall_end >= 0.0:
 		return _wall_end
-	return float(Time.get_ticks_usec() - _wall0) / 1.0e6
+	# Настоящее время прогона без времени свёрнутой игры (тест стоял: лимит wall_limit — только на работу)
+	return float(Time.get_ticks_usec() - _wall0 - (TestBot.away_total_us - _away0)) / 1.0e6
 
 
 ## Остановить снаружи (бот кончился: «Стоп», лимит, перегрев) — настройки движка на место.
@@ -337,7 +343,7 @@ func _end(reason: String) -> void:
 	done = true
 	_stopping = true
 	stop_reason = reason
-	_wall_end = float(Time.get_ticks_usec() - _wall0) / 1.0e6
+	_wall_end = float(Time.get_ticks_usec() - _wall0 - (TestBot.away_total_us - _away0)) / 1.0e6
 	_set_boost(false)
 	var p := _p()
 	var h := _h()
@@ -424,9 +430,10 @@ func _tick() -> bool:
 			if (n as Node).process_mode != Node.PROCESS_MODE_DISABLED:
 				awake += 1
 		var tk := ticks - _beat_ticks
-		var ms := float(Time.get_ticks_usec() - _beat_us) / 1000.0 / maxf(float(tk), 1.0)
+		var ms := float(Time.get_ticks_usec() - _beat_us - (TestBot.away_total_us - _beat_away)) / 1000.0 / maxf(float(tk), 1.0)
 		_beat_ticks = ticks
 		_beat_us = Time.get_ticks_usec()
+		_beat_away = TestBot.away_total_us
 		bot.note("Кардинал [%s, %d ур., %s]: идёт — %s; герой у (%.0f, %.0f), HP %d/%d; сдано %d; убийств %d, смертей %d; %.2f мс/тик, узлов %d, зверей не спят %d, физика %.1f мс, кадр %.1f мс" % [
 			TestBot.clock(game_t), Game.level, title, _last_plan, bp.global_position.x, bp.global_position.z, bp.hp, bp.max_hp,
 			done_count(), kills, deaths, ms, int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)), awake,

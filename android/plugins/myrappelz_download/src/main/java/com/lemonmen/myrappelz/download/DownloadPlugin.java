@@ -41,7 +41,9 @@ import java.io.OutputStream;
  * <p>
  * Заодно — температура телефона для бережения (ThermalGuard в игре): thermalStatus, thermalHeadroom; для отчёта
  * тест-бота (TestBot, BotReport): batteryTemp, deviceInfo, saveToDownloads (общая папка «Загрузки» через MediaStore,
- * без разрешений), share и openFile (файл отдаётся другим приложениям через свой ReportProvider — без androidx).
+ * без разрешений), share и openFile (файл отдаётся другим приложениям через свой ReportProvider — без androidx);
+ * пока тест-бот идёт и игра свёрнута — уведомление «тест на паузе» с кнопкой «Остановить тест» (BotNotice, botState,
+ * botStopRequested), питание и фон для отчёта — powerInfo.
  */
 public class DownloadPlugin extends GodotPlugin {
 	private static final String TAG = "MyRappelzDownload";
@@ -576,6 +578,124 @@ public class DownloadPlugin extends GodotPlugin {
 			return null;
 		}
 		return (PowerManager)c.getSystemService(Context.POWER_SERVICE);
+	}
+
+	// ---------- Тест-бот: пауза в фоне, «Остановить тест», питание (BotNotice) ----------
+
+	/**
+	 * Игра: идёт ли тест-бот и что он делает (title — заголовок уведомления, text — режим и шаг). Пока идёт — свернули
+	 * игру: уведомление «на паузе» с кнопкой «Остановить тест» (onMainPause). running=false — уведомление убирается.
+	 */
+	@UsedByGodot
+	public boolean botState(boolean running, String title, String text) {
+		BotNotice.setState(context(), running, title, text);
+		return true;
+	}
+
+	/** Нажали «Остановить тест» в уведомлении (флаг живёт и после выгрузки процесса — до botClearStop). */
+	@UsedByGodot
+	public boolean botStopRequested() {
+		return BotNotice.stopRequested(context());
+	}
+
+	@UsedByGodot
+	public void botClearStop() {
+		BotNotice.clearStop(context());
+	}
+
+	@Override
+	public void onMainPause() {
+		try {
+			BotNotice.onPause(context());
+		} catch (Throwable t) {
+			Log.w(TAG, "bot pause notice failed", t);
+		}
+	}
+
+	@Override
+	public void onMainResume() {
+		try {
+			BotNotice.onResume(context());
+		} catch (Throwable t) {
+			Log.w(TAG, "bot resume notice failed", t);
+		}
+	}
+
+	@Override
+	public void onMainDestroy() {
+		try {
+			Context c = context();
+			if (c != null) {
+				BotNotice.cancel(c);
+			}
+		} catch (Throwable t) {
+			Log.w(TAG, "bot notice cancel failed", t);
+		}
+	}
+
+	/**
+	 * Питание и фон для отчёта тест-бота: power_save (экономия энергии), interactive (экран включён), ignoring_opt
+	 * (Android 6+: игра исключена из оптимизации батареи), idle (режим Doze), bg_restricted (Android 9+: «ограничить
+	 * фоновую работу»), bucket (Android 9+: группа ожидания UsageStatsManager — 10 активная, 20 рабочая, 30 частая,
+	 * 40 редкая, 45 ограниченная), battery (%), plugged, charging, notifications (можно ли показывать уведомления).
+	 * Чего нет на этом Android — ключа нет.
+	 */
+	@UsedByGodot
+	public Dictionary powerInfo() {
+		Dictionary d = new Dictionary();
+		Context c = context();
+		if (c == null) {
+			return d;
+		}
+		try {
+			PowerManager pm = powerManager();
+			if (pm != null) {
+				d.put("power_save", pm.isPowerSaveMode());
+				d.put("interactive", pm.isInteractive());
+				if (Build.VERSION.SDK_INT >= 23) {
+					d.put("ignoring_opt", pm.isIgnoringBatteryOptimizations(c.getPackageName()));
+					d.put("idle", pm.isDeviceIdleMode());
+				}
+			}
+		} catch (Throwable t) {
+			Log.w(TAG, "power info failed", t);
+		}
+		if (Build.VERSION.SDK_INT >= 28) {
+			try {
+				android.app.ActivityManager am = (android.app.ActivityManager)c.getSystemService(Context.ACTIVITY_SERVICE);
+				if (am != null) {
+					d.put("bg_restricted", am.isBackgroundRestricted());
+				}
+			} catch (Throwable t) {
+				Log.w(TAG, "background restriction failed", t);
+			}
+			try {
+				android.app.usage.UsageStatsManager us =
+					(android.app.usage.UsageStatsManager)c.getSystemService(Context.USAGE_STATS_SERVICE);
+				if (us != null) {
+					d.put("bucket", us.getAppStandbyBucket());
+				}
+			} catch (Throwable t) {
+				Log.w(TAG, "standby bucket failed", t);
+			}
+		}
+		try {
+			Intent b = c.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+			if (b != null) {
+				int level = b.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+				int scale = b.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+				int plugged = b.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
+				int status = b.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+				d.put("battery", level >= 0 && scale > 0 ? level * 100 / scale : -1);
+				d.put("plugged", plugged);
+				d.put("charging", plugged != 0 || status == BatteryManager.BATTERY_STATUS_CHARGING
+					|| status == BatteryManager.BATTERY_STATUS_FULL);
+			}
+		} catch (Throwable t) {
+			Log.w(TAG, "battery info failed", t);
+		}
+		d.put("notifications", notificationsAllowed());
+		return d;
 	}
 
 	/** Текст последней ошибки (для журнала). */

@@ -19,6 +19,11 @@
             android:authorities="${applicationId}.darkpact_reports"
             android:exported="false"
             android:grantUriPermissions="true" />
+        <!-- Кнопка «Остановить тест» в уведомлении тест-бота «на паузе» (BotNotice): только флаг для игры;
+             не экспортирован — его зовёт только PendingIntent этого приложения. -->
+        <receiver
+            android:name="com.lemonmen.myrappelz.download.BotStopReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

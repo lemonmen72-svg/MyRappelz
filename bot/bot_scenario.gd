@@ -17,6 +17,9 @@ extends RefCounted
 ## Один сценарий — несколько режимов: в mode_key — id строки MODES, по которой он создан (create).
 ## Сценарий без мира тестового героя (needs_world false — «Автотесты») сам ставит и убирает сцены (owns_scene):
 ## бот не следит за главной сценой, в конце создаёт её заново; on_finish — уборка при любом конце (стоп, перегрев).
+## Долгий режим, который продолжается после прерывания (resumable true: «Кардинал: профили игроков», «Автотесты»):
+## после каждой законченной части (прогон, тест) — bot.save_checkpoint(данные, прогресс); «Продолжить» во вкладке
+## «Тест-бот» создаёт сценарий заново и зовёт resume(данные) до limit() и build — готовое не повторяется.
 ## Игровые режимы «Быстрый», «Полный», «По разделам» — BotScenarioGame (bot/bot_scenario_game.gd) из разделов
 ## BotSection (bot/bot_section.gd, bot/section_<id>.gd); minutes — лимит активного времени (у «По разделам» — по
 ## оценке выбранных разделов, BotScenarioGame.estimate).
@@ -42,8 +45,18 @@ const MODES := [
 ]
 
 
+## Режимы тестов (tests/test_bot_lifecycle.gd): id → Callable, создающий сценарий, — как строки MODES (имя «Тест: id»),
+## чтобы «Продолжить» во вкладке шёл настоящим путём. В игре пусто.
+static var test_modes: Dictionary = {}
+
+
 ## Сценарий режима mode_id (null — режима нет или он «скоро»).
 static func create(mode_id: String) -> BotScenario:
+	if test_modes.has(mode_id):
+		var ts: BotScenario = (test_modes[mode_id] as Callable).call()
+		if ts != null:
+			ts.mode_key = mode_id
+		return ts
 	var m := mode(mode_id)
 	if m.is_empty() or not bool(m.get("ready", false)):
 		return null
@@ -60,6 +73,8 @@ static func create(mode_id: String) -> BotScenario:
 
 
 static func mode(mode_id: String) -> Dictionary:
+	if test_modes.has(mode_id):
+		return {"id": mode_id, "name": "Тест: " + mode_id, "ready": true, "minutes": 15}
 	for e in MODES:
 		var d: Dictionary = e
 		if String(d["id"]) == mode_id:
@@ -128,3 +143,14 @@ func on_hot(_bot: TestBot) -> String:
 
 func on_finish(_bot: TestBot) -> void:
 	pass
+
+
+## Продолжается ли режим с контрольной точки (TestBot.save_checkpoint после каждой законченной части).
+func resumable() -> bool:
+	return false
+
+
+## Продолжение: data — данные контрольной точки (что уже готово); зовётся до limit() и build. "" — можно, иначе
+## причина (точка не подходит — запуск не начинается).
+func resume(_data: Dictionary) -> String:
+	return "режим «%s» не продолжается с контрольной точки" % title()

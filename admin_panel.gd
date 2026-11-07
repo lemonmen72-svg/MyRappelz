@@ -52,6 +52,7 @@ extends RefCounted
 ##     "editor_start", "editor_share", "editor_reset", "editor_reset_yes", "editor_reset_no" (DungeonEditor), "tp_poi_<id>", "tp_zone_<id>" (teleports());
 ##   «Тест-бот»: "bot_mode_<id>" (BotScenario.MODES; «скоро» — недоступны), "bot_sec_<раздел>" (режим «По разделам»:
 ##     переключатели разделов BotSection.SECTIONS), "bot_start", "bot_stop", "bot_open", "bot_share",
+##     "bot_resume" / "bot_forget" (прерванный запуск долгого режима — контрольная точка TestBot.read_checkpoint),
 ##     «Кардинал: профили игроков»: "bot_prof_<профиль>", "bot_seg_<elder|job|post>", "bot_seeds_<1|3|5>",
 ##     "bot_race_<раса>", "bot_job_<профессия>", "bot_paccel_<8|16|32>" (BotScenarioCardinalProfiles),
 ##     "anim_system", "anim_combat_idle" (система анимаций 1.0 и боевая стойка — выключатели отката),
@@ -1054,6 +1055,22 @@ static func _build_bot(main: Node, body: VBoxContainer) -> void:
 	(buttons["bot_start"] as Button).disabled = running or (bot_mode == "sections" and BotScenarioGame.chosen().is_empty()) \
 		or (bot_mode == "cardinal_profiles" and BotScenarioCardinalProfiles.validate() != "")
 	(buttons["bot_stop"] as Button).disabled = not running
+	# Прерванный запуск долгого режима (контрольная точка): «Продолжить» — с того же места, «Забыть»
+	var cp := TestBot.read_checkpoint()
+	if bool(cp.get("exists", false)) and not running:
+		_head(body, "Прерванный запуск")
+		var cp_ok := bool(cp.get("ok", false))
+		if cp_ok:
+			body.add_child(_text("«%s»: %s, записана %s. «Продолжить» — с того же места, готовое не повторяется." % [
+				String(cp.get("title", "")), String(cp.get("progress", "")), String(cp.get("saved", ""))], UiScale.FONT_SMALL,
+				INFO))
+		else:
+			body.add_child(_text("Контрольная точка «%s» не подходит: %s." % [String(cp.get("title", "?")),
+				String(cp.get("error", ""))], UiScale.FONT_SMALL, BAD))
+		var r5 := _row(body)
+		_btn(r5, "bot_resume", "Продолжить", func() -> void: AdminPanel.bot_resume(main), 160.0)
+		_btn(r5, "bot_forget", "Забыть", func() -> void: AdminPanel.bot_forget(main), 160.0)
+		(buttons["bot_resume"] as Button).disabled = not cp_ok
 	var last := TestBot.last_result()
 	_head(body, "Последний отчёт")
 	var where := String(last.get("public", ""))
@@ -1193,6 +1210,30 @@ static func bot_start(main: Node) -> String:
 	if err != "" and hud != null:
 		hud.show_message("Тест-бот: " + err)
 	return err
+
+
+## «Продолжить» прерванный запуск (контрольная точка долгого режима): тот же режим и выбор, готовое не повторяется.
+static func bot_resume(main: Node) -> String:
+	var cp := TestBot.read_checkpoint()
+	var hud := main.get("hud") as HUD
+	if not bool(cp.get("ok", false)):
+		var why := "Продолжить нельзя: " + String(cp.get("error", "контрольной точки нет"))
+		if hud != null:
+			hud.show_message("Тест-бот: " + why)
+		return why
+	if hud != null:
+		hud.close_window()
+	var err := TestBot.start(main, String(cp["mode"]), {"resume": cp})
+	if err != "" and hud != null:
+		hud.show_message("Тест-бот: " + err)
+	return err
+
+
+## «Забыть» прерванный запуск: контрольная точка удаляется.
+static func bot_forget(main: Node) -> void:
+	TestBot.drop_checkpoint()
+	if is_open(main):
+		open(main)
 
 
 static func bot_stop(main: Node) -> void:

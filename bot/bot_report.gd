@@ -97,6 +97,46 @@ static func plugin_call(method: String, args: Array) -> Variant:
 	return p.callv(method, args)
 
 
+## Питание и фон (плагин powerInfo): power_save, interactive, ignoring_opt, idle, bg_restricted, bucket, battery,
+## plugged, charging, notifications; {} — нет плагина (ПК) или старый AAR.
+static func power_info() -> Dictionary:
+	var v: Variant = plugin_call("powerInfo", [])
+	return (v as Dictionary).duplicate() if v is Dictionary else {}
+
+
+## Группы ожидания Android (UsageStatsManager.STANDBY_BUCKET_*): чем больше число, тем строже система с фоном.
+const BUCKETS := {5: "без ограничений", 10: "активная", 20: "рабочая", 30: "частая", 40: "редкая", 45: "ограниченная",
+	50: "никогда"}
+
+
+## Строка питания для отчёта: зарядка, экономия энергии, оптимизация батареи, ограничение фона, группа ожидания.
+static func power_text(d: Dictionary) -> String:
+	if d.is_empty():
+		return "нет данных (нет плагина Android)"
+	var parts := PackedStringArray()
+	if d.has("charging"):
+		var lvl := int(d.get("battery", -1))
+		parts.append("зарядка: %s%s" % ["да" if bool(d["charging"]) else "нет", " (%d %%)" % lvl if lvl >= 0 else ""])
+	if d.has("power_save"):
+		parts.append("экономия энергии: " + ("ВКЛ" if bool(d["power_save"]) else "выкл"))
+	if d.has("ignoring_opt"):
+		parts.append("оптимизация батареи для игры: " + ("выкл (игра исключена)" if bool(d["ignoring_opt"])
+			else "вкл — система может выгрузить свёрнутую игру"))
+	if d.has("bg_restricted"):
+		parts.append("ограничение фона: " + ("ДА" if bool(d["bg_restricted"]) else "нет"))
+	if d.has("bucket"):
+		var b := int(d["bucket"])
+		parts.append("группа ожидания: %s (%d)" % [String(BUCKETS.get(b, "?")), b])
+	if bool(d.get("idle", false)):
+		parts.append("режим Doze")
+	if d.has("interactive") and not bool(d["interactive"]):
+		parts.append("экран выключен")
+	if d.has("notifications"):
+		parts.append("уведомления: " + ("разрешены" if bool(d["notifications"])
+			else "ЗАПРЕЩЕНЫ (уведомление «тест на паузе» не покажется)"))
+	return ", ".join(parts)
+
+
 ## Устройство: model, os, soc, vulkan, cpu, gpu, api, driver, renderer, renderer_diag (RendererGuard.diagnostics()),
 ## last_exit, screen, memory, pack, plugin.
 static func device_info() -> Dictionary:
@@ -366,8 +406,9 @@ static func build_text(bot: TestBot) -> String:
 	else:
 		L.append("Проверок бота: %d, ошибок: %d" % [bot.checks.size(), _errors(bot)])
 	L.append("Версия игры: %s · дата: %s" % [version(), bot.started_text])
-	L.append("Длительность: %s (сценарий %s, загрузка мира и паузы — остальное)" % [TestBot.clock(bot.total_time),
-		TestBot.clock(bot.active_time)])
+	L.append("Длительность: %s (сценарий %s, загрузка мира и паузы — остальное)%s" % [TestBot.clock(bot.total_time),
+		TestBot.clock(bot.active_time), "; игра свёрнута %s — не в счёт" % TestBot.clock(bot.away_time)
+		if bot.away_time > 0.0 else ""])
 	if bot.pauses.is_empty():
 		L.append("Пауз на остывание: нет")
 	else:
@@ -399,6 +440,7 @@ static func build_text(bot: TestBot) -> String:
 	L.append("  Температура в начале: %s" % temps_text(bot.temp_start))
 	L.append("  Температура в конце: %s" % temps_text(bot.temp_end))
 	L.append("")
+	_away_block(bot, L)
 	_exits_block(bot, L)
 	if bot.measures_total > 0 or not bot.rows.is_empty():
 		_presets_block(bot, L)
@@ -457,6 +499,55 @@ static func _interrupted_block(bot: TestBot, L: PackedStringArray) -> void:
 		L.append("!!! Причину конца процесса узнать нельзя (%s)." % String(ex["why"]))
 	if bool(ib.get("settings_recovered", false)):
 		L.append("!!! Настройки графики игрока были возвращены из копии при следующем запуске игры.")
+	if bool(ib.get("stopped_by_notice", false)):
+		L.append("!!! Перед этим в уведомлении «тест на паузе» нажали «Остановить тест» — контрольная точка удалена.")
+	elif String(ib.get("checkpoint", "")) != "":
+		var cp := TestBot.read_checkpoint(bot.report_dir, false)
+		if bool(cp.get("exists", false)) and String(cp.get("origin", "")) == String(ib.get("origin", "")):
+			L.append("!!! Его контрольная точка (%s) цела — продолжить: вкладка «Тест-бот» → «Продолжить»."
+				% String(ib["checkpoint"]))
+	L.append("")
+
+
+## Фон Android: сворачивания (тест стоял — свёрнутой игра на Android не работает; время в лимиты не вошло), простои
+## без уведомления, потери фокуса, остановка из уведомления, контрольные точки, питание в начале и в конце.
+static func _away_block(bot: TestBot, L: PackedStringArray) -> void:
+	L.append("Сворачивания и фон")
+	var cnt := {}
+	var sec := {}
+	for e in bot.interruptions:
+		var k := String(e["kind"])
+		cnt[k] = int(cnt.get(k, 0)) + 1
+		sec[k] = float(sec.get(k, 0.0)) + float(e["sec"])
+	if bot.interruptions.is_empty():
+		L.append("  Игру не сворачивали.")
+	else:
+		if cnt.has("свёрнута"):
+			L.append("  Свёрнута: %d, всего %s — тест стоял (свёрнутой игра на Android не работает), в лимиты не вошло"
+				% [int(cnt["свёрнута"]), TestBot.clock(float(sec["свёрнута"]))])
+		if cnt.has("стояла"):
+			L.append("  Стояла без уведомления о паузе: %d, всего %s — в лимиты не вошло" % [int(cnt["стояла"]),
+				TestBot.clock(float(sec["стояла"]))])
+		if cnt.has("без фокуса"):
+			L.append("  Без фокуса (шторка, диалог — игра работала): %d, всего %s" % [int(cnt["без фокуса"]),
+				TestBot.clock(float(sec["без фокуса"]))])
+		for e in bot.interruptions:
+			var pw: Dictionary = e.get("power", {})
+			L.append("    · %s — %s %s, шаг «%s»%s" % [String(e["at"]), String(e["kind"]), TestBot.clock(float(e["sec"])),
+				String(e["step"]), "; " + power_text(pw) if not pw.is_empty() else ""])
+	L.append("  Фоновой работы нет: свёрнутая игра стоит (главный цикл Godot на паузе), тест продолжается при возвращении;"
+		+ " пока свёрнута — уведомление «тест на паузе» с кнопкой «Остановить тест».")
+	if bot.stop_from_notice:
+		L.append("  Остановлен кнопкой «Остановить тест» в уведомлении.")
+	if not bot.resume_cp.is_empty():
+		L.append("  Продолжение запуска %s с контрольной точки «%s» (записана %s): готовое не повторялось."
+			% [bot.origin, String(bot.resume_cp.get("progress", "")), String(bot.resume_cp.get("saved", ""))])
+	if bot.checkpoints > 0:
+		L.append("  Контрольных точек записано: %d, последняя — %s." % [bot.checkpoints, bot.checkpoint_last])
+	elif bot.scenario != null and bot.scenario.resumable():
+		L.append("  Контрольных точек не записано (ни одна часть режима не закончилась).")
+	L.append("  Питание в начале: " + power_text(bot.power_start))
+	L.append("  Питание в конце: " + power_text(bot.power_end))
 	L.append("")
 
 

@@ -92,6 +92,8 @@ var start := {}
 var finish := {}
 
 var _wall0 := 0
+## TestBot.away_total_us в начале прогона: время свёрнутой игры не идёт в часы прогона.
+var _away0 := 0
 var _target: Mob
 var _target_xp := 0
 var _target_t0 := 0.0
@@ -141,6 +143,7 @@ func begin() -> void:
 		p.message.connect(_on_message)
 	start = _snapshot()
 	_wall0 = Time.get_ticks_usec()
+	_away0 = TestBot.away_total_us
 	_clock0 = Util.game_time()
 	bot.note("Кардинал «%s»: профиль «%s», seed %d, ускорение ×%.0f, лимит игрового времени %s" % [title,
 		String(profile["name"]), seed_value, accel, TestBot.clock(game_limit)])
@@ -210,7 +213,7 @@ func _snapshot() -> Dictionary:
 
 
 func wall_sec() -> float:
-	return float(Time.get_ticks_usec() - _wall0) / 1.0e6
+	return float(Time.get_ticks_usec() - _wall0 - (TestBot.away_total_us - _away0)) / 1.0e6
 
 
 func tick(dt: float) -> void:

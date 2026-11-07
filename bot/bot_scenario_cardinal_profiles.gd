@@ -9,6 +9,9 @@ extends BotScenario
 ## доход фарма против заданий) — у каждого: важность, доказательства, диапазон, база сравнения, уверенность, как
 ## повторить, что посмотреть (рекомендация, НЕ применяется). Баланс, данные и сохранения игрока не меняются.
 ## cardinal_profiles.json — в папке запуска.
+## Контрольная точка (фаза 5): после каждого прогона — TestBot.save_checkpoint (выбор запуска и результаты готовых
+## прогонов); игру выгрузила система, бот остановлен перегревом или лимитом — «Продолжить» (resume): выбор того
+## запуска, готовые прогоны не повторяются, в итоге и анализе — все.
 
 ## Отрезки: название, условие конца, старт, лимит игрового времени прогона и оценка (игровые с) для расчёта лимита.
 ## Оценки — по пробному прогону 07.11 (люди, Воин, seed 20261107, ×16): староста — Новичок 5:24, Обычный 1:41,
@@ -40,6 +43,8 @@ static var accel := 8.0
 static var seed_base := 20261107
 
 var runs: Array[CardinalStory] = []
+## Готовые прогоны из контрольной точки (resume): run → результат CardinalStory.result() (после JSON числа — float).
+var prior: Dictionary = {}
 var _analysis := {}
 var _last := {}
 var _notes: PackedStringArray = PackedStringArray()
@@ -107,7 +112,74 @@ static func validate() -> String:
 ## Лимит режима — вдвое больше оценки: на телефоне ускорение ниже заданного (упирается в процессор), оценка
 ## считает его до ×5 (×1.6 к игровому времени / ускорение).
 func limit() -> float:
-	return maxf(10.0, estimate_min() * 2.0) * 60.0
+	var total := maxi(1, chosen.size() * seeds)
+	var left := maxi(1, total - prior.size())
+	return maxf(10.0, estimate_min() * 2.0 * float(left) / float(total)) * 60.0
+
+
+func resumable() -> bool:
+	return true
+
+
+## Продолжение: выбор того запуска (профили, отрезок, прогоны, раса, профессия, ускорение, seed) и готовые прогоны.
+func resume(data: Dictionary) -> String:
+	var st: Variant = data.get("settings", null)
+	var res: Variant = data.get("results", null)
+	if not (st is Dictionary) or not (res is Array):
+		return "в контрольной точке нет выбора или результатов прогонов"
+	var sd: Dictionary = st
+	var ch: Array = sd.get("profiles", [])
+	if ch.is_empty():
+		return "в контрольной точке нет профилей"
+	for pid in ch:
+		if not CardinalProfiles.IDS.has(String(pid)):
+			return "неизвестный профиль «%s»" % String(pid)
+	if not SEGMENTS.has(String(sd.get("segment", ""))):
+		return "неизвестный отрезок «%s»" % String(sd.get("segment", ""))
+	chosen = []
+	for pid in ch:
+		chosen.append(String(pid))
+	segment = String(sd["segment"])
+	seeds = clampi(int(sd.get("seeds", 1)), 1, 10)
+	race = String(sd.get("race", "human"))
+	job = String(sd.get("job", ""))
+	accel = float(sd.get("accel", 8.0))
+	seed_base = int(sd.get("seed_base", seed_base))
+	prior.clear()
+	for r in res:
+		if r is Dictionary and String((r as Dictionary).get("run", "")) != "":
+			prior[String(r["run"])] = r
+	return ""
+
+
+## Прогоны по порядку плана: готовые из контрольной точки и этого запуска (only_done — только законченные).
+func _ordered_results(only_done: bool) -> Array:
+	var by_run: Dictionary = {}
+	for r in runs:
+		by_run[r.run_name] = r
+	var out: Array = []
+	for pid in chosen:
+		for s in seeds:
+			var rn := "%s_%d" % [pid, s + 1]
+			if prior.has(rn):
+				out.append(prior[rn])
+			elif by_run.has(rn):
+				var cr: CardinalStory = by_run[rn]
+				if cr.done or not only_done:
+					out.append(cr.result())
+	return out
+
+
+func _settings_dict() -> Dictionary:
+	return {"profiles": chosen.duplicate(), "segment": segment, "seeds": seeds, "seed_base": seed_base, "race": race,
+		"job": job, "accel": accel}
+
+
+## Контрольная точка после прогона: выбор и результаты готовых прогонов.
+func _checkpoint(bot: TestBot) -> void:
+	var done := _ordered_results(true)
+	bot.save_checkpoint({"settings": _settings_dict(), "results": done}, "прогонов %d из %d" % [done.size(),
+		chosen.size() * seeds])
 
 
 func build(bot: TestBot) -> void:
@@ -116,10 +188,15 @@ func build(bot: TestBot) -> void:
 	for n in _notes:
 		bot.note("Кардинал, профили: " + n)
 	var seg: Dictionary = SEGMENTS.get(segment, SEGMENTS["job"])
+	if not prior.is_empty():
+		bot.note("Кардинал, профили: из контрольной точки — готовых прогонов %d из %d (%s)" % [prior.size(),
+			chosen.size() * seeds, ", ".join(PackedStringArray(prior.keys()))])
 	var k := 0
 	for pid in chosen:
 		for s in seeds:
 			k += 1
+			if prior.has("%s_%d" % [pid, s + 1]):
+				continue
 			var pr := CardinalProfiles.profile(String(pid))
 			var r := CardinalStory.new()
 			r.bot = bot
@@ -140,6 +217,7 @@ func build(bot: TestBot) -> void:
 			bot.section("prof_%s_%d" % [pid, s + 1], r.title)
 			bot.do("Кардинал: прогон «%s»" % r.title, r.begin)
 			bot.wait_until("Кардинал: прогон «%s» закончен" % r.title, func() -> bool: return r.done, r.game_limit + 600.0)
+			bot.do("Кардинал: контрольная точка", _checkpoint.bind(bot))
 	bot.do("Кардинал: профили — итог и подозрения", func() -> void: _summary(bot))
 
 
@@ -169,9 +247,7 @@ func analysis() -> Dictionary:
 # ==================== Итог: метрики, распределения, подозрения ====================
 
 func _summary(bot: TestBot) -> void:
-	var results: Array = []
-	for r in runs:
-		results.append(r.result())
+	var results := _ordered_results(false)
 	var logs: Dictionary = BotReport.log_by_section(bot.log_mark) if bot.log_mark != "" else {}
 	_analysis = analyze(results, logs, {"segment": segment, "accel": accel, "race": race, "job": job_for_run(),
 		"seeds": seeds})
@@ -191,7 +267,8 @@ func _summary(bot: TestBot) -> void:
 	_last = {"version": 1, "game_version": str(ProjectSettings.get_setting("application/config/version", "dev")),
 		"scenario": id(), "settings": {"profiles": chosen, "segment": segment, "segment_name": SEGMENTS[segment]["name"],
 		"seeds": seeds, "seed_base": seed_base, "race": race, "job": job_for_run(), "accel": accel},
-		"profiles": profs, "override_notes": _notes, "runs": results, "analysis": _analysis}
+		"profiles": profs, "override_notes": _notes, "runs": results, "analysis": _analysis,
+		"resumed_runs": PackedStringArray(prior.keys())}
 	var dir := bot.run_dir if bot.run_dir != "" else bot.report_dir
 	DirAccess.make_dir_recursive_absolute(dir)
 	var f := FileAccess.open(dir.path_join("cardinal_profiles.json"), FileAccess.WRITE)
@@ -459,7 +536,9 @@ func summary(_bot: TestBot) -> String:
 	for s in _analysis["suspicions"]:
 		if String((s as Dictionary)["severity"]) == "высокая":
 			hi += 1
-	return "Кардинал, профили: прогонов %d, подозрений %d (высоких %d)" % [runs.size(), (_analysis["suspicions"] as Array).size(), hi]
+	return "Кардинал, профили: прогонов %d%s, подозрений %d (высоких %d)" % [runs.size() + prior.size(),
+		" (из них %d — из контрольной точки)" % prior.size() if not prior.is_empty() else "",
+		(_analysis["suspicions"] as Array).size(), hi]
 
 
 func report_lines(_bot: TestBot) -> PackedStringArray:
@@ -477,11 +556,13 @@ func report_lines(_bot: TestBot) -> PackedStringArray:
 		return out
 	var profiles: Dictionary = _analysis["profiles"]
 	out.append("  Прогоны (игровое время, уровень, сданных заданий, смертей, переносов, опыт/мин, золото в конце (пришло/ушло), прокачка, паузы, зелья выпито/куплено, боёв (брошено), TTK, урон по герою):")
-	for r in runs:
-		var rd := r.result()
+	if not prior.is_empty():
+		out.append("    (* — прогон до перерыва, из контрольной точки)")
+	for rd0 in _ordered_results(false):
+		var rd: Dictionary = rd0
 		var mm := run_metrics(rd)
 		out.append("    %-18s %-26s %s, ур. %d→%d, сдано %d, смертей %d, переносов %d, опыт %.0f/мин, золото %d (+%d/−%d), прокачка %d %%, паузы %d %%, зелья %d/%d, боёв %d (%d), TTK %.1f с, урон %d, ×%.1f" % [
-			String(rd["title"]), String(rd["stop"]).left(26), TestBot.clock(float(mm["game"])), int(mm["level0"]), int(mm["level"]),
+			String(rd["title"]) + (" *" if prior.has(String(rd.get("run", ""))) else ""), String(rd["stop"]).left(26), TestBot.clock(float(mm["game"])), int(mm["level0"]), int(mm["level"]),
 			int(mm["quests"]), int(mm["deaths"]), int(mm["teleports"]), float(mm["xp_min"]), int(mm["gold_end"]), int(mm["gold_in"]),
 			int(mm["gold_out"]), roundi(float(mm["grind_share"]) * 100.0), roundi(float(mm["pause_share"]) * 100.0),
 			int(mm["potions_used"]), int(mm["potions_bought"]), int(mm["fights"]), int(mm["fights_dropped"]), float(mm["ttk"]),
