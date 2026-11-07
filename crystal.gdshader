@@ -7,6 +7,10 @@
 shader_type spatial;
 render_mode unshaded, cull_back, depth_draw_opaque, shadows_disabled;
 
+// Атмосфера (0.46): ночью кристаллы светятся сильнее (atmo_night), свет на землю — NightLights
+global uniform float atmo_night;
+uniform float night_boost = 0.7;
+
 uniform vec4 color : source_color = vec4(0.45, 0.82, 1.0, 1.0);
 uniform vec4 core_color : source_color = vec4(0.16, 0.32, 0.66, 1.0);
 uniform vec4 edge_color : source_color = vec4(0.92, 0.99, 1.0, 1.0);
@@ -35,5 +39,5 @@ void fragment() {
 	float facet = 0.72 + 0.28 * clamp(dot(normalize(v_wn), normalize(vec3(0.35, 0.8, 0.45))), 0.0, 1.0);
 	vec3 body = mix(core_color.rgb, color.rgb, smoothstep(0.0, height_range, v_h)) * facet;
 	vec3 c = mix(body, edge_color.rgb, fres * 0.85);
-	ALBEDO = c * glow * pulse;
+	ALBEDO = c * glow * pulse * (1.0 + atmo_night * night_boost);
 }

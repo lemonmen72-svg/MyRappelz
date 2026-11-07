@@ -81,3 +81,4 @@ test_dungeon_story 15
 test_fixes_040 20
 test_skill_pages 10
 test_catalog 2
+test_atmosphere 10

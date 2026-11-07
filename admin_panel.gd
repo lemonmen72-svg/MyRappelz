@@ -47,7 +47,9 @@ extends RefCounted
 ##   «Питомцы»: "pet_<вид>_<ур.>", "pet_lvl_minus10", "pet_lvl_minus5", "pet_lvl_minus", "pet_lvl_plus", "pet_lvl_plus5",
 ##     "pet_lvl_plus10", "pet_lvl_<1|30|50|60|100|115>", "pet_evolve", "pet_devolve", "pet_xp_up", "pet_full",
 ##     "pet_revive", "pets_clear", "pets_clear_yes", "pets_clear_no";
-##   «Мир»: "kill_target", "kill_around", "respawn_all", "mob_lvl_minus5", "mob_lvl_minus", "mob_lvl_plus",
+##   «Мир»: "time_<0|5|6|9|12|17|18|21>", "time_speed_<1|10|60>", "time_freeze", "time_reset", "weather_auto",
+##     "weather_<clear|cloudy|rain|storm|mist>" (время и погода — WorldClock, Weather; на эту игру),
+##     "kill_target", "kill_around", "respawn_all", "mob_lvl_minus5", "mob_lvl_minus", "mob_lvl_plus",
 ##     "mob_lvl_plus5", "mob_lvl_hero", "spawn_<вид>", "speed_<1|2|3>", "loc_island", "loc_dungeon" (go_location),
 ##     "editor_start", "editor_share", "editor_reset", "editor_reset_yes", "editor_reset_no" (DungeonEditor), "tp_poi_<id>", "tp_zone_<id>" (teleports());
 ##   «Тест-бот»: "bot_mode_<id>" (BotScenario.MODES; «скоро» — недоступны), "bot_sec_<раздел>" (режим «По разделам»:
@@ -756,6 +758,26 @@ static func _pet(main: Node) -> Pet:
 # ---------- Вкладка «Мир» ----------
 
 static func _build_world(main: Node, body: VBoxContainer) -> void:
+	# Время и погода (0.46, атмосфера): час, скорость времени, своя погода — только на эту игру
+	_head(body, "Время и погода: " + Atmosphere.status_text())
+	body.add_child(_text("Сутки — 24 минуты (минута — час), время и погода у всех игроков одни и те же. Здесь — "
+		+ "своё только на эту игру: поставить час, ускорить время, выбрать погоду.", UiScale.FONT_SMALL, MUTED))
+	var tr := _row(body)
+	for hh in [0, 5, 6, 9, 12, 17, 18, 21]:
+		var h := int(hh)
+		_btn(tr, "time_%d" % h, "%02d:00" % h, func() -> void: AdminPanel.set_time(main, float(h)), 70.0)
+	var sr2 := _row(body)
+	for v in [1, 10, 60]:
+		var sp := int(v)
+		_choice(sr2, "time_speed_%d" % sp, "Время ×%d" % sp, not WorldClock.frozen and roundi(WorldClock.speed) == sp,
+			func() -> void: AdminPanel.set_time_speed(main, float(sp)))
+	_choice(sr2, "time_freeze", "Остановить", WorldClock.frozen, func() -> void: AdminPanel.toggle_time_freeze(main))
+	_btn(sr2, "time_reset", "Как у всех", func() -> void: AdminPanel.reset_time(main), 120.0)
+	var wg := _grid(body, 3)
+	_choice(wg, "weather_auto", "Погода по расписанию", Weather.force == "", func() -> void: AdminPanel.set_weather(main, ""))
+	for wid in Weather.ORDER:
+		var ww := String(wid)
+		_choice(wg, "weather_" + ww, Weather.state_name(ww), Weather.force == ww, func() -> void: AdminPanel.set_weather(main, ww))
 	_head(body, "Звери")
 	var kr := _row(body)
 	_btn(kr, "kill_target", "Убить цель", func() -> void: AdminPanel.kill_target(main))
@@ -1404,6 +1426,43 @@ static func _build_bot_profiles(main: Node, body: VBoxContainer) -> void:
 static func _reopen(main: Node) -> void:
 	if is_open(main):
 		open(main)
+
+
+## Время и погода (админ-панель «Мир», только на эту игру).
+static func set_time(main: Node, h: float) -> void:
+	WorldClock.frozen = false
+	WorldClock.set_hour(h)
+	_reopen(main)
+
+
+static func set_time_speed(main: Node, sp: float) -> void:
+	var h := WorldClock.hour()
+	WorldClock.frozen = false
+	WorldClock.speed = sp
+	WorldClock.set_hour(h)
+	_reopen(main)
+
+
+static func toggle_time_freeze(main: Node) -> void:
+	if WorldClock.frozen:
+		var h := WorldClock.frozen_hour
+		WorldClock.frozen = false
+		WorldClock.set_hour(h)
+	else:
+		WorldClock.frozen_hour = WorldClock.hour()
+		WorldClock.frozen = true
+	_reopen(main)
+
+
+static func reset_time(main: Node) -> void:
+	WorldClock.reset()
+	Weather.force = ""
+	_reopen(main)
+
+
+static func set_weather(main: Node, id: String) -> void:
+	Weather.force = id
+	_reopen(main)
 
 
 static func set_bot_accel(main: Node, k: int) -> void:

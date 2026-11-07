@@ -19,6 +19,12 @@
 shader_type spatial;
 render_mode cull_disabled;
 
+// Атмосфера (0.46): после дождя земля темнеет и блестит (atmo_wet), в дождь — лужи на дорогах (тёмные пятна с
+// отблеском неба), вспышка молнии подсвечивает (atmo_flash).
+global uniform float atmo_wet;
+global uniform float atmo_flash;
+global uniform vec4 atmo_sky_color;
+
 uniform vec3 dirt_light : source_color = vec3(0.80, 0.64, 0.44);
 uniform vec3 dirt_dark : source_color = vec3(0.66, 0.50, 0.34);
 uniform vec3 road_edge : source_color = vec3(0.54, 0.41, 0.28);
@@ -293,6 +299,15 @@ void fragment() {
 	// --- Под водой: дно темнеет и зеленеет с глубиной (видно сквозь полупрозрачную воду)
 	float depth = -above;
 	col = mix(col, bed_deep, smoothstep(0.15, 3.2, depth) * 0.85);
+
+	// --- Мокрая земля после дождя: темнее, на ровных дорогах — лужи (отблеск цвета неба)
+	if (atmo_wet > 0.01) {
+		col *= 1.0 - 0.32 * atmo_wet * smoothstep(0.0, 0.15, above + 0.1);
+		float flat_k = smoothstep(0.9, 0.98, ny);
+		float puddle = smoothstep(0.62, 0.7, n3 * 0.5 + 0.5) * flat_k * max(road_m, plaza_m) * atmo_wet;
+		col = mix(col, atmo_sky_color.rgb * 0.55 + vec3(0.04), puddle * 0.7);
+	}
+	col += vec3(0.5, 0.55, 0.75) * atmo_flash * 0.25;
 
 	ALBEDO = col;
 }

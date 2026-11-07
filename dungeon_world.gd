@@ -76,6 +76,7 @@ func build(rng: RandomNumberGenerator) -> void:
 	var t2 := Time.get_ticks_msec()
 	DungeonWater.build(self)
 	DungeonProps.build(self, rng)
+	_build_atmo_fx()
 	var t3 := Time.get_ticks_msec()
 	_build_dungeon_mesh()
 	print("Подземелье: сетка %d мс, рельеф и мосты %d мс, вода и объекты %d мс, меш %d мс" % [t1 - t0, t2 - t1, t3 - t2,
@@ -83,6 +84,44 @@ func build(rng: RandomNumberGenerator) -> void:
 	# Остров кладёт сюда следы построек и мелочей (жители, находки, путь Кардинала ищут их) — у подземелья пусто
 	set_meta("poi_footprints", [])
 	set_meta("poi_props", [])
+
+
+## Атмосфера подземелья (0.46): пламя факелов, жаровен, свечей (FireFx), свет огней и кристаллов (NightLights —
+## пул ближайших), изумрудная дымка над зелёными озёрами у алтаря (HazeFx «emerald»), чёрная магическая — над
+## озером, где корабль капитана («abyss»), и над каналом — лёгкая изумрудная.
+func _build_atmo_fx() -> void:
+	var nl := NightLights.new()
+	add_child(nl)
+	var ff := FireFx.new()
+	add_child(ff)
+	for f in get_meta("dg_fires", []):
+		var fd: Dictionary = f
+		ff.add(fd["pos"], float(fd["size"]), fd["color"], String(fd["kind"]))
+		nl.add((fd["pos"] as Vector3) + Vector3(0.0, float(fd["size"]) * 0.7, 0.0), fd["color"],
+			7.5 if String(fd["kind"]) == "brazier" else 6.0, 1.2 if String(fd["kind"]) == "brazier" else 0.9, "fire")
+	ff.build()
+	for g in get_meta("dg_glows", []):
+		var gd: Dictionary = g
+		nl.add(gd["pos"], gd["color"], float(gd["range"]), float(gd["energy"]), String(gd["kind"]))
+	var hz := HazeFx.new()
+	add_child(hz)
+	for wt in cfg.get("water", []):
+		var wd: Dictionary = wt
+		var id := String(wd.get("id", ""))
+		if String(wd.get("shape", "")) == "ellipse":
+			var c := IslandWorld.v2(wd["center"])
+			var r := IslandWorld.v2(wd["radius"])
+			var kind := "abyss" if id == "lake" else "emerald"
+			hz.add(kind, Vector3(c.x, water_y, c.y), r * 2.2)
+		elif String(wd.get("shape", "")) == "path":
+			var pts: Array = wd.get("points", [])
+			for i in range(1, pts.size()):
+				var a := IslandWorld.v2(pts[i - 1])
+				var b := IslandWorld.v2(pts[i])
+				var n := maxi(1, ceili(a.distance_to(b) / 14.0))
+				for k in n:
+					var p := a.lerp(b, (float(k) + 0.5) / float(n))
+					hz.add("emerald", Vector3(p.x, water_y, p.y), Vector2(14.0, float(wd.get("width", 6.0)) * 1.8))
 
 
 func _load_dungeon_config() -> void:
@@ -734,6 +773,10 @@ func _dungeon_environment() -> void:
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.directional_shadow_max_distance = 45.0
 	add_child(sun)
+	# Атмосфера подземелья (0.46): неба и дождя нет, огни и кристаллы — как ночью
+	var atmo := Atmosphere.new()
+	atmo.setup_dungeon(env, sun)
+	add_child(atmo)
 
 
 func _build_dungeon_mesh() -> void:

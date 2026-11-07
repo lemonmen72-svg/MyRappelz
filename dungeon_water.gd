@@ -46,6 +46,13 @@ static func build(world: DungeonWorld) -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://dungeon_water.gdshader")
 	mat.set_shader_parameter("rich", Quality.rich_shaders())
+	# Озеро босса (корабль капитана) — чернее, свечение фиолетово-изумрудное (0.46)
+	for wt in world.cfg.get("water", []):
+		var wd: Dictionary = wt
+		if String(wd.get("id", "")) == "lake" and String(wd.get("shape", "")) == "ellipse":
+			var c := IslandWorld.v2(wd["center"])
+			var r := IslandWorld.v2(wd["radius"])
+			mat.set_shader_parameter("abyss_area", Vector4(c.x, c.y, r.x, r.y))
 	material = mat
 	var mi := MeshInstance3D.new()
 	mi.name = "Water"

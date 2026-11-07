@@ -26,6 +26,21 @@ const SOLID := ["dg_spire", "dg_crag", "dg_moss_stones", "dg_amethyst_spires", "
 	"dg_cannon", "dg_relics", "dg_hoard", "dg_brazier", "dg_siren",
 	"dg_helm", "dg_leviathan", "dg_cavern", "dg_cliffs", "dg_dripstone"]
 const MAX_LIGHTS := 10
+## Огни (0.46, атмосфера): модели с пламенем — id → [вид огня FireFx, цвет FireFx.COLORS, высота пламени, м]
+## (у основания — точка «glow» модели); свет ночью — NightLights (пул ближайших вместо прежних 10 постоянных).
+const FIRES := {
+	"dg_torch": ["torch", "warm", 0.42], "dg_brazier": ["brazier", "warm", 0.7], "dg_cauldron": ["camp", "warm", 0.55],
+	"dg_witch_brazier": ["brazier", "emerald", 0.75], "dg_candles": ["torch", "emerald", 0.22],
+}
+## Светящиеся модели без пламени: id → [цвет, радиус света, сила, вид "crystal" / "lamp"].
+const GLOWS := {
+	"dg_crystal_blue": [Color(0.4, 0.75, 1.0), 7.0, 1.0, "crystal"], "dg_crystal_purple": [Color(0.72, 0.4, 1.0), 7.0, 1.0, "crystal"],
+	"dg_glowcaps": [Color(0.4, 0.8, 1.0), 5.5, 0.8, "crystal"], "dg_coral": [Color(0.35, 0.85, 1.0), 4.5, 0.6, "crystal"],
+	"dg_coral_altar": [Color(0.35, 1.0, 0.55), 14.0, 2.0, "crystal"], "dg_crypt_altar": [Color(0.35, 1.0, 0.55), 8.0, 1.2, "crystal"],
+	"dg_spiral": [Color(0.35, 1.0, 0.55), 10.0, 1.4, "crystal"], "dg_rune_arch": [Color(0.35, 1.0, 0.55), 8.0, 1.2, "crystal"],
+	"dg_lantern": [Color(1.0, 0.7, 0.35), 6.0, 0.9, "lamp"], "dg_harbor_post": [Color(1.0, 0.7, 0.35), 7.0, 1.0, "lamp"],
+	"dg_chest_open": [Color(1.0, 0.8, 0.35), 6.0, 0.9, "lamp"],
+}
 ## Модель моста на настил мостов и мостков, насколько опустить её (доски модели — у её основания), м.
 const BRIDGE_PROP := "dg_rope_bridge"
 const BRIDGE_SINK := 0.33
@@ -70,6 +85,8 @@ static func build(world: DungeonWorld, _rng: RandomNumberGenerator) -> void:
 	holder.add_child(fallback)
 	var lights := 0
 	var placed := 0
+	var fires: Array = []
+	var glows: Array = []
 	# Раскладка редактора объектов у администратора (DungeonEditor.props_for), иначе world/dungeon.json "props"
 	for e in DungeonEditor.props_for(world):
 		var a: Array = e
@@ -82,9 +99,17 @@ static func build(world: DungeonWorld, _rng: RandomNumberGenerator) -> void:
 		var sy := float(a[6]) if a.size() > 6 else 1.0
 		_place(world, holder, fallback, zones, id, pos, yaw, s, SOLID.has(id), sy, tilt_of(a))
 		placed += 1
-		if LIGHTS.has(id) and lights < MAX_LIGHTS:
-			_light(holder, id, pos, s)
-			lights += 1
+		# Огни и свечение (0.46): точка «glow» модели в мире; свет ночью — пул NightLights
+		if FIRES.has(id) or GLOWS.has(id):
+			var xf := Transform3D(Basis(Vector3.UP, yaw) * tilt_of(a) * Basis.from_scale(Vector3(s, s * sy, s)), pos)
+			var gp := xf * (PropAsset.marker(id, "glow", Vector3(0, 0.8, 0)) if PropAsset.has(id) else Vector3(0, 0.8, 0))
+			if FIRES.has(id):
+				var fd: Array = FIRES[id]
+				fires.append({"pos": gp, "size": float(fd[2]) * s, "color": FireFx.color_of(String(fd[1])), "kind": String(fd[0])})
+			else:
+				var g: Array = GLOWS[id]
+				glows.append({"pos": gp + Vector3(0, 0.3, 0), "color": g[0], "range": float(g[1]) * s, "energy": float(g[2]),
+					"kind": String(g[3])})
 	# Мосты — свои меши участков (редактор объектов DungeonEditor прячет склеенные объекты, мосты остаются)
 	var bridge_zones := {}
 	placed += _bridge_decks(world, holder, fallback, bridge_zones)
@@ -94,6 +119,8 @@ static func build(world: DungeonWorld, _rng: RandomNumberGenerator) -> void:
 		_zone_mesh(holder, bridge_zones[key], "Bridges")
 	holder.set_meta("placed", placed)
 	holder.set_meta("lights", lights)
+	world.set_meta("dg_fires", fires)
+	world.set_meta("dg_glows", glows)
 
 
 ## Точка основания записи раскладки: 6-е поле — сдвиг по высоте от рельефа, а при 8-м поле 1 — точная высота в

@@ -6,6 +6,7 @@ test_anathema
 test_anim_system
 test_asset_fallback
 test_asset_pack
+test_atmosphere
 test_bags
 test_balance_start
 test_bot

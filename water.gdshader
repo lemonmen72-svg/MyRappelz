@@ -4,6 +4,9 @@
 // Глубина и расстояние до берега берутся из текстуры данных (без текстуры глубины экрана —
 // её нет в GL Compatibility): R — расстояние до берега, G — глубина, B — пена у камней.
 // Пена ступенчатая (чёткие края), лёгкие волны в вершинах, линии бликов, искры солнца, френель.
+// Атмосфера (0.46): свет и блики — от солнца или луны (atmo_sun_dir, atmo_sun_color), отражение — цвет неба у
+// горизонта (atmo_sky_color), ночью вода темнеет и синеет (atmo_night), мелкая рябь (детали нормали), на дожде —
+// круги от капель (atmo_rain), вспышка молнии (atmo_flash).
 shader_type spatial;
 render_mode blend_mix, depth_draw_never, cull_disabled, unshaded, shadows_disabled, world_vertex_coords;
 
@@ -28,6 +31,12 @@ uniform float flow_speed = 1.0;
 // false — облегчённый режим для слабых пресетов (Quality): 2 шума на пиксель вместо ~10,
 // без линий бликов, штрихов течения, рваных полос прибоя и искр солнца.
 uniform bool rich = true;
+global uniform float atmo_night;
+global uniform float atmo_rain;
+global uniform float atmo_flash;
+global uniform vec3 atmo_sun_dir;
+global uniform vec4 atmo_sun_color;
+global uniform vec4 atmo_sky_color;
 
 varying vec3 v_pos;
 varying vec3 v_nrm;
@@ -135,23 +144,57 @@ void fragment() {
 	col = mix(col, foam_color, fa);
 	alpha = max(alpha, max(fm * 0.95, soft));
 
-	// --- Френель (отражение неба под углом), широкий отблеск и искры солнца
+	// --- День и ночь: ночью вода темнее и синее, на заре — отсвет солнца
+	float night = clamp(atmo_night, 0.0, 1.0);
+	col *= mix(vec3(1.0), vec3(0.17, 0.24, 0.42), night * 0.88);
+	vec3 sun_c = atmo_sun_color.rgb;
+	vec3 sdir = length(atmo_sun_dir) > 0.01 ? normalize(atmo_sun_dir) : normalize(sun_dir);
+
+	// --- Мелкая рябь: детали нормали (два слоя шума навстречу); на дожде — круги от капель
+	vec3 N0 = v_nrm;
+	if (rich) {
+		vec2 rq = p * 1.7;
+		float e = 0.35;
+		float h0 = wt_noise(rq + vec2(t * 0.55, t * 0.32));
+		float hx = wt_noise(rq + vec2(e, 0.0) + vec2(t * 0.55, t * 0.32));
+		float hz = wt_noise(rq + vec2(0.0, e) + vec2(t * 0.55, t * 0.32));
+		float g0 = wt_noise(rq * 1.9 - vec2(t * 0.4, t * 0.6) + 4.1);
+		float gx = wt_noise(rq * 1.9 + vec2(e, 0.0) - vec2(t * 0.4, t * 0.6) + 4.1);
+		N0 = normalize(v_nrm + vec3((h0 - hx) + (g0 - gx) * 0.6, 0.0, (h0 - hz)) * 0.55);
+	}
+	float rings = 0.0;
+	if (atmo_rain > 0.02) {
+		vec2 cell = floor(p / 1.3);
+		vec2 f = p / 1.3 - cell;
+		float hc = wt_hash(cell);
+		vec2 cpos = vec2(wt_hash(cell + 3.7), wt_hash(cell + 9.1)) * 0.6 + 0.2;
+		float ph = fract(t * (0.8 + hc * 0.6) + hc);
+		float d = length(f - cpos);
+		float ring = 1.0 - smoothstep(0.0, 0.05, abs(d - ph * 0.42));
+		rings = ring * (1.0 - ph) * step(1.0 - atmo_rain * 0.85, wt_hash(cell + floor(t * (0.8 + hc * 0.6) + hc) * 0.17));
+		col = mix(col, foam_color * mix(1.0, 0.35, night), rings * 0.45 * (1.0 - fm));
+	}
+
+	// --- Френель (отражение неба под углом), широкий отблеск и искры солнца или луны
 	vec3 cam = INV_VIEW_MATRIX[3].xyz;
 	vec3 V = normalize(cam - v_pos);
-	float fres = pow(1.0 - clamp(dot(V, v_nrm), 0.0, 1.0), 4.0);
-	col = mix(col, sky_color, fres * 0.55 * (1.0 - fm));
+	float fres = pow(1.0 - clamp(dot(V, N0), 0.0, 1.0), 4.0);
+	vec3 refl = mix(sky_color, atmo_sky_color.rgb * 1.15, 0.85);
+	col = mix(col, refl, fres * 0.55 * (1.0 - fm));
 	alpha = mix(alpha, 1.0, fres * 0.6);
-	vec3 H = normalize(normalize(sun_dir) + V);
-	float wide = pow(clamp(dot(v_nrm, H), 0.0, 1.0), 40.0);
-	col += glint_color * wide * 0.18 * (1.0 - fm);
+	vec3 H = normalize(sdir + V);
+	float wide = pow(clamp(dot(N0, H), 0.0, 1.0), 40.0);
+	vec3 gl = glint_color * clamp(sun_c * 1.4, vec3(0.08), vec3(1.2));
+	col += gl * wide * 0.2 * (1.0 - fm) * step(0.0, sdir.y);
 	if (rich) {
 		vec2 nn = vec2(wt_noise(p * 0.9 + t * 0.4), wt_noise(p * 0.9 - t * 0.35 + 3.3)) - 0.5;
-		vec3 N = normalize(v_nrm + vec3(nn.x, 0.0, nn.y) * 0.35);
+		vec3 N = normalize(N0 + vec3(nn.x, 0.0, nn.y) * 0.35);
 		float spec = pow(clamp(dot(N, H), 0.0, 1.0), 220.0);
-		float glint = smoothstep(0.35, 0.45, spec) * (1.0 - fm);
-		col = mix(col, glint_color, glint);
+		float glint = smoothstep(0.35, 0.45, spec) * (1.0 - fm) * step(0.0, sdir.y);
+		col = mix(col, gl, glint);
 		alpha = max(alpha, glint);
 	}
+	col += vec3(0.6, 0.65, 0.85) * atmo_flash * 0.35;
 
 	ALBEDO = col;
 	ALPHA = clamp(alpha, 0.0, 1.0);

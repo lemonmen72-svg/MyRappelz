@@ -113,6 +113,63 @@ func build(rng: RandomNumberGenerator) -> void:
 	# который меш рельефа пишет в UV2.x вершин (лесная подстилка в island_terrain.gdshader)
 	IslandVegetation.build(self, rng)
 	_build_terrain_mesh()
+	_build_atmo_fx()
+
+
+# ---------- Атмосфера: огни, ночной свет, туман у воды (0.46) ----------
+
+## Огни построек (IslandPois: мета poi_fires — пламя, poi_lights — фонари, кристаллы) → FireFx и NightLights;
+## туман у воды (HazeFx «mist», по погоде) — вдоль русел реки, над прудом.
+func _build_atmo_fx() -> void:
+	var nl := NightLights.new()
+	add_child(nl)
+	var ff := FireFx.new()
+	add_child(ff)
+	for f in get_meta("poi_fires", []):
+		var fd: Dictionary = f
+		ff.add(fd["pos"], float(fd["size"]), fd["color"], String(fd.get("kind", "torch")))
+		nl.add((fd["pos"] as Vector3) + Vector3(0.0, float(fd["size"]) * 0.6, 0.0), fd["color"],
+			6.5 if String(fd.get("kind", "")) != "camp" else 9.0, 1.4 if String(fd.get("kind", "")) == "camp" else 1.0, "fire")
+	ff.build()
+	for l in get_meta("poi_lights", []):
+		var ld: Dictionary = l
+		nl.add(ld["pos"], ld["color"], float(ld.get("range", 6.0)), float(ld.get("energy", 0.8)), String(ld.get("kind", "lamp")))
+	# Гроза: удар молнии вдали при вспышке (Atmosphere — вспышка неба и света)
+	if Atmosphere.current != null:
+		Atmosphere.current.on_strike(_distant_strike)
+	var hz := HazeFx.new()
+	add_child(hz)
+	# Река: пятна тумана вдоль русел через ~16 м; пруд — одно пятно
+	for branch in cfg.get("river", {}).get("branches", []):
+		var pts: Array = branch
+		var carry := 0.0
+		for i in range(1, pts.size()):
+			var a := v2(pts[i - 1])
+			var b := v2(pts[i])
+			var seg := a.distance_to(b)
+			var t := carry
+			while t < seg:
+				var p := a.lerp(b, t / seg)
+				hz.add("mist", Vector3(p.x, river_level + 0.1, p.y), Vector2(20.0, 20.0))
+				t += 16.0
+			carry = t - seg
+	for pd in cfg.get("ponds", []):
+		var c := v2(pd["center"])
+		var r := float(pd.get("radius", 6.0))
+		hz.add("mist", Vector3(c.x, float(pd.get("water_level", 0.0)) + 0.1, c.y), Vector2(r * 2.8, r * 2.8))
+
+
+## Молния с неба в 45–85 м от камеры (эффект StormFX, как у умений «Молния с неба»).
+func _distant_strike() -> void:
+	var vp := get_viewport()
+	var cam := vp.get_camera_3d() if vp != null else null
+	if cam == null:
+		return
+	var a := randf() * TAU
+	var d := randf_range(45.0, 85.0)
+	var p := cam.global_position + Vector3(cos(a), 0.0, sin(a)) * d
+	var g := Vector3(p.x, height_at(p.x, p.z), p.z)
+	VfxKit.sky_strike(self, VfxArchetypes.PALETTES["storm"], "storm", g, 3.0, 70.0, 1, 0.0, 0.5)
 
 
 # ---------- Конфиг и сетка ----------

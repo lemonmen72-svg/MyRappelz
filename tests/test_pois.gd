@@ -91,7 +91,15 @@ func run_step() -> void:
 				var pen := IslandWorld.v2(w.poi("sheep_pen")["center"])
 				check(Vector2(sheep.position.x, sheep.position.z).distance_to(pen) < float(w.poi("sheep_pen").get("radius", 5.0)),
 					"овца внутри загона")
-			check(pois.find_child("Flames", true, false) is MultiMeshInstance3D, "огни пещеры и лагерей")
+			# Огни (0.46): пламя факелов пещеры, костров лагерей и жаровен — FireFx (один MultiMesh), свет — NightLights
+			var ff := FireFx.current
+			check(ff != null and ff.fires.size() >= 5 and ff.mmi != null and ff.mmi.multimesh.instance_count == ff.fires.size(),
+				"огни пещеры, лагерей и жаровен: %d" % (ff.fires.size() if ff != null else 0))
+			var camps := 0
+			for f in ff.fires if ff != null else []:
+				if String(f["kind"]) == "camp":
+					camps += 1
+			check(camps >= 2, "костры лагерей: %d" % camps)
 			check(PoiModels.get_mesh("light_elf_house").get_surface_count() >= 2, "модель дома: несколько поверхностей")
 			# Анимации идут только рядом с камерой: переносим игрока в деревню людей у мельницы
 			main.player.global_position = w.spawn_point("human")

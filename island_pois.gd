@@ -82,6 +82,10 @@ var moved := {}
 ## Зоны склейки мешей и текущая (куда идут модели строящегося POI).
 var zones: Array[Zone] = []
 var _zone: Zone
+## Огни (0.46, атмосфера): пламя {pos, size, color, kind} и свет ореолов {pos, color, range, energy, kind} в
+## координатах мира — меты острова poi_fires и poi_lights (IslandWorld._build_atmo_fx: FireFx, NightLights).
+var fires: Array = []
+var lights: Array = []
 ## Общий меш полотнища флажка.
 var _flag_cloth: ArrayMesh
 
@@ -156,6 +160,8 @@ func _build(world: IslandWorld) -> void:
 	_finish_zones()
 	w.set_meta("poi_footprints", footprints)
 	w.set_meta("poi_props", small_props)
+	w.set_meta("poi_fires", fires)
+	w.set_meta("poi_lights", lights)
 
 
 # ---------- Места: занятость, проверки, поиск ----------
@@ -441,13 +447,19 @@ func _prop(parent: Node3D, kind: String, p: Vector2, yaw: float, col_r: float = 
 ## Ореол-свечение (аддитивное пятно лицом к камере) — дешёвая замена bloom у кристаллов и огней.
 ## Все ореолы зоны — одна поверхность меша мелочей (разворот к камере в шейдере).
 func _halo(parent: Node3D, pos: Vector3, c: Color, size: float) -> void:
-	var p := _zone.inv * (_world_xf(parent) * pos)
+	var wp := _world_xf(parent) * pos
+	var p := _zone.inv * wp
 	_zone.near.halo(p, c, snappedf(size, 0.1))
+	# Свет ореола ночью (NightLights): холодный — кристалл (пульсирует), тёплый — фонарь
+	lights.append({"pos": wp, "color": Color(c.r, c.g, c.b), "range": clampf(size * 3.0, 4.0, 14.0),
+		"energy": 0.5 + c.a, "kind": "crystal" if c.b > c.r * 0.9 else "lamp"})
 
 
-## Огонь (мерцает): экземпляр MultiMesh огней зоны; parent и local — как у _put.
-func _flame(parent: Node3D, local: Transform3D) -> void:
-	_zone.flames.append(_zone.inv * _world_xf(parent) * local)
+## Огонь (0.46): пламя FireFx (шейдер к камере, свой цвет) и его свет ночью; parent и local — как у _put
+## (масштаб local по Y — высота пламени: 1 — костёр). kind "camp" — костёр (дым), иначе факел или жаровня.
+func _flame(parent: Node3D, local: Transform3D, kind: String = "torch", color: Color = FireFx.COLORS["warm"]) -> void:
+	var xf := _world_xf(parent) * local
+	fires.append({"pos": xf.origin, "size": 0.95 * xf.basis.get_scale().y, "color": color, "kind": kind})
 
 
 # ---------- Зоны: склейка мешей ----------
@@ -1026,6 +1038,8 @@ func _dark_elf_village(h: Node3D, poi: Dictionary) -> void:
 		if bp.is_finite():
 			var b := _prop(h, "brazier_dark", bp, 0.0, 0.55, 2.2)
 			_halo(b, _lamp("brazier_dark", Vector3(0, 2.0, 0)) + Vector3(0, 0.3, 0), Color(0.75, 0.4, 1.0, 0.5), 1.4)
+			_flame(b, _xf(_lamp("brazier_dark", Vector3(0, 2.0, 0)) - Vector3(0, 0.15, 0), 0.0, Vector3(0.6, 0.75, 0.6)),
+				"brazier", FireFx.COLORS["violet"])
 	_dark_fog(h, c, r)
 
 
@@ -1564,7 +1578,7 @@ func _camp(h: Node3D, poi: Dictionary) -> void:
 	fire.position = w.ground(c.x, c.y, -0.03)
 	h.add_child(fire)
 	_put(fire, "campfire", Transform3D.IDENTITY, true)
-	_flame(fire, _xf(Vector3(0, 0.1, 0)))
+	_flame(fire, _xf(Vector3(0, 0.1, 0), 0.0, Vector3(1.2, 1.25, 1.2)), "camp", FireFx.COLORS["camp"])
 	_halo(fire, Vector3(0, 0.7, 0), Color(1.0, 0.6, 0.25, 0.65), 2.6)
 	var sparks := CPUParticles3D.new()
 	sparks.name = "Sparks"

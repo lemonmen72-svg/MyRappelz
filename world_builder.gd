@@ -94,7 +94,8 @@ static func _build_environment(root: Node3D) -> void:
 	var env := Environment.new()
 	var sky := Sky.new()
 	var sm := ShaderMaterial.new()
-	sm.shader = load("res://sky.gdshader")
+	# Небо атмосферы (0.46): день и ночь, погода — Atmosphere (atmo/atmosphere.gd)
+	sm.shader = load("res://atmo/atmo_sky.gdshader")
 	sky.sky_material = sm
 	sky.radiance_size = Sky.RADIANCE_SIZE_32
 	env.background_mode = Environment.BG_SKY
@@ -125,6 +126,13 @@ static func _build_environment(root: Node3D) -> void:
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.directional_shadow_max_distance = 55.0
 	root.add_child(sun)
+	# Атмосфера: смена дня и ночи (сутки 24 мин), погода, туман, дождь (0.46)
+	var atmo := Atmosphere.new()
+	atmo.setup(env, sun, sm)
+	root.add_child(atmo)
+	var rain := RainFx.new()
+	root.add_child(rain)
+	atmo.rain_fx = rain
 
 
 static func _shader_mat(path: String) -> ShaderMaterial:

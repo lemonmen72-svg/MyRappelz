@@ -30,15 +30,17 @@ const HALO_SHADER_CODE := """
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled, skip_vertex_transform;
 
+// Ночью (атмосфера 0.46, atmo_night) ореолы фонарей и кристаллов ярче и шире
+global uniform float atmo_night;
 uniform sampler2D dot_tex : hint_default_white, filter_linear;
 
 void vertex() {
-	VERTEX = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz + vec3((UV - vec2(0.5)) * UV2.x, 0.0);
+	VERTEX = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz + vec3((UV - vec2(0.5)) * UV2.x * (1.0 + 0.4 * atmo_night), 0.0);
 }
 
 void fragment() {
 	ALBEDO = COLOR.rgb;
-	ALPHA = COLOR.a * texture(dot_tex, UV).a;
+	ALPHA = COLOR.a * texture(dot_tex, UV).a * (0.55 + 0.85 * atmo_night);
 }
 """
 
