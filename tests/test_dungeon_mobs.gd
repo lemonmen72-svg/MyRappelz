@@ -69,15 +69,16 @@ func _data() -> void:
 	check(MobStats.is_magic("dg_bone_oracle") and not MobStats.is_magic("dg_goblin"), "жрецы бьют магией, гоблины — нет")
 
 
-## Сила обычного — как у босса острова того же уровня (боссы острова: power 1.5, BOSS_*); мини-босс — HP ×2.
+## Сила обычного — как у босса острова того же уровня (боссы острова: power 1.5, BOSS_*); мини-босс — HP ×2; у всех
+## монстров подземелья HP ×0.85 (MobStats.DUNGEON_HP_CUT, решение Максима 07.11).
 func _strength() -> void:
 	for id in ["dg_goblin", "dg_sailor", "dg_wight", "dg_coral_corsair", "dg_goblin_chief", "dg_dead_knight"]:
 		var lv := int(MobData.get_type(id)["level"])
 		var m := MobStats.derived(id, lv)
 		var b := MobStats.derived("boss_wolf", lv)
-		var k := 2.0 if MINI.has(id) else 1.0
+		var k := (2.0 if MINI.has(id) else 1.0) * 0.85
 		var hp_ratio := float(m["max_hp"]) / float(b["max_hp"])
-		check(absf(hp_ratio - k) < 0.02, "%s ур. %d: HP %d = босс острова ×%.0f (%d)" % [id, lv, m["max_hp"], k, b["max_hp"]])
+		check(absf(hp_ratio - k) < 0.02, "%s ур. %d: HP %d = босс острова ×%.2f (%d)" % [id, lv, m["max_hp"], k, b["max_hp"]])
 		check(absf(float(m["patk"]) / float(b["patk"]) - 1.0) < 0.05, "%s: физ. атака как у босса (%d / %d)" % [id, m["patk"], b["patk"]])
 		check(absf(float(m["xp"]) / float(b["xp"]) - 1.0) < 0.05, "%s: опыт как у босса (%d / %d)" % [id, m["xp"], b["xp"]])
 		print("ПОДЗЕМЕЛЬЕ %s ур. %d: HP %d, атака %d, маг. %d, защита %d, опыт %d" % [id, lv, m["max_hp"], m["patk"],

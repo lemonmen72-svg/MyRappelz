@@ -3,6 +3,7 @@ extends BotSection
 ## (кнопка HUD) ставит метку, герой побеждает зверя обычными атаками — успех подставлен (Taming.force_roll = 0):
 ## пустая карта стала картой с душой; формирование (как в карточке карты) — существо 1-го уровня в коллекции,
 ## призвано. Полный проход — ещё неудача с зеркальной картой в сумке: ломается зеркальная, карта вида цела.
+## Добыча с фазанов (бывает своя зеркальная карта — в 0.44.0 так упала проверка) учитывается по Economy.looted.
 
 const SPECIES := "pheasant"
 const MOB_LEVEL := 3
@@ -13,6 +14,9 @@ var _mob: Mob = null
 var _pets0 := 0
 var _attempts0 := 0
 var _fight_t := 0.0
+## Зеркальных карт в сумке перед неудачей и подобрано с добычей после.
+var _mirror0 := 0
+var _mirror_looted := 0
 
 
 func id() -> String:
@@ -139,6 +143,11 @@ func _fail_mark(card: String) -> void:
 	if not Game.inventory.has(card):
 		Game.inventory.add(card, 1)
 	Game.inventory.add(ItemData.MIRROR_CARD, 1)
+	_mirror0 = Game.inventory.count(ItemData.MIRROR_CARD)
+	_mirror_looted = 0
+	var eco := economy()
+	if eco != null and not eco.looted.is_connected(_on_looted):
+		eco.looted.connect(_on_looted)
 	_mob = spawn_ahead(SPECIES, MOB_LEVEL, 4.0)
 	var p := player()
 	if _mob == null or p == null:
@@ -153,13 +162,25 @@ func _fail_mark(card: String) -> void:
 	bot.set_tick(_fight)
 
 
+func _on_looted(items: Dictionary, _gold: int) -> void:
+	_mirror_looted += int(items.get(ItemData.MIRROR_CARD, 0))
+
+
 func _fail_check(card: String) -> void:
-	check(not Game.inventory.has(ItemData.MIRROR_CARD) and Game.inventory.has(card)
-		and not Game.inventory.has(ItemData.soul_card_for(SPECIES)), "неудача: зеркальная карта сломалась, карта вида цела")
+	var tm := bot.main.get("taming") as Taming
+	var mirror := Game.inventory.count(ItemData.MIRROR_CARD)
+	check(tm != null and tm.last_outcome == "mirror", "неудача: сломалась зеркальная карта (исход «%s»)"
+		% (tm.last_outcome if tm != null else "?"))
+	check(mirror == _mirror0 - 1 + _mirror_looted and Game.inventory.has(card)
+		and not Game.inventory.has(ItemData.soul_card_for(SPECIES)),
+		"неудача: зеркальных карт %d (было %d, подобрано %d), карта вида цела" % [mirror, _mirror0, _mirror_looted])
 
 
 func _end() -> void:
 	bot.set_tick(Callable())
+	var eco := economy()
+	if eco != null and eco.looted.is_connected(_on_looted):
+		eco.looted.disconnect(_on_looted)
 	var tm := bot.main.get("taming") as Taming
 	if tm != null:
 		tm.force_roll = -1.0

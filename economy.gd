@@ -36,6 +36,8 @@ signal stored(id: String, n: int)
 signal enchanted(id: String, ok: bool, result: String)
 ## Закалка у кузнеца: вещь стала result за price золота.
 signal tempered(result: String, price: int)
+## Мешочек добычи подобран: что легло в сумку (id → штук) и золото.
+signal looted(items: Dictionary, gold: int)
 
 ## Где стоит торговец (внутри безопасной зоны MobData.SAFE_RADIUS).
 const MERCHANT_POS := Vector3(0, 0, -4)
@@ -698,6 +700,7 @@ func _on_drop_picked(items: Dictionary, gold: int) -> void:
 		_msg("Подобрано: " + LootDrop.describe(items, gold))
 	if gold > 0:
 		Game.changed.emit()
+	looted.emit(items, gold)
 
 
 func _on_bag_full(_left: Dictionary) -> void:

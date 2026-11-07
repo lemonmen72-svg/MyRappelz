@@ -143,6 +143,7 @@ func run_step() -> void:
 			tm.force_roll = 0.99
 			mob.take_damage(mob.hp + 5, player)
 			check(inv.count("card_wolf") == cards - 1 and not inv.has("card_wolf_soul"), "карта волка сломалась")
+			check(tm.last_outcome == "card", "исход попытки: «%s» (нужно card)" % tm.last_outcome)
 			check(hud._msg_label.text.contains("Карта существа сломалась"), "сообщение: " + hud._msg_label.text)
 			# Неудача с зеркальной картой: ломается она, карта существа цела
 			inv.add(ItemData.MIRROR_CARD, 2)
@@ -157,6 +158,7 @@ func run_step() -> void:
 			mob.take_damage(mob.hp + 5, player)
 			tm.force_roll = -1.0
 			check(inv.count(ItemData.MIRROR_CARD) == 1 and inv.count("card_wolf") == cards, "сломалась зеркальная карта")
+			check(tm.last_outcome == "mirror", "исход попытки: «%s» (нужно mirror)" % tm.last_outcome)
 			check(hud._msg_label.text.contains("Зеркальная карта сломалась, карта существа цела"),
 				"сообщение: " + hud._msg_label.text)
 			check(game.pets.size() == 2, "неудачи не добавляют питомцев")

@@ -39,6 +39,9 @@ var mark_left := 0.0
 var cooldown := 0.0
 ## Сколько попыток приручения состоялось (зверь с меткой побеждён и карта была в сумке).
 var attempts := 0
+## Исход последней попытки: "soul" — душа поймана, "mirror" — сломалась зеркальная карта, "card" — сломалась карта
+## вида, "no_card" — карты вида в сумке не было (тесты и бот).
+var last_outcome := ""
 ## Тесты: >= 0 — вместо случайного числа (0 — точно успех, 0.99 — точно неудача).
 var force_roll := -1.0
 
@@ -100,6 +103,7 @@ func on_mob_killed(mob: Mob) -> void:
 	var pos := mob.global_position
 	var card := ItemData.card_for(mob.type_id)
 	if card == "" or not Game.inventory.has(card):
+		last_outcome = "no_card"
 		_msg("Карты существа нет в сумке — приручение сорвалось")
 		return
 	attempts += 1
@@ -107,6 +111,7 @@ func on_mob_killed(mob: Mob) -> void:
 	if roll < chance_for(ItemData.card_tier(card)):
 		var soul := ItemData.soul_card_for(mob.type_id)
 		Game.inventory.replace_one(card, soul)
+		last_outcome = "soul"
 		Util.float_text(main, pos + Vector3(0, 3.0, 0), "Душа поймана!", Color(0.5, 1.0, 0.7), 1.4)
 		Vfx.tame_success(main, pos, clampf(mob.body_scale, 0.8, 1.6))
 		_msg("Душа %s поймана в карту. Сформируйте существо (окно «Питомцы» или карта в сумке)"
@@ -114,10 +119,12 @@ func on_mob_killed(mob: Mob) -> void:
 		soul_caught.emit(mob.type_id)
 	elif Game.inventory.has(ItemData.MIRROR_CARD):
 		Game.inventory.remove(ItemData.MIRROR_CARD)
+		last_outcome = "mirror"
 		Util.float_text(main, pos + Vector3(0, 3.0, 0), "Зеркальная карта сломалась", Color(0.8, 0.88, 1.0))
 		_msg("Зеркальная карта сломалась, карта существа цела: зверь «%s» не приручен" % mob.mob_name)
 	else:
 		Game.inventory.remove(card)
+		last_outcome = "card"
 		Util.float_text(main, pos + Vector3(0, 3.0, 0), "Карта сломалась", Color(1.0, 0.5, 0.4))
 		_msg("Карта существа сломалась: зверь «%s» не приручен" % mob.mob_name)
 

@@ -161,6 +161,25 @@ var seen_gold := 0
 var _body: VBoxContainer = null
 ## Поле суммы золота в окне склада (null — окно не склада).
 var gold_edit: LineEdit = null
+## Перестройка на месте (0.45; вылет 0.44.0 на телефоне: тест сумки перестраивал окно целиком 250 раз за кадр —
+## 4 ГБ памяти; на ПК одна перестройка полной сумки — 120 мс, из них 74 мс — 120 ячеек): касание ячейки и действия
+## обновляют окно без пересоздания — левая колонка (экипировка, товары, склад, крафт, кузница) и карточка строятся
+## заново, ячейки сумки, которые не изменились, остаются (у выделенной меняется только рамка). Целиком — при
+## открытии и если поменялось устройство окна (_layout_sig: режим, продавец, крафт, раздел, ячейки раздела, размер
+## интерфейса и экрана).
+var _left: VBoxContainer = null
+var _card: VBoxContainer = null
+var _gold_label: Label = null
+var _used_label: Label = null
+var _bag_cell_sz := 0.0
+var _layout: Array = []
+var _part_keys := {}
+## Сколько раз окно строилось целиком и обновлялось на месте (тесты).
+var full_builds := 0
+var patch_builds := 0
+## Рамки ячеек — общие на все ячейки (цвет рамки, выделение, скругление; после создания не меняются).
+static var _boxes := {}
+static var _no_focus: StyleBoxEmpty = null
 
 
 func setup(m: Node, eco: Node) -> void:
@@ -200,7 +219,11 @@ func is_open() -> bool:
 
 ## Перестроить открытое окно (после действия, изменения сумки или золота); выделение сохраняется.
 func refresh() -> void:
-	if is_open():
+	if not is_open():
+		return
+	if _can_patch():
+		_patch()
+	else:
 		_build()
 
 
@@ -245,6 +268,7 @@ func _build() -> void:
 	dirty = false
 	seen_gold = Game.gold
 	buttons.clear()
+	_part_keys.clear()
 	gold_edit = null
 	_validate_selection()
 	_validate_craft()
@@ -281,22 +305,134 @@ func _build() -> void:
 	var card := VBoxContainer.new()
 	card.add_theme_constant_override("separation", int(UiScale.px(5)))
 	card_panel.add_child(card)
+	_left = left
+	_card = card
+	_bag_cell_sz = _bag_cell_size()
+	_build_part("left", _build_left.bind(left))
+	_build_bag(center, _bag_cell_sz)
+	_build_part("card", _build_card.bind(card))
+	_layout = _layout_sig()
+	full_builds += 1
+
+
+## Размер ячеек сумки по режиму окна.
+func _bag_cell_size() -> float:
+	if mode == "storage":
+		return UiScale.px(STORE_CELL)
+	if mode == "shop" or mode == "forge" or craft_open:
+		return UiScale.px(SHOP_CELL)
+	return UiScale.px(CELL)
+
+
+## Левая колонка окна по режиму: товары, склад, кузница, крафт или экипировка с поясом.
+func _build_left(left: VBoxContainer) -> void:
 	if mode == "shop":
 		_build_goods(left)
-		_build_bag(center, UiScale.px(SHOP_CELL))
 	elif mode == "storage":
 		_build_storage(left)
-		_build_bag(center, UiScale.px(STORE_CELL))
 	elif mode == "forge":
 		_build_forge(left)
-		_build_bag(center, UiScale.px(SHOP_CELL))
 	elif craft_open:
 		_build_craft(left)
-		_build_bag(center, UiScale.px(SHOP_CELL))
 	else:
 		_build_equipment(left)
-		_build_bag(center, UiScale.px(CELL))
-	_build_card(card)
+
+
+## Построить часть окна (fn) и запомнить её кнопки (ключи buttons) — для перестройки части на месте.
+func _build_part(part: String, fn: Callable) -> void:
+	var before := buttons.duplicate()
+	fn.call()
+	var keys: Array = []
+	for k in buttons:
+		if not before.has(k) or before[k] != buttons[k]:
+			keys.append(k)
+	_part_keys[part] = keys
+
+
+## Убрать содержимое части окна box: узлы — сразу из дерева (поиск по окну их больше не находит), кнопки части —
+## из buttons.
+func _clear_part(part: String, box: Control) -> void:
+	for k in _part_keys.get(part, []):
+		var b: Variant = buttons.get(k)
+		if b == null or not is_instance_valid(b) or box.is_ancestor_of(b):
+			buttons.erase(k)
+	_part_keys.erase(part)
+	for ch in box.get_children():
+		box.remove_child(ch)
+		ch.queue_free()
+
+
+## Устройство окна (изменилось — перестройка целиком).
+func _layout_sig() -> Array:
+	var view := Vector2.ZERO
+	if main != null and main.get("hud") != null and (main.hud as Node).is_inside_tree():
+		view = (main.hud as Node).get_viewport().get_visible_rect().size
+	return [mode, seller, craft_open, bag_tab, Game.inventory.cell_count(), _shown_cells(), UiScale.level(), view]
+
+
+## Можно ли обновить открытое окно на месте.
+func _can_patch() -> bool:
+	for n in [_left, _card, _gold_label, _used_label]:
+		if n == null or not is_instance_valid(n) or not (n as Node).is_inside_tree():
+			return false
+	return _body.is_ancestor_of(_left) and _body.is_ancestor_of(_card) and _layout == _layout_sig()
+
+
+## Обновить окно на месте: шапка сумки, левая колонка, изменившиеся ячейки сумки, карточка (прокрутка карточки
+## остаётся, если выделение то же).
+func _patch() -> void:
+	dirty = false
+	seen_gold = Game.gold
+	var was := [sel_kind, sel_index, sel_id, moving]
+	_validate_selection()
+	_validate_craft()
+	gold_edit = null
+	_clear_part("left", _left)
+	_build_part("left", _build_left.bind(_left))
+	_update_bag_head()
+	_sync_bag()
+	var keep := 0
+	if was == [sel_kind, sel_index, sel_id, moving] and is_instance_valid(card_box):
+		keep = card_box.scroll_vertical
+	_clear_part("card", _card)
+	_build_part("card", _build_card.bind(_card))
+	if is_instance_valid(card_box):
+		card_box.scroll_vertical = keep
+	patch_builds += 1
+
+
+## Шапка сумки: золото и занятость.
+func _update_bag_head() -> void:
+	var inv: Inventory = Game.inventory
+	_gold_label.text = "Золото: %d" % Game.gold
+	_used_label.text = "Занято: %d/%d" % [inv.used_cells(), inv.capacity]
+	_used_label.add_theme_color_override("font_color", BAD if inv.is_full() else MUTED)
+
+
+## Ячейки сумки на месте: предмет или число изменились — ячейка заменяется новой, выделение или «Переместить» —
+## только рамка.
+func _sync_bag() -> void:
+	var list := Game.inventory.cells()
+	for i in _shown_cells():
+		var old := buttons.get("cell_%d" % i) as Cell
+		if old == null or not is_instance_valid(old):
+			continue
+		var c: Dictionary = list[i] if i < list.size() else {}
+		var id := String(c.get("id", ""))
+		var n := int(c.get("n", 0))
+		var corner := str(n) if n > 1 else ""
+		var selected := sel_kind == "cell" and sel_index == i
+		if old.item_id == id and old.corner == corner:
+			if old.selected != selected or old.tint != _tinted("bag", selected):
+				_style_cell(old, selected)
+			continue
+		var nb := _make_cell("bag", i, id, corner, _bag_cell_sz, selected)
+		var parent := old.get_parent()
+		parent.add_child(nb)
+		parent.move_child(nb, old.get_index())
+		parent.remove_child(old)
+		old.queue_free()
+		buttons["cell_%d" % i] = nb
 
 
 ## Прокрутка карточки (тесты: высота и прокрутка до кнопок).
@@ -581,10 +717,12 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", int(UiScale.px(10)))
 	parent.add_child(head)
-	head.add_child(_label("Золото: %d" % Game.gold, UiScale.FONT_HEAD, GOLD))
+	_gold_label = _label("Золото: %d" % Game.gold, UiScale.FONT_HEAD, GOLD)
+	head.add_child(_gold_label)
 	var used := _label("Занято: %d/%d" % [inv.used_cells(), inv.capacity], UiScale.FONT_HEAD,
 		BAD if inv.is_full() else MUTED)
 	used.name = "used_label"
+	_used_label = used
 	used.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(used)
 	# Сортировка — кнопкой-значком (подпись — подсказкой): строка над сеткой не шире сетки
@@ -622,12 +760,7 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 	grid.add_theme_constant_override("v_separation", int(UiScale.px(GAP)))
 	var list := inv.cells()
 	var total := inv.cell_count()
-	var shown: Array[int] = []
-	var qitems := quest_items()
-	for i in total:
-		var cid := String((list[i] as Dictionary).get("id", "")) if i < list.size() else ""
-		if bag_tab == "all" or (cid != "" and tab_of(cid, qitems) == bag_tab):
-			shown.append(i)
+	var shown := _shown_cells()
 	if total > BAG_VISIBLE:
 		# Ячеек больше 40: видно 5 рядов, остальное — прокруткой (окно не растёт)
 		var sc := ScrollContainer.new()
@@ -652,6 +785,22 @@ func _build_bag(parent: VBoxContainer, cell_sz: float) -> void:
 	if shown.is_empty():
 		grid.columns = 1
 		grid.add_child(_label("В этом разделе пусто", UiScale.FONT_TEXT, MUTED))
+
+
+## Ячейки сумки, видимые в разделе bag_tab (номера ячеек).
+func _shown_cells() -> Array[int]:
+	var inv: Inventory = Game.inventory
+	var list := inv.cells()
+	var shown: Array[int] = []
+	var qitems := quest_items() if bag_tab != "all" else {}
+	for i in inv.cell_count():
+		if bag_tab == "all":
+			shown.append(i)
+			continue
+		var cid := String((list[i] as Dictionary).get("id", "")) if i < list.size() else ""
+		if cid != "" and tab_of(cid, qitems) == bag_tab:
+			shown.append(i)
+	return shown
 
 
 ## Раздел сумки предмета id (вкладки): "gear" (оружие, броня, торбы, лом), "loot" (трофеи), "cards" (карты
@@ -1099,20 +1248,10 @@ func _make_cell(kind: String, index: int, id: String, corner: String, sz: float,
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(sz, sz)
 	b.name = "%s_%d" % [kind, index]
-	var frame := ItemData.frame_color(id) if id != "" else EMPTY_FRAME
-	if moving and kind == "bag" and not selected:
-		frame = frame.lerp(SEL_COLOR, 0.35)
-	for st in ["normal", "hover", "pressed", "disabled"]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = CELL_BG.lightened(0.12) if st == "pressed" else CELL_BG
-		if id != "":
-			sb.bg_color = sb.bg_color.lerp(frame, 0.12)
-		sb.border_color = SEL_COLOR if selected else frame
-		sb.set_border_width_all(3 if selected else 2)
-		sb.set_corner_radius_all(int(sz * 0.12))
-		sb.anti_aliasing = true
-		b.add_theme_stylebox_override(st, sb)
-	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	b.corner = corner
+	b.caption = caption
+	b.cell_size = sz
+	_style_cell(b, selected)
 	var pad := roundf(sz * 0.08)
 	var icon_sz := sz - pad * 2.0
 	var icon_y := pad
@@ -1140,6 +1279,46 @@ func _make_cell(kind: String, index: int, id: String, corner: String, sz: float,
 		b.add_child(l)
 	b.pressed.connect(_on_cell.bind(kind, index))
 	return b
+
+
+## При «Переместить» ячейки сумки (кроме выделенной) — с отсветом.
+func _tinted(kind: String, selected: bool) -> bool:
+	return moving and kind == "bag" and not selected
+
+
+## Рамка ячейки: цвет редкости предмета (пустая — серая), выделенная — светлая и толще, при «Переместить» — с отсветом.
+func _style_cell(b: Cell, selected: bool) -> void:
+	var frame := ItemData.frame_color(b.item_id) if b.item_id != "" else EMPTY_FRAME
+	b.tint = _tinted(b.kind, selected)
+	if b.tint:
+		frame = frame.lerp(SEL_COLOR, 0.35)
+	b.selected = selected
+	b.begin_bulk_theme_override()
+	for st in ["normal", "hover", "pressed", "disabled"]:
+		b.add_theme_stylebox_override(st, _cell_box(st, b.item_id != "", frame, selected, b.cell_size))
+	if _no_focus == null:
+		_no_focus = StyleBoxEmpty.new()
+	b.add_theme_stylebox_override("focus", _no_focus)
+	b.end_bulk_theme_override()
+
+
+## Общая рамка ячейки (кэш _boxes).
+static func _cell_box(st: String, filled: bool, frame: Color, selected: bool, sz: float) -> StyleBoxFlat:
+	var radius := int(sz * 0.12)
+	var key := "%s|%s|%s|%s|%d" % [st, filled, frame.to_html(), selected, radius]
+	var sb: StyleBoxFlat = _boxes.get(key)
+	if sb != null:
+		return sb
+	sb = StyleBoxFlat.new()
+	sb.bg_color = CELL_BG.lightened(0.12) if st == "pressed" else CELL_BG
+	if filled:
+		sb.bg_color = sb.bg_color.lerp(frame, 0.12)
+	sb.border_color = SEL_COLOR if selected else frame
+	sb.set_border_width_all(3 if selected else 2)
+	sb.set_corner_radius_all(radius)
+	sb.anti_aliasing = true
+	_boxes[key] = sb
+	return sb
 
 
 # ---------- Карточка ----------
@@ -1918,6 +2097,12 @@ class Cell extends Button:
 	var kind := ""
 	var index := -1
 	var item_id := ""
+	## Число в углу, подпись, размер, выделена ли, с отсветом ли («Переместить») — для обновления на месте.
+	var corner := ""
+	var caption := ""
+	var cell_size := 0.0
+	var selected := false
+	var tint := false
 	## (kind: String, index: int, from: int) — на эту ячейку бросили ячейку сумки from.
 	var drop_fn: Callable
 	## (kind: String, index: int, from: int) -> bool — можно ли бросить.

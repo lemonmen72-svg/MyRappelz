@@ -178,6 +178,11 @@ static func xp_to_next(lvl: int) -> int:
 	return roundi(float(XP_TABLE[XP_TABLE.size() - 1]) * pow(1.06, float(l - XP_TABLE.size())))
 
 
+## HP всех монстров подземелья — обычных, мини-боссов и босса — ×0.85 (решение Максима 07.11, после 0.44.0:
+## «снизь количество HP монстров в данже на 15 %»). Атака, защита и опыт — прежние (сила босса острова).
+const DUNGEON_HP_CUT := 0.85
+
+
 ## Все характеристики зверя type_id на уровне lvl.
 ## Ключи: stats (7 статов), max_hp, atk (главная атака), patk, matk, magic (атака магическая), def, mdef,
 ## acc (точность), avoid (уклонение), eva и crit (%), aspd (% скорости атаки), attack_cd (с между ударами), xp.
@@ -195,7 +200,7 @@ static func derived(type_id: String, lvl: int) -> Dictionary:
 	var elite := not boss and is_mini_boss(type_id)
 	var hp_m := pw * (BOSS_HP if boss else (ELITE_HP if elite else 1.0))
 	if dungeon:
-		hp_m *= float(MobData.get_type(type_id).get("dungeon_hp", 1.0))
+		hp_m *= float(MobData.get_type(type_id).get("dungeon_hp", 1.0)) * DUNGEON_HP_CUT
 	var atk_m := pw * (BOSS_ATK if boss else (ELITE_ATK if elite else 1.0))
 	var def_m := MobData.defense(type_id) * (BOSS_DEF if boss else (ELITE_DEF if elite else 1.0))
 	var xp_m := pw * (BOSS_XP if boss else (ELITE_XP if elite else 1.0))

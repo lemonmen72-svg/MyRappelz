@@ -6,6 +6,11 @@ extends "res://tests/test_base.gd"
 ## в сохранении (подробно чарование — tests/test_enchant.gd).
 
 var drop: LootDrop = null
+## Все предметы игры — карточка каждого (по 25 за кадр: на телефоне 0.44.0 250 карточек за кадр съели память).
+var _all_ids: Array = []
+var _all_at := 0
+var _all_full := 0
+var _all_patch := 0
 
 
 func race_class() -> Array:
@@ -153,18 +158,33 @@ func run_step() -> void:
 					ok = false
 			check(ok, "после сортировки предметы в первых %d ячейках" % used)
 			check(ItemData.is_weapon(String(inv.cell(0).get("id", ""))), "оружие первым")
+			_unit_patch(win, inv)
 			# Все предметы: карточка строится для каждого
 			for key in ItemData.ITEMS:
 				inv.add(String(key), 1)
 			win.refresh()
-			for key in ItemData.ITEMS:
-				var id := String(key)
-				var c := inv.find_cell(id)
+			_all_ids = ItemData.ITEMS.keys()
+			_all_at = 0
+			_all_full = win.full_builds
+			_all_patch = win.patch_builds
+			step = 41
+		41:
+			var n := 0
+			while _all_at < _all_ids.size() and n < 25:
+				var id := String(_all_ids[_all_at])
+				_all_at += 1
 				if id == game.weapon:
 					continue
+				var c := inv.find_cell(id)
 				check(c >= 0, "%s в ячейке" % id)
 				_press("cell_%d" % c)
 				check(_card_title() == ItemData.item_name(id), "карточка «%s»" % ItemData.item_name(id))
+				n += 1
+			if _all_at < _all_ids.size():
+				return
+			check(win.full_builds == _all_full and win.patch_builds > _all_patch + 200,
+				"карточки всех предметов — окно на месте (целиком %d, на месте %d)" % [win.full_builds - _all_full,
+				win.patch_builds - _all_patch])
 			# Закрыть повторным действием
 			main._on_action("bag_window")
 			check(not main.hud.is_window_open() and not eco.is_bag_open(), "сумка закрывается повторным действием")
@@ -457,6 +477,62 @@ func _save_load() -> void:
 	check(ids.size() == game.inventory.used_cells() and ids.has("potion_hp_r1") and ids.has("boar_tusk"),
 		"старое сохранение без раскладки: %s" % [ids])
 	check(game.inventory.find_cell(game.weapon) == -1, "старое сохранение: надетое оружие не в ячейке")
+
+
+## Обновление на месте (0.45): касание ячейки и изменения сумки не пересоздают окно — меняются рамки, числа в
+## ячейках, шапка и карточка; раздел сумки — окно целиком.
+func _unit_patch(win: InventoryWindow, inv: Inventory) -> void:
+	var w0: Node = main.hud._window
+	var fb := win.full_builds
+	var a := inv.find_cell("potion_hp_r1")
+	var b := inv.find_cell("revive_scroll")
+	var cell_a: Button = win.buttons["cell_%d" % a]
+	_press("cell_%d" % a)
+	check(main.hud._window == w0 and win.full_builds == fb, "касание ячейки — окно на месте, без перестройки")
+	check(win.buttons["cell_%d" % a] == cell_a, "выделенная ячейка — та же (меняется только рамка)")
+	check(_border(win, a) == InventoryWindow.SEL_COLOR, "выделенная ячейка — светлая рамка")
+	_press("cell_%d" % b)
+	check(_border(win, a) != InventoryWindow.SEL_COLOR and _border(win, b) == InventoryWindow.SEL_COLOR,
+		"выделение перешло — рамки обеих ячеек обновились")
+	check(_card_title() == ItemData.item_name("revive_scroll"), "карточка нового выделения")
+	check(_labels_named("card_title") == 1, "в окне одна карточка (прежняя убрана из окна)")
+	# Изменения сумки: число в ячейке и «Занято» — на месте, ячейка заменена
+	var used := inv.used_cells()
+	inv.add("potion_hp_r1", 2)
+	inv.add("wolf_pelt", 1)
+	win.refresh()
+	var ca := win.buttons["cell_%d" % a] as InventoryWindow.Cell
+	check(main.hud._window == w0 and win.full_builds == fb, "сумка изменилась — окно на месте")
+	check(ca != null and ca.corner == str(inv.count("potion_hp_r1")), "число зелий в ячейке обновилось (%s)" %
+		(ca.corner if ca != null else "?"))
+	var used_l := main.hud._window.find_child("used_label", true, false) as Label
+	check(used_l != null and used_l.text == "Занято: %d/%d" % [used + 1, inv.capacity], "шапка: %s" % (used_l.text if used_l else "?"))
+	var wc := inv.find_cell("wolf_pelt")
+	check((win.buttons["cell_%d" % wc] as InventoryWindow.Cell).item_id == "wolf_pelt", "новый предмет — в своей ячейке")
+	check(_border(win, b) == InventoryWindow.SEL_COLOR and win.sel_id == "revive_scroll", "выделение осталось")
+	inv.remove("wolf_pelt", 1)
+	inv.remove("potion_hp_r1", 2)
+	# Раздел сумки — окно целиком
+	_press("bagtab_potions")
+	check(win.full_builds == fb + 1 and main.hud._window != w0, "раздел сумки — окно строится целиком")
+	_press("bagtab_all")
+	win.clear_selection()
+	win.refresh()
+
+
+## Цвет рамки ячейки сумки i.
+func _border(win: InventoryWindow, i: int) -> Color:
+	var sb := (win.buttons["cell_%d" % i] as Button).get_theme_stylebox("normal") as StyleBoxFlat
+	return sb.border_color if sb != null else Color.BLACK
+
+
+## Сколько в открытом окне надписей с этим именем (не помеченных на удаление).
+func _labels_named(node_name: String) -> int:
+	var c := 0
+	for n in main.hud._window.find_children(node_name, "", true, false):
+		if not n.is_queued_for_deletion():
+			c += 1
+	return c
 
 
 # ---------- Помощники ----------
